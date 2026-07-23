@@ -52,7 +52,6 @@ function Home() {
     <AppShell>
       <header className="px-5 pb-4 pt-14">
         <h1 className="text-[34px] font-semibold leading-none tracking-tight">Log</h1>
-        <p className="mt-2 text-[15px] text-muted-foreground">Weight and reps. Nothing else in the way.</p>
       </header>
 
       <div className="px-5">
@@ -86,13 +85,13 @@ function Home() {
           </div>
         )}
 
-        <ul className="bg-surface">
+        <ul className="space-y-3 px-5">
           {history.map(({ session, slotName, setCount, exercises: exNames }) => (
-            <li key={session.id} className="hairline-t">
+            <li key={session.id}>
               <Link
                 to="/session/$id"
                 params={{ id: session.id }}
-                className="flex items-center justify-between px-5 py-3.5"
+                className="flex items-center justify-between rounded-2xl bg-surface px-5 py-4"
               >
                 <div className="min-w-0 flex-1 pr-3">
                   <div className="flex items-baseline gap-2">
