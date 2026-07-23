@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { LogSetSheet } from "../components/LogSetSheet";
 import { SessionView } from "../components/SessionView";
+import { detectSessionPRs, formatPRMessage } from "../lib/pr-detection";
 import { useStore } from "../lib/store";
 
 export const Route = createFileRoute("/workout")({
@@ -77,13 +78,26 @@ function WorkoutPage() {
   };
 
   const handleEnd = () => {
-    // trivial "motivational" preview — real detection would compute PRs
-    if (motivationEnabled && sessSets.length > 3) {
-      setMotivationMsg(`${slot?.name} estimated 1RM progressed this month`);
-      setTimeout(() => setMotivationMsg(null), 2600);
+    const msg = motivationEnabled
+      ? formatPRMessage(
+          detectSessionPRs({ sessionSets: sessSets, allSets: sets, exercises, now: Date.now() }),
+        )
+      : null;
+    if (msg) {
+      // Show the toast on this screen before ending the workout: ending
+      // clears activeSessionId, which the effect above turns into an
+      // immediate navigate away, unmounting this screen (and the toast)
+      // before it could be seen.
+      setMotivationMsg(msg);
+      setTimeout(() => {
+        setMotivationMsg(null);
+        endWorkout();
+        router.navigate({ to: "/" });
+      }, 2600);
+    } else {
+      endWorkout();
+      router.navigate({ to: "/" });
     }
-    endWorkout();
-    router.navigate({ to: "/" });
   };
 
   if (!session || !slot) return null;
