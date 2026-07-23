@@ -26,8 +26,13 @@ and `git status`, before anything else.**
 | 5 | Expand exercise preset library | DONE | c6c17c7 |
 | 1 | Persist data via IndexedDB (Dexie) + tests | DONE | 9c14064 |
 | 2 | PWA installability & offline | DONE (see caveat) | 7555602 |
-| 3 | Real backup import | IN PROGRESS (sequential on main) | — |
-| 4 | Real PR/progress detection | QUEUED (sequential on main) | — |
+| 3 | Real backup import | DONE | 3d071b4 |
+| 4 | Real PR/progress detection | IN PROGRESS (sequential on main) | — |
+
+### Issue #3 result (DONE, 3d071b4)
+Import wired: pure `parseBackup` validator (rejects malformed before any DB touch) + `db.replaceAllData`
+(atomic transaction) + `store.importData` (DB-first then memory) + settings.tsx confirm-before-replace UI
+(iOS-safe File.text(), visible errors, plain ASCII copy). 45 tests pass (21 added incl. round-trip), build green.
 
 ### Issue #2 result (DONE, 7555602) + IMPORTANT caveat
 vite-plugin-pwa wired via the lovable config passthrough. Build emits sw.js + workbox + manifest.webmanifest +
