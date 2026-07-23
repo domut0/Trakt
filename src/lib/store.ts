@@ -1,4 +1,13 @@
 import { create } from "zustand";
+import {
+  db,
+  isDbEmpty,
+  isIndexedDbAvailable,
+  loadAll,
+  safeWrite,
+  seedDb,
+  type SettingsMeta,
+} from "./db";
 
 export type ExerciseType = "main" | "accessory";
 
@@ -36,6 +45,15 @@ export interface WorkoutSet {
   loggedAt: number;
 }
 
+type CurrentBlock = {
+  blockGroupId: string;
+  targetSets: number;
+  loggedInBlock: number;
+  weight: number;
+  reps: number;
+  rpe?: number;
+};
+
 interface State {
   unit: "lbs" | "kg";
   motivationEnabled: boolean;
@@ -45,8 +63,12 @@ interface State {
   sets: WorkoutSet[];
   activeSessionId?: string;
   currentExerciseId?: string;
-  currentBlock?: { blockGroupId: string; targetSets: number; loggedInBlock: number; weight: number; reps: number; rpe?: number };
+  currentBlock?: CurrentBlock;
+  /** True once the client-side IndexedDB load (or first-run seed) has completed. */
+  hydrated: boolean;
 
+  /** Client-only. Loads persisted state from IndexedDB, seeding it on first-ever run. Idempotent. */
+  hydrate: () => Promise<void>;
   startWorkout: (slotName: string) => string;
   endWorkout: () => void;
   setCurrentExercise: (exerciseId: string) => void;
@@ -66,6 +88,9 @@ interface State {
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 // Seed data — a couple of realistic sessions so the UI has something to render.
+// Used ONLY by hydrate() to populate a brand-new (empty) IndexedDB on first run.
+// The store's own default state is empty arrays (see useStore below); these
+// constants are no longer read directly as the default state.
 const now = Date.now();
 const day = 86400000;
 
@@ -248,41 +273,211 @@ const seedSets: WorkoutSet[] = [
   { id: uid(), sessionId: "sess_3", exerciseId: "e_row", weight: 90, reps: 10, rpe: 9, blockGroupId: uid(), timeBetweenSetsSeconds: 200, loggedAt: now - day + 1300_000 },
 ];
 
+// ---------------------------------------------------------------------------
+// Pure logic, extracted so it can be unit-tested with plain arrays — no store,
+// no IndexedDB, no React. The store actions below are thin wrappers around
+// these that read current state via get() and delegate here. Behavior must
+// stay identical to the original inline implementations.
+// ---------------------------------------------------------------------------
+
+/** Rotation round-robin: predicts the next Split Slot name after whichever slot was most recently logged. */
+export function predictNextSlotName(slots: SplitSlot[]): string | undefined {
+  const sorted = [...slots].sort((a, b) => a.rotationOrder - b.rotationOrder);
+  if (sorted.length === 0) return undefined;
+  const lastLogged = sorted
+    .filter((s) => s.lastLoggedAt)
+    .sort((a, b) => (b.lastLoggedAt ?? 0) - (a.lastLoggedAt ?? 0))[0];
+  if (!lastLogged) return sorted[0].name;
+  const idx = sorted.findIndex((s) => s.id === lastLogged.id);
+  return sorted[(idx + 1) % sorted.length].name;
+}
+
+/** Case-insensitive, whitespace-trimmed Split Slot lookup by name. */
+export function matchSlot(slots: SplitSlot[], name: string): SplitSlot | undefined {
+  const key = name.trim().toLowerCase();
+  return slots.find((s) => s.name.trim().toLowerCase() === key);
+}
+
+/**
+ * "Next Exercise" suggestion: pulls from the last occurrence of the SAME
+ * Split Slot, advancing one exercise at a time in the order they were logged
+ * that day, skipping exercises already done in the current session.
+ */
+export function suggestNextExercise(
+  sessions: WorkoutSession[],
+  sets: WorkoutSet[],
+  sessionId: string,
+): { exerciseId: string; weight?: number; reps?: number; rpe?: number } | undefined {
+  const sess = sessions.find((s) => s.id === sessionId);
+  if (!sess) return undefined;
+  const doneExerciseIds = new Set(
+    sets.filter((s) => s.sessionId === sessionId).map((s) => s.exerciseId),
+  );
+  // Last session of this slot (excluding current)
+  const lastSess = sessions
+    .filter((s) => s.splitSlotId === sess.splitSlotId && s.id !== sessionId && s.endedAt)
+    .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0];
+  if (!lastSess) return undefined;
+  const setsInLast = sets
+    .filter((s) => s.sessionId === lastSess.id)
+    .sort((a, b) => a.loggedAt - b.loggedAt);
+  const order: string[] = [];
+  for (const s of setsInLast) if (!order.includes(s.exerciseId)) order.push(s.exerciseId);
+  const next = order.find((id) => !doneExerciseIds.has(id));
+  if (!next) return undefined;
+  const firstSet = setsInLast.find((s) => s.exerciseId === next);
+  return { exerciseId: next, weight: firstSet?.weight, reps: firstSet?.reps, rpe: firstSet?.rpe };
+}
+
+/**
+ * Distinct-weight-block matching: the Nth distinct weight/rep block logged
+ * for an exercise in today's session prefills from the Nth distinct
+ * weight/rep block logged for that exercise the last time this same Split
+ * Slot occurred.
+ */
+export function computePrefill(
+  sessions: WorkoutSession[],
+  sets: WorkoutSet[],
+  sessionId: string,
+  exerciseId: string,
+): { weight?: number; reps?: number; rpe?: number } {
+  const sess = sessions.find((s) => s.id === sessionId);
+  if (!sess) return {};
+  const setsToday = sets.filter((s) => s.sessionId === sessionId && s.exerciseId === exerciseId);
+  const distinctToday = new Set(setsToday.map((s) => `${s.weight}x${s.reps}`)).size;
+  const lastSess = sessions
+    .filter((s) => s.splitSlotId === sess.splitSlotId && s.id !== sessionId && s.endedAt)
+    .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0];
+  if (!lastSess) return {};
+  const lastSets = sets
+    .filter((s) => s.sessionId === lastSess.id && s.exerciseId === exerciseId)
+    .sort((a, b) => a.loggedAt - b.loggedAt);
+  const distinctBlocks: WorkoutSet[] = [];
+  const seen = new Set<string>();
+  for (const s of lastSets) {
+    const k = `${s.weight}x${s.reps}`;
+    if (!seen.has(k)) {
+      seen.add(k);
+      distinctBlocks.push(s);
+    }
+  }
+  const target = distinctBlocks[distinctToday];
+  if (!target) return {};
+  return { weight: target.weight, reps: target.reps, rpe: target.rpe };
+}
+
+// ---------------------------------------------------------------------------
+// Write-through persistence helpers. Every mutating store action calls one of
+// these right after updating Zustand state. All of them are safe no-ops (they
+// log and swallow) if the DB write fails — the in-memory state already won.
+// These are only ever invoked from store actions, which only ever run from
+// client-side user interaction — never during SSR render.
+// ---------------------------------------------------------------------------
+
+function persistActiveMeta(meta: {
+  activeSessionId?: string;
+  currentExerciseId?: string;
+  currentBlock?: CurrentBlock;
+}) {
+  safeWrite(() =>
+    db.meta.put({
+      key: "activeSession",
+      activeSessionId: meta.activeSessionId,
+      currentExerciseId: meta.currentExerciseId,
+      currentBlock: meta.currentBlock,
+    }),
+  );
+}
+
+function persistSettings(unit: "lbs" | "kg", motivationEnabled: boolean) {
+  safeWrite(() => db.meta.put({ key: "settings", unit, motivationEnabled }));
+}
+
 export const useStore = create<State>((set, get) => ({
   unit: "lbs",
   motivationEnabled: true,
-  exercises: seedExercises,
-  slots: seedSlots,
-  sessions: seedSessions,
-  sets: seedSets,
+  exercises: [],
+  slots: [],
+  sessions: [],
+  sets: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
+  hydrated: false,
 
-  predictedNextSlotName: () => {
-    const slots = [...get().slots].sort((a, b) => a.rotationOrder - b.rotationOrder);
-    if (slots.length === 0) return undefined;
-    const lastLogged = slots
-      .filter((s) => s.lastLoggedAt)
-      .sort((a, b) => (b.lastLoggedAt ?? 0) - (a.lastLoggedAt ?? 0))[0];
-    if (!lastLogged) return slots[0].name;
-    const idx = slots.findIndex((s) => s.id === lastLogged.id);
-    return slots[(idx + 1) % slots.length].name;
+  hydrate: async () => {
+    if (get().hydrated) return; // idempotent — never double-seed/duplicate on repeat calls
+    if (!isIndexedDbAvailable()) {
+      // Should never happen (hydrate is only ever invoked from a client-side
+      // effect), but never leave the app stuck un-hydrated.
+      set({ hydrated: true });
+      return;
+    }
+    try {
+      const empty = await isDbEmpty();
+      if (empty) {
+        const settings: SettingsMeta = { key: "settings", unit: "lbs", motivationEnabled: true };
+        await seedDb({
+          exercises: seedExercises,
+          slots: seedSlots,
+          sessions: seedSessions,
+          sets: seedSets,
+          settings,
+        });
+        set({
+          exercises: seedExercises,
+          slots: seedSlots,
+          sessions: seedSessions,
+          sets: seedSets,
+          unit: settings.unit,
+          motivationEnabled: settings.motivationEnabled,
+          activeSessionId: undefined,
+          currentExerciseId: undefined,
+          currentBlock: undefined,
+          hydrated: true,
+        });
+        return;
+      }
+      const data = await loadAll();
+      set({
+        exercises: data.exercises,
+        slots: data.slots,
+        sessions: data.sessions,
+        sets: data.sets,
+        unit: data.settings.unit,
+        motivationEnabled: data.settings.motivationEnabled,
+        activeSessionId: data.activeSession.activeSessionId,
+        currentExerciseId: data.activeSession.currentExerciseId,
+        currentBlock: data.activeSession.currentBlock,
+        hydrated: true,
+      });
+    } catch (err) {
+      console.error("[store] hydrate failed", err);
+      set({ hydrated: true }); // don't leave the UI stuck; falls back to empty in-memory state
+    }
   },
+
+  predictedNextSlotName: () => predictNextSlotName(get().slots),
 
   startWorkout: (slotName) => {
     const trimmed = slotName.trim();
-    const key = trimmed.toLowerCase();
-    let slot = get().slots.find((s) => s.name.toLowerCase() === key);
+    let slot = matchSlot(get().slots, trimmed);
     if (!slot) {
       const maxOrder = Math.max(-1, ...get().slots.map((s) => s.rotationOrder));
       slot = { id: uid(), name: trimmed, rotationOrder: maxOrder + 1 };
       set({ slots: [...get().slots, slot] });
+      safeWrite(() => db.slots.put(slot!));
     }
     const sessionId = uid();
     const session: WorkoutSession = { id: sessionId, splitSlotId: slot.id, startedAt: Date.now() };
     set({
       sessions: [...get().sessions, session],
+      activeSessionId: sessionId,
+      currentExerciseId: undefined,
+      currentBlock: undefined,
+    });
+    safeWrite(() => db.sessions.put(session));
+    persistActiveMeta({
       activeSessionId: sessionId,
       currentExerciseId: undefined,
       currentBlock: undefined,
@@ -293,23 +488,45 @@ export const useStore = create<State>((set, get) => ({
   endWorkout: () => {
     const id = get().activeSessionId;
     if (!id) return;
+    const sess = get().sessions.find((s) => s.id === id);
+    const endedAt = Date.now();
+    const updatedSessions = get().sessions.map((s) => (s.id === id ? { ...s, endedAt } : s));
+    const updatedSlots = get().slots.map((sl) =>
+      sess && sl.id === sess.splitSlotId ? { ...sl, lastLoggedAt: endedAt } : sl,
+    );
     set({
-      sessions: get().sessions.map((s) => (s.id === id ? { ...s, endedAt: Date.now() } : s)),
-      slots: get().slots.map((sl) => {
-        const sess = get().sessions.find((s) => s.id === id);
-        return sess && sl.id === sess.splitSlotId ? { ...sl, lastLoggedAt: Date.now() } : sl;
-      }),
+      sessions: updatedSessions,
+      slots: updatedSlots,
+      activeSessionId: undefined,
+      currentExerciseId: undefined,
+      currentBlock: undefined,
+    });
+    const updatedSession = updatedSessions.find((s) => s.id === id);
+    if (updatedSession) safeWrite(() => db.sessions.put(updatedSession));
+    if (sess) {
+      const updatedSlot = updatedSlots.find((sl) => sl.id === sess.splitSlotId);
+      if (updatedSlot) safeWrite(() => db.slots.put(updatedSlot));
+    }
+    persistActiveMeta({
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
     });
   },
 
-  setCurrentExercise: (exerciseId) => set({ currentExerciseId: exerciseId, currentBlock: undefined }),
+  setCurrentExercise: (exerciseId) => {
+    set({ currentExerciseId: exerciseId, currentBlock: undefined });
+    persistActiveMeta({
+      activeSessionId: get().activeSessionId,
+      currentExerciseId: exerciseId,
+      currentBlock: undefined,
+    });
+  },
 
   addExercise: (name, type) => {
     const ex: Exercise = { id: uid(), name: name.trim(), type };
     set({ exercises: [...get().exercises, ex] });
+    safeWrite(() => db.exercises.put(ex));
     return ex;
   },
 
@@ -332,17 +549,25 @@ export const useStore = create<State>((set, get) => ({
       blockGroupId,
       loggedAt: Date.now(),
     };
+    const currentBlock: CurrentBlock | undefined =
+      targetSets > 1
+        ? { blockGroupId, targetSets, loggedInBlock: 1, weight, reps, rpe }
+        : undefined;
     set({
       sets: [...get().sets, newSet],
       currentExerciseId: exerciseId,
-      currentBlock: targetSets > 1 ? { blockGroupId, targetSets, loggedInBlock: 1, weight, reps, rpe } : undefined,
+      currentBlock,
     });
+    safeWrite(() => db.sets.put(newSet));
+    persistActiveMeta({ activeSessionId: sessionId, currentExerciseId: exerciseId, currentBlock });
   },
 
   logNextInBlock: (overrides) => {
     const { activeSessionId, currentBlock, sets } = get();
     if (!activeSessionId || !currentBlock) return;
-    const lastLogged = [...sets].filter((s) => s.sessionId === activeSessionId).sort((a, b) => b.loggedAt - a.loggedAt)[0];
+    const lastLogged = [...sets]
+      .filter((s) => s.sessionId === activeSessionId)
+      .sort((a, b) => b.loggedAt - a.loggedAt)[0];
     const tbs = lastLogged ? Math.round((Date.now() - lastLogged.loggedAt) / 1000) : undefined;
     const exerciseId = lastLogged?.exerciseId ?? get().currentExerciseId!;
     const newSet: WorkoutSet = {
@@ -357,19 +582,40 @@ export const useStore = create<State>((set, get) => ({
       loggedAt: Date.now(),
     };
     const nextCount = currentBlock.loggedInBlock + 1;
+    const updatedBlock: CurrentBlock = { ...currentBlock, loggedInBlock: nextCount };
     set({
       sets: [...sets, newSet],
-      currentBlock: { ...currentBlock, loggedInBlock: nextCount },
+      currentBlock: updatedBlock,
+    });
+    safeWrite(() => db.sets.put(newSet));
+    persistActiveMeta({
+      activeSessionId,
+      currentExerciseId: get().currentExerciseId,
+      currentBlock: updatedBlock,
     });
   },
 
-  deleteSet: (setId) => set({ sets: get().sets.filter((s) => s.id !== setId) }),
+  deleteSet: (setId) => {
+    set({ sets: get().sets.filter((s) => s.id !== setId) });
+    safeWrite(() => db.sets.delete(setId));
+  },
 
-  updateSet: (setId, patch) =>
-    set({ sets: get().sets.map((s) => (s.id === setId ? { ...s, ...patch } : s)) }),
+  updateSet: (setId, patch) => {
+    set({ sets: get().sets.map((s) => (s.id === setId ? { ...s, ...patch } : s)) });
+    const updated = get().sets.find((s) => s.id === setId);
+    if (updated) safeWrite(() => db.sets.put(updated));
+  },
 
-  toggleMotivation: () => set({ motivationEnabled: !get().motivationEnabled }),
-  setUnit: (u) => set({ unit: u }),
+  toggleMotivation: () => {
+    const next = !get().motivationEnabled;
+    set({ motivationEnabled: next });
+    persistSettings(get().unit, next);
+  },
+
+  setUnit: (u) => {
+    set({ unit: u });
+    persistSettings(u, get().motivationEnabled);
+  },
 
   reorderSlots: (fromId, toId) => {
     const slots = [...get().slots].sort((a, b) => a.rotationOrder - b.rotationOrder);
@@ -378,54 +624,16 @@ export const useStore = create<State>((set, get) => ({
     if (fromIdx < 0 || toIdx < 0) return;
     const [moved] = slots.splice(fromIdx, 1);
     slots.splice(toIdx, 0, moved);
-    set({ slots: slots.map((s, i) => ({ ...s, rotationOrder: i })) });
+    const reordered = slots.map((s, i) => ({ ...s, rotationOrder: i }));
+    set({ slots: reordered });
+    safeWrite(() => db.slots.bulkPut(reordered));
   },
 
-  suggestedNextExerciseFor: (sessionId) => {
-    const sess = get().sessions.find((s) => s.id === sessionId);
-    if (!sess) return undefined;
-    const doneExerciseIds = new Set(
-      get().sets.filter((s) => s.sessionId === sessionId).map((s) => s.exerciseId),
-    );
-    // Last session of this slot (excluding current)
-    const lastSess = get()
-      .sessions.filter((s) => s.splitSlotId === sess.splitSlotId && s.id !== sessionId && s.endedAt)
-      .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0];
-    if (!lastSess) return undefined;
-    const setsInLast = get().sets.filter((s) => s.sessionId === lastSess.id).sort((a, b) => a.loggedAt - b.loggedAt);
-    const order: string[] = [];
-    for (const s of setsInLast) if (!order.includes(s.exerciseId)) order.push(s.exerciseId);
-    const next = order.find((id) => !doneExerciseIds.has(id));
-    if (!next) return undefined;
-    const firstSet = setsInLast.find((s) => s.exerciseId === next);
-    return { exerciseId: next, weight: firstSet?.weight, reps: firstSet?.reps, rpe: firstSet?.rpe };
-  },
+  suggestedNextExerciseFor: (sessionId) =>
+    suggestNextExercise(get().sessions, get().sets, sessionId),
 
-  prefillFor: (sessionId, exerciseId) => {
-    const sess = get().sessions.find((s) => s.id === sessionId);
-    if (!sess) return {};
-    const setsToday = get().sets.filter((s) => s.sessionId === sessionId && s.exerciseId === exerciseId);
-    const distinctToday = new Set(setsToday.map((s) => `${s.weight}x${s.reps}`)).size;
-    const lastSess = get()
-      .sessions.filter((s) => s.splitSlotId === sess.splitSlotId && s.id !== sessionId && s.endedAt)
-      .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0];
-    if (!lastSess) return {};
-    const lastSets = get()
-      .sets.filter((s) => s.sessionId === lastSess.id && s.exerciseId === exerciseId)
-      .sort((a, b) => a.loggedAt - b.loggedAt);
-    const distinctBlocks: WorkoutSet[] = [];
-    const seen = new Set<string>();
-    for (const s of lastSets) {
-      const k = `${s.weight}x${s.reps}`;
-      if (!seen.has(k)) {
-        seen.add(k);
-        distinctBlocks.push(s);
-      }
-    }
-    const target = distinctBlocks[distinctToday];
-    if (!target) return {};
-    return { weight: target.weight, reps: target.reps, rpe: target.rpe };
-  },
+  prefillFor: (sessionId, exerciseId) =>
+    computePrefill(get().sessions, get().sets, sessionId, exerciseId),
 }));
 
 export function estimated1RM(weight: number, reps: number): number {

@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { useStore } from "../lib/store";
 
 function NotFoundComponent() {
   return (
@@ -113,11 +114,23 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+// Client-only: loads persisted state from IndexedDB (seeding it on first-ever
+// run) after mount. useEffect never runs during SSR, so this never touches
+// IndexedDB on the server. Renders nothing.
+function StoreHydrator() {
+  const hydrate = useStore((s) => s.hydrate);
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
+      <StoreHydrator />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>
