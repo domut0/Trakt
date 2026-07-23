@@ -25,9 +25,9 @@ and `git status`, before anything else.**
 | — | Baseline commit + green build | DONE | c6b9397 / c125e5f |
 | 5 | Expand exercise preset library | DONE | c6c17c7 |
 | 1 | Persist data via IndexedDB (Dexie) + tests | DONE | 9c14064 |
-| 2 | PWA installability & offline | IN PROGRESS (worktree) | — |
-| 3 | Real backup import | IN PROGRESS (worktree) | — |
-| 4 | Real PR/progress detection | IN PROGRESS (worktree) | — |
+| 2 | PWA installability & offline | IN PROGRESS (sequential on main) | — |
+| 3 | Real backup import | QUEUED (sequential on main) | — |
+| 4 | Real PR/progress detection | QUEUED (sequential on main) | — |
 | — | Merge batch + final DoD verify | NOT STARTED | — |
 
 ### Issue #1 result (DONE, 9c14064)
@@ -45,8 +45,13 @@ green. SSR-safe (client-only DB). Only store.ts + __root.tsx touched; all consum
   estimated1RM read-only), a test. ONLY batch member touching workout.tsx. **Decision: fire the toast at
   End Workout** (matches PRD §12.7 worked example + the issue's "replace the stub in handleEnd"; keeps #4 in
   its lane). Detection = real week/month rolling-window e1RM + rep-at-weight bests.
-- Each runs in its own git worktree/branch, commits to its branch, reports branch name. Orchestrator merges
-  all three into main, then runs full DoD verification.
+- **DECISION (user-confirmed): run #2 → #3 → #4 SEQUENTIALLY on `main`**, verifying + committing each before
+  the next — NOT parallel worktrees. Worktree isolation is unavailable (orchestrator cwd is not a git repo),
+  and the three issues are independent separate-file-lane changes, so sequential eliminates all merge/clobber
+  risk at no product cost. Matches the user's instruction "verify and commit after each". The file lanes above
+  are still respected so nothing needlessly churns Issue #1's store.ts/db.ts.
+- **DECISION (user-confirmed): Issue #4 toast fires at End Workout** (not per-set) — matches PRD §12.7 worked
+  example and the issue's "replace the stub in handleEnd"; detection logic is still real week/month windows.
 
 ### Issue #5 result (DONE, c6c17c7)
 117 exercises total (110 added). Data-only change to `seedExercises`. Build green. Verified: only
@@ -86,4 +91,7 @@ repo-wide prettier reformat (out of scope; would bloat every diff and risk the L
 - Everything committed locally; nothing pushed; no PRs.
 
 ## Next action
-Finish baseline commit, run `npm run build` to confirm green baseline, then spawn issue #5 subagent.
+Baseline + #5 + #1 all done & committed (see table). Now running #2 (PWA) sequentially on main via a Sonnet
+subagent; verify build + SW/manifest emitted, then commit. Then #3, then #4. Then final DoD verification (#7).
+Note: `vite-plugin-pwa` is already present in node_modules from an interrupted partial run but must be
+recorded in package.json as a devDependency by the #2 implementation.
