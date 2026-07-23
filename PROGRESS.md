@@ -27,7 +27,44 @@ and `git status`, before anything else.**
 | 1 | Persist data via IndexedDB (Dexie) + tests | DONE | 9c14064 |
 | 2 | PWA installability & offline | DONE (see caveat) | 7555602 |
 | 3 | Real backup import | DONE | 3d071b4 |
-| 4 | Real PR/progress detection | IN PROGRESS (sequential on main) | — |
+| 4 | Real PR/progress detection | DONE | 0078a50 |
+| — | Final DoD verification | DONE | (this file) |
+
+## ALL 5 ISSUES COMPLETE — final Definition-of-Done verification
+
+- **`npm test`: 56/56 pass** (4 files: store.pure, db.persistence, import, pr-detection).
+- **`npm run build`: green** on the final combined main.
+- **Live browser smoke test** (dev server on :8080, in-app browser) — no regressions, all flows work:
+  - Home + History render with persisted data (seed + a session that survived from an earlier browser load).
+  - Start Workout -> Workout Mode -> Log Set: exercise picker shows the ~117 Issue #5 presets (Main/Accessory
+    tags correct); selecting Bench Press prefilled 225x3@7 from the last Heavy Bench session (Issue #1
+    per-slot distinct-block prefill, read from IndexedDB); logging wrote the set through to IndexedDB (verified
+    by reading the DB directly).
+  - Reload -> the store rehydrated from IndexedDB, the active session resumed, and the persistent "Workout in
+    progress" banner + "Return to workout" button appeared (Issue #1 hydration; strictly better than the old
+    in-memory behavior which lost the session on reload).
+  - Settings: units, motivation toggle, split-rotation reorder, Export + the now-wired Import file input (Issue #3).
+  - Charts renders (estimated1RM); persisted kg unit setting survived.
+- **Visual identity untouched:** scanned all added lines since origin/main — no em dashes in UI copy (the only
+  em dashes added are in code comments), no gradient/glow, no orange/amber. (Note: some PRE-EXISTING UI copy
+  already contains em dashes, e.g. "— pick an exercise —" in workout.tsx and the description meta — left as-is
+  per "don't touch visual design"; the DoD constraint is not INTRODUCING new ones.)
+- **Git: 12 local commits, 0 pushed to origin/main, no PRs.** Clean tree.
+- **Known limitations (not blockers, flagged to user):**
+  1. `vite preview` is broken PRE-EXISTING (returns 500 on every route incl. static assets; TanStack Start's
+     preview server expects dist/server/server.js but the cloudflare-module nitro preset emits
+     .output/server/index.mjs). So there is no working LOCAL production-serve path, and PWA install/offline
+     could only be verified STATICALLY (SW + manifest are correctly generated in .output/public). `npm run dev`
+     / `dev:device` work fine, but service workers are disabled in dev by design.
+  2. Offline model is SSR-appropriate best-effort (NetworkFirst nav caching + precached assets), per HANDOFF §3
+     "default to keeping TanStack Start" rather than converting to a static SPA. A previously-loaded route
+     works offline; a never-visited route cold-loaded offline would not (matches criterion 3's "previously-loaded").
+
+### Issue #4 result (DONE, 0078a50)
+Real PR detection at End Workout: new pure `src/lib/pr-detection.ts` (detectSessionPRs + formatPRMessage,
+rolling 7d/30d windows, e1RM + rep-at-exact-weight bests, month>week>e1RM>reps, only fires vs a prior baseline).
+workout.tsx handleEnd: stub removed, gated on motivationEnabled, defers endWorkout+navigate so the toast is
+actually visible. 11 tests added (56 total) incl. inclusive/exclusive week & month boundary flips. Build green.
 
 ### Issue #3 result (DONE, 3d071b4)
 Import wired: pure `parseBackup` validator (rejects malformed before any DB touch) + `db.replaceAllData`
@@ -110,7 +147,7 @@ repo-wide prettier reformat (out of scope; would bloat every diff and risk the L
 - Everything committed locally; nothing pushed; no PRs.
 
 ## Next action
-Baseline + #5 + #1 all done & committed (see table). Now running #2 (PWA) sequentially on main via a Sonnet
-subagent; verify build + SW/manifest emitted, then commit. Then #3, then #4. Then final DoD verification (#7).
-Note: `vite-plugin-pwa` is already present in node_modules from an interrupted partial run but must be
-recorded in package.json as a devDependency by the #2 implementation.
+NONE — all 5 issues implemented, verified (56 tests + green build + live smoke test), and committed locally.
+Nothing pushed; no PRs (user handles those). Two flagged known-limitations above are for the user to decide on
+(fix `vite preview`/deploy path for local PWA runtime verification; and/or pursue a static shell for true
+offline-first). If the user wants either, that is a NEW piece of work beyond the 5 scoped issues.
