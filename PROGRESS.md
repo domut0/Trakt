@@ -25,9 +25,23 @@ and `git status`, before anything else.**
 | — | Baseline commit + green build | DONE | c6b9397 / c125e5f |
 | 5 | Expand exercise preset library | DONE | c6c17c7 |
 | 1 | Persist data via IndexedDB (Dexie) + tests | DONE | 9c14064 |
-| 2 | PWA installability & offline | IN PROGRESS (sequential on main) | — |
-| 3 | Real backup import | QUEUED (sequential on main) | — |
+| 2 | PWA installability & offline | DONE (see caveat) | 7555602 |
+| 3 | Real backup import | IN PROGRESS (sequential on main) | — |
 | 4 | Real PR/progress detection | QUEUED (sequential on main) | — |
+
+### Issue #2 result (DONE, 7555602) + IMPORTANT caveat
+vite-plugin-pwa wired via the lovable config passthrough. Build emits sw.js + workbox + manifest.webmanifest +
+icons into `.output/public` (verified). Manifest theme/bg #1a1c1f. Controlled updates (registerType 'prompt',
+no silent skipWaiting) via a client-only PwaUpdatePrompt banner. SSR-appropriate offline: NetworkFirst nav
+caching + precached assets (no static index.html exists, so no navigateFallback — per HANDOFF §3, kept
+TanStack Start rather than fighting it). Criteria 1-4 met.
+- **CAVEAT — `vite preview` is broken PRE-EXISTING (not caused by #2):** returns HTTP 500 on EVERY route incl.
+  static /sw.js and /manifest.webmanifest. Root cause: TanStack Start's preview-server looks for
+  `dist/server/server.js` but the cloudflare-module nitro preset emits `.output/server/index.mjs`. Confirmed
+  by me on ports 4173/4174 (all 500) and the subagent reproduced it on a pristine HEAD checkout. **Consequence:
+  there is no working LOCAL production-serve path, so PWA install/offline cannot be live-verified locally, and
+  the DoD "vite preview smoke test" is unsatisfiable without fixing this framework/preset mismatch (out of #2
+  scope). `npm run dev` / `dev:device` still work — but SWs are disabled in dev by design.** Flagged to user.
 | — | Merge batch + final DoD verify | NOT STARTED | — |
 
 ### Issue #1 result (DONE, 9c14064)
