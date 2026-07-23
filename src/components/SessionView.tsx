@@ -58,7 +58,12 @@ function SetRow({ s, index, editable, onEdit, onDelete }: { s: WorkoutSet; index
 }
 
 export function SessionView({ sessionId, editable = true }: { sessionId: string; editable?: boolean }) {
-  const sets = useStore((s) => s.sets.filter((x) => x.sessionId === sessionId));
+  // Select the stable `sets` array reference and derive the per-session slice
+  // in a memo. Filtering inside the selector would return a new array on every
+  // getSnapshot call, which useSyncExternalStore treats as a changed snapshot,
+  // causing an infinite render loop ("getSnapshot should be cached").
+  const allSets = useStore((s) => s.sets);
+  const sets = useMemo(() => allSets.filter((x) => x.sessionId === sessionId), [allSets, sessionId]);
   const exercises = useStore((s) => s.exercises);
   const deleteSet = useStore((s) => s.deleteSet);
   const updateSet = useStore((s) => s.updateSet);

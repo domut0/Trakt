@@ -139,3 +139,4 @@ dist
 .output/
 .wrangler/
 .nitro/
+.tanstack/
