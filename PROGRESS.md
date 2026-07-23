@@ -24,11 +24,29 @@ and `git status`, before anything else.**
 |---|-------|--------|--------|
 | — | Baseline commit + green build | DONE | c6b9397 / c125e5f |
 | 5 | Expand exercise preset library | DONE | c6c17c7 |
-| 1 | Persist data via IndexedDB (Dexie) + tests | IN PROGRESS | — |
-| 2 | PWA installability & offline | NOT STARTED | — |
-| 3 | Real backup import | NOT STARTED | — |
-| 4 | Real PR/progress detection | NOT STARTED | — |
+| 1 | Persist data via IndexedDB (Dexie) + tests | DONE | 9c14064 |
+| 2 | PWA installability & offline | IN PROGRESS (worktree) | — |
+| 3 | Real backup import | IN PROGRESS (worktree) | — |
+| 4 | Real PR/progress detection | IN PROGRESS (worktree) | — |
 | — | Merge batch + final DoD verify | NOT STARTED | — |
+
+### Issue #1 result (DONE, 9c14064)
+Dexie persistence via hydrate-then-write-through. New `src/lib/db.ts`; `store.ts` inits empty, seeds
+only on empty DB, write-throughs every mutation; pure logic extracted+tested. 24 vitest tests pass, build
+green. SSR-safe (client-only DB). Only store.ts + __root.tsx touched; all consuming components unchanged.
+`npm test` now exists.
+
+### Parallel batch plan (#2/#3/#4) — file lanes chosen to make merges conflict-free
+- **#2 PWA**: `vite.config.ts`, `src/routes/__root.tsx` (SW registration/head), new `src/components/PwaUpdatePrompt.tsx`,
+  `public/` icons, `package.json`/lock (adds vite-plugin-pwa). ONLY batch member touching these.
+- **#3 backup import**: `src/routes/settings.tsx`, `src/lib/store.ts` (adds importData action), `src/lib/db.ts`
+  (adds replaceAll helper), a test. ONLY batch member touching store.ts/db.ts/settings.tsx.
+- **#4 PR detection**: `src/routes/workout.tsx` (handleEnd only), NEW `src/lib/pr-detection.ts` (pure, imports
+  estimated1RM read-only), a test. ONLY batch member touching workout.tsx. **Decision: fire the toast at
+  End Workout** (matches PRD §12.7 worked example + the issue's "replace the stub in handleEnd"; keeps #4 in
+  its lane). Detection = real week/month rolling-window e1RM + rep-at-weight bests.
+- Each runs in its own git worktree/branch, commits to its branch, reports branch name. Orchestrator merges
+  all three into main, then runs full DoD verification.
 
 ### Issue #5 result (DONE, c6c17c7)
 117 exercises total (110 added). Data-only change to `seedExercises`. Build green. Verified: only
