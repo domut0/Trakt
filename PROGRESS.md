@@ -22,13 +22,24 @@ and `git status`, before anything else.**
 
 | # | Issue | Status | Commit |
 |---|-------|--------|--------|
-| — | Baseline commit + green build | IN PROGRESS | — |
-| 5 | Expand exercise preset library | NOT STARTED | — |
-| 1 | Persist data via IndexedDB (Dexie) + tests | NOT STARTED | — |
+| — | Baseline commit + green build | DONE | c6b9397 / c125e5f |
+| 5 | Expand exercise preset library | DONE | c6c17c7 |
+| 1 | Persist data via IndexedDB (Dexie) + tests | IN PROGRESS | — |
 | 2 | PWA installability & offline | NOT STARTED | — |
 | 3 | Real backup import | NOT STARTED | — |
 | 4 | Real PR/progress detection | NOT STARTED | — |
 | — | Merge batch + final DoD verify | NOT STARTED | — |
+
+### Issue #5 result (DONE, c6c17c7)
+117 exercises total (110 added). Data-only change to `seedExercises`. Build green. Verified: only
+store.ts changed, ASCII-only names, no dup names, custom-add untouched, 14 "main" (3 orig + 11 barbell variants).
+
+### Verification note: lint baseline is RED (pre-existing)
+`npm run lint` fails on the untouched prototype — ~145 `prettier/prettier` formatting errors across the
+Lovable-generated codebase (store actions, routes, ui components). This is the BASELINE state, NOT a
+regression. **The DoD gate is `npm run build`, not lint.** When verifying a subagent's diff, check that it
+added no NEW lint errors *in the lines it touched* rather than expecting a clean lint run. Do not attempt a
+repo-wide prettier reformat (out of scope; would bloat every diff and risk the Lovable sync).
 
 ## Key architecture facts (verified from code)
 - **SSR app**: TanStack Start with a real server entry (`src/server.ts`, `src/start.ts`). Root uses
