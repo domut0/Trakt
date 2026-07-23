@@ -4,6 +4,7 @@ import {
   isDbEmpty,
   isIndexedDbAvailable,
   loadAll,
+  replaceAllData,
   safeWrite,
   seedDb,
   type SettingsMeta,
@@ -45,6 +46,18 @@ export interface WorkoutSet {
   loggedAt: number;
 }
 
+/** The shape produced by Settings' "Export backup" action, and the shape
+ * `importData` / `replaceAllData` expect back in. Kept flat (no meta
+ * nesting) to match the exported JSON exactly. */
+export interface BackupData {
+  exercises: Exercise[];
+  slots: SplitSlot[];
+  sessions: WorkoutSession[];
+  sets: WorkoutSet[];
+  unit: "lbs" | "kg";
+  motivationEnabled: boolean;
+}
+
 type CurrentBlock = {
   blockGroupId: string;
   targetSets: number;
@@ -80,6 +93,12 @@ interface State {
   toggleMotivation: () => void;
   setUnit: (u: "lbs" | "kg") => void;
   reorderSlots: (fromId: string, toId: string) => void;
+  /** Full backup restore. Assumes `data` has already been validated by
+   * `parseBackup` — replaces IndexedDB first (single transaction; a failure
+   * there rejects and leaves both the DB and the in-memory store untouched),
+   * then mirrors the same data into the live store and clears any
+   * in-progress workout, since a fresh backup has none. */
+  importData: (data: BackupData) => Promise<void>;
   predictedNextSlotName: () => string | undefined;
   suggestedNextExerciseFor: (sessionId: string) => { exerciseId: string; weight?: number; reps?: number; rpe?: number } | undefined;
   prefillFor: (sessionId: string, exerciseId: string) => { weight?: number; reps?: number; rpe?: number };
@@ -366,6 +385,103 @@ export function computePrefill(
   return { weight: target.weight, reps: target.reps, rpe: target.rpe };
 }
 
+export type ParseBackupResult = { ok: true; data: BackupData } | { ok: false; error: string };
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function isExercise(v: unknown): v is Exercise {
+  if (!isPlainObject(v)) return false;
+  if (typeof v.id !== "string" || v.id.length === 0) return false;
+  if (typeof v.name !== "string") return false;
+  if (v.type !== "main" && v.type !== "accessory") return false;
+  if (v.setupNote !== undefined && typeof v.setupNote !== "string") return false;
+  return true;
+}
+
+function isSplitSlot(v: unknown): v is SplitSlot {
+  if (!isPlainObject(v)) return false;
+  if (typeof v.id !== "string" || v.id.length === 0) return false;
+  if (typeof v.name !== "string") return false;
+  if (typeof v.rotationOrder !== "number") return false;
+  if (v.lastLoggedAt !== undefined && typeof v.lastLoggedAt !== "number") return false;
+  return true;
+}
+
+function isWorkoutSession(v: unknown): v is WorkoutSession {
+  if (!isPlainObject(v)) return false;
+  if (typeof v.id !== "string" || v.id.length === 0) return false;
+  if (typeof v.splitSlotId !== "string") return false;
+  if (typeof v.startedAt !== "number") return false;
+  if (v.endedAt !== undefined && typeof v.endedAt !== "number") return false;
+  return true;
+}
+
+function isWorkoutSet(v: unknown): v is WorkoutSet {
+  if (!isPlainObject(v)) return false;
+  if (typeof v.id !== "string" || v.id.length === 0) return false;
+  if (typeof v.sessionId !== "string") return false;
+  if (typeof v.exerciseId !== "string") return false;
+  if (typeof v.weight !== "number") return false;
+  if (typeof v.reps !== "number") return false;
+  if (v.rpe !== undefined && typeof v.rpe !== "number") return false;
+  if (v.isDropsetOrPartial !== undefined && typeof v.isDropsetOrPartial !== "boolean") return false;
+  if (v.timeBetweenSetsSeconds !== undefined && typeof v.timeBetweenSetsSeconds !== "number") return false;
+  if (v.blockGroupId !== undefined && typeof v.blockGroupId !== "string") return false;
+  if (typeof v.loggedAt !== "number") return false;
+  return true;
+}
+
+/**
+ * Parses and fully validates a backup JSON string against the exact shape
+ * `exportJson` in Settings produces. Pure — no IndexedDB, no store, no DOM —
+ * so the import flow can validate a file completely before touching
+ * persistence, and this can be unit-tested directly. Never throws; returns a
+ * discriminated result instead.
+ */
+export function parseBackup(text: string): ParseBackupResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, error: "That file is not valid JSON." };
+  }
+  if (!isPlainObject(parsed)) {
+    return { ok: false, error: "That file does not contain a backup." };
+  }
+  const { exercises, slots, sessions, sets, unit, motivationEnabled } = parsed;
+  if (!Array.isArray(exercises) || !exercises.every(isExercise)) {
+    return { ok: false, error: "The backup's exercises list is missing or malformed." };
+  }
+  if (!Array.isArray(slots) || !slots.every(isSplitSlot)) {
+    return { ok: false, error: "The backup's split slots list is missing or malformed." };
+  }
+  if (!Array.isArray(sessions) || !sessions.every(isWorkoutSession)) {
+    return { ok: false, error: "The backup's sessions list is missing or malformed." };
+  }
+  if (!Array.isArray(sets) || !sets.every(isWorkoutSet)) {
+    return { ok: false, error: "The backup's sets list is missing or malformed." };
+  }
+  if (unit !== "lbs" && unit !== "kg") {
+    return { ok: false, error: "The backup's unit must be lbs or kg." };
+  }
+  if (typeof motivationEnabled !== "boolean") {
+    return { ok: false, error: "The backup's motivationEnabled setting is missing or malformed." };
+  }
+  return {
+    ok: true,
+    data: {
+      exercises: exercises as Exercise[],
+      slots: slots as SplitSlot[],
+      sessions: sessions as WorkoutSession[],
+      sets: sets as WorkoutSet[],
+      unit,
+      motivationEnabled,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Write-through persistence helpers. Every mutating store action calls one of
 // these right after updating Zustand state. All of them are safe no-ops (they
@@ -627,6 +743,25 @@ export const useStore = create<State>((set, get) => ({
     const reordered = slots.map((s, i) => ({ ...s, rotationOrder: i }));
     set({ slots: reordered });
     safeWrite(() => db.slots.bulkPut(reordered));
+  },
+
+  importData: async (data) => {
+    // Write to IndexedDB first — replaceAllData is one Dexie transaction, so
+    // a failure partway through rejects and rolls everything back. Only once
+    // that succeeds do we swap the in-memory store, so a DB failure leaves
+    // both existing IndexedDB data AND the live UI state untouched.
+    await replaceAllData(data);
+    set({
+      exercises: data.exercises,
+      slots: data.slots,
+      sessions: data.sessions,
+      sets: data.sets,
+      unit: data.unit,
+      motivationEnabled: data.motivationEnabled,
+      activeSessionId: undefined,
+      currentExerciseId: undefined,
+      currentBlock: undefined,
+    });
   },
 
   suggestedNextExerciseFor: (sessionId) =>

@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { Exercise, SplitSlot, WorkoutSession, WorkoutSet } from "./store";
+import type { BackupData, Exercise, SplitSlot, WorkoutSession, WorkoutSet } from "./store";
 
 /**
  * IndexedDB persistence via Dexie.
@@ -122,6 +122,30 @@ export async function seedDb(data: {
     await db.sessions.bulkPut(data.sessions);
     await db.sets.bulkPut(data.sets);
     await db.meta.put(data.settings);
+    await db.meta.put(EMPTY_ACTIVE_SESSION);
+  });
+}
+
+/**
+ * Full backup restore: replaces the entire dataset (exercises, slots,
+ * sessions, sets, settings) and clears any in-progress workout, in a single
+ * Dexie transaction. Either everything lands or nothing does — a failure
+ * partway through rolls the whole transaction back, so existing data is
+ * never left half-overwritten. Client-only. Caller must have already fully
+ * validated `data` (see `parseBackup` in store.ts) — this helper trusts its
+ * input completely.
+ */
+export async function replaceAllData(data: BackupData): Promise<void> {
+  await db.transaction("rw", db.exercises, db.slots, db.sessions, db.sets, db.meta, async () => {
+    await db.exercises.clear();
+    await db.slots.clear();
+    await db.sessions.clear();
+    await db.sets.clear();
+    await db.exercises.bulkPut(data.exercises);
+    await db.slots.bulkPut(data.slots);
+    await db.sessions.bulkPut(data.sessions);
+    await db.sets.bulkPut(data.sets);
+    await db.meta.put({ key: "settings", unit: data.unit, motivationEnabled: data.motivationEnabled });
     await db.meta.put(EMPTY_ACTIVE_SESSION);
   });
 }
