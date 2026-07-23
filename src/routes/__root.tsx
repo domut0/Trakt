@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { useStore } from "../lib/store";
+import { PwaUpdatePrompt } from "../components/PwaUpdatePrompt";
 
 function NotFoundComponent() {
   return (
@@ -79,6 +80,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { name: "theme-color", content: "#1a1c1f" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black" },
+      { name: "apple-mobile-web-app-title", content: "ABTN Log" },
       { title: "Anything But The Notes App" },
       { name: "description", content: "A frictionless workout logger for lifters. Weight and reps — nothing else in the way." },
       { property: "og:title", content: "Anything But The Notes App" },
@@ -92,6 +96,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Mulish:wght@400;500;600;700;800;900&display=swap" },
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),
   shellComponent: RootShell,
@@ -131,6 +137,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <StoreHydrator />
+      <PwaUpdatePrompt />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>
