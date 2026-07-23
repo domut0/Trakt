@@ -29,6 +29,19 @@ and `git status`, before anything else.**
 | 3 | Real backup import | DONE | 3d071b4 |
 | 4 | Real PR/progress detection | DONE | 0078a50 |
 | — | Final DoD verification | DONE | (this file) |
+| — | Post-completion fix: SessionView render loop | DONE | 36b8443 |
+
+### Post-completion bug fix (36b8443) — SessionView infinite render loop
+User reported "View Workout" mid-workout showed "This page didn't load". Root cause (confirmed via browser
+console: "getSnapshot should be cached" -> "Maximum update depth exceeded" in `<SessionView>`): `SessionView.tsx`
+filtered INSIDE the Zustand selector — `useStore((s) => s.sets.filter(...))` — returning a new array every
+getSnapshot call, which useSyncExternalStore treats as a changed snapshot -> infinite re-render -> error boundary.
+**Pre-existing Lovable-prototype bug** (SessionView was untouched by the 5 issues); I missed it because my smoke
+test never opened View Workout. Fix: select stable `s.sets` and derive the slice in a `useMemo`. Swept the whole
+codebase for the same anti-pattern — SessionView was the only offender (settings.tsx spreads/sorts OUTSIDE the
+selector; session.$id uses `.find` returning a stable element — both safe). Verified live: both View Workout and
+the History session view now render the full breakdown. 56 tests pass, build green.
+NOTE: this is unrelated to the two flagged limitations (vite preview / offline model).
 
 ## ALL 5 ISSUES COMPLETE — final Definition-of-Done verification
 
