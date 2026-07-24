@@ -77,7 +77,14 @@ export function SessionView({ sessionId, editable = true }: { sessionId: string;
       if (!byExercise.has(s.exerciseId)) { byExercise.set(s.exerciseId, []); order.push(s.exerciseId); }
       byExercise.get(s.exerciseId)!.push(s);
     });
-    return order.map((eid) => ({ exercise: exercises.find((e) => e.id === eid)!, sets: byExercise.get(eid)! }));
+    return order.map((eid) => {
+      const groupSets = byExercise.get(eid)!;
+      const ex = exercises.find((e) => e.id === eid)!;
+      // Snapshot: the latest note recorded in THIS session for the exercise
+      // (per-set, so past sessions keep whatever they were logged with).
+      const noteSet = [...groupSets].reverse().find((s) => s.setupNote?.trim());
+      return { exercise: ex, sets: groupSets, setupNote: noteSet?.setupNote ?? ex.setupNote };
+    });
   }, [sets, exercises]);
 
   if (grouped.length === 0) {
@@ -90,7 +97,7 @@ export function SessionView({ sessionId, editable = true }: { sessionId: string;
 
   return (
     <div className="pb-6">
-      {grouped.map(({ exercise, sets }) => (
+      {grouped.map(({ exercise, sets, setupNote }) => (
         <div key={exercise.id} className="mt-4">
           <div className="flex items-baseline justify-between px-4 pb-2">
             <h3 className="text-[17px] font-semibold tracking-tight">{exercise.name}</h3>
@@ -98,9 +105,9 @@ export function SessionView({ sessionId, editable = true }: { sessionId: string;
               {exercise.type === "main" ? "Main" : "Accessory"}
             </span>
           </div>
-          {exercise.setupNote && (
+          {setupNote && (
             <div className="mx-4 mb-1 rounded-md bg-muted px-3 py-1.5 text-[12px] text-muted-foreground">
-              {exercise.setupNote}
+              {setupNote}
             </div>
           )}
           <div className="bg-surface">

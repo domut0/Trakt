@@ -10,6 +10,7 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
   const addExercise = useStore((s) => s.addExercise);
   const setCurrentExercise = useStore((s) => s.setCurrentExercise);
   const prefillFor = useStore((s) => s.prefillFor);
+  const lastSetupNoteFor = useStore((s) => s.lastSetupNoteFor);
   const logSet = useStore((s) => s.logSet);
 
   const [pickingExercise, setPickingExercise] = useState(false);
@@ -18,7 +19,7 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
   const [rpe, setRpe] = useState("");
-  const [flag, setFlag] = useState(false);
+  const [note, setNote] = useState("");
   const [targetSets, setTargetSets] = useState(1);
 
   useEffect(() => {
@@ -26,7 +27,7 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
     const eid = currentExerciseId;
     setExerciseId(eid);
     setPickingExercise(!eid);
-    setFlag(false);
+    setNote("");
     setTargetSets(1);
     setWeight("");
     setReps("");
@@ -44,6 +45,7 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
   }, [sets, activeSessionId, exerciseId, prefillFor]);
 
   const chosen = exercises.find((e) => e.id === exerciseId);
+  const suggestedNote = exerciseId ? lastSetupNoteFor(exerciseId) : undefined;
 
   const filtered = useMemo(() => {
     const q = exerciseQuery.trim().toLowerCase();
@@ -66,7 +68,7 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
       weight: w,
       reps: r,
       rpe: rp,
-      isDropsetOrPartial: flag || undefined,
+      setupNote: note.trim() || suggestedNote,
       targetSets,
     });
     onClose();
@@ -94,7 +96,7 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
               {filtered.map((e) => (
                 <li key={e.id}>
                   <button
-                    onClick={() => { setExerciseId(e.id); setCurrentExercise(e.id); setPickingExercise(false); setWeight(""); setReps(""); setRpe(""); }}
+                    onClick={() => { setExerciseId(e.id); setCurrentExercise(e.id); setPickingExercise(false); setWeight(""); setReps(""); setRpe(""); setNote(""); }}
                     className="flex w-full items-center justify-between py-3 text-left"
                   >
                     <span className="text-[16px]">{e.name}</span>
@@ -105,7 +107,7 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
               {exerciseQuery.trim() && !filtered.some((e) => e.name.toLowerCase() === exerciseQuery.trim().toLowerCase()) && (
                 <li>
                   <button
-                    onClick={() => { const ex = addExercise(exerciseQuery.trim(), "accessory"); setExerciseId(ex.id); setCurrentExercise(ex.id); setPickingExercise(false); }}
+                    onClick={() => { const ex = addExercise(exerciseQuery.trim(), "accessory"); setExerciseId(ex.id); setCurrentExercise(ex.id); setPickingExercise(false); setWeight(""); setReps(""); setRpe(""); setNote(""); }}
                     className="flex w-full items-center justify-between py-3 text-left text-accent"
                   >
                     <span className="text-[16px]">Add "{exerciseQuery.trim()}"</span>
@@ -125,11 +127,15 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
               <button onClick={() => setPickingExercise(true)} className="text-[13px] font-medium text-accent">Change</button>
             </div>
 
-            {chosen?.setupNote && (
-              <div className="mt-3 rounded-lg bg-muted px-3 py-2 text-[13px] text-muted-foreground">
-                {chosen.setupNote}
-              </div>
-            )}
+            <div className="mt-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
+              <span className="shrink-0 text-[11px] uppercase tracking-wider text-muted-foreground">Setup</span>
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={suggestedNote ?? "Add notes — seat, pins, grip…"}
+                className="w-full bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
+              />
+            </div>
 
             <div className="mt-5 grid grid-cols-2 gap-3">
               <NumField
@@ -162,11 +168,6 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
                 </div>
               </div>
             </div>
-
-            <label className="mt-4 flex items-center gap-2 text-[14px] text-muted-foreground">
-              <input type="checkbox" checked={flag} onChange={(e) => setFlag(e.target.checked)} className="h-4 w-4 accent-[color:var(--color-accent)]" />
-              Dropset / partial reps
-            </label>
 
             <div className="mt-6 flex items-center gap-2">
               <button onClick={onClose} className="flex-1 rounded-full py-3 text-[15px] font-medium text-muted-foreground">Cancel</button>

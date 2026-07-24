@@ -46,6 +46,7 @@ function WorkoutPage() {
   const currentBlock = useStore((s) => s.currentBlock);
   const endWorkout = useStore((s) => s.endWorkout);
   const logNextInBlock = useStore((s) => s.logNextInBlock);
+  const lastSetupNoteFor = useStore((s) => s.lastSetupNoteFor);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showView, setShowView] = useState(false);
@@ -62,6 +63,7 @@ function WorkoutPage() {
   const lastLoggedAt = sessSets[sessSets.length - 1]?.loggedAt;
   const elapsedSinceLast = useElapsed(lastLoggedAt);
   const currentExercise = exercises.find((e) => e.id === currentExerciseId);
+  const currentSetupNote = currentExerciseId ? lastSetupNoteFor(currentExerciseId) : undefined;
   const inBlock = !!currentBlock && currentBlock.loggedInBlock < currentBlock.targetSets;
 
   const handleEnd = () => {
@@ -115,8 +117,8 @@ function WorkoutPage() {
         <div className="mt-1 text-[26px] font-semibold tracking-tight">
           {currentExercise?.name ?? <span className="text-muted-foreground/60">—</span>}
         </div>
-        {currentExercise?.setupNote && (
-          <div className="mt-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-muted-foreground">{currentExercise.setupNote}</div>
+        {currentSetupNote && (
+          <div className="mt-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-muted-foreground">{currentSetupNote}</div>
         )}
       </div>
 

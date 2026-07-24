@@ -41,6 +41,11 @@ export interface WorkoutSet {
   reps: number;
   rpe?: number;
   isDropsetOrPartial?: boolean;
+  /** Setup notes captured at log time (e.g. "seat 4, pins 12"). Stored per-set
+   * so it's a snapshot: editing next week's note never rewrites this entry.
+   * The most recent non-empty note for an exercise is surfaced as a grey
+   * suggestion the next time it's logged (see `lastSetupNoteFor`). */
+  setupNote?: string;
   timeBetweenSetsSeconds?: number;
   blockGroupId?: string;
   loggedAt: number;
@@ -88,7 +93,7 @@ interface State {
   endWorkout: () => void;
   setCurrentExercise: (exerciseId: string) => void;
   addExercise: (name: string, type: ExerciseType) => Exercise;
-  logSet: (input: { exerciseId: string; weight: number; reps: number; rpe?: number; isDropsetOrPartial?: boolean; targetSets: number }) => void;
+  logSet: (input: { exerciseId: string; weight: number; reps: number; rpe?: number; setupNote?: string; targetSets: number }) => void;
   logNextInBlock: (overrides?: { reps?: number }) => void;
   deleteSet: (setId: string) => void;
   updateSet: (setId: string, patch: Partial<WorkoutSet>) => void;
@@ -111,6 +116,10 @@ interface State {
   predictedNextSlotName: () => string | undefined;
   suggestedNextExerciseFor: (sessionId: string) => { exerciseId: string; weight?: number; reps?: number; rpe?: number } | undefined;
   prefillFor: (sessionId: string, exerciseId: string) => { weight?: number; reps?: number; rpe?: number };
+  /** The setup note to suggest for an exercise: the most recently logged
+   * non-empty per-set note, falling back to the exercise's base note. Persists
+   * across workouts so last week's setup shows up as a grey hint this week. */
+  lastSetupNoteFor: (exerciseId: string) => string | undefined;
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -436,6 +445,7 @@ function isWorkoutSet(v: unknown): v is WorkoutSet {
   if (typeof v.reps !== "number") return false;
   if (v.rpe !== undefined && typeof v.rpe !== "number") return false;
   if (v.isDropsetOrPartial !== undefined && typeof v.isDropsetOrPartial !== "boolean") return false;
+  if (v.setupNote !== undefined && typeof v.setupNote !== "string") return false;
   if (v.timeBetweenSetsSeconds !== undefined && typeof v.timeBetweenSetsSeconds !== "number") return false;
   if (v.blockGroupId !== undefined && typeof v.blockGroupId !== "string") return false;
   if (typeof v.loggedAt !== "number") return false;
@@ -674,13 +684,14 @@ export const useStore = create<State>((set, get) => ({
     return ex;
   },
 
-  logSet: ({ exerciseId, weight, reps, rpe, isDropsetOrPartial, targetSets }) => {
+  logSet: ({ exerciseId, weight, reps, rpe, setupNote, targetSets }) => {
     const sessionId = get().activeSessionId;
     if (!sessionId) return;
     const blockGroupId = uid();
     const setsInSession = get().sets.filter((s) => s.sessionId === sessionId);
     const lastLogged = setsInSession.sort((a, b) => b.loggedAt - a.loggedAt)[0];
     const tbs = lastLogged ? Math.round((Date.now() - lastLogged.loggedAt) / 1000) : undefined;
+    const note = setupNote?.trim();
     const newSet: WorkoutSet = {
       id: uid(),
       sessionId,
@@ -688,7 +699,7 @@ export const useStore = create<State>((set, get) => ({
       weight,
       reps,
       rpe,
-      isDropsetOrPartial,
+      setupNote: note || undefined,
       timeBetweenSetsSeconds: tbs,
       blockGroupId,
       loggedAt: Date.now(),
@@ -721,6 +732,7 @@ export const useStore = create<State>((set, get) => ({
       weight: currentBlock.weight,
       reps: overrides?.reps ?? currentBlock.reps,
       rpe: currentBlock.rpe,
+      setupNote: lastLogged?.setupNote,
       timeBetweenSetsSeconds: tbs,
       blockGroupId: currentBlock.blockGroupId,
       loggedAt: Date.now(),
@@ -837,6 +849,13 @@ export const useStore = create<State>((set, get) => ({
 
   prefillFor: (sessionId, exerciseId) =>
     computePrefill(get().sessions, get().sets, sessionId, exerciseId),
+
+  lastSetupNoteFor: (exerciseId) => {
+    const mostRecentWithNote = get()
+      .sets.filter((s) => s.exerciseId === exerciseId && s.setupNote?.trim())
+      .sort((a, b) => b.loggedAt - a.loggedAt)[0];
+    return mostRecentWithNote?.setupNote ?? get().exercises.find((e) => e.id === exerciseId)?.setupNote;
+  },
 }));
 
 export function estimated1RM(weight: number, reps: number): number {
