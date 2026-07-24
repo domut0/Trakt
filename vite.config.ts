@@ -37,8 +37,8 @@ export default defineConfig({
           short_name: "ABTN Log",
           description:
             "A frictionless workout logger for lifters. Weight and reps, nothing else in the way.",
-          theme_color: "#1a1c1f",
-          background_color: "#1a1c1f",
+          theme_color: "#0E1217",
+          background_color: "#0E1217",
           display: "standalone",
           start_url: "/",
           icons: [
