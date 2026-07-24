@@ -140,6 +140,7 @@ dist
 .wrangler/
 .nitro/
 .tanstack/
+.vercel/
 
 # Local tooling / editor state
 .claude/

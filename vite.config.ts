@@ -14,10 +14,13 @@ export default defineConfig(async ({ command }) => {
     tanstackStart({ server: { entry: "server" } }),
   ];
 
-  // nitro produces the SSR server bundle; it's only needed for the build.
+  // nitro produces the SSR server bundle; it's only needed for the build. No
+  // preset is forced: nitro auto-detects the deploy target from the build
+  // environment (Vercel, Cloudflare, Netlify, ...) and falls back to a plain
+  // Node server for local builds.
   if (command === "build") {
     const { nitro } = await import("nitro/vite");
-    plugins.push(nitro({ defaultPreset: "cloudflare-module" }));
+    plugins.push(nitro());
   }
 
   // React must come after tanstackStart.
