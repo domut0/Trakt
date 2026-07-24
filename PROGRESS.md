@@ -173,6 +173,20 @@ repo-wide prettier reformat (out of scope; would bloat every diff and risk the L
   quirk, not addressed. Workout Mode still has some empty vertical space mid-screen on tall viewports (bottom
   bar pinned) — acceptable per the bottom-bar request; offered to center the cluster if wanted.
 
+## Feature round 3 (user-requested, all committed + browser-verified)
+- Clear all data reset in Settings (2926daf).
+- Toggleable Charts + Calendar tabs (persisted settings) + new /calendar month-view history
+  (today highlighted blue, workout dots, per-day agenda with clickable session cards) + Home "Calendar"
+  link (17c497e). Verified: toggles hide/show tabs and persist; calendar renders + clickable.
+- Swipe-between-tabs navigation (dx>60, dx>1.8*dy, dt<600, no-wrap; gated to tab pages so /session row-swipe
+  is safe; Charts chip-row guarded via data-swipe-ignore) + directional page transitions + broad staggered
+  animation pass (bb731c3). Verified live: swipe both ways, chip-row ignored, session/charts gestures intact.
+- Full-app QA passed: Start Workout suggestion -> workout mode -> circular log -> picker -> prefill -> log ->
+  End all work; no console errors. 56 tests, build green.
+- KNOWN DEBT (pre-existing, non-blocking, NOT introduced this round): `npx tsc --noEmit` reports 4 errors —
+  3 are the Dexie union-`InsertType` quirk on `db.meta.put(...)` (issues #1/#3), 1 redundant comparison in
+  pr-detection.ts (issue #4). Build uses Vite (no tsc); runtime verified fine. Worth a cleanup pass someday.
+
 ## Next action
 NONE — all 5 issues implemented, verified (56 tests + green build + live smoke test), and committed locally.
 Nothing pushed; no PRs (user handles those). Two flagged known-limitations above are for the user to decide on
