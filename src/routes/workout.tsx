@@ -160,7 +160,7 @@ function WorkoutPage() {
       <LogSetSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
 
       {showView && (
-        <div className="fixed inset-0 z-50 bg-background" onClick={() => setShowView(false)}>
+        <div className="fixed inset-0 z-50 bg-background anim-backdrop" onClick={() => setShowView(false)}>
           <div className="mx-auto flex h-full max-w-md flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-14 pb-3">
               <button onClick={() => setShowView(false)} className="text-[15px] font-medium text-accent">Done</button>
@@ -175,7 +175,7 @@ function WorkoutPage() {
       )}
 
       {motivationMsg && (
-        <div className="pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full bg-foreground px-5 py-3 text-[13px] font-medium text-background shadow-lg">
+        <div className="pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full bg-foreground px-5 py-3 text-[13px] font-medium text-background shadow-lg anim-fade-up">
           {motivationMsg}
         </div>
       )}

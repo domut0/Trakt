@@ -30,9 +30,9 @@ export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; o
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/25" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/25 anim-backdrop" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-t-3xl bg-surface p-5 pb-8"
+        className="w-full max-w-md rounded-t-3xl bg-surface p-5 pb-8 anim-sheet"
         onClick={(e) => e.stopPropagation()}
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >

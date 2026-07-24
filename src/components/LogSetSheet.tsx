@@ -72,9 +72,9 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 anim-backdrop" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-t-3xl bg-surface"
+        className="w-full max-w-md rounded-t-3xl bg-surface anim-sheet"
         onClick={(e) => e.stopPropagation()}
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 20px)" }}
       >

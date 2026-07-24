@@ -91,7 +91,7 @@ function Home() {
               <Link
                 to="/session/$id"
                 params={{ id: session.id }}
-                className="flex items-center justify-between rounded-2xl bg-surface px-5 py-4"
+                className="flex items-center justify-between rounded-2xl bg-surface px-5 py-4 anim-fade-up"
               >
                 <div className="min-w-0 flex-1 pr-3">
                   <div className="flex items-baseline gap-2">
