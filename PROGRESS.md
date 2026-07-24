@@ -159,6 +159,20 @@ repo-wide prettier reformat (out of scope; would bloat every diff and risk the L
 - Visual identity untouched: no NEW em dashes in UI copy, no glow/gradient, no orange accent tabs.
 - Everything committed locally; nothing pushed; no PRs.
 
+## Post-v1 UX + theme round (user-requested, all committed)
+- SessionView render-loop fix (36b8443).
+- Home declutter + spaced history cards (ef21a3f); Workout Mode circular Log Set + bottom bar + remove Next
+  Exercise (148a68f); true-center Split + h-[100dvh] no-scroll fit (9c959bf); remove Settings Split-rotation
+  (f8c770c); gray "suggested" placeholders in Start Workout + Log Set-from-previous-set (862bacc).
+- **Theme → MyFitnessPal dark** (c91ed9a): palette in styles.css (bg #0E1217, surface #1A2029, accent #4B82F5),
+  font Mulish→Inter, theme-color + PWA manifest colors synced. Motion (7a9989f): button press-scale, sheet
+  slide-up + backdrop fade, card/toast fade-up, prefers-reduced-motion guard. All verified live (computed
+  styles: accent #4b82f5, bg #0e1217, Inter, card animationName fade-up). 56 tests pass, build green.
+- NOTE: the PRD's "Apple Notes / Space Grotesk" direction was superseded by the user's explicit request to
+  match MyFitnessPal. The exercise picker is ordered by Dexie id (not name-alphabetical) — pre-existing minor
+  quirk, not addressed. Workout Mode still has some empty vertical space mid-screen on tall viewports (bottom
+  bar pinned) — acceptable per the bottom-bar request; offered to center the cluster if wanted.
+
 ## Next action
 NONE — all 5 issues implemented, verified (56 tests + green build + live smoke test), and committed locally.
 Nothing pushed; no PRs (user handles those). Two flagged known-limitations above are for the user to decide on
