@@ -1,5 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { AppShell } from "../components/AppShell";
+import { DeleteWorkoutButton } from "../components/DeleteWorkoutButton";
 import { SessionView } from "../components/SessionView";
 import { useStore } from "../lib/store";
 
@@ -37,7 +38,10 @@ function SessionPage() {
         >
           Back
         </button>
-        <span className="w-10" />
+        <DeleteWorkoutButton
+          sessionId={session.id}
+          onDeleted={() => router.navigate({ to: "/" })}
+        />
       </div>
       <header className="px-5 pb-2">
         <div className="text-[11px] uppercase tracking-widest text-muted-foreground">

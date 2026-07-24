@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Check, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { DeleteWorkoutButton } from "../components/DeleteWorkoutButton";
 import { LogSetSheet } from "../components/LogSetSheet";
 import { SessionView } from "../components/SessionView";
 import { detectSessionPRs, formatPRMessage } from "../lib/pr-detection";
@@ -52,6 +53,23 @@ function WorkoutPage() {
   const [showView, setShowView] = useState(false);
   const [motivationMsg, setMotivationMsg] = useState<string | null>(null);
   const motivationEnabled = useStore((s) => s.motivationEnabled);
+
+  // "Set logged" confirmation toast. The nonce keys the toast element so each
+  // log remounts it and replays the slide-up/fade animation, even on rapid
+  // consecutive logs (multi-set blocks).
+  const [loggedToast, setLoggedToast] = useState<number | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashLogged = () => {
+    setLoggedToast(Date.now());
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setLoggedToast(null), 1600);
+  };
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!activeSessionId) router.navigate({ to: "/" });
@@ -143,7 +161,14 @@ function WorkoutPage() {
       {/* Primary action */}
       <div className="mt-6 flex flex-col items-center px-5">
         <button
-          onClick={() => (inBlock ? logNextInBlock() : setSheetOpen(true))}
+          onClick={() => {
+            if (inBlock) {
+              logNextInBlock();
+              flashLogged();
+            } else {
+              setSheetOpen(true);
+            }
+          }}
           className="flex h-[88px] w-[88px] items-center justify-center rounded-full bg-accent text-accent-foreground"
         >
           <Plus size={30} />
@@ -192,7 +217,7 @@ function WorkoutPage() {
         </button>
       </div>
 
-      <LogSetSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
+      <LogSetSheet open={sheetOpen} onClose={() => setSheetOpen(false)} onLogged={flashLogged} />
 
       {showView && (
         <div
@@ -211,7 +236,7 @@ function WorkoutPage() {
                 Done
               </button>
               <div className="text-[15px] font-semibold tracking-tight">{slot.name}</div>
-              <span className="w-10" />
+              <DeleteWorkoutButton sessionId={session.id} onDeleted={() => setShowView(false)} />
             </div>
             <div className="flex-1 overflow-y-auto">
               <SessionView sessionId={session.id} />
@@ -223,6 +248,18 @@ function WorkoutPage() {
       {motivationMsg && (
         <div className="pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full bg-foreground px-5 py-3 text-[13px] font-medium text-background shadow-lg anim-fade-up">
           {motivationMsg}
+        </div>
+      )}
+
+      {loggedToast !== null && (
+        <div
+          key={loggedToast}
+          className="anim-toast pointer-events-none fixed bottom-36 left-1/2 z-[60] flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-[13px] font-semibold text-background shadow-lg"
+        >
+          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-accent">
+            <Check size={11} strokeWidth={3.5} className="text-accent-foreground" />
+          </span>
+          Set logged
         </div>
       )}
     </div>

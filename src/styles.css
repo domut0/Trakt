@@ -163,6 +163,32 @@
   animation: route-fade 0.28s ease both;
 }
 
+/* One-shot success toast: slides up from below, holds, then fades out and
+   drifts up. Self-contained (enter + exit in one animation) so it just needs
+   to be mounted for its duration. The X translate stays at -50% throughout so
+   it works with `left-1/2` centering. */
+@keyframes toast-up {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 22px);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  78% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+@utility anim-toast {
+  animation: toast-up 1.6s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

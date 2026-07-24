@@ -103,6 +103,10 @@ interface State {
   }) => void;
   logNextInBlock: (overrides?: { reps?: number }) => void;
   deleteSet: (setId: string) => void;
+  /** Delete an entire logged workout: the session and every set in it. Recomputes
+   * the affected split slot's lastLoggedAt from the sessions that remain, and
+   * clears the in-progress workout if the deleted session was the active one. */
+  deleteSession: (sessionId: string) => void;
   updateSet: (setId: string, patch: Partial<WorkoutSet>) => void;
   toggleMotivation: () => void;
   setUnit: (u: "lbs" | "kg") => void;
@@ -948,6 +952,46 @@ export const useStore = create<State>((set, get) => ({
   deleteSet: (setId) => {
     set({ sets: get().sets.filter((s) => s.id !== setId) });
     safeWrite(() => db.sets.delete(setId));
+  },
+
+  deleteSession: (sessionId) => {
+    const sess = get().sessions.find((s) => s.id === sessionId);
+    const sessions = get().sessions.filter((s) => s.id !== sessionId);
+    const sets = get().sets.filter((s) => s.sessionId !== sessionId);
+    let slots = get().slots;
+    if (sess) {
+      const remainingForSlot = sessions.filter(
+        (s) => s.splitSlotId === sess.splitSlotId && s.endedAt != null,
+      );
+      const newLast = remainingForSlot.length
+        ? Math.max(...remainingForSlot.map((s) => s.endedAt!))
+        : undefined;
+      slots = get().slots.map((sl) =>
+        sl.id === sess.splitSlotId ? { ...sl, lastLoggedAt: newLast } : sl,
+      );
+    }
+    const clearingActive = get().activeSessionId === sessionId;
+    set({
+      sessions,
+      sets,
+      slots,
+      ...(clearingActive
+        ? { activeSessionId: undefined, currentExerciseId: undefined, currentBlock: undefined }
+        : {}),
+    });
+    safeWrite(() => db.sessions.delete(sessionId));
+    safeWrite(() => db.sets.where("sessionId").equals(sessionId).delete());
+    if (sess) {
+      const updatedSlot = slots.find((sl) => sl.id === sess.splitSlotId);
+      if (updatedSlot) safeWrite(() => db.slots.put(updatedSlot));
+    }
+    if (clearingActive) {
+      persistActiveMeta({
+        activeSessionId: undefined,
+        currentExerciseId: undefined,
+        currentBlock: undefined,
+      });
+    }
   },
 
   updateSet: (setId, patch) => {

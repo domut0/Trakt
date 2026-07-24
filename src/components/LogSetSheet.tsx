@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "../lib/store";
 
-export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function LogSetSheet({
+  open,
+  onClose,
+  onLogged,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onLogged?: () => void;
+}) {
   const activeSessionId = useStore((s) => s.activeSessionId)!;
   const currentExerciseId = useStore((s) => s.currentExerciseId);
   const exercises = useStore((s) => s.exercises);
@@ -75,6 +83,7 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
       setupNote: note.trim() || suggestedNote,
       targetSets,
     });
+    onLogged?.();
     onClose();
   };
 
