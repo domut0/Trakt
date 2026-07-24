@@ -90,27 +90,27 @@ function WorkoutPage() {
   if (!session || !slot) return null;
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background">
+    <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-5 pt-14">
-        <button onClick={() => router.navigate({ to: "/" })} className="text-[15px] font-medium text-accent">Home</button>
-        <div className="text-center">
+      <div className="grid grid-cols-3 items-center px-5 pt-14">
+        <button onClick={() => router.navigate({ to: "/" })} className="justify-self-start text-[15px] font-medium text-accent">Home</button>
+        <div className="justify-self-center text-center">
           <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Split</div>
           <div className="text-[15px] font-semibold tracking-tight">{slot.name}</div>
         </div>
-        <button onClick={handleEnd} className="text-[15px] font-medium text-muted-foreground">End</button>
+        <button onClick={handleEnd} className="justify-self-end text-[15px] font-medium text-muted-foreground">End</button>
       </div>
 
       {/* Stopwatch */}
-      <div className="mt-10 flex flex-col items-center">
+      <div className="mt-6 flex flex-col items-center">
         <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Time between sets</div>
-        <div className="tnum mt-1 text-[52px] font-semibold leading-none tracking-tight">
+        <div className="tnum mt-1 text-[44px] font-semibold leading-none tracking-tight">
           {sessSets.length === 0 ? "0:00" : fmtTime(elapsedSinceLast)}
         </div>
       </div>
 
       {/* Current exercise */}
-      <div className="mt-10 flex flex-col items-center px-5 text-center">
+      <div className="mt-6 flex flex-col items-center px-5 text-center">
         <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Current exercise</div>
         <div className="mt-1 text-[26px] font-semibold tracking-tight">
           {currentExercise?.name ?? <span className="text-muted-foreground/60">—</span>}
@@ -121,7 +121,7 @@ function WorkoutPage() {
       </div>
 
       {/* Primary action */}
-      <div className="mt-8 flex flex-col items-center px-5">
+      <div className="mt-6 flex flex-col items-center px-5">
         <button
           onClick={() => (inBlock ? logNextInBlock() : setSheetOpen(true))}
           className="flex h-[88px] w-[88px] items-center justify-center rounded-full bg-accent text-accent-foreground"
@@ -141,7 +141,10 @@ function WorkoutPage() {
       </div>
 
       {/* Bottom row: session summary (left) + View Workout (right) */}
-      <div className="mt-auto flex items-end justify-between px-5 pb-8 pt-8">
+      <div
+        className="mt-auto flex items-end justify-between px-5 pt-8"
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
+      >
         <div>
           <div className="text-[11px] uppercase tracking-widest text-muted-foreground">This session</div>
           <div className="mt-1 flex items-baseline gap-4">
