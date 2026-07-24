@@ -40,7 +40,8 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
       .filter((s) => s.sessionId === activeSessionId && s.exerciseId === exerciseId)
       .sort((a, b) => b.loggedAt - a.loggedAt);
     const mostRecent = priorSetsThisSession[0];
-    if (mostRecent) return { weight: mostRecent.weight, reps: mostRecent.reps, rpe: mostRecent.rpe };
+    if (mostRecent)
+      return { weight: mostRecent.weight, reps: mostRecent.reps, rpe: mostRecent.rpe };
     return activeSessionId ? prefillFor(activeSessionId, exerciseId) : {};
   }, [sets, activeSessionId, exerciseId, prefillFor]);
 
@@ -55,7 +56,10 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
 
   if (!open || typeof document === "undefined") return null;
 
-  const canLog = exerciseId && (weight.trim() || suggestion.weight != null) && (reps.trim() || suggestion.reps != null);
+  const canLog =
+    exerciseId &&
+    (weight.trim() || suggestion.weight != null) &&
+    (reps.trim() || suggestion.reps != null);
 
   const doLog = () => {
     if (!canLog) return;
@@ -75,7 +79,10 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
   };
 
   return createPortal(
-    <div className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end justify-center bg-black/30 anim-backdrop" onClick={onClose}>
+    <div
+      className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end justify-center bg-black/30 anim-backdrop"
+      onClick={onClose}
+    >
       <div
         className="w-full max-w-md rounded-t-3xl bg-surface anim-sheet"
         onClick={(e) => e.stopPropagation()}
@@ -96,39 +103,72 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
               {filtered.map((e) => (
                 <li key={e.id}>
                   <button
-                    onClick={() => { setExerciseId(e.id); setCurrentExercise(e.id); setPickingExercise(false); setWeight(""); setReps(""); setRpe(""); setNote(""); }}
+                    onClick={() => {
+                      setExerciseId(e.id);
+                      setCurrentExercise(e.id);
+                      setPickingExercise(false);
+                      setWeight("");
+                      setReps("");
+                      setRpe("");
+                      setNote("");
+                    }}
                     className="flex w-full items-center justify-between py-3 text-left"
                   >
                     <span className="text-[16px]">{e.name}</span>
-                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{e.type === "main" ? "Main" : "Accessory"}</span>
+                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      {e.type === "main" ? "Main" : "Accessory"}
+                    </span>
                   </button>
                 </li>
               ))}
-              {exerciseQuery.trim() && !filtered.some((e) => e.name.toLowerCase() === exerciseQuery.trim().toLowerCase()) && (
-                <li>
-                  <button
-                    onClick={() => { const ex = addExercise(exerciseQuery.trim(), "accessory"); setExerciseId(ex.id); setCurrentExercise(ex.id); setPickingExercise(false); setWeight(""); setReps(""); setRpe(""); setNote(""); }}
-                    className="flex w-full items-center justify-between py-3 text-left text-accent"
-                  >
-                    <span className="text-[16px]">Add "{exerciseQuery.trim()}"</span>
-                    <span className="text-[11px] uppercase tracking-wider">New</span>
-                  </button>
-                </li>
-              )}
+              {exerciseQuery.trim() &&
+                !filtered.some(
+                  (e) => e.name.toLowerCase() === exerciseQuery.trim().toLowerCase(),
+                ) && (
+                  <li>
+                    <button
+                      onClick={() => {
+                        const ex = addExercise(exerciseQuery.trim(), "accessory");
+                        setExerciseId(ex.id);
+                        setCurrentExercise(ex.id);
+                        setPickingExercise(false);
+                        setWeight("");
+                        setReps("");
+                        setRpe("");
+                        setNote("");
+                      }}
+                      className="flex w-full items-center justify-between py-3 text-left text-accent"
+                    >
+                      <span className="text-[16px]">Add "{exerciseQuery.trim()}"</span>
+                      <span className="text-[11px] uppercase tracking-wider">New</span>
+                    </button>
+                  </li>
+                )}
             </ul>
           </div>
         ) : (
           <div className="px-5 pb-5">
             <div className="flex items-baseline justify-between">
               <button onClick={() => setPickingExercise(true)} className="text-left">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Exercise</div>
-                <div className="mt-0.5 text-[22px] font-semibold tracking-tight">{chosen?.name}</div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  Exercise
+                </div>
+                <div className="mt-0.5 text-[22px] font-semibold tracking-tight">
+                  {chosen?.name}
+                </div>
               </button>
-              <button onClick={() => setPickingExercise(true)} className="text-[13px] font-medium text-accent">Change</button>
+              <button
+                onClick={() => setPickingExercise(true)}
+                className="text-[13px] font-medium text-accent"
+              >
+                Change
+              </button>
             </div>
 
             <div className="mt-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-              <span className="shrink-0 text-[11px] uppercase tracking-wider text-muted-foreground">Setup</span>
+              <span className="shrink-0 text-[11px] uppercase tracking-wider text-muted-foreground">
+                Setup
+              </span>
               <input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -160,17 +200,34 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
                 onChange={setRpe}
               />
               <div className="rounded-xl bg-muted p-3">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Sets</div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  Sets
+                </div>
                 <div className="mt-1 flex items-center justify-between">
-                  <button onClick={() => setTargetSets(Math.max(1, targetSets - 1))} className="h-8 w-8 rounded-full bg-surface text-[18px] hairline-t hairline-b">−</button>
+                  <button
+                    onClick={() => setTargetSets(Math.max(1, targetSets - 1))}
+                    className="h-8 w-8 rounded-full bg-surface text-[18px] hairline-t hairline-b"
+                  >
+                    −
+                  </button>
                   <span className="tnum text-[22px] font-semibold">{targetSets}</span>
-                  <button onClick={() => setTargetSets(targetSets + 1)} className="h-8 w-8 rounded-full bg-surface text-[18px] hairline-t hairline-b">+</button>
+                  <button
+                    onClick={() => setTargetSets(targetSets + 1)}
+                    className="h-8 w-8 rounded-full bg-surface text-[18px] hairline-t hairline-b"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
             </div>
 
             <div className="mt-6 flex items-center gap-2">
-              <button onClick={onClose} className="flex-1 rounded-full py-3 text-[15px] font-medium text-muted-foreground">Cancel</button>
+              <button
+                onClick={onClose}
+                className="flex-1 rounded-full py-3 text-[15px] font-medium text-muted-foreground"
+              >
+                Cancel
+              </button>
               <button
                 onClick={doLog}
                 disabled={!canLog}
@@ -187,7 +244,19 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
   );
 }
 
-function NumField({ label, value, onChange, placeholder, suffix }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; suffix?: string }) {
+function NumField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  suffix,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  suffix?: string;
+}) {
   return (
     <div className="rounded-xl bg-muted p-3">
       <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>

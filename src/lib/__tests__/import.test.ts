@@ -45,7 +45,9 @@ const validBackup: BackupData = {
   exercises: [{ id: "e1", name: "Bench Press", type: "main" }],
   slots: [{ id: "s1", name: "Heavy Bench", rotationOrder: 0 }],
   sessions: [{ id: "sess1", splitSlotId: "s1", startedAt: 1000, endedAt: 2000 }],
-  sets: [{ id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1500 }],
+  sets: [
+    { id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1500 },
+  ],
   unit: "kg",
   motivationEnabled: false,
 };
@@ -106,7 +108,16 @@ describe("parseBackup (validation)", () => {
   it("rejects a backup with a malformed set item (weight not a number)", () => {
     const broken = {
       ...validBackup,
-      sets: [{ id: "set1", sessionId: "sess1", exerciseId: "e1", weight: "225", reps: 5, loggedAt: 1500 }],
+      sets: [
+        {
+          id: "set1",
+          sessionId: "sess1",
+          exerciseId: "e1",
+          weight: "225",
+          reps: 5,
+          loggedAt: 1500,
+        },
+      ],
     };
     const result = parseBackup(JSON.stringify(broken));
     expect(result.ok).toBe(false);

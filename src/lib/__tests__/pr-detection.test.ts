@@ -5,7 +5,9 @@ import type { Exercise, WorkoutSet } from "../store";
 const DAY = 86400000;
 const NOW = 2_000_000_000_000; // arbitrary fixed anchor so tests are deterministic
 
-function set(partial: Partial<WorkoutSet> & Pick<WorkoutSet, "exerciseId" | "weight" | "reps" | "loggedAt">): WorkoutSet {
+function set(
+  partial: Partial<WorkoutSet> & Pick<WorkoutSet, "exerciseId" | "weight" | "reps" | "loggedAt">,
+): WorkoutSet {
   return {
     id: `set_${Math.random().toString(36).slice(2, 8)}`,
     sessionId: "sess_current",
@@ -38,7 +40,12 @@ describe("detectSessionPRs", () => {
     // session never clears, so any PR here can only come from the reps-at-
     // exact-weight comparison, not the overall e1RM comparison.
     const priorHeavy = set({ exerciseId: "e2", weight: 225, reps: 3, loggedAt: NOW - 10 * DAY }); // e1RM 248
-    const priorSameWeight = set({ exerciseId: "e2", weight: 185, reps: 5, loggedAt: NOW - 10 * DAY }); // e1RM 216, 5 reps @ 185
+    const priorSameWeight = set({
+      exerciseId: "e2",
+      weight: 185,
+      reps: 5,
+      loggedAt: NOW - 10 * DAY,
+    }); // e1RM 216, 5 reps @ 185
     const session = set({ exerciseId: "e2", weight: 185, reps: 6, loggedAt: NOW }); // e1RM 222 (< 248) but 6 reps @ 185 (> 5)
 
     const prs = detectSessionPRs({
@@ -110,7 +117,12 @@ describe("detectSessionPRs", () => {
     });
 
     it("excludes a prior set at now - 7*DAY - 1 from the week window, flipping the result", () => {
-      const justOutside = set({ exerciseId: "e4", weight: 200, reps: 5, loggedAt: NOW - 7 * DAY - 1 }); // same e1RM 233, but now outside the week window (still inside month)
+      const justOutside = set({
+        exerciseId: "e4",
+        weight: 200,
+        reps: 5,
+        loggedAt: NOW - 7 * DAY - 1,
+      }); // same e1RM 233, but now outside the week window (still inside month)
 
       const prs = detectSessionPRs({
         sessionSets: [session],
@@ -146,7 +158,12 @@ describe("detectSessionPRs", () => {
     });
 
     it("does not count a prior set just outside 30 days at all", () => {
-      const justOutside = set({ exerciseId: "e6", weight: 200, reps: 5, loggedAt: NOW - 30 * DAY - 1 });
+      const justOutside = set({
+        exerciseId: "e6",
+        weight: 200,
+        reps: 5,
+        loggedAt: NOW - 30 * DAY - 1,
+      });
 
       const prs = detectSessionPRs({
         sessionSets: [session],

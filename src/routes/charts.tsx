@@ -20,7 +20,10 @@ function ChartsPage() {
   const sets = useStore((s) => s.sets);
   const unit = useStore((s) => s.unit);
 
-  const withData = useMemo(() => exercises.filter((e) => sets.some((s) => s.exerciseId === e.id)), [exercises, sets]);
+  const withData = useMemo(
+    () => exercises.filter((e) => sets.some((s) => s.exerciseId === e.id)),
+    [exercises, sets],
+  );
   const [selectedId, setSelectedId] = useState<string>(withData[0]?.id ?? "");
 
   const points = useMemo(() => {
@@ -45,14 +48,19 @@ function ChartsPage() {
         <p className="mt-1 text-[14px] text-muted-foreground">Estimated 1RM over time.</p>
       </header>
 
-      <div data-swipe-ignore className="scrollbar-none flex gap-2 overflow-x-auto px-5 pb-4 anim-fade-up">
+      <div
+        data-swipe-ignore
+        className="scrollbar-none flex gap-2 overflow-x-auto px-5 pb-4 anim-fade-up"
+      >
         {withData.map((e) => (
           <button
             key={e.id}
             onClick={() => setSelectedId(e.id)}
             className={
               "whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors duration-200 " +
-              (selectedId === e.id ? "bg-foreground text-background" : "bg-muted text-muted-foreground")
+              (selectedId === e.id
+                ? "bg-foreground text-background"
+                : "bg-muted text-muted-foreground")
             }
           >
             {e.name}
@@ -60,18 +68,25 @@ function ChartsPage() {
         ))}
       </div>
 
-      <div className="mx-5 rounded-2xl bg-surface p-5 hairline-t hairline-b anim-fade-up" style={{ animationDelay: "40ms" }}>
+      <div
+        className="mx-5 rounded-2xl bg-surface p-5 hairline-t hairline-b anim-fade-up"
+        style={{ animationDelay: "40ms" }}
+      >
         <Chart points={points} unit={unit} />
         <div className="mt-4 flex items-baseline justify-between">
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Current e1RM</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Current e1RM
+            </div>
             <div className="tnum mt-0.5 text-[26px] font-semibold">
               {points.length > 0 ? points[points.length - 1].e1rm : "—"}
               <span className="ml-1 text-[12px] font-normal text-muted-foreground">{unit}</span>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Sessions</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Sessions
+            </div>
             <div className="tnum mt-0.5 text-[26px] font-semibold">{points.length}</div>
           </div>
         </div>
@@ -85,17 +100,25 @@ function Chart({ points, unit }: { points: { ts: number; e1rm: number }[]; unit:
   const H = 180;
   const pad = { l: 8, r: 8, t: 12, b: 20 };
   if (points.length < 2) {
-    return <div className="flex h-[180px] items-center justify-center text-[13px] text-muted-foreground">Not enough data yet.</div>;
+    return (
+      <div className="flex h-[180px] items-center justify-center text-[13px] text-muted-foreground">
+        Not enough data yet.
+      </div>
+    );
   }
   const xs = points.map((p) => p.ts);
   const ys = points.map((p) => p.e1rm);
-  const xMin = Math.min(...xs), xMax = Math.max(...xs);
-  const yMin = Math.min(...ys), yMax = Math.max(...ys);
+  const xMin = Math.min(...xs),
+    xMax = Math.max(...xs);
+  const yMin = Math.min(...ys),
+    yMax = Math.max(...ys);
   const ySpan = Math.max(1, yMax - yMin);
   const xSpan = Math.max(1, xMax - xMin);
   const x = (t: number) => pad.l + ((t - xMin) / xSpan) * (W - pad.l - pad.r);
   const y = (v: number) => pad.t + (1 - (v - yMin) / ySpan) * (H - pad.t - pad.b);
-  const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(p.ts).toFixed(1)},${y(p.e1rm).toFixed(1)}`).join(" ");
+  const d = points
+    .map((p, i) => `${i === 0 ? "M" : "L"}${x(p.ts).toFixed(1)},${y(p.e1rm).toFixed(1)}`)
+    .join(" ");
   const areaD = `${d} L${x(xMax)},${H - pad.b} L${x(xMin)},${H - pad.b} Z`;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="h-[180px] w-full">
@@ -106,17 +129,36 @@ function Chart({ points, unit }: { points: { ts: number; e1rm: number }[]; unit:
         </linearGradient>
       </defs>
       <path d={areaD} fill="url(#chart-area)" />
-      <path d={d} fill="none" stroke="var(--color-accent)" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={d}
+        fill="none"
+        stroke="var(--color-accent)"
+        strokeWidth={1.75}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
       {points.map((p, i) => (
         <circle key={i} cx={x(p.ts)} cy={y(p.e1rm)} r={2} fill="var(--color-accent)" />
       ))}
       <text x={pad.l} y={H - 6} fontSize={10} fill="var(--color-muted-foreground)">
         {new Date(xMin).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
       </text>
-      <text x={W - pad.r} y={H - 6} fontSize={10} textAnchor="end" fill="var(--color-muted-foreground)">
+      <text
+        x={W - pad.r}
+        y={H - 6}
+        fontSize={10}
+        textAnchor="end"
+        fill="var(--color-muted-foreground)"
+      >
         {new Date(xMax).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
       </text>
-      <text x={W - pad.r} y={pad.t + 4} fontSize={10} textAnchor="end" fill="var(--color-muted-foreground)">
+      <text
+        x={W - pad.r}
+        y={pad.t + 4}
+        fontSize={10}
+        textAnchor="end"
+        fill="var(--color-muted-foreground)"
+      >
         {yMax} {unit}
       </text>
     </svg>

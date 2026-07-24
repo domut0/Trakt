@@ -118,7 +118,10 @@ function CalendarPage() {
         ))}
       </div>
 
-      <div key={monthLabel} className="mx-5 grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-border bg-border anim-fade-up">
+      <div
+        key={monthLabel}
+        className="mx-5 grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-border bg-border anim-fade-up"
+      >
         {cells.map((cell, i) => {
           if (!cell) return <div key={`blank-${i}`} className="min-h-[64px] bg-surface" />;
           const workouts = byDay.get(cell.key) ?? [];
@@ -178,11 +181,15 @@ function CalendarPage() {
                   >
                     <div className="min-w-0 flex-1 pr-3">
                       <div className="flex items-baseline gap-2">
-                        <span className="text-[16px] font-semibold tracking-tight">{slot?.name ?? "Untitled"}</span>
+                        <span className="text-[16px] font-semibold tracking-tight">
+                          {slot?.name ?? "Untitled"}
+                        </span>
                         <span className="text-[12px] text-muted-foreground">· {setCount} sets</span>
                       </div>
                     </div>
-                    <span className="text-[12px] text-muted-foreground">{fmtTime(session.startedAt)}</span>
+                    <span className="text-[12px] text-muted-foreground">
+                      {fmtTime(session.startedAt)}
+                    </span>
                   </Link>
                 </li>
               );

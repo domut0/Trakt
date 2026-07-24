@@ -149,7 +149,11 @@ export async function replaceAllData(data: BackupData): Promise<void> {
     await db.slots.bulkPut(data.slots);
     await db.sessions.bulkPut(data.sessions);
     await db.sets.bulkPut(data.sets);
-    await db.meta.put({ key: "settings", unit: data.unit, motivationEnabled: data.motivationEnabled });
+    await db.meta.put({
+      key: "settings",
+      unit: data.unit,
+      motivationEnabled: data.motivationEnabled,
+    });
     await db.meta.put(EMPTY_ACTIVE_SESSION);
   });
 }

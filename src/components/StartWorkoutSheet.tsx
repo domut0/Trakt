@@ -2,7 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "../lib/store";
 
-export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; onClose: () => void; onStart: (sessionId: string) => void }) {
+export function StartWorkoutSheet({
+  open,
+  onClose,
+  onStart,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onStart: (sessionId: string) => void;
+}) {
   const slots = useStore((s) => s.slots);
   const predicted = useStore((s) => s.predictedNextSlotName());
   const startWorkout = useStore((s) => s.startWorkout);
@@ -20,7 +28,13 @@ export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; o
 
   const trimmed = value.trim();
   const suggestions = trimmed
-    ? slots.filter((s) => s.name.toLowerCase().includes(trimmed.toLowerCase()) && s.name.toLowerCase() !== trimmed.toLowerCase()).slice(0, 4)
+    ? slots
+        .filter(
+          (s) =>
+            s.name.toLowerCase().includes(trimmed.toLowerCase()) &&
+            s.name.toLowerCase() !== trimmed.toLowerCase(),
+        )
+        .slice(0, 4)
     : [];
 
   const handleStart = (name?: string) => {
@@ -31,7 +45,10 @@ export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; o
   };
 
   return createPortal(
-    <div className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end justify-center bg-black/25 anim-backdrop" onClick={onClose}>
+    <div
+      className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end justify-center bg-black/25 anim-backdrop"
+      onClick={onClose}
+    >
       <div
         className="w-full max-w-md rounded-t-3xl bg-surface p-5 pb-8 anim-sheet"
         onClick={(e) => e.stopPropagation()}
@@ -45,13 +62,18 @@ export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; o
           onChange={(e) => setValue(e.target.value)}
           placeholder={predicted ? `suggested: ${predicted}` : "Heavy Bench, D2, Arms…"}
           className="mt-2 w-full bg-transparent text-[26px] font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
-          onKeyDown={(e) => { if (e.key === "Enter") handleStart(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleStart();
+          }}
         />
         {suggestions.length > 0 && (
           <ul className="mt-3 space-y-1">
             {suggestions.map((s) => (
               <li key={s.id}>
-                <button onClick={() => handleStart(s.name)} className="w-full rounded-md px-2 py-1.5 text-left text-[15px] hover:bg-muted">
+                <button
+                  onClick={() => handleStart(s.name)}
+                  className="w-full rounded-md px-2 py-1.5 text-left text-[15px] hover:bg-muted"
+                >
                   {s.name}
                 </button>
               </li>
@@ -59,7 +81,12 @@ export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; o
           </ul>
         )}
         <div className="mt-6 flex items-center gap-2">
-          <button onClick={onClose} className="flex-1 rounded-full py-3 text-[15px] font-medium text-muted-foreground hairline-t">Cancel</button>
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-full py-3 text-[15px] font-medium text-muted-foreground hairline-t"
+          >
+            Cancel
+          </button>
           <button
             onClick={() => handleStart()}
             disabled={!(trimmed || predicted)}

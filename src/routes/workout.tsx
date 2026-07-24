@@ -59,7 +59,9 @@ function WorkoutPage() {
 
   const session = sessions.find((s) => s.id === activeSessionId);
   const slot = slots.find((sl) => sl.id === session?.splitSlotId);
-  const sessSets = sets.filter((s) => s.sessionId === activeSessionId).sort((a, b) => a.loggedAt - b.loggedAt);
+  const sessSets = sets
+    .filter((s) => s.sessionId === activeSessionId)
+    .sort((a, b) => a.loggedAt - b.loggedAt);
   const lastLoggedAt = sessSets[sessSets.length - 1]?.loggedAt;
   const elapsedSinceLast = useElapsed(lastLoggedAt);
   const currentExercise = exercises.find((e) => e.id === currentExerciseId);
@@ -95,17 +97,29 @@ function WorkoutPage() {
     <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
       {/* Top bar */}
       <div className="grid grid-cols-3 items-center px-5 pt-14">
-        <button onClick={() => router.navigate({ to: "/" })} className="justify-self-start text-[15px] font-medium text-accent">Home</button>
+        <button
+          onClick={() => router.navigate({ to: "/" })}
+          className="justify-self-start text-[15px] font-medium text-accent"
+        >
+          Home
+        </button>
         <div className="justify-self-center text-center">
           <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Split</div>
           <div className="text-[15px] font-semibold tracking-tight">{slot.name}</div>
         </div>
-        <button onClick={handleEnd} className="justify-self-end text-[15px] font-medium text-muted-foreground">End</button>
+        <button
+          onClick={handleEnd}
+          className="justify-self-end text-[15px] font-medium text-muted-foreground"
+        >
+          End
+        </button>
       </div>
 
       {/* Stopwatch */}
       <div className="mt-6 flex flex-col items-center">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Time between sets</div>
+        <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+          Time between sets
+        </div>
         <div className="tnum mt-1 text-[44px] font-semibold leading-none tracking-tight">
           {sessSets.length === 0 ? "0:00" : fmtTime(elapsedSinceLast)}
         </div>
@@ -113,12 +127,16 @@ function WorkoutPage() {
 
       {/* Current exercise */}
       <div className="mt-6 flex flex-col items-center px-5 text-center">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Current exercise</div>
+        <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+          Current exercise
+        </div>
         <div className="mt-1 text-[26px] font-semibold tracking-tight">
           {currentExercise?.name ?? <span className="text-muted-foreground/60">—</span>}
         </div>
         {currentSetupNote && (
-          <div className="mt-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-muted-foreground">{currentSetupNote}</div>
+          <div className="mt-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-muted-foreground">
+            {currentSetupNote}
+          </div>
         )}
       </div>
 
@@ -134,7 +152,9 @@ function WorkoutPage() {
           <div className="mt-2 text-center">
             <div className="text-[13px] font-medium text-accent">Next set</div>
             <div className="text-[12px] text-muted-foreground">
-              {currentBlock.loggedInBlock + 1} of {currentBlock.targetSets} · {currentBlock.weight} × {currentBlock.reps}{currentBlock.rpe != null ? ` @ ${currentBlock.rpe}` : ""}
+              {currentBlock.loggedInBlock + 1} of {currentBlock.targetSets} · {currentBlock.weight}{" "}
+              × {currentBlock.reps}
+              {currentBlock.rpe != null ? ` @ ${currentBlock.rpe}` : ""}
             </div>
           </div>
         ) : (
@@ -148,13 +168,26 @@ function WorkoutPage() {
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
         <div>
-          <div className="text-[11px] uppercase tracking-widest text-muted-foreground">This session</div>
+          <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+            This session
+          </div>
           <div className="mt-1 flex items-baseline gap-4">
-            <div><span className="tnum text-[22px] font-semibold">{sessSets.length}</span> <span className="text-[12px] text-muted-foreground">sets</span></div>
-            <div><span className="tnum text-[22px] font-semibold">{new Set(sessSets.map(s => s.exerciseId)).size}</span> <span className="text-[12px] text-muted-foreground">exercises</span></div>
+            <div>
+              <span className="tnum text-[22px] font-semibold">{sessSets.length}</span>{" "}
+              <span className="text-[12px] text-muted-foreground">sets</span>
+            </div>
+            <div>
+              <span className="tnum text-[22px] font-semibold">
+                {new Set(sessSets.map((s) => s.exerciseId)).size}
+              </span>{" "}
+              <span className="text-[12px] text-muted-foreground">exercises</span>
+            </div>
           </div>
         </div>
-        <button onClick={() => setShowView(true)} className="rounded-full bg-surface px-4 py-2 text-[13px] font-medium hairline-t hairline-b">
+        <button
+          onClick={() => setShowView(true)}
+          className="rounded-full bg-surface px-4 py-2 text-[13px] font-medium hairline-t hairline-b"
+        >
           View Workout
         </button>
       </div>
@@ -162,10 +195,21 @@ function WorkoutPage() {
       <LogSetSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
 
       {showView && (
-        <div className="fixed inset-x-0 top-0 z-50 h-[100dvh] bg-background anim-backdrop" onClick={() => setShowView(false)}>
-          <div className="mx-auto flex h-full max-w-md flex-col" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-x-0 top-0 z-50 h-[100dvh] bg-background anim-backdrop"
+          onClick={() => setShowView(false)}
+        >
+          <div
+            className="mx-auto flex h-full max-w-md flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-5 pt-14 pb-3">
-              <button onClick={() => setShowView(false)} className="text-[15px] font-medium text-accent">Done</button>
+              <button
+                onClick={() => setShowView(false)}
+                className="text-[15px] font-medium text-accent"
+              >
+                Done
+              </button>
               <div className="text-[15px] font-semibold tracking-tight">{slot.name}</div>
               <span className="w-10" />
             </div>

@@ -93,7 +93,14 @@ interface State {
   endWorkout: () => void;
   setCurrentExercise: (exerciseId: string) => void;
   addExercise: (name: string, type: ExerciseType) => Exercise;
-  logSet: (input: { exerciseId: string; weight: number; reps: number; rpe?: number; setupNote?: string; targetSets: number }) => void;
+  logSet: (input: {
+    exerciseId: string;
+    weight: number;
+    reps: number;
+    rpe?: number;
+    setupNote?: string;
+    targetSets: number;
+  }) => void;
   logNextInBlock: (overrides?: { reps?: number }) => void;
   deleteSet: (setId: string) => void;
   updateSet: (setId: string, patch: Partial<WorkoutSet>) => void;
@@ -114,8 +121,13 @@ interface State {
    * "empty" (which would make hydrate re-insert the demo history on next load). */
   clearAllData: () => Promise<void>;
   predictedNextSlotName: () => string | undefined;
-  suggestedNextExerciseFor: (sessionId: string) => { exerciseId: string; weight?: number; reps?: number; rpe?: number } | undefined;
-  prefillFor: (sessionId: string, exerciseId: string) => { weight?: number; reps?: number; rpe?: number };
+  suggestedNextExerciseFor: (
+    sessionId: string,
+  ) => { exerciseId: string; weight?: number; reps?: number; rpe?: number } | undefined;
+  prefillFor: (
+    sessionId: string,
+    exerciseId: string,
+  ) => { weight?: number; reps?: number; rpe?: number };
   /** The setup note to suggest for an exercise: the most recently logged
    * non-empty per-set note, falling back to the exercise's base note. Persists
    * across workouts so last week's setup shows up as a grey hint this week. */
@@ -281,33 +293,214 @@ const seedSlots: SplitSlot[] = [
 ];
 
 const seedSessions: WorkoutSession[] = [
-  { id: "sess_1", splitSlotId: "s_hb", startedAt: now - 3 * day, endedAt: now - 3 * day + 3600_000 },
-  { id: "sess_2", splitSlotId: "s_sq", startedAt: now - 2 * day, endedAt: now - 2 * day + 3900_000 },
+  {
+    id: "sess_1",
+    splitSlotId: "s_hb",
+    startedAt: now - 3 * day,
+    endedAt: now - 3 * day + 3600_000,
+  },
+  {
+    id: "sess_2",
+    splitSlotId: "s_sq",
+    startedAt: now - 2 * day,
+    endedAt: now - 2 * day + 3900_000,
+  },
   { id: "sess_3", splitSlotId: "s_vb", startedAt: now - day, endedAt: now - day + 3400_000 },
 ];
 
-const b1 = uid(), b2 = uid(), b3 = uid(), b4 = uid(), b5 = uid();
+const b1 = uid(),
+  b2 = uid(),
+  b3 = uid(),
+  b4 = uid(),
+  b5 = uid();
 const seedSets: WorkoutSet[] = [
   // Heavy Bench 3 days ago
-  { id: uid(), sessionId: "sess_1", exerciseId: "e_bench", weight: 225, reps: 3, rpe: 7, blockGroupId: b1, loggedAt: now - 3 * day + 600_000 },
-  { id: uid(), sessionId: "sess_1", exerciseId: "e_bench", weight: 190, reps: 5, rpe: 6, blockGroupId: b2, timeBetweenSetsSeconds: 240, loggedAt: now - 3 * day + 900_000 },
-  { id: uid(), sessionId: "sess_1", exerciseId: "e_bench", weight: 190, reps: 5, rpe: 7, blockGroupId: b2, timeBetweenSetsSeconds: 220, loggedAt: now - 3 * day + 1130_000 },
-  { id: uid(), sessionId: "sess_1", exerciseId: "e_bench", weight: 190, reps: 5, rpe: 8, blockGroupId: b2, timeBetweenSetsSeconds: 235, loggedAt: now - 3 * day + 1370_000 },
-  { id: uid(), sessionId: "sess_1", exerciseId: "e_bench", weight: 190, reps: 4, rpe: 9, blockGroupId: b2, timeBetweenSetsSeconds: 250, loggedAt: now - 3 * day + 1625_000 },
-  { id: uid(), sessionId: "sess_1", exerciseId: "e_flap", weight: 57.5, reps: 6, rpe: 10, blockGroupId: b3, timeBetweenSetsSeconds: 300, loggedAt: now - 3 * day + 2000_000 },
-  { id: uid(), sessionId: "sess_1", exerciseId: "e_flap", weight: 57.5, reps: 6, rpe: 10, blockGroupId: b3, timeBetweenSetsSeconds: 280, loggedAt: now - 3 * day + 2290_000 },
-  { id: uid(), sessionId: "sess_1", exerciseId: "e_push", weight: 60, reps: 12, rpe: 9, blockGroupId: b4, timeBetweenSetsSeconds: 200, loggedAt: now - 3 * day + 2600_000 },
-  { id: uid(), sessionId: "sess_1", exerciseId: "e_push", weight: 60, reps: 10, rpe: 10, blockGroupId: b4, timeBetweenSetsSeconds: 210, loggedAt: now - 3 * day + 2820_000 },
+  {
+    id: uid(),
+    sessionId: "sess_1",
+    exerciseId: "e_bench",
+    weight: 225,
+    reps: 3,
+    rpe: 7,
+    blockGroupId: b1,
+    loggedAt: now - 3 * day + 600_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_1",
+    exerciseId: "e_bench",
+    weight: 190,
+    reps: 5,
+    rpe: 6,
+    blockGroupId: b2,
+    timeBetweenSetsSeconds: 240,
+    loggedAt: now - 3 * day + 900_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_1",
+    exerciseId: "e_bench",
+    weight: 190,
+    reps: 5,
+    rpe: 7,
+    blockGroupId: b2,
+    timeBetweenSetsSeconds: 220,
+    loggedAt: now - 3 * day + 1130_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_1",
+    exerciseId: "e_bench",
+    weight: 190,
+    reps: 5,
+    rpe: 8,
+    blockGroupId: b2,
+    timeBetweenSetsSeconds: 235,
+    loggedAt: now - 3 * day + 1370_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_1",
+    exerciseId: "e_bench",
+    weight: 190,
+    reps: 4,
+    rpe: 9,
+    blockGroupId: b2,
+    timeBetweenSetsSeconds: 250,
+    loggedAt: now - 3 * day + 1625_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_1",
+    exerciseId: "e_flap",
+    weight: 57.5,
+    reps: 6,
+    rpe: 10,
+    blockGroupId: b3,
+    timeBetweenSetsSeconds: 300,
+    loggedAt: now - 3 * day + 2000_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_1",
+    exerciseId: "e_flap",
+    weight: 57.5,
+    reps: 6,
+    rpe: 10,
+    blockGroupId: b3,
+    timeBetweenSetsSeconds: 280,
+    loggedAt: now - 3 * day + 2290_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_1",
+    exerciseId: "e_push",
+    weight: 60,
+    reps: 12,
+    rpe: 9,
+    blockGroupId: b4,
+    timeBetweenSetsSeconds: 200,
+    loggedAt: now - 3 * day + 2600_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_1",
+    exerciseId: "e_push",
+    weight: 60,
+    reps: 10,
+    rpe: 10,
+    blockGroupId: b4,
+    timeBetweenSetsSeconds: 210,
+    loggedAt: now - 3 * day + 2820_000,
+  },
   // Squat 2 days ago
-  { id: uid(), sessionId: "sess_2", exerciseId: "e_squat", weight: 275, reps: 3, rpe: 8, blockGroupId: uid(), loggedAt: now - 2 * day + 600_000 },
-  { id: uid(), sessionId: "sess_2", exerciseId: "e_squat", weight: 245, reps: 5, rpe: 7, blockGroupId: b5, timeBetweenSetsSeconds: 260, loggedAt: now - 2 * day + 900_000 },
-  { id: uid(), sessionId: "sess_2", exerciseId: "e_squat", weight: 245, reps: 5, rpe: 8, blockGroupId: b5, timeBetweenSetsSeconds: 245, loggedAt: now - 2 * day + 1160_000 },
-  { id: uid(), sessionId: "sess_2", exerciseId: "e_squat", weight: 245, reps: 5, rpe: 9, blockGroupId: b5, timeBetweenSetsSeconds: 255, loggedAt: now - 2 * day + 1415_000 },
+  {
+    id: uid(),
+    sessionId: "sess_2",
+    exerciseId: "e_squat",
+    weight: 275,
+    reps: 3,
+    rpe: 8,
+    blockGroupId: uid(),
+    loggedAt: now - 2 * day + 600_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_2",
+    exerciseId: "e_squat",
+    weight: 245,
+    reps: 5,
+    rpe: 7,
+    blockGroupId: b5,
+    timeBetweenSetsSeconds: 260,
+    loggedAt: now - 2 * day + 900_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_2",
+    exerciseId: "e_squat",
+    weight: 245,
+    reps: 5,
+    rpe: 8,
+    blockGroupId: b5,
+    timeBetweenSetsSeconds: 245,
+    loggedAt: now - 2 * day + 1160_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_2",
+    exerciseId: "e_squat",
+    weight: 245,
+    reps: 5,
+    rpe: 9,
+    blockGroupId: b5,
+    timeBetweenSetsSeconds: 255,
+    loggedAt: now - 2 * day + 1415_000,
+  },
   // Volume Bench yesterday
-  { id: uid(), sessionId: "sess_3", exerciseId: "e_bench", weight: 175, reps: 6, rpe: 7, blockGroupId: uid(), loggedAt: now - day + 600_000 },
-  { id: uid(), sessionId: "sess_3", exerciseId: "e_bench", weight: 175, reps: 6, rpe: 8, blockGroupId: uid(), timeBetweenSetsSeconds: 200, loggedAt: now - day + 800_000 },
-  { id: uid(), sessionId: "sess_3", exerciseId: "e_row", weight: 90, reps: 10, rpe: 8, blockGroupId: uid(), timeBetweenSetsSeconds: 190, loggedAt: now - day + 1100_000 },
-  { id: uid(), sessionId: "sess_3", exerciseId: "e_row", weight: 90, reps: 10, rpe: 9, blockGroupId: uid(), timeBetweenSetsSeconds: 200, loggedAt: now - day + 1300_000 },
+  {
+    id: uid(),
+    sessionId: "sess_3",
+    exerciseId: "e_bench",
+    weight: 175,
+    reps: 6,
+    rpe: 7,
+    blockGroupId: uid(),
+    loggedAt: now - day + 600_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_3",
+    exerciseId: "e_bench",
+    weight: 175,
+    reps: 6,
+    rpe: 8,
+    blockGroupId: uid(),
+    timeBetweenSetsSeconds: 200,
+    loggedAt: now - day + 800_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_3",
+    exerciseId: "e_row",
+    weight: 90,
+    reps: 10,
+    rpe: 8,
+    blockGroupId: uid(),
+    timeBetweenSetsSeconds: 190,
+    loggedAt: now - day + 1100_000,
+  },
+  {
+    id: uid(),
+    sessionId: "sess_3",
+    exerciseId: "e_row",
+    weight: 90,
+    reps: 10,
+    rpe: 9,
+    blockGroupId: uid(),
+    timeBetweenSetsSeconds: 200,
+    loggedAt: now - day + 1300_000,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -446,7 +639,8 @@ function isWorkoutSet(v: unknown): v is WorkoutSet {
   if (v.rpe !== undefined && typeof v.rpe !== "number") return false;
   if (v.isDropsetOrPartial !== undefined && typeof v.isDropsetOrPartial !== "boolean") return false;
   if (v.setupNote !== undefined && typeof v.setupNote !== "string") return false;
-  if (v.timeBetweenSetsSeconds !== undefined && typeof v.timeBetweenSetsSeconds !== "number") return false;
+  if (v.timeBetweenSetsSeconds !== undefined && typeof v.timeBetweenSetsSeconds !== "number")
+    return false;
   if (v.blockGroupId !== undefined && typeof v.blockGroupId !== "string") return false;
   if (typeof v.loggedAt !== "number") return false;
   return true;
@@ -854,7 +1048,9 @@ export const useStore = create<State>((set, get) => ({
     const mostRecentWithNote = get()
       .sets.filter((s) => s.exerciseId === exerciseId && s.setupNote?.trim())
       .sort((a, b) => b.loggedAt - a.loggedAt)[0];
-    return mostRecentWithNote?.setupNote ?? get().exercises.find((e) => e.id === exerciseId)?.setupNote;
+    return (
+      mostRecentWithNote?.setupNote ?? get().exercises.find((e) => e.id === exerciseId)?.setupNote
+    );
   },
 }));
 

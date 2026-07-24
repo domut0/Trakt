@@ -44,11 +44,14 @@ function SettingsPage() {
 
   const exportJson = () => {
     const { exercises, slots, sessions, sets, unit, motivationEnabled } = useStore.getState();
-    const blob = new Blob([JSON.stringify({ exercises, slots, sessions, sets, unit, motivationEnabled }, null, 2)], { type: "application/json" });
+    const blob = new Blob(
+      [JSON.stringify({ exercises, slots, sessions, sets, unit, motivationEnabled }, null, 2)],
+      { type: "application/json" },
+    );
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `workout-log-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `workout-log-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -118,7 +121,9 @@ function SettingsPage() {
         <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
           <div>
             <div className="text-[15px]">Motivational messages</div>
-            <div className="text-[12px] text-muted-foreground">In-app toasts after qualifying sets.</div>
+            <div className="text-[12px] text-muted-foreground">
+              In-app toasts after qualifying sets.
+            </div>
           </div>
           <Toggle checked={motivationEnabled} onChange={toggleMotivation} />
         </div>
@@ -135,14 +140,19 @@ function SettingsPage() {
         <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
           <div>
             <div className="text-[15px]">Calendar tab</div>
-            <div className="text-[12px] text-muted-foreground">Show the Calendar tab in the nav.</div>
+            <div className="text-[12px] text-muted-foreground">
+              Show the Calendar tab in the nav.
+            </div>
           </div>
           <Toggle checked={calendarEnabled} onChange={() => setCalendarEnabled(!calendarEnabled)} />
         </div>
       </Section>
 
       <Section title="Data" delay={120}>
-        <button onClick={exportJson} className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t">
+        <button
+          onClick={exportJson}
+          className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+        >
           <div>
             <div className="text-[15px]">Export backup</div>
             <div className="text-[12px] text-muted-foreground">Download all data as JSON.</div>
@@ -154,7 +164,12 @@ function SettingsPage() {
             <div className="text-[15px]">Import backup</div>
             <div className="text-[12px] text-muted-foreground">Restore from a previous export.</div>
           </div>
-          <input type="file" accept="application/json" className="hidden" onChange={handleFileChange} />
+          <input
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={handleFileChange}
+          />
           <span className="text-accent">→</span>
         </label>
 
@@ -165,13 +180,21 @@ function SettingsPage() {
         {pendingImport && (
           <div className="px-5 py-3.5 hairline-t">
             <div className="text-[13px] text-muted-foreground">
-              This file has {pendingImport.exercises.length} exercises, {pendingImport.sessions.length} sessions and {pendingImport.sets.length} sets. Importing will replace all data currently on this device. This cannot be undone.
+              This file has {pendingImport.exercises.length} exercises,{" "}
+              {pendingImport.sessions.length} sessions and {pendingImport.sets.length} sets.
+              Importing will replace all data currently on this device. This cannot be undone.
             </div>
             <div className="mt-3 flex gap-2">
-              <button onClick={cancelImport} className="flex-1 rounded-full bg-muted py-2.5 text-[14px] font-medium text-muted-foreground">
+              <button
+                onClick={cancelImport}
+                className="flex-1 rounded-full bg-muted py-2.5 text-[14px] font-medium text-muted-foreground"
+              >
                 Cancel
               </button>
-              <button onClick={confirmImport} className="flex-1 rounded-full bg-foreground py-2.5 text-[14px] font-medium text-background">
+              <button
+                onClick={confirmImport}
+                className="flex-1 rounded-full bg-foreground py-2.5 text-[14px] font-medium text-background"
+              >
                 Replace all data
               </button>
             </div>
@@ -179,29 +202,43 @@ function SettingsPage() {
         )}
 
         {importSuccess && (
-          <div className="px-5 py-3 text-[13px] text-muted-foreground hairline-t">Backup imported.</div>
+          <div className="px-5 py-3 text-[13px] text-muted-foreground hairline-t">
+            Backup imported.
+          </div>
         )}
       </Section>
 
       <Section title="Reset" delay={160}>
         {!showClearConfirm ? (
-          <button onClick={() => setShowClearConfirm(true)} className="flex w-full items-center justify-between px-5 py-3.5 text-left">
+          <button
+            onClick={() => setShowClearConfirm(true)}
+            className="flex w-full items-center justify-between px-5 py-3.5 text-left"
+          >
             <div>
               <div className="text-[15px] text-destructive">Clear all data</div>
-              <div className="text-[12px] text-muted-foreground">Wipe all workouts and start fresh.</div>
+              <div className="text-[12px] text-muted-foreground">
+                Wipe all workouts and start fresh.
+              </div>
             </div>
             <span className="text-destructive">→</span>
           </button>
         ) : (
           <div className="px-5 py-3.5">
             <div className="text-[13px] text-muted-foreground">
-              This permanently deletes every split, session, and set on this device and resets your settings. The exercise library is kept. This cannot be undone.
+              This permanently deletes every split, session, and set on this device and resets your
+              settings. The exercise library is kept. This cannot be undone.
             </div>
             <div className="mt-3 flex gap-2">
-              <button onClick={() => setShowClearConfirm(false)} className="flex-1 rounded-full bg-muted py-2.5 text-[14px] font-medium text-muted-foreground">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 rounded-full bg-muted py-2.5 text-[14px] font-medium text-muted-foreground"
+              >
                 Cancel
               </button>
-              <button onClick={confirmClear} className="flex-1 rounded-full bg-destructive py-2.5 text-[14px] font-medium text-white">
+              <button
+                onClick={confirmClear}
+                className="flex-1 rounded-full bg-destructive py-2.5 text-[14px] font-medium text-white"
+              >
                 Clear all data
               </button>
             </div>
@@ -209,15 +246,27 @@ function SettingsPage() {
         )}
       </Section>
 
-      <p className="px-5 pt-6 text-[12px] text-muted-foreground">v0.1 · local only · no accounts, no sync.</p>
+      <p className="px-5 pt-6 text-[12px] text-muted-foreground">
+        v0.1 · local only · no accounts, no sync.
+      </p>
     </AppShell>
   );
 }
 
-function Section({ title, children, delay = 0 }: { title: string; children: React.ReactNode; delay?: number }) {
+function Section({
+  title,
+  children,
+  delay = 0,
+}: {
+  title: string;
+  children: React.ReactNode;
+  delay?: number;
+}) {
   return (
     <section className="mt-6 anim-fade-up" style={{ animationDelay: `${delay}ms` }}>
-      <div className="px-5 pb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">{title}</div>
+      <div className="px-5 pb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
+        {title}
+      </div>
       <div className="bg-surface hairline-t hairline-b">{children}</div>
     </section>
   );

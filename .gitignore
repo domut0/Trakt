@@ -140,3 +140,6 @@ dist
 .wrangler/
 .nitro/
 .tanstack/
+
+# Local tooling / editor state
+.claude/

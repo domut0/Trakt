@@ -8,9 +8,17 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Anything But The Notes App" },
-      { name: "description", content: "A frictionless workout logger for lifters. Weight and reps — nothing else in the way." },
+      {
+        name: "description",
+        content:
+          "A frictionless workout logger for lifters. Weight and reps — nothing else in the way.",
+      },
       { property: "og:title", content: "Anything But The Notes App" },
-      { property: "og:description", content: "A frictionless workout logger for lifters. Weight and reps — nothing else in the way." },
+      {
+        property: "og:description",
+        content:
+          "A frictionless workout logger for lifters. Weight and reps — nothing else in the way.",
+      },
     ],
   }),
   component: Home,
@@ -20,7 +28,8 @@ function fmtDate(ts: number) {
   const d = new Date(ts);
   const now = new Date();
   const isToday = d.toDateString() === now.toDateString();
-  const y = new Date(now); y.setDate(now.getDate() - 1);
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
   const isYest = d.toDateString() === y.toDateString();
   if (isToday) return "Today";
   if (isYest) return "Yesterday";
@@ -43,8 +52,17 @@ function Home() {
       .map((s) => {
         const slot = slots.find((sl) => sl.id === s.splitSlotId);
         const inSess = sets.filter((x) => x.sessionId === s.id);
-        const exNames = Array.from(new Set(inSess.map((x) => exercises.find((e) => e.id === x.exerciseId)?.name).filter(Boolean)));
-        return { session: s, slotName: slot?.name ?? "Untitled", setCount: inSess.length, exercises: exNames as string[] };
+        const exNames = Array.from(
+          new Set(
+            inSess.map((x) => exercises.find((e) => e.id === x.exerciseId)?.name).filter(Boolean),
+          ),
+        );
+        return {
+          session: s,
+          slotName: slot?.name ?? "Untitled",
+          setCount: inSess.length,
+          exercises: exNames as string[],
+        };
       });
   }, [sessions, slots, sets, exercises]);
 
@@ -75,7 +93,9 @@ function Home() {
 
       <section className="mt-9">
         <div className="flex items-baseline justify-between px-5 pb-2">
-          <h2 className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">History</h2>
+          <h2 className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
+            History
+          </h2>
           <div className="flex items-baseline gap-3">
             <span className="text-[12px] text-muted-foreground">{history.length} sessions</span>
             <Link to="/calendar" className="text-[12px] font-semibold text-accent">
@@ -105,10 +125,13 @@ function Home() {
                     <span className="text-[12px] text-muted-foreground">· {setCount} sets</span>
                   </div>
                   <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
-                    {exNames.slice(0, 4).join(" · ")}{exNames.length > 4 ? " · …" : ""}
+                    {exNames.slice(0, 4).join(" · ")}
+                    {exNames.length > 4 ? " · …" : ""}
                   </p>
                 </div>
-                <span className="text-[12px] text-muted-foreground">{fmtDate(session.endedAt!)}</span>
+                <span className="text-[12px] text-muted-foreground">
+                  {fmtDate(session.endedAt!)}
+                </span>
               </Link>
             </li>
           ))}
@@ -118,7 +141,10 @@ function Home() {
       <StartWorkoutSheet
         open={openStart}
         onClose={() => setOpenStart(false)}
-        onStart={() => { setOpenStart(false); router.navigate({ to: "/workout" }); }}
+        onStart={() => {
+          setOpenStart(false);
+          router.navigate({ to: "/workout" });
+        }}
       />
     </AppShell>
   );

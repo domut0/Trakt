@@ -2,7 +2,8 @@
 @source "../src";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
 
   --color-background: var(--background);
   --color-surface: var(--surface);
@@ -21,16 +22,16 @@
 
 :root {
   /* MyFitnessPal dark theme */
-  --background: #0E1217;
-  --surface: #1A2029;
-  --foreground: #F3F5F8;
-  --muted: #232B36;
-  --muted-foreground: #9BA5B2;
-  --border: #29323D;
+  --background: #0e1217;
+  --surface: #1a2029;
+  --foreground: #f3f5f8;
+  --muted: #232b36;
+  --muted-foreground: #9ba5b2;
+  --border: #29323d;
   /* MFP blue accent */
-  --accent: #4B82F5;
-  --accent-foreground: #FFFFFF;
-  --destructive: #F0554E;
+  --accent: #4b82f5;
+  --accent-foreground: #ffffff;
+  --destructive: #f0554e;
 }
 
 @layer base {
@@ -38,14 +39,17 @@
     border-color: var(--color-border);
     -webkit-tap-highlight-color: transparent;
   }
-  html, body, #root {
+  html,
+  body,
+  #root {
     height: 100%;
   }
   /* App-shell lock: the page itself never scrolls or rubber-bands; scrolling
      happens only inside the in-frame content area (AppShell <main>). This is
      what makes the installed PWA feel native and keeps the bottom nav / sheets
      pinned to the visible viewport instead of drifting behind browser chrome. */
-  html, body {
+  html,
+  body {
     overflow: hidden;
   }
   body {
@@ -56,10 +60,22 @@
     text-rendering: optimizeLegibility;
     overscroll-behavior: none;
   }
-  button { font-family: inherit; transition: transform 0.12s ease, opacity 0.12s ease; }
-  button:active { transform: scale(0.97); }
-  input, textarea { font-family: inherit; }
-  .tnum { font-variant-numeric: tabular-nums; }
+  button {
+    font-family: inherit;
+    transition:
+      transform 0.12s ease,
+      opacity 0.12s ease;
+  }
+  button:active {
+    transform: scale(0.97);
+  }
+  input,
+  textarea {
+    font-family: inherit;
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 @utility hairline-t {
@@ -70,16 +86,30 @@
 }
 
 @keyframes sheet-up {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 @keyframes backdrop-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @utility anim-sheet {
@@ -96,16 +126,32 @@
    plain fade fallback for fresh loads/deep links where there's no travel
    direction to key off of. */
 @keyframes route-in-right {
-  from { opacity: 0; transform: translateX(24px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 @keyframes route-in-left {
-  from { opacity: 0; transform: translateX(-24px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 @keyframes route-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 @utility anim-route-in-right {
   animation: route-in-right 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
@@ -118,10 +164,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
 }
-

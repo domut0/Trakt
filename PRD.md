@@ -2,13 +2,13 @@
 
 > Working title only — literally a placeholder because the visual direction is "Apple Notes-inspired," not because anyone's attached to the name. Rename freely.
 
-**Status:** Draft — intended for a first UI pass in Lovable. Expect a round of feedback and revision after seeing the generated UI before this becomes final.
+**Status:** Draft — intended for a first UI pass. Expect a round of feedback and revision after seeing the generated UI before this becomes final.
 
 ---
 
 ## 1. Overview
 
-A mobile-first, offline-first workout tracker for lifters who already know how to train but consistently fail to *log* their training. The product's central bet is that logging friction — not lack of motivation, not lack of a program — is the #1 reason tracking habits die. Every design decision in this document optimizes for reducing taps, typing, and decisions during an active set, in that order.
+A mobile-first, offline-first workout tracker for lifters who already know how to train but consistently fail to _log_ their training. The product's central bet is that logging friction — not lack of motivation, not lack of a program — is the #1 reason tracking habits die. Every design decision in this document optimizes for reducing taps, typing, and decisions during an active set, in that order.
 
 This is a **standalone product**, deliberately separate from LiftLens (the user's existing on-device video bar-velocity app). The two solve different problems — LiftLens is a deliberate, occasional-use video analysis tool; this is a high-frequency, every-set logging tool — and merging them would blur both identities.
 
@@ -28,7 +28,7 @@ Powerlifters, "powerbuilders" (modern bodybuilders who also chase strength on a 
 ## 4. Scope & Phasing
 
 - **Phase 1 (this PRD):** Pure PWA. Installed via Safari "Add to Home Screen." No App Store, no native wrapper, no developer account needed. Distributed by sending a URL to friends.
-- **Phase 2 (only if there's real signal — friends keep using it, or a decision to go to market):** Wrap the same codebase with Capacitor to ship on the App Store. This is a mechanical step *because* the architecture below was chosen to make it one — not a rewrite.
+- **Phase 2 (only if there's real signal — friends keep using it, or a decision to go to market):** Wrap the same codebase with Capacitor to ship on the App Store. This is a mechanical step _because_ the architecture below was chosen to make it one — not a rewrite.
 - **Out of scope indefinitely unless Phase 2 happens:** accounts, monetization, App Store presence, marketing.
 
 ## 5. Product Principles (non-negotiable)
@@ -41,12 +41,12 @@ Powerlifters, "powerbuilders" (modern bodybuilders who also chase strength on a 
 
 ## 6. Core Concepts (glossary)
 
-| Term | Definition |
-|---|---|
-| **Exercise** | A named movement (e.g., "Bench Press," or a fully custom/nicknamed lift like "Keenan Flaps"). Tagged **Main Lift** or **Accessory** (default: Accessory). Carries one optional free-text **Setup Note** (e.g., "seat: 4, pins: 12"). |
-| **Set** | One logged instance of an exercise: weight (mandatory), reps (mandatory), RPE/RIR (optional), dropset/partial-reps flag (optional). Warm-up sets are never logged — by design, not by omission. |
-| **Split Slot** | A named, recurring workout type in the user's rotation (e.g., "Heavy Bench," "Volume Bench," "Arms," or shorthand like "D2"). Created inline, on the fly, the first time it's typed — no separate management screen. |
-| **Workout Session** | One instance of a Split Slot being trained on a given day: a collection of logged Sets across one or more Exercises. |
+| Term                  | Definition                                                                                                                                                                                                                                                              |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Exercise**          | A named movement (e.g., "Bench Press," or a fully custom/nicknamed lift like "Keenan Flaps"). Tagged **Main Lift** or **Accessory** (default: Accessory). Carries one optional free-text **Setup Note** (e.g., "seat: 4, pins: 12").                                    |
+| **Set**               | One logged instance of an exercise: weight (mandatory), reps (mandatory), RPE/RIR (optional), dropset/partial-reps flag (optional). Warm-up sets are never logged — by design, not by omission.                                                                         |
+| **Split Slot**        | A named, recurring workout type in the user's rotation (e.g., "Heavy Bench," "Volume Bench," "Arms," or shorthand like "D2"). Created inline, on the fly, the first time it's typed — no separate management screen.                                                    |
+| **Workout Session**   | One instance of a Split Slot being trained on a given day: a collection of logged Sets across one or more Exercises.                                                                                                                                                    |
 | **Time Between Sets** | A passive, count-up stopwatch value captured per set — literally the elapsed time since the previous set was logged. Explicitly **not** called "rest time" because it also includes the time spent performing the next set — an honest label, not a precise rest-timer. |
 
 ## 7. Feature Specification
@@ -54,7 +54,7 @@ Powerlifters, "powerbuilders" (modern bodybuilders who also chase strength on a 
 ### 7.1 Starting a Workout
 
 - Home screen shows one large **"Start Workout"** button.
-- Tapping it reveals a single text field, prefilled with a **predicted Split Slot name** (see 7.2), placeholder text like *"Heavy Bench, D2, Arms…"*.
+- Tapping it reveals a single text field, prefilled with a **predicted Split Slot name** (see 7.2), placeholder text like _"Heavy Bench, D2, Arms…"_.
 - The field autocompletes against existing Split Slot names as the user types. Matching is **case-insensitive and whitespace-trimmed** ("Heavy Bench" = "heavy bench" = " Heavy Bench ") so typos never silently fork a slot's history into two disconnected threads.
 - Accepting the prefilled name, picking an autocomplete match, or typing something entirely new are all one motion — no separate "create a split" flow exists anywhere in the app.
 - Tapping confirm enters **Workout Mode**.
@@ -62,16 +62,16 @@ Powerlifters, "powerbuilders" (modern bodybuilders who also chase strength on a 
 ### 7.2 Split Slot Rotation Prediction
 
 - Split Slots have an implicit rotation order (the order they were first created in, reorderable — see 7.9).
-- "Start Workout" prefills the *next slot in rotation order after whichever slot was logged most recently*, pure round-robin. It has no concept of calendar days or training blocks — it just advances the list.
+- "Start Workout" prefills the _next slot in rotation order after whichever slot was logged most recently_, pure round-robin. It has no concept of calendar days or training blocks — it just advances the list.
 - The user can always override the prefilled name.
 
 ### 7.3 Workout Mode (the core screen)
 
-Inspired by Strava's minimal in-activity screen. Shown only while a workout is active. Contains, and *only* contains:
+Inspired by Strava's minimal in-activity screen. Shown only while a workout is active. Contains, and _only_ contains:
 
 - **A big "Log Set" button** (primary, center of screen).
 - **The current exercise name**, sticky until changed — the first set of any exercise requires picking it from the exercise autocomplete/recents; every subsequent set defaults to the same exercise.
-- **A "Next Exercise" button** — advances the "current exercise" context. Pulls an incrementally-suggested next exercise from the *last time this same Split Slot occurred*, one at a time (not a bulk pre-loaded plan). The suggestion includes that exercise's last-logged weight/reps as a starting prefill. Always overridable via search.
+- **A "Next Exercise" button** — advances the "current exercise" context. Pulls an incrementally-suggested next exercise from the _last time this same Split Slot occurred_, one at a time (not a bulk pre-loaded plan). The suggestion includes that exercise's last-logged weight/reps as a starting prefill. Always overridable via search.
 - **The "time between sets" stopwatch**, small, passive, count-up, no alarms, no targets, resets every time a set is logged.
 - **A "View Workout" button** — opens the full session breakdown (7.6).
 - **An "End Workout" button.**
@@ -95,8 +95,8 @@ Confirming logs the set, starts/resets the "time between sets" stopwatch, and re
 
 Two related but distinct matching rules, both scoped **per Split Slot**, never globally per-exercise (a lifter who trains the same exercise across multiple differently-structured days — e.g., "Heavy Bench" top-single+backdowns vs. "Volume Bench" straight sets of 6 — must not have these threads cross-contaminate each other):
 
-1. **"Next Exercise" suggestion:** pulls from the last occurrence of the *same Split Slot*, advancing one exercise at a time in the order they were logged that day.
-2. **Distinct-weight block matching (within one exercise, one session):** the *first* distinct weight/rep-scheme logged for an exercise in today's session prefills from the *first* distinct weight/rep-scheme logged for that exercise **the last time this same Split Slot occurred**; the second distinct one prefills from the second, and so on. This is how a top single (block 1) and backdown triples (block 2) each get correctly prefilled from history, without a formal "training block" data model.
+1. **"Next Exercise" suggestion:** pulls from the last occurrence of the _same Split Slot_, advancing one exercise at a time in the order they were logged that day.
+2. **Distinct-weight block matching (within one exercise, one session):** the _first_ distinct weight/rep-scheme logged for an exercise in today's session prefills from the _first_ distinct weight/rep-scheme logged for that exercise **the last time this same Split Slot occurred**; the second distinct one prefills from the second, and so on. This is how a top single (block 1) and backdown triples (block 2) each get correctly prefilled from history, without a formal "training block" data model.
 
 **Self-correcting block transitions:** when a training block changes (e.g., moving from heavy singles+backdown triples to heavy doubles+backdown 4s), the prefill will initially suggest the old rep scheme — the user manually corrects it once, that day. The next time this Split Slot occurs, "most recent occurrence" is now the corrected version, so it prefills correctly from then on with zero explicit block-versioning logic required.
 
@@ -109,8 +109,8 @@ Two related but distinct matching rules, both scoped **per Split Slot**, never g
 
 ### 7.7 Feedback & Motivation
 
-- After logging a qualifying set, an in-app toast/banner surfaces a **time-windowed motivational message** — e.g., *"Heaviest squat triple this month"* or *"Tricep pushdown progressed this week."*
-- Detection is based on **estimated 1RM** (Epley/Brzycki formula applied to any logged set, not just true maximal singles) and **rep-at-a-given-weight** bests, computed within rolling weekly/monthly windows — deliberately *not* a rigid "all-time PR" system, since powerlifters rarely hit true maximal efforts outside of a meet.
+- After logging a qualifying set, an in-app toast/banner surfaces a **time-windowed motivational message** — e.g., _"Heaviest squat triple this month"_ or _"Tricep pushdown progressed this week."_
+- Detection is based on **estimated 1RM** (Epley/Brzycki formula applied to any logged set, not just true maximal singles) and **rep-at-a-given-weight** bests, computed within rolling weekly/monthly windows — deliberately _not_ a rigid "all-time PR" system, since powerlifters rarely hit true maximal efforts outside of a meet.
 - **Toggleable off entirely in Settings.**
 - **In-app only.** No push notifications of any kind — no streak reminders, no "you haven't logged in a while" nudges. This is an architectural constraint, not just a scope cut: real push notifications require a server to trigger sends, which breaks the zero-backend design.
 - No streaks, no gamification mascot, no badges in v1 — considered and explicitly deferred, not because they're bad ideas, but because a personal app validating basic feedback-loop mechanics doesn't need them yet.
@@ -152,7 +152,7 @@ Two related but distinct matching rules, both scoped **per Split Slot**, never g
 
 - **Export:** one button dumps all data (exercises, sets, split slots, setup notes) to a JSON file via the OS share sheet (save to Files/iCloud/email to self).
 - **Import:** reads a previously-exported JSON file back into a fresh install.
-- This is the *only* backup mechanism, given the deliberate no-backend/no-accounts architecture — a phone loss or reinstall without an export is unrecoverable data loss. Non-negotiable for v1 given that real training history is going into this.
+- This is the _only_ backup mechanism, given the deliberate no-backend/no-accounts architecture — a phone loss or reinstall without an export is unrecoverable data loss. Non-negotiable for v1 given that real training history is going into this.
 
 ## 8. Explicit Non-Goals for v1
 
@@ -190,7 +190,7 @@ No user/account entity — a fresh install has no identity beyond its local data
 
 - **Font:** Space Grotesk (shared with LiftLens, for the builder's own visual consistency across apps).
 - **Aesthetic:** Apple Notes-inspired minimalism — clean, restrained, native-feeling. Flat list rows, thin dividers, no heavy shadows, no gradient buttons.
-- **Explicitly avoid:** em dashes in UI copy, glow/gradient effects, orange accent tabs, or any other visual signature typical of default AI-generated ("vibe-coded") UI. This should not look or read like a Claude/Lovable template — it should look hand-considered.
+- **Explicitly avoid:** em dashes in UI copy, glow/gradient effects, orange accent tabs, or any other visual signature typical of default AI-generated ("vibe-coded") UI. This should not look or read like a generated template — it should look hand-considered.
 - **Distinct from LiftLens:** same font, different accent color and overall visual identity, so the two apps are clearly not the same product when installed side by side. LiftLens is dark-only with an orange AWP-inspired accent — this app should not reuse that palette.
 - **Mobile-only.** No desktop/responsive layout work.
 
@@ -199,8 +199,8 @@ No user/account entity — a fresh install has no identity beyond its local data
 A single powerbuilding "Heavy Bench" session, illustrating the flow end to end:
 
 1. User taps **Start Workout** → field prefilled with "Heavy Bench" (predicted next in rotation) → confirms.
-2. Enters Workout Mode. Taps **Log Set** → picks "Bench Press" (Main Lift) → weight 225, reps 3, RPE 7, sets stepper left at 1 → confirms. Logged: *Bench Press, 225×3 @7*.
-3. Taps **Log Set** again (exercise still sticky as "Bench Press") → adjusts weight down to 190, reps to 5, RPE 6, bumps **Sets stepper to 4** (declaring the backdown block) → confirms. Logged: *Bench Press, 190×5 @6* (set 1 of 4). Button now reads **"Log Next Set (2 of 4)."** Stopwatch starts.
+2. Enters Workout Mode. Taps **Log Set** → picks "Bench Press" (Main Lift) → weight 225, reps 3, RPE 7, sets stepper left at 1 → confirms. Logged: _Bench Press, 225×3 @7_.
+3. Taps **Log Set** again (exercise still sticky as "Bench Press") → adjusts weight down to 190, reps to 5, RPE 6, bumps **Sets stepper to 4** (declaring the backdown block) → confirms. Logged: _Bench Press, 190×5 @6_ (set 1 of 4). Button now reads **"Log Next Set (2 of 4)."** Stopwatch starts.
 4. User rests, performs backdown set 2, immediately taps the single button (no re-entry) → logged with its own accurate "time between sets." Repeats for sets 3 and 4.
 5. Taps **Next Exercise** → app suggests "Keenan Flaps" (from last "Heavy Bench" session, in sequence) at its last-logged weight/reps → user confirms or adjusts → logs 2×6 @57.5, RPE 10 each (accessory, always near-failure, no block-matching ambiguity since it's a single distinct weight).
 6. Continues through remaining accessories the same way.
@@ -209,6 +209,6 @@ A single powerbuilding "Heavy Bench" session, illustrating the flow end to end:
 
 ## 13. Open Questions / Next Steps
 
-1. Prototype the screens above in Lovable (Home, Start Workout, Workout Mode, Log Set sheet, View Workout, History, Charts, Settings) to validate the visual direction (Section 11).
+1. Prototype the screens above (Home, Start Workout, Workout Mode, Log Set sheet, View Workout, History, Charts, Settings) to validate the visual direction (Section 11).
 2. Review the generated UI against Section 11's explicit "avoid" list before treating any screen as final.
 3. Revise this PRD based on what does/doesn't work once real screens exist, then treat that revision as final v1.
