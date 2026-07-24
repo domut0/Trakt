@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useStore } from "../lib/store";
 
 export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -50,7 +51,7 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
     return list.slice(0, 20);
   }, [exercises, exerciseQuery]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const canLog = exerciseId && (weight.trim() || suggestion.weight != null) && (reps.trim() || suggestion.reps != null);
 
@@ -71,8 +72,8 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 anim-backdrop" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end justify-center bg-black/30 anim-backdrop" onClick={onClose}>
       <div
         className="w-full max-w-md rounded-t-3xl bg-surface anim-sheet"
         onClick={(e) => e.stopPropagation()}
@@ -180,7 +181,8 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

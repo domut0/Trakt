@@ -109,7 +109,7 @@ export function BottomNav() {
   const currentIndex = items.findIndex((it) => it.to === location.pathname);
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-30 hairline-t bg-background/95 backdrop-blur"
+      className="relative z-30 shrink-0 hairline-t bg-background"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
     >
       <ul className="mx-auto flex max-w-md items-stretch justify-around px-2 pt-2">
@@ -141,7 +141,7 @@ export function BottomNav() {
   );
 }
 
-export function AppShell({ children, bottomPad = true }: { children: ReactNode; bottomPad?: boolean }) {
+export function AppShell({ children }: { children: ReactNode }) {
   const activeSessionId = useStore((s) => s.activeSessionId);
   const chartsEnabled = useStore((s) => s.chartsEnabled);
   const calendarEnabled = useStore((s) => s.calendarEnabled);
@@ -199,11 +199,10 @@ export function AppShell({ children, bottomPad = true }: { children: ReactNode; 
   };
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background">
+    <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
       <ActiveSessionBanner />
       <main
-        className={(showBanner ? "flex-1 pt-11" : "flex-1") + " " + routeAnimClass}
-        style={{ paddingBottom: bottomPad ? 88 : 0 }}
+        className={"min-h-0 flex-1 overflow-y-auto overscroll-contain " + (showBanner ? "pt-11 " : "") + routeAnimClass}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >

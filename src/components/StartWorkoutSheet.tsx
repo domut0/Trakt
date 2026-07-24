@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useStore } from "../lib/store";
 
 export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; onClose: () => void; onStart: (sessionId: string) => void }) {
@@ -15,7 +16,7 @@ export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; o
     }
   }, [open, predicted]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const trimmed = value.trim();
   const suggestions = trimmed
@@ -29,8 +30,8 @@ export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; o
     onStart(id);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/25 anim-backdrop" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end justify-center bg-black/25 anim-backdrop" onClick={onClose}>
       <div
         className="w-full max-w-md rounded-t-3xl bg-surface p-5 pb-8 anim-sheet"
         onClick={(e) => e.stopPropagation()}
@@ -68,6 +69,7 @@ export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; o
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useStore, type WorkoutSet } from "../lib/store";
 
 function fmtTBS(s?: number) {
@@ -132,8 +133,9 @@ function EditSetSheet({ s, onClose, onSave }: { s: WorkoutSet; onClose: () => vo
   const [weight, setWeight] = useState(String(s.weight));
   const [reps, setReps] = useState(String(s.reps));
   const [rpe, setRpe] = useState(s.rpe != null ? String(s.rpe) : "");
-  return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/30 anim-backdrop" onClick={onClose}>
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end bg-black/30 anim-backdrop" onClick={onClose}>
       <div className="mx-auto w-full max-w-md rounded-t-3xl bg-surface p-5 anim-sheet" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}>
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
         <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Edit set</div>
@@ -164,6 +166,7 @@ function EditSetSheet({ s, onClose, onSave }: { s: WorkoutSet; onClose: () => vo
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -41,13 +41,20 @@
   html, body, #root {
     height: 100%;
   }
+  /* App-shell lock: the page itself never scrolls or rubber-bands; scrolling
+     happens only inside the in-frame content area (AppShell <main>). This is
+     what makes the installed PWA feel native and keeps the bottom nav / sheets
+     pinned to the visible viewport instead of drifting behind browser chrome. */
+  html, body {
+    overflow: hidden;
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    overscroll-behavior-y: none;
+    overscroll-behavior: none;
   }
   button { font-family: inherit; transition: transform 0.12s ease, opacity 0.12s ease; }
   button:active { transform: scale(0.97); }
