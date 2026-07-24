@@ -7,9 +7,9 @@ export const Route = createFileRoute("/settings")({
   head: () => ({
     meta: [
       { title: "Settings" },
-      { name: "description", content: "Units, feedback, rotation and backup." },
+      { name: "description", content: "Units, feedback and backup." },
       { property: "og:title", content: "Settings" },
-      { property: "og:description", content: "Units, feedback, rotation and backup." },
+      { property: "og:description", content: "Units, feedback and backup." },
     ],
   }),
   component: SettingsPage,
@@ -20,8 +20,6 @@ function SettingsPage() {
   const setUnit = useStore((s) => s.setUnit);
   const motivationEnabled = useStore((s) => s.motivationEnabled);
   const toggleMotivation = useStore((s) => s.toggleMotivation);
-  const slots = [...useStore((s) => s.slots)].sort((a, b) => a.rotationOrder - b.rotationOrder);
-  const reorderSlots = useStore((s) => s.reorderSlots);
   const importData = useStore((s) => s.importData);
 
   // Import flow: a selected file is parsed and fully validated (parseBackup)
@@ -111,31 +109,6 @@ function SettingsPage() {
           </div>
           <Toggle checked={motivationEnabled} onChange={toggleMotivation} />
         </div>
-      </Section>
-
-      <Section title="Split rotation">
-        <ul className="bg-surface">
-          {slots.map((s, i) => (
-            <li key={s.id} className="flex items-center justify-between px-5 py-3.5 hairline-t">
-              <div className="flex items-baseline gap-3">
-                <span className="tnum w-5 text-[13px] text-muted-foreground">{i + 1}</span>
-                <span className="text-[15px]">{s.name}</span>
-              </div>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => i > 0 && reorderSlots(s.id, slots[i - 1].id)}
-                  disabled={i === 0}
-                  className="h-8 w-8 rounded-full bg-muted text-[14px] disabled:opacity-30"
-                >↑</button>
-                <button
-                  onClick={() => i < slots.length - 1 && reorderSlots(s.id, slots[i + 1].id)}
-                  disabled={i === slots.length - 1}
-                  className="h-8 w-8 rounded-full bg-muted text-[14px] disabled:opacity-30"
-                >↓</button>
-              </div>
-            </li>
-          ))}
-        </ul>
       </Section>
 
       <Section title="Data">
