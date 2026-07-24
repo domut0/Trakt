@@ -17,6 +17,8 @@ export interface SettingsMeta {
   key: "settings";
   unit: "lbs" | "kg";
   motivationEnabled: boolean;
+  chartsEnabled?: boolean;
+  calendarEnabled?: boolean;
 }
 
 export interface ActiveSessionMeta {
@@ -67,6 +69,8 @@ export const DEFAULT_SETTINGS: SettingsMeta = {
   key: "settings",
   unit: "lbs",
   motivationEnabled: true,
+  chartsEnabled: true,
+  calendarEnabled: true,
 };
 
 export const EMPTY_ACTIVE_SESSION: ActiveSessionMeta = {

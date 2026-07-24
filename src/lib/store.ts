@@ -70,6 +70,8 @@ type CurrentBlock = {
 interface State {
   unit: "lbs" | "kg";
   motivationEnabled: boolean;
+  chartsEnabled: boolean;
+  calendarEnabled: boolean;
   exercises: Exercise[];
   slots: SplitSlot[];
   sessions: WorkoutSession[];
@@ -92,6 +94,8 @@ interface State {
   updateSet: (setId: string, patch: Partial<WorkoutSet>) => void;
   toggleMotivation: () => void;
   setUnit: (u: "lbs" | "kg") => void;
+  setChartsEnabled: (v: boolean) => void;
+  setCalendarEnabled: (v: boolean) => void;
   reorderSlots: (fromId: string, toId: string) => void;
   /** Full backup restore. Assumes `data` has already been validated by
    * `parseBackup` — replaces IndexedDB first (single transaction; a failure
@@ -510,13 +514,22 @@ function persistActiveMeta(meta: {
   );
 }
 
-function persistSettings(unit: "lbs" | "kg", motivationEnabled: boolean) {
-  safeWrite(() => db.meta.put({ key: "settings", unit, motivationEnabled }));
+function persistSettings(
+  unit: "lbs" | "kg",
+  motivationEnabled: boolean,
+  chartsEnabled: boolean,
+  calendarEnabled: boolean,
+) {
+  safeWrite(() =>
+    db.meta.put({ key: "settings", unit, motivationEnabled, chartsEnabled, calendarEnabled }),
+  );
 }
 
 export const useStore = create<State>((set, get) => ({
   unit: "lbs",
   motivationEnabled: true,
+  chartsEnabled: true,
+  calendarEnabled: true,
   exercises: [],
   slots: [],
   sessions: [],
@@ -537,7 +550,13 @@ export const useStore = create<State>((set, get) => ({
     try {
       const empty = await isDbEmpty();
       if (empty) {
-        const settings: SettingsMeta = { key: "settings", unit: "lbs", motivationEnabled: true };
+        const settings: SettingsMeta = {
+          key: "settings",
+          unit: "lbs",
+          motivationEnabled: true,
+          chartsEnabled: true,
+          calendarEnabled: true,
+        };
         await seedDb({
           exercises: seedExercises,
           slots: seedSlots,
@@ -552,6 +571,8 @@ export const useStore = create<State>((set, get) => ({
           sets: seedSets,
           unit: settings.unit,
           motivationEnabled: settings.motivationEnabled,
+          chartsEnabled: true,
+          calendarEnabled: true,
           activeSessionId: undefined,
           currentExerciseId: undefined,
           currentBlock: undefined,
@@ -567,6 +588,8 @@ export const useStore = create<State>((set, get) => ({
         sets: data.sets,
         unit: data.settings.unit,
         motivationEnabled: data.settings.motivationEnabled,
+        chartsEnabled: data.settings.chartsEnabled ?? true,
+        calendarEnabled: data.settings.calendarEnabled ?? true,
         activeSessionId: data.activeSession.activeSessionId,
         currentExerciseId: data.activeSession.currentExerciseId,
         currentBlock: data.activeSession.currentBlock,
@@ -730,12 +753,22 @@ export const useStore = create<State>((set, get) => ({
   toggleMotivation: () => {
     const next = !get().motivationEnabled;
     set({ motivationEnabled: next });
-    persistSettings(get().unit, next);
+    persistSettings(get().unit, next, get().chartsEnabled, get().calendarEnabled);
   },
 
   setUnit: (u) => {
     set({ unit: u });
-    persistSettings(u, get().motivationEnabled);
+    persistSettings(u, get().motivationEnabled, get().chartsEnabled, get().calendarEnabled);
+  },
+
+  setChartsEnabled: (v) => {
+    set({ chartsEnabled: v });
+    persistSettings(get().unit, get().motivationEnabled, v, get().calendarEnabled);
+  },
+
+  setCalendarEnabled: (v) => {
+    set({ calendarEnabled: v });
+    persistSettings(get().unit, get().motivationEnabled, get().chartsEnabled, v);
   },
 
   reorderSlots: (fromId, toId) => {
@@ -763,6 +796,8 @@ export const useStore = create<State>((set, get) => ({
       sets: data.sets,
       unit: data.unit,
       motivationEnabled: data.motivationEnabled,
+      chartsEnabled: true,
+      calendarEnabled: true,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
@@ -789,6 +824,8 @@ export const useStore = create<State>((set, get) => ({
       sets: [],
       unit: "lbs",
       motivationEnabled: true,
+      chartsEnabled: true,
+      calendarEnabled: true,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,

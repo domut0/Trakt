@@ -2,11 +2,12 @@ import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { type ReactNode } from "react";
 import { useStore } from "../lib/store";
 
-function Icon({ name }: { name: "home" | "chart" | "settings" }) {
+function Icon({ name }: { name: "home" | "chart" | "calendar" | "settings" }) {
   const stroke = "currentColor";
   const common = { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none", stroke, strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   if (name === "home") return (<svg {...common}><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>);
   if (name === "chart") return (<svg {...common}><path d="M4 19h16"/><path d="M6 15l4-5 4 3 4-7"/></svg>);
+  if (name === "calendar") return (<svg {...common}><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M7.5 13.5h3"/><path d="M13.5 13.5h3"/></svg>);
   return (<svg {...common}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>);
 }
 
@@ -40,10 +41,13 @@ export function ActiveSessionBanner() {
 export function BottomNav() {
   const location = useLocation();
   const activeSessionId = useStore((s) => s.activeSessionId);
+  const chartsEnabled = useStore((s) => s.chartsEnabled);
+  const calendarEnabled = useStore((s) => s.calendarEnabled);
   if (location.pathname === "/workout") return null;
   const items = [
     { to: "/", label: "Home", icon: "home" as const },
-    { to: "/charts", label: "Charts", icon: "chart" as const },
+    ...(chartsEnabled ? [{ to: "/charts", label: "Charts", icon: "chart" as const }] : []),
+    ...(calendarEnabled ? [{ to: "/calendar", label: "Calendar", icon: "calendar" as const }] : []),
     { to: "/settings", label: "Settings", icon: "settings" as const },
   ];
   return (

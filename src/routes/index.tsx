@@ -76,7 +76,12 @@ function Home() {
       <section className="mt-9">
         <div className="flex items-baseline justify-between px-5 pb-2">
           <h2 className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">History</h2>
-          <span className="text-[12px] text-muted-foreground">{history.length} sessions</span>
+          <div className="flex items-baseline gap-3">
+            <span className="text-[12px] text-muted-foreground">{history.length} sessions</span>
+            <Link to="/calendar" className="text-[12px] font-semibold text-accent">
+              Calendar
+            </Link>
+          </div>
         </div>
 
         {history.length === 0 && (
