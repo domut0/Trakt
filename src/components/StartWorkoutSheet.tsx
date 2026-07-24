@@ -10,7 +10,7 @@ export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; o
 
   useEffect(() => {
     if (open) {
-      setValue(predicted ?? "");
+      setValue("");
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open, predicted]);
@@ -23,7 +23,7 @@ export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; o
     : [];
 
   const handleStart = (name?: string) => {
-    const n = (name ?? value).trim();
+    const n = (name ?? value).trim() || (predicted ?? "");
     if (!n) return;
     const id = startWorkout(n);
     onStart(id);
@@ -42,8 +42,8 @@ export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; o
           ref={inputRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Heavy Bench, D2, Arms…"
-          className="mt-2 w-full bg-transparent text-[26px] font-semibold tracking-tight outline-none placeholder:text-muted-foreground/50"
+          placeholder={predicted ? `suggested: ${predicted}` : "Heavy Bench, D2, Arms…"}
+          className="mt-2 w-full bg-transparent text-[26px] font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
           onKeyDown={(e) => { if (e.key === "Enter") handleStart(); }}
         />
         {suggestions.length > 0 && (
@@ -61,7 +61,7 @@ export function StartWorkoutSheet({ open, onClose, onStart }: { open: boolean; o
           <button onClick={onClose} className="flex-1 rounded-full py-3 text-[15px] font-medium text-muted-foreground hairline-t">Cancel</button>
           <button
             onClick={() => handleStart()}
-            disabled={!trimmed}
+            disabled={!(trimmed || predicted)}
             className="flex-[2] rounded-full bg-accent py-3 text-[15px] font-semibold text-accent-foreground disabled:opacity-40"
           >
             Start

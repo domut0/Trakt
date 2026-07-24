@@ -5,6 +5,7 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
   const activeSessionId = useStore((s) => s.activeSessionId)!;
   const currentExerciseId = useStore((s) => s.currentExerciseId);
   const exercises = useStore((s) => s.exercises);
+  const sets = useStore((s) => s.sets);
   const addExercise = useStore((s) => s.addExercise);
   const setCurrentExercise = useStore((s) => s.setCurrentExercise);
   const prefillFor = useStore((s) => s.prefillFor);
@@ -26,17 +27,20 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
     setPickingExercise(!eid);
     setFlag(false);
     setTargetSets(1);
+    setWeight("");
+    setReps("");
     setRpe("");
-    if (eid && activeSessionId) {
-      const pf = prefillFor(activeSessionId, eid);
-      setWeight(pf.weight != null ? String(pf.weight) : "");
-      setReps(pf.reps != null ? String(pf.reps) : "");
-      setRpe(pf.rpe != null ? String(pf.rpe) : "");
-    } else {
-      setWeight("");
-      setReps("");
-    }
-  }, [open, currentExerciseId, activeSessionId, prefillFor]);
+  }, [open, currentExerciseId]);
+
+  const suggestion = useMemo(() => {
+    if (!exerciseId) return {} as { weight?: number; reps?: number; rpe?: number };
+    const priorSetsThisSession = sets
+      .filter((s) => s.sessionId === activeSessionId && s.exerciseId === exerciseId)
+      .sort((a, b) => b.loggedAt - a.loggedAt);
+    const mostRecent = priorSetsThisSession[0];
+    if (mostRecent) return { weight: mostRecent.weight, reps: mostRecent.reps, rpe: mostRecent.rpe };
+    return activeSessionId ? prefillFor(activeSessionId, exerciseId) : {};
+  }, [sets, activeSessionId, exerciseId, prefillFor]);
 
   const chosen = exercises.find((e) => e.id === exerciseId);
 
@@ -48,15 +52,19 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
 
   if (!open) return null;
 
-  const canLog = exerciseId && weight.trim() && reps.trim();
+  const canLog = exerciseId && (weight.trim() || suggestion.weight != null) && (reps.trim() || suggestion.reps != null);
 
   const doLog = () => {
     if (!canLog) return;
+    const w = weight.trim() ? parseFloat(weight) : suggestion.weight;
+    const r = reps.trim() ? parseInt(reps, 10) : suggestion.reps;
+    const rp = rpe.trim() ? parseFloat(rpe) : suggestion.rpe;
+    if (w == null || Number.isNaN(w) || r == null || Number.isNaN(r)) return;
     logSet({
       exerciseId: exerciseId!,
-      weight: parseFloat(weight),
-      reps: parseInt(reps, 10),
-      rpe: rpe ? parseFloat(rpe) : undefined,
+      weight: w,
+      reps: r,
+      rpe: rp,
       isDropsetOrPartial: flag || undefined,
       targetSets,
     });
@@ -85,7 +93,7 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
               {filtered.map((e) => (
                 <li key={e.id}>
                   <button
-                    onClick={() => { setExerciseId(e.id); setCurrentExercise(e.id); setPickingExercise(false); if (activeSessionId) { const pf = prefillFor(activeSessionId, e.id); setWeight(pf.weight != null ? String(pf.weight) : ""); setReps(pf.reps != null ? String(pf.reps) : ""); setRpe(pf.rpe != null ? String(pf.rpe) : ""); } }}
+                    onClick={() => { setExerciseId(e.id); setCurrentExercise(e.id); setPickingExercise(false); setWeight(""); setReps(""); setRpe(""); }}
                     className="flex w-full items-center justify-between py-3 text-left"
                   >
                     <span className="text-[16px]">{e.name}</span>
@@ -123,11 +131,27 @@ export function LogSetSheet({ open, onClose }: { open: boolean; onClose: () => v
             )}
 
             <div className="mt-5 grid grid-cols-2 gap-3">
-              <NumField label="Weight" suffix={useStore.getState().unit} value={weight} onChange={setWeight} />
-              <NumField label="Reps" value={reps} onChange={setReps} />
+              <NumField
+                label="Weight"
+                suffix={useStore.getState().unit}
+                value={weight}
+                onChange={setWeight}
+                placeholder={suggestion.weight != null ? String(suggestion.weight) : "0"}
+              />
+              <NumField
+                label="Reps"
+                value={reps}
+                onChange={setReps}
+                placeholder={suggestion.reps != null ? String(suggestion.reps) : "0"}
+              />
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <NumField label="RPE" placeholder="—" value={rpe} onChange={setRpe} />
+              <NumField
+                label="RPE"
+                placeholder={suggestion.rpe != null ? String(suggestion.rpe) : "—"}
+                value={rpe}
+                onChange={setRpe}
+              />
               <div className="rounded-xl bg-muted p-3">
                 <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Sets</div>
                 <div className="mt-1 flex items-center justify-between">
@@ -170,7 +194,7 @@ function NumField({ label, value, onChange, placeholder, suffix }: { label: stri
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder ?? "0"}
-          className="tnum w-full bg-transparent text-[22px] font-semibold outline-none placeholder:text-muted-foreground/50"
+          className="tnum w-full bg-transparent text-[22px] font-semibold outline-none placeholder:text-muted-foreground"
         />
         {suffix && <span className="text-[12px] text-muted-foreground">{suffix}</span>}
       </div>
