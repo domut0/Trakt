@@ -118,7 +118,7 @@ function CalendarPage() {
         ))}
       </div>
 
-      <div className="mx-5 grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-border bg-border">
+      <div key={monthLabel} className="mx-5 grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-border bg-border anim-fade-up">
         {cells.map((cell, i) => {
           if (!cell) return <div key={`blank-${i}`} className="min-h-[64px] bg-surface" />;
           const workouts = byDay.get(cell.key) ?? [];
@@ -152,7 +152,7 @@ function CalendarPage() {
         })}
       </div>
 
-      <section className="mt-6">
+      <section className="mt-6" key={selectedKey}>
         <div className="px-5 pb-2">
           <h2 className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
             {format(selectedDate, "EEEE, MMMM d")}
@@ -160,12 +160,12 @@ function CalendarPage() {
         </div>
 
         {selectedSessions.length === 0 ? (
-          <div className="mx-5 rounded-xl bg-muted px-4 py-8 text-center text-[14px] text-muted-foreground">
+          <div className="mx-5 rounded-xl bg-muted px-4 py-8 text-center text-[14px] text-muted-foreground anim-fade-up">
             No workout logged.
           </div>
         ) : (
           <ul className="space-y-3 px-5">
-            {selectedSessions.map((session) => {
+            {selectedSessions.map((session, i) => {
               const slot = slots.find((sl) => sl.id === session.splitSlotId);
               const setCount = sets.filter((x) => x.sessionId === session.id).length;
               return (
@@ -174,6 +174,7 @@ function CalendarPage() {
                     to="/session/$id"
                     params={{ id: session.id }}
                     className="flex items-center justify-between rounded-2xl bg-surface px-5 py-4 anim-fade-up"
+                    style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
                   >
                     <div className="min-w-0 flex-1 pr-3">
                       <div className="flex items-baseline gap-2">

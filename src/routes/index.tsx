@@ -54,7 +54,7 @@ function Home() {
         <h1 className="text-[34px] font-semibold leading-none tracking-tight">Log</h1>
       </header>
 
-      <div className="px-5">
+      <div className="px-5 anim-fade-up">
         {activeSessionId ? (
           <button
             onClick={() => router.navigate({ to: "/workout" })}
@@ -91,12 +91,13 @@ function Home() {
         )}
 
         <ul className="space-y-3 px-5">
-          {history.map(({ session, slotName, setCount, exercises: exNames }) => (
+          {history.map(({ session, slotName, setCount, exercises: exNames }, i) => (
             <li key={session.id}>
               <Link
                 to="/session/$id"
                 params={{ id: session.id }}
                 className="flex items-center justify-between rounded-2xl bg-surface px-5 py-4 anim-fade-up"
+                style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
               >
                 <div className="min-w-0 flex-1 pr-3">
                   <div className="flex items-baseline gap-2">

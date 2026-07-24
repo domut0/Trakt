@@ -45,13 +45,13 @@ function ChartsPage() {
         <p className="mt-1 text-[14px] text-muted-foreground">Estimated 1RM over time.</p>
       </header>
 
-      <div className="scrollbar-none flex gap-2 overflow-x-auto px-5 pb-4">
+      <div data-swipe-ignore className="scrollbar-none flex gap-2 overflow-x-auto px-5 pb-4 anim-fade-up">
         {withData.map((e) => (
           <button
             key={e.id}
             onClick={() => setSelectedId(e.id)}
             className={
-              "whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors " +
+              "whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors duration-200 " +
               (selectedId === e.id ? "bg-foreground text-background" : "bg-muted text-muted-foreground")
             }
           >
@@ -60,7 +60,7 @@ function ChartsPage() {
         ))}
       </div>
 
-      <div className="mx-5 rounded-2xl bg-surface p-5 hairline-t hairline-b">
+      <div className="mx-5 rounded-2xl bg-surface p-5 hairline-t hairline-b anim-fade-up" style={{ animationDelay: "40ms" }}>
         <Chart points={points} unit={unit} />
         <div className="mt-4 flex items-baseline justify-between">
           <div>

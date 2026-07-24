@@ -97,7 +97,7 @@ function SettingsPage() {
         <h1 className="text-[30px] font-semibold tracking-tight">Settings</h1>
       </header>
 
-      <Section title="Units">
+      <Section title="Units" delay={0}>
         <div className="flex gap-2 px-5 py-3">
           {(["lbs", "kg"] as const).map((u) => (
             <button
@@ -114,7 +114,7 @@ function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="Feedback">
+      <Section title="Feedback" delay={40}>
         <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
           <div>
             <div className="text-[15px]">Motivational messages</div>
@@ -124,7 +124,7 @@ function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="Tabs">
+      <Section title="Tabs" delay={80}>
         <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
           <div>
             <div className="text-[15px]">Charts tab</div>
@@ -141,7 +141,7 @@ function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="Data">
+      <Section title="Data" delay={120}>
         <button onClick={exportJson} className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t">
           <div>
             <div className="text-[15px]">Export backup</div>
@@ -183,7 +183,7 @@ function SettingsPage() {
         )}
       </Section>
 
-      <Section title="Reset">
+      <Section title="Reset" delay={160}>
         {!showClearConfirm ? (
           <button onClick={() => setShowClearConfirm(true)} className="flex w-full items-center justify-between px-5 py-3.5 text-left">
             <div>
@@ -214,9 +214,9 @@ function SettingsPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, delay = 0 }: { title: string; children: React.ReactNode; delay?: number }) {
   return (
-    <section className="mt-6">
+    <section className="mt-6 anim-fade-up" style={{ animationDelay: `${delay}ms` }}>
       <div className="px-5 pb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">{title}</div>
       <div className="bg-surface hairline-t hairline-b">{children}</div>
     </section>

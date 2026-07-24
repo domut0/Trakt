@@ -1,6 +1,67 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
-import { type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useStore } from "../lib/store";
+
+type TabPath = "/" | "/charts" | "/calendar" | "/settings";
+type TabItem = {
+  to: TabPath;
+  label: string;
+  icon: "home" | "chart" | "calendar" | "settings";
+  requires?: "charts" | "calendar";
+};
+
+const ALL_TABS: TabItem[] = [
+  { to: "/", label: "Home", icon: "home" },
+  { to: "/charts", label: "Charts", icon: "chart", requires: "charts" },
+  { to: "/calendar", label: "Calendar", icon: "calendar", requires: "calendar" },
+  { to: "/settings", label: "Settings", icon: "settings" },
+];
+
+/**
+ * Ordered list of tabs currently shown in the bottom nav, respecting the
+ * Charts/Calendar toggles in Settings. Shared by BottomNav (rendering) and
+ * AppShell (swipe navigation + directional transitions) so both always agree
+ * on tab order.
+ */
+function getEnabledTabs(chartsEnabled: boolean, calendarEnabled: boolean): TabItem[] {
+  return ALL_TABS.filter((t) => {
+    if (t.requires === "charts") return chartsEnabled;
+    if (t.requires === "calendar") return calendarEnabled;
+    return true;
+  });
+}
+
+/**
+ * Direction of the most recent tab-to-tab navigation, recorded right before
+ * the navigate() call fires (bottom-nav tap or swipe) and consumed once by
+ * the next AppShell mount to pick its entrance animation. Module-level
+ * because each tab page mounts a fresh AppShell instance, so this can't live
+ * in component state. Never touched during SSR (only DOM event handlers
+ * write to it), so it's always null on the server and on a fresh client
+ * load -- no hydration mismatch.
+ */
+type NavDirection = "forward" | "back" | null;
+let lastNavDirection: NavDirection = null;
+
+/**
+ * True if a swipe gesture should be left alone: it started inside an
+ * explicitly-marked container (e.g. the Charts chip row), or inside any
+ * element that's actually horizontally scrollable.
+ */
+function shouldIgnoreSwipe(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el || typeof el.closest !== "function") return false;
+  if (el.closest("[data-swipe-ignore]")) return true;
+  let node: HTMLElement | null = el;
+  while (node && node !== document.body) {
+    if (node.scrollWidth > node.clientWidth) {
+      const overflowX = getComputedStyle(node).overflowX;
+      if (overflowX === "auto" || overflowX === "scroll") return true;
+    }
+    node = node.parentElement;
+  }
+  return false;
+}
 
 function Icon({ name }: { name: "home" | "chart" | "calendar" | "settings" }) {
   const stroke = "currentColor";
@@ -44,24 +105,27 @@ export function BottomNav() {
   const chartsEnabled = useStore((s) => s.chartsEnabled);
   const calendarEnabled = useStore((s) => s.calendarEnabled);
   if (location.pathname === "/workout") return null;
-  const items = [
-    { to: "/", label: "Home", icon: "home" as const },
-    ...(chartsEnabled ? [{ to: "/charts", label: "Charts", icon: "chart" as const }] : []),
-    ...(calendarEnabled ? [{ to: "/calendar", label: "Calendar", icon: "calendar" as const }] : []),
-    { to: "/settings", label: "Settings", icon: "settings" as const },
-  ];
+  const items = getEnabledTabs(chartsEnabled, calendarEnabled);
+  const currentIndex = items.findIndex((it) => it.to === location.pathname);
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-30 hairline-t bg-background/95 backdrop-blur"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
     >
       <ul className="mx-auto flex max-w-md items-stretch justify-around px-2 pt-2">
-        {items.map((it) => {
+        {items.map((it, i) => {
           const active = location.pathname === it.to;
           return (
             <li key={it.to} className="flex-1">
               <Link
                 to={it.to}
+                onClick={() => {
+                  // Record travel direction before the route change so the
+                  // page we're about to mount knows which way to slide in.
+                  if (currentIndex !== -1 && i !== currentIndex) {
+                    lastNavDirection = i > currentIndex ? "forward" : "back";
+                  }
+                }}
                 className="flex flex-col items-center gap-0.5 py-1"
                 style={{ color: active ? "var(--color-accent)" : "var(--color-muted-foreground)" }}
               >
@@ -79,12 +143,70 @@ export function BottomNav() {
 
 export function AppShell({ children, bottomPad = true }: { children: ReactNode; bottomPad?: boolean }) {
   const activeSessionId = useStore((s) => s.activeSessionId);
+  const chartsEnabled = useStore((s) => s.chartsEnabled);
+  const calendarEnabled = useStore((s) => s.calendarEnabled);
   const location = useLocation();
+  const router = useRouter();
   const showBanner = activeSessionId && location.pathname !== "/workout";
+
+  // Ordered enabled-tab paths, for both swipe navigation and figuring out
+  // whether the current page is a tab at all (swipes only act on tabs --
+  // e.g. never on /session/$id, which has its own row swipe gestures).
+  const tabPaths = useMemo(
+    () => getEnabledTabs(chartsEnabled, calendarEnabled).map((t) => t.to),
+    [chartsEnabled, calendarEnabled],
+  );
+  const tabIndex = tabPaths.findIndex((p) => p === location.pathname);
+
+  // Picked once per mount from whatever direction the bottom-nav tap or
+  // swipe recorded right before navigating here; null (fresh load / deep
+  // link) falls back to a plain fade with no horizontal slide.
+  const [routeAnimClass] = useState(() => {
+    const dir = lastNavDirection;
+    lastNavDirection = null;
+    if (dir === "forward") return "anim-route-in-right";
+    if (dir === "back") return "anim-route-in-left";
+    return "anim-route-fade";
+  });
+
+  const touchStartRef = useRef<{ x: number; y: number; time: number; ignore: boolean } | null>(null);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (tabIndex === -1) return;
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY, time: Date.now(), ignore: shouldIgnoreSwipe(e.target) };
+  };
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start || start.ignore || tabIndex === -1) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const dt = Date.now() - start.time;
+    const isDeliberateSwipe = Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.8 && dt < 600;
+    if (!isDeliberateSwipe) return;
+    if (dx < 0 && tabIndex < tabPaths.length - 1) {
+      // Swipe left -> next tab.
+      lastNavDirection = "forward";
+      router.navigate({ to: tabPaths[tabIndex + 1] });
+    } else if (dx > 0 && tabIndex > 0) {
+      // Swipe right -> previous tab.
+      lastNavDirection = "back";
+      router.navigate({ to: tabPaths[tabIndex - 1] });
+    }
+  };
+
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background">
       <ActiveSessionBanner />
-      <main className={showBanner ? "flex-1 pt-11" : "flex-1"} style={{ paddingBottom: bottomPad ? 88 : 0 }}>
+      <main
+        className={(showBanner ? "flex-1 pt-11" : "flex-1") + " " + routeAnimClass}
+        style={{ paddingBottom: bottomPad ? 88 : 0 }}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         {children}
       </main>
       <BottomNav />
