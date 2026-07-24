@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { parseBackup, useStore, type BackupData } from "../lib/store";
@@ -21,6 +21,8 @@ function SettingsPage() {
   const motivationEnabled = useStore((s) => s.motivationEnabled);
   const toggleMotivation = useStore((s) => s.toggleMotivation);
   const importData = useStore((s) => s.importData);
+  const clearAllData = useStore((s) => s.clearAllData);
+  const router = useRouter();
 
   // Import flow: a selected file is parsed and fully validated (parseBackup)
   // before anything is shown here. Nothing touches IndexedDB or the live
@@ -28,6 +30,13 @@ function SettingsPage() {
   const [pendingImport, setPendingImport] = useState<BackupData | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  const confirmClear = async () => {
+    await clearAllData();
+    setShowClearConfirm(false);
+    router.navigate({ to: "/" });
+  };
 
   const exportJson = () => {
     const { exercises, slots, sessions, sets, unit, motivationEnabled } = useStore.getState();
@@ -150,6 +159,32 @@ function SettingsPage() {
 
         {importSuccess && (
           <div className="px-5 py-3 text-[13px] text-muted-foreground hairline-t">Backup imported.</div>
+        )}
+      </Section>
+
+      <Section title="Reset">
+        {!showClearConfirm ? (
+          <button onClick={() => setShowClearConfirm(true)} className="flex w-full items-center justify-between px-5 py-3.5 text-left">
+            <div>
+              <div className="text-[15px] text-destructive">Clear all data</div>
+              <div className="text-[12px] text-muted-foreground">Wipe all workouts and start fresh.</div>
+            </div>
+            <span className="text-destructive">→</span>
+          </button>
+        ) : (
+          <div className="px-5 py-3.5">
+            <div className="text-[13px] text-muted-foreground">
+              This permanently deletes every split, session, and set on this device and resets your settings. The exercise library is kept. This cannot be undone.
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button onClick={() => setShowClearConfirm(false)} className="flex-1 rounded-full bg-muted py-2.5 text-[14px] font-medium text-muted-foreground">
+                Cancel
+              </button>
+              <button onClick={confirmClear} className="flex-1 rounded-full bg-destructive py-2.5 text-[14px] font-medium text-white">
+                Clear all data
+              </button>
+            </div>
+          </div>
         )}
       </Section>
 

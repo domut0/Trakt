@@ -99,6 +99,11 @@ interface State {
    * then mirrors the same data into the live store and clears any
    * in-progress workout, since a fresh backup has none. */
   importData: (data: BackupData) => Promise<void>;
+  /** Wipe all logged data (slots, sessions, sets), reset settings to defaults,
+   * and restore the exercise preset library — a clean slate for testing. The
+   * preset library is re-seeded so the picker stays usable AND so the DB is not
+   * "empty" (which would make hydrate re-insert the demo history on next load). */
+  clearAllData: () => Promise<void>;
   predictedNextSlotName: () => string | undefined;
   suggestedNextExerciseFor: (sessionId: string) => { exerciseId: string; weight?: number; reps?: number; rpe?: number } | undefined;
   prefillFor: (sessionId: string, exerciseId: string) => { weight?: number; reps?: number; rpe?: number };
@@ -758,6 +763,32 @@ export const useStore = create<State>((set, get) => ({
       sets: data.sets,
       unit: data.unit,
       motivationEnabled: data.motivationEnabled,
+      activeSessionId: undefined,
+      currentExerciseId: undefined,
+      currentBlock: undefined,
+    });
+  },
+
+  clearAllData: async () => {
+    // Reuse the atomic replace: wipe every table, then write back only the
+    // exercise preset library with empty history and default settings. Keeping
+    // the presets means the DB is not "empty", so hydrate() won't re-seed the
+    // demo history on the next load — the clean slate persists.
+    await replaceAllData({
+      exercises: seedExercises,
+      slots: [],
+      sessions: [],
+      sets: [],
+      unit: "lbs",
+      motivationEnabled: true,
+    });
+    set({
+      exercises: seedExercises,
+      slots: [],
+      sessions: [],
+      sets: [],
+      unit: "lbs",
+      motivationEnabled: true,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
