@@ -10,8 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as ChartsRouteImport } from './routes/charts'
+import { Route as HistoryRouteImport } from './routes/history'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as WorkoutRouteImport } from './routes/workout'
 import { Route as SessionIdRouteImport } from './routes/session.$id'
@@ -21,14 +21,14 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CalendarRoute = CalendarRouteImport.update({
-  id: '/calendar',
-  path: '/calendar',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ChartsRoute = ChartsRouteImport.update({
   id: '/charts',
   path: '/charts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -49,16 +49,16 @@ const SessionIdRoute = SessionIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/calendar': typeof CalendarRoute
   '/charts': typeof ChartsRoute
+  '/history': typeof HistoryRoute
   '/settings': typeof SettingsRoute
   '/workout': typeof WorkoutRoute
   '/session/$id': typeof SessionIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/calendar': typeof CalendarRoute
   '/charts': typeof ChartsRoute
+  '/history': typeof HistoryRoute
   '/settings': typeof SettingsRoute
   '/workout': typeof WorkoutRoute
   '/session/$id': typeof SessionIdRoute
@@ -66,8 +66,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/calendar': typeof CalendarRoute
   '/charts': typeof ChartsRoute
+  '/history': typeof HistoryRoute
   '/settings': typeof SettingsRoute
   '/workout': typeof WorkoutRoute
   '/session/$id': typeof SessionIdRoute
@@ -75,14 +75,14 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/calendar' | '/charts' | '/settings' | '/workout' | '/session/$id'
+    '/' | '/charts' | '/history' | '/settings' | '/workout' | '/session/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/calendar' | '/charts' | '/settings' | '/workout' | '/session/$id'
+  to: '/' | '/charts' | '/history' | '/settings' | '/workout' | '/session/$id'
   id:
     | '__root__'
     | '/'
-    | '/calendar'
     | '/charts'
+    | '/history'
     | '/settings'
     | '/workout'
     | '/session/$id'
@@ -90,8 +90,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CalendarRoute: typeof CalendarRoute
   ChartsRoute: typeof ChartsRoute
+  HistoryRoute: typeof HistoryRoute
   SettingsRoute: typeof SettingsRoute
   WorkoutRoute: typeof WorkoutRoute
   SessionIdRoute: typeof SessionIdRoute
@@ -106,18 +106,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/calendar': {
-      id: '/calendar'
-      path: '/calendar'
-      fullPath: '/calendar'
-      preLoaderRoute: typeof CalendarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/charts': {
       id: '/charts'
       path: '/charts'
       fullPath: '/charts'
       preLoaderRoute: typeof ChartsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -146,8 +146,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CalendarRoute: CalendarRoute,
   ChartsRoute: ChartsRoute,
+  HistoryRoute: HistoryRoute,
   SettingsRoute: SettingsRoute,
   WorkoutRoute: WorkoutRoute,
   SessionIdRoute: SessionIdRoute,

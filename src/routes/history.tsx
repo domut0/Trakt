@@ -1,0 +1,58 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { AppShell } from "../components/AppShell";
+import { CalendarView } from "../components/CalendarView";
+import { WeeklyView } from "../components/WeeklyView";
+
+export const Route = createFileRoute("/history")({
+  head: () => ({
+    meta: [
+      { title: "History" },
+      { name: "description", content: "Your logged workouts, by week or by day." },
+      { property: "og:title", content: "History" },
+      { property: "og:description", content: "Your logged workouts, by week or by day." },
+    ],
+  }),
+  component: HistoryPage,
+});
+
+type ViewMode = "weekly" | "calendar";
+
+/**
+ * Thin shell: renders the header and Weekly/Calendar switcher, then delegates
+ * to WeeklyView or CalendarView. Kept intentionally dumb so later slices can
+ * edit one child view without touching the other.
+ */
+function HistoryPage() {
+  const [view, setView] = useState<ViewMode>("weekly");
+
+  return (
+    <AppShell>
+      <header className="flex items-center justify-between px-5 pb-4 pt-14">
+        <h1 className="text-[30px] font-semibold tracking-tight">History</h1>
+        <div data-swipe-ignore className="flex gap-1 rounded-full bg-muted p-1">
+          <button
+            onClick={() => setView("weekly")}
+            className={
+              "rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors " +
+              (view === "weekly" ? "bg-foreground text-background" : "text-muted-foreground")
+            }
+          >
+            Weekly
+          </button>
+          <button
+            onClick={() => setView("calendar")}
+            className={
+              "rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors " +
+              (view === "calendar" ? "bg-foreground text-background" : "text-muted-foreground")
+            }
+          >
+            Calendar
+          </button>
+        </div>
+      </header>
+
+      {view === "weekly" ? <WeeklyView /> : <CalendarView />}
+    </AppShell>
+  );
+}

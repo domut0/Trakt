@@ -2,31 +2,30 @@ import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useStore } from "../lib/store";
 
-type TabPath = "/" | "/charts" | "/calendar" | "/settings";
+type TabPath = "/" | "/history" | "/charts" | "/settings";
 type TabItem = {
   to: TabPath;
   label: string;
   icon: "home" | "chart" | "calendar" | "settings";
-  requires?: "charts" | "calendar";
+  requires?: "charts";
 };
 
 const ALL_TABS: TabItem[] = [
-  { to: "/", label: "Home", icon: "home" },
+  { to: "/", label: "Today", icon: "home" },
+  { to: "/history", label: "History", icon: "calendar" },
   { to: "/charts", label: "Charts", icon: "chart", requires: "charts" },
-  { to: "/calendar", label: "Calendar", icon: "calendar", requires: "calendar" },
   { to: "/settings", label: "Settings", icon: "settings" },
 ];
 
 /**
  * Ordered list of tabs currently shown in the bottom nav, respecting the
- * Charts/Calendar toggles in Settings. Shared by BottomNav (rendering) and
- * AppShell (swipe navigation + directional transitions) so both always agree
- * on tab order.
+ * Charts toggle in Settings. Shared by BottomNav (rendering) and AppShell
+ * (swipe navigation + directional transitions) so both always agree on tab
+ * order.
  */
-function getEnabledTabs(chartsEnabled: boolean, calendarEnabled: boolean): TabItem[] {
+function getEnabledTabs(chartsEnabled: boolean): TabItem[] {
   return ALL_TABS.filter((t) => {
     if (t.requires === "charts") return chartsEnabled;
-    if (t.requires === "calendar") return calendarEnabled;
     return true;
   });
 }
@@ -139,9 +138,8 @@ export function BottomNav() {
   const location = useLocation();
   const activeSessionId = useStore((s) => s.activeSessionId);
   const chartsEnabled = useStore((s) => s.chartsEnabled);
-  const calendarEnabled = useStore((s) => s.calendarEnabled);
   if (location.pathname === "/workout") return null;
-  const items = getEnabledTabs(chartsEnabled, calendarEnabled);
+  const items = getEnabledTabs(chartsEnabled);
   const currentIndex = items.findIndex((it) => it.to === location.pathname);
   return (
     <nav
@@ -182,7 +180,6 @@ export function BottomNav() {
 export function AppShell({ children }: { children: ReactNode }) {
   const activeSessionId = useStore((s) => s.activeSessionId);
   const chartsEnabled = useStore((s) => s.chartsEnabled);
-  const calendarEnabled = useStore((s) => s.calendarEnabled);
   const location = useLocation();
   const router = useRouter();
   const showBanner = activeSessionId && location.pathname !== "/workout";
@@ -190,10 +187,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Ordered enabled-tab paths, for both swipe navigation and figuring out
   // whether the current page is a tab at all (swipes only act on tabs --
   // e.g. never on /session/$id, which has its own row swipe gestures).
-  const tabPaths = useMemo(
-    () => getEnabledTabs(chartsEnabled, calendarEnabled).map((t) => t.to),
-    [chartsEnabled, calendarEnabled],
-  );
+  const tabPaths = useMemo(() => getEnabledTabs(chartsEnabled).map((t) => t.to), [chartsEnabled]);
   const tabIndex = tabPaths.findIndex((p) => p === location.pathname);
 
   // Picked once per mount from whatever direction the bottom-nav tap or

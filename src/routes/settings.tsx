@@ -20,8 +20,6 @@ function SettingsPage() {
   const setUnit = useStore((s) => s.setUnit);
   const chartsEnabled = useStore((s) => s.chartsEnabled);
   const setChartsEnabled = useStore((s) => s.setChartsEnabled);
-  const calendarEnabled = useStore((s) => s.calendarEnabled);
-  const setCalendarEnabled = useStore((s) => s.setCalendarEnabled);
   const importData = useStore((s) => s.importData);
   const clearAllData = useStore((s) => s.clearAllData);
   const router = useRouter();
@@ -121,15 +119,6 @@ function SettingsPage() {
             <div className="text-[12px] text-muted-foreground">Show the Charts tab in the nav.</div>
           </div>
           <Toggle checked={chartsEnabled} onChange={() => setChartsEnabled(!chartsEnabled)} />
-        </div>
-        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
-          <div>
-            <div className="text-[15px]">Calendar tab</div>
-            <div className="text-[12px] text-muted-foreground">
-              Show the Calendar tab in the nav.
-            </div>
-          </div>
-          <Toggle checked={calendarEnabled} onChange={() => setCalendarEnabled(!calendarEnabled)} />
         </div>
       </Section>
 

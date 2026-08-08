@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   addMonths,
@@ -9,20 +9,7 @@ import {
   startOfMonth,
   subMonths,
 } from "date-fns";
-import { AppShell } from "../components/AppShell";
 import { useStore, type WorkoutSession } from "../lib/store";
-
-export const Route = createFileRoute("/calendar")({
-  head: () => ({
-    meta: [
-      { title: "Calendar" },
-      { name: "description", content: "Month view of your logged workouts." },
-      { property: "og:title", content: "Calendar" },
-      { property: "og:description", content: "Month view of your logged workouts." },
-    ],
-  }),
-  component: CalendarPage,
-});
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -34,7 +21,12 @@ function fmtTime(ts: number) {
   return new Date(ts).toLocaleTimeString(undefined, { hour: "numeric" });
 }
 
-function CalendarPage() {
+/**
+ * The History tab's Calendar view: month stepper, weekday header, day-cell
+ * grid with workout dots, and the selected day's session list. Moved here
+ * verbatim from the old standalone /calendar route.
+ */
+export function CalendarView() {
   const sessions = useStore((s) => s.sessions);
   const slots = useStore((s) => s.slots);
   const sets = useStore((s) => s.sets);
@@ -86,12 +78,7 @@ function CalendarPage() {
   }, [viewedMonth]);
 
   return (
-    <AppShell>
-      <header className="px-5 pb-4 pt-14">
-        <h1 className="text-[30px] font-semibold tracking-tight">Calendar</h1>
-        <p className="mt-1 text-[14px] text-muted-foreground">Your logged workouts by day.</p>
-      </header>
-
+    <>
       <div className="mx-5 mb-3 flex items-center justify-between">
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(subMonths(m, 1)))}
@@ -197,6 +184,6 @@ function CalendarPage() {
           </ul>
         )}
       </section>
-    </AppShell>
+    </>
   );
 }

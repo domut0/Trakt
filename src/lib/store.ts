@@ -76,7 +76,6 @@ type CurrentBlock = {
 interface State {
   unit: "lbs" | "kg";
   chartsEnabled: boolean;
-  calendarEnabled: boolean;
   exercises: Exercise[];
   slots: SplitSlot[];
   sessions: WorkoutSession[];
@@ -113,7 +112,6 @@ interface State {
   updateSet: (setId: string, patch: Partial<WorkoutSet>) => void;
   setUnit: (u: "lbs" | "kg") => void;
   setChartsEnabled: (v: boolean) => void;
-  setCalendarEnabled: (v: boolean) => void;
   reorderSlots: (fromId: string, toId: string) => void;
   /** Full backup restore. Assumes `data` has already been validated by
    * `parseBackup` — replaces IndexedDB first (single transaction; a failure
@@ -151,7 +149,6 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 // constants are no longer read directly as the default state.
 const now = Date.now();
 const day = 86400000;
-
 
 const seedSlots: SplitSlot[] = [
   { id: "s_hb", name: "Heavy Bench", rotationOrder: 0, lastLoggedAt: now - 3 * day },
@@ -582,14 +579,13 @@ function persistActiveMeta(meta: {
   );
 }
 
-function persistSettings(unit: "lbs" | "kg", chartsEnabled: boolean, calendarEnabled: boolean) {
-  safeWrite(() => db.meta.put({ key: "settings", unit, chartsEnabled, calendarEnabled }));
+function persistSettings(unit: "lbs" | "kg", chartsEnabled: boolean) {
+  safeWrite(() => db.meta.put({ key: "settings", unit, chartsEnabled }));
 }
 
 export const useStore = create<State>((set, get) => ({
   unit: "lbs",
   chartsEnabled: true,
-  calendarEnabled: true,
   exercises: [],
   slots: [],
   sessions: [],
@@ -615,7 +611,6 @@ export const useStore = create<State>((set, get) => ({
           key: "settings",
           unit: "lbs",
           chartsEnabled: true,
-          calendarEnabled: true,
         };
         await seedDb({
           exercises: seedExercises,
@@ -631,7 +626,6 @@ export const useStore = create<State>((set, get) => ({
           sets: seedSets,
           unit: settings.unit,
           chartsEnabled: true,
-          calendarEnabled: true,
           activeSessionId: undefined,
           currentExerciseId: undefined,
           currentBlock: undefined,
@@ -647,7 +641,6 @@ export const useStore = create<State>((set, get) => ({
         sets: data.sets,
         unit: data.settings.unit,
         chartsEnabled: data.settings.chartsEnabled ?? true,
-        calendarEnabled: data.settings.calendarEnabled ?? true,
         activeSessionId: data.activeSession.activeSessionId,
         currentExerciseId: data.activeSession.currentExerciseId,
         currentBlock: data.activeSession.currentBlock,
@@ -852,17 +845,12 @@ export const useStore = create<State>((set, get) => ({
 
   setUnit: (u) => {
     set({ unit: u });
-    persistSettings(u, get().chartsEnabled, get().calendarEnabled);
+    persistSettings(u, get().chartsEnabled);
   },
 
   setChartsEnabled: (v) => {
     set({ chartsEnabled: v });
-    persistSettings(get().unit, v, get().calendarEnabled);
-  },
-
-  setCalendarEnabled: (v) => {
-    set({ calendarEnabled: v });
-    persistSettings(get().unit, get().chartsEnabled, v);
+    persistSettings(get().unit, v);
   },
 
   reorderSlots: (fromId, toId) => {
@@ -890,7 +878,6 @@ export const useStore = create<State>((set, get) => ({
       sets: data.sets,
       unit: data.unit,
       chartsEnabled: true,
-      calendarEnabled: true,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
@@ -916,7 +903,6 @@ export const useStore = create<State>((set, get) => ({
       sets: [],
       unit: "lbs",
       chartsEnabled: true,
-      calendarEnabled: true,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
