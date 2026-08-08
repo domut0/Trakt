@@ -50,30 +50,35 @@ function Home() {
 
   const todaysSessions = useMemo(() => {
     const now = new Date();
-    return [...sessions]
-      .filter((s) => s.endedAt && isSameLocalDay(new Date(s.endedAt), now))
-      .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))
-      .map((s) => {
-        if (isCardioSession(s)) {
-          const ex = exercises.find((e) => e.id === s.cardioExerciseId);
-          const subtitleElements: string[] = [];
-          if (s.durationMinutes !== undefined) subtitleElements.push(`${s.durationMinutes} min`);
-          if (s.distance !== undefined)
-            subtitleElements.push(`${s.distance} ${unit === "lbs" ? "mi" : "km"}`);
+    return (
+      [...sessions]
+        // Bucketed by startedAt, matching CalendarView and WeeklyView. A session
+        // running past midnight belongs to the day you started training, and all
+        // three surfaces must agree or the same workout appears on two dates.
+        .filter((s) => s.endedAt && isSameLocalDay(new Date(s.startedAt), now))
+        .sort((a, b) => b.startedAt - a.startedAt)
+        .map((s) => {
+          if (isCardioSession(s)) {
+            const ex = exercises.find((e) => e.id === s.cardioExerciseId);
+            const subtitleElements: string[] = [];
+            if (s.durationMinutes !== undefined) subtitleElements.push(`${s.durationMinutes} min`);
+            if (s.distance !== undefined)
+              subtitleElements.push(`${s.distance} ${unit === "lbs" ? "mi" : "km"}`);
+            return {
+              session: s,
+              title: ex?.name ?? "Cardio",
+              subtitle: subtitleElements.length > 0 ? subtitleElements.join(" · ") : null,
+            };
+          }
+          const slot = slots.find((sl) => sl.id === s.splitSlotId);
+          const setCount = sets.filter((x) => x.sessionId === s.id).length;
           return {
             session: s,
-            title: ex?.name ?? "Cardio",
-            subtitle: subtitleElements.length > 0 ? subtitleElements.join(" · ") : null,
+            title: slot?.name ?? "Untitled",
+            subtitle: `${setCount} sets`,
           };
-        }
-        const slot = slots.find((sl) => sl.id === s.splitSlotId);
-        const setCount = sets.filter((x) => x.sessionId === s.id).length;
-        return {
-          session: s,
-          title: slot?.name ?? "Untitled",
-          subtitle: `${setCount} sets`,
-        };
-      });
+        })
+    );
   }, [sessions, slots, sets, exercises, unit]);
 
   return (
