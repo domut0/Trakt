@@ -2,13 +2,6 @@ import { useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useStore, type WorkoutSet } from "../lib/store";
 
-function fmtTBS(s?: number) {
-  if (s == null) return "—";
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${String(r).padStart(2, "0")}`;
-}
-
 /** Row with swipe-left to delete / swipe-right to edit (touch). */
 function SetRow({
   s,
@@ -88,9 +81,6 @@ function SetRow({
             </span>
           )}
         </div>
-        <span className="tnum text-[12px] text-muted-foreground">
-          {fmtTBS(s.timeBetweenSetsSeconds)}
-        </span>
       </div>
     </div>
   );
@@ -154,7 +144,11 @@ export function SessionView({
           <div className="flex items-baseline justify-between px-4 pb-2">
             <h3 className="text-[17px] font-semibold tracking-tight">{exercise.name}</h3>
             <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              {exercise.type === "main" ? "Main" : "Accessory"}
+              {exercise.type === "main"
+                ? "Main"
+                : exercise.type === "cardio"
+                  ? "Cardio"
+                  : "Accessory"}
             </span>
           </div>
           {setupNote && (

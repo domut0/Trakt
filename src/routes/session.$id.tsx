@@ -2,7 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { AppShell } from "../components/AppShell";
 import { DeleteWorkoutButton } from "../components/DeleteWorkoutButton";
 import { SessionView } from "../components/SessionView";
-import { useStore } from "../lib/store";
+import { isCardioSession, useStore } from "../lib/store";
 
 export const Route = createFileRoute("/session/$id")({
   head: () => ({
@@ -15,11 +15,11 @@ function SessionPage() {
   const { id } = Route.useParams();
   const router = useRouter();
   const session = useStore((s) => s.sessions.find((x) => x.id === id));
-  const slot = useStore((s) =>
-    session ? s.slots.find((sl) => sl.id === session.splitSlotId) : undefined,
-  );
+  const slots = useStore((s) => s.slots);
+  const exercises = useStore((s) => s.exercises);
+  const unit = useStore((s) => s.unit);
 
-  if (!session || !slot) {
+  if (!session) {
     return (
       <AppShell>
         <div className="px-6 py-20 text-center text-muted-foreground">Session not found.</div>
@@ -27,7 +27,20 @@ function SessionPage() {
     );
   }
 
-  const d = new Date(session.endedAt ?? session.startedAt);
+  const isCardio = isCardioSession(session);
+  const slot = !isCardio ? slots.find((sl) => sl.id === session.splitSlotId) : undefined;
+  const cardioEx = isCardio ? exercises.find((e) => e.id === session.cardioExerciseId) : undefined;
+
+  if (!isCardio && !slot) {
+    return (
+      <AppShell>
+        <div className="px-6 py-20 text-center text-muted-foreground">Session not found.</div>
+      </AppShell>
+    );
+  }
+
+  const title = isCardio ? (cardioEx?.name ?? "Cardio") : slot!.name;
+  const d = new Date(session.startedAt);
 
   return (
     <AppShell>
@@ -47,9 +60,52 @@ function SessionPage() {
         <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
           {d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
         </div>
-        <h1 className="mt-1 text-[30px] font-semibold tracking-tight">{slot.name}</h1>
+        <h1 className="mt-1 text-[30px] font-semibold tracking-tight">{title}</h1>
       </header>
-      <SessionView sessionId={session.id} />
+      {isCardio ? (
+        <div className="mt-4 px-5 space-y-4">
+          {(session.durationMinutes != null || session.distance != null) && (
+            <div className="flex gap-3">
+              {session.durationMinutes != null && (
+                <div className="flex-1 rounded-2xl bg-surface p-4">
+                  <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Duration
+                  </div>
+                  <div className="tnum mt-1 text-[22px] font-semibold tracking-tight">
+                    {session.durationMinutes}{" "}
+                    <span className="text-[14px] font-normal text-muted-foreground">min</span>
+                  </div>
+                </div>
+              )}
+              {session.distance != null && (
+                <div className="flex-1 rounded-2xl bg-surface p-4">
+                  <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Distance
+                  </div>
+                  <div className="tnum mt-1 text-[22px] font-semibold tracking-tight">
+                    {session.distance}{" "}
+                    <span className="text-[14px] font-normal text-muted-foreground">
+                      {unit === "lbs" ? "mi" : "km"}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {session.setupNote && (
+            <div className="rounded-2xl bg-surface p-4">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Notes
+              </div>
+              <div className="mt-1 text-[15px] text-foreground whitespace-pre-wrap">
+                {session.setupNote}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <SessionView sessionId={session.id} />
+      )}
     </AppShell>
   );
 }

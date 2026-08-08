@@ -11,12 +11,27 @@ import {
 } from "date-fns";
 import { dayKey } from "../lib/daily-log";
 import { DayEditorSheet } from "./DayEditorSheet";
-import { useStore, type WorkoutSession } from "../lib/store";
+import { isCardioSession, useStore, type WorkoutSession } from "../lib/store";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 function fmtTime(ts: number) {
   return new Date(ts).toLocaleTimeString(undefined, { hour: "numeric" });
+}
+
+function fmtCardioDetails(
+  durationMinutes?: number,
+  distance?: number,
+  unit: "lbs" | "kg" = "lbs",
+): string {
+  const parts: string[] = [];
+  if (durationMinutes != null) {
+    parts.push(`${durationMinutes} min`);
+  }
+  if (distance != null) {
+    parts.push(`${distance} ${unit === "lbs" ? "mi" : "km"}`);
+  }
+  return parts.join(" · ");
 }
 
 /**
@@ -27,6 +42,7 @@ function fmtTime(ts: number) {
 export function CalendarView() {
   const sessions = useStore((s) => s.sessions);
   const slots = useStore((s) => s.slots);
+  const exercises = useStore((s) => s.exercises);
   const sets = useStore((s) => s.sets);
   const dailyLogs = useStore((s) => s.dailyLogs);
   const unit = useStore((s) => s.unit);
@@ -42,7 +58,7 @@ export function CalendarView() {
   const byDay = useMemo(() => {
     const map = new Map<string, WorkoutSession[]>();
     for (const session of loggedSessions) {
-      const key = dayKey(new Date(session.endedAt!));
+      const key = dayKey(new Date(session.startedAt));
       const arr = map.get(key);
       if (arr) arr.push(session);
       else map.set(key, [session]);
@@ -116,8 +132,6 @@ export function CalendarView() {
           if (!cell) return <div key={`blank-${i}`} className="min-h-[64px] bg-surface" />;
           const workouts = byDay.get(cell.key) ?? [];
           const log = dailyLogs.find((l) => l.date === cell.key);
-          const showWorkout1 = workouts.length > 0;
-          const showWorkout2 = workouts.length > 1;
           const showNutrition =
             log &&
             (log.calories !== undefined ||
@@ -126,7 +140,7 @@ export function CalendarView() {
               log.fat !== undefined);
           const showSteps = log?.steps !== undefined;
           const showBodyweight = log?.bodyweight !== undefined;
-          const hasAnyDot = showWorkout1 || showNutrition || showSteps || showBodyweight;
+          const hasAnyDot = workouts.length > 0 || showNutrition || showSteps || showBodyweight;
           const isSelected = cell.key === selectedKey;
           const todayCell = isToday(cell.date);
           return (
@@ -148,8 +162,15 @@ export function CalendarView() {
               </span>
               {hasAnyDot && (
                 <span className="flex gap-0.5">
-                  {showWorkout1 && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
-                  {showWorkout2 && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
+                  {workouts.slice(0, 2).map((w) => (
+                    <span
+                      key={w.id}
+                      className={
+                        "h-1.5 w-1.5 rounded-full " +
+                        (isCardioSession(w) ? "bg-cardio" : "bg-accent")
+                      }
+                    />
+                  ))}
                   {showNutrition && (
                     <span
                       className={
@@ -275,8 +296,25 @@ export function CalendarView() {
               {hasSessions && (
                 <ul className="space-y-3 px-5">
                   {selectedSessions.map((session, i) => {
-                    const slot = slots.find((sl) => sl.id === session.splitSlotId);
-                    const setCount = sets.filter((x) => x.sessionId === session.id).length;
+                    const isCardio = isCardioSession(session);
+                    const slot = !isCardio
+                      ? slots.find((sl) => sl.id === session.splitSlotId)
+                      : undefined;
+                    const cardioEx = isCardio
+                      ? exercises.find((e) => e.id === session.cardioExerciseId)
+                      : undefined;
+                    const title = isCardio
+                      ? (cardioEx?.name ?? "Cardio")
+                      : (slot?.name ?? "Untitled");
+                    const cardioDetails = isCardio
+                      ? fmtCardioDetails(session.durationMinutes, session.distance, unit)
+                      : null;
+                    const subtitle = isCardio
+                      ? cardioDetails
+                        ? `· ${cardioDetails}`
+                        : undefined
+                      : `· ${sets.filter((x) => x.sessionId === session.id).length} sets`;
+
                     return (
                       <li key={session.id}>
                         <Link
@@ -288,11 +326,13 @@ export function CalendarView() {
                           <div className="min-w-0 flex-1 pr-3">
                             <div className="flex items-baseline gap-2">
                               <span className="text-[16px] font-semibold tracking-tight">
-                                {slot?.name ?? "Untitled"}
+                                {title}
                               </span>
-                              <span className="text-[12px] text-muted-foreground">
-                                · {setCount} sets
-                              </span>
+                              {subtitle && (
+                                <span className="text-[12px] text-muted-foreground">
+                                  {subtitle}
+                                </span>
+                              )}
                             </div>
                           </div>
                           <span className="text-[12px] text-muted-foreground">
