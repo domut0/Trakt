@@ -9,13 +9,11 @@ import {
   startOfMonth,
   subMonths,
 } from "date-fns";
+import { dayKey } from "../lib/daily-log";
+import { DayEditorSheet } from "./DayEditorSheet";
 import { useStore, type WorkoutSession } from "../lib/store";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
-
-function dayKey(d: Date) {
-  return format(d, "yyyy-MM-dd");
-}
 
 function fmtTime(ts: number) {
   return new Date(ts).toLocaleTimeString(undefined, { hour: "numeric" });
@@ -30,11 +28,14 @@ export function CalendarView() {
   const sessions = useStore((s) => s.sessions);
   const slots = useStore((s) => s.slots);
   const sets = useStore((s) => s.sets);
+  const dailyLogs = useStore((s) => s.dailyLogs);
+  const unit = useStore((s) => s.unit);
 
   const [viewedMonth, setViewedMonth] = useState(() => startOfMonth(new Date()));
   // null until the user taps a day — lets the default track newly-hydrated
   // data instead of freezing at whatever was loaded on first render.
   const [pickedKey, setPickedKey] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const loggedSessions = useMemo(() => sessions.filter((s) => s.endedAt != null), [sessions]);
 
@@ -52,10 +53,12 @@ export function CalendarView() {
 
   const defaultKey = useMemo(() => {
     const todayKey = dayKey(new Date());
-    if (byDay.has(todayKey)) return todayKey;
-    const mostRecent = [...loggedSessions].sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0];
-    return mostRecent ? dayKey(new Date(mostRecent.endedAt!)) : todayKey;
-  }, [byDay, loggedSessions]);
+    if (byDay.has(todayKey) || dailyLogs.some((l) => l.date === todayKey)) return todayKey;
+    const allKeys = Array.from(new Set([...byDay.keys(), ...dailyLogs.map((l) => l.date)])).sort(
+      (a, b) => b.localeCompare(a),
+    );
+    return allKeys[0] ?? todayKey;
+  }, [byDay, dailyLogs]);
 
   const selectedKey = pickedKey ?? defaultKey;
   const selectedDate = useMemo(() => {
@@ -112,6 +115,18 @@ export function CalendarView() {
         {cells.map((cell, i) => {
           if (!cell) return <div key={`blank-${i}`} className="min-h-[64px] bg-surface" />;
           const workouts = byDay.get(cell.key) ?? [];
+          const log = dailyLogs.find((l) => l.date === cell.key);
+          const showWorkout1 = workouts.length > 0;
+          const showWorkout2 = workouts.length > 1;
+          const showNutrition =
+            log &&
+            (log.calories !== undefined ||
+              log.protein !== undefined ||
+              log.carbs !== undefined ||
+              log.fat !== undefined);
+          const showSteps = log?.steps !== undefined;
+          const showBodyweight = log?.bodyweight !== undefined;
+          const hasAnyDot = showWorkout1 || showNutrition || showSteps || showBodyweight;
           const isSelected = cell.key === selectedKey;
           const todayCell = isToday(cell.date);
           return (
@@ -131,10 +146,20 @@ export function CalendarView() {
               >
                 {cell.date.getDate()}
               </span>
-              {workouts.length > 0 && (
+              {hasAnyDot && (
                 <span className="flex gap-0.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                  {workouts.length > 1 && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
+                  {showWorkout1 && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
+                  {showWorkout2 && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
+                  {showNutrition && (
+                    <span
+                      className={
+                        "h-1.5 w-1.5 rounded-full " +
+                        (log.isCheatDay ? "bg-destructive" : "bg-nutrition")
+                      }
+                    />
+                  )}
+                  {showSteps && <span className="h-1.5 w-1.5 rounded-full bg-steps" />}
+                  {showBodyweight && <span className="h-1.5 w-1.5 rounded-full bg-bodyweight" />}
                 </span>
               )}
             </button>
@@ -142,48 +167,149 @@ export function CalendarView() {
         })}
       </div>
 
-      <section className="mt-6" key={selectedKey}>
-        <div className="px-5 pb-2">
+      <section className="mt-6 pb-6" key={selectedKey}>
+        <div className="px-5 pb-2 flex items-center justify-between">
           <h2 className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
             {format(selectedDate, "EEEE, MMMM d")}
           </h2>
         </div>
 
-        {selectedSessions.length === 0 ? (
-          <div className="mx-5 rounded-xl bg-muted px-4 py-8 text-center text-[14px] text-muted-foreground anim-fade-up">
-            No workout logged.
-          </div>
-        ) : (
-          <ul className="space-y-3 px-5">
-            {selectedSessions.map((session, i) => {
-              const slot = slots.find((sl) => sl.id === session.splitSlotId);
-              const setCount = sets.filter((x) => x.sessionId === session.id).length;
-              return (
-                <li key={session.id}>
-                  <Link
-                    to="/session/$id"
-                    params={{ id: session.id }}
-                    className="flex items-center justify-between rounded-2xl bg-surface px-5 py-4 anim-fade-up"
-                    style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
+        {(() => {
+          const selectedLog = dailyLogs.find((l) => l.date === selectedKey);
+          const hasSessions = selectedSessions.length > 0;
+          const hasLog =
+            selectedLog &&
+            (selectedLog.calories !== undefined ||
+              selectedLog.protein !== undefined ||
+              selectedLog.carbs !== undefined ||
+              selectedLog.fat !== undefined ||
+              selectedLog.steps !== undefined ||
+              selectedLog.bodyweight !== undefined ||
+              selectedLog.isCheatDay);
+
+          if (!hasSessions && !hasLog) {
+            return (
+              <div className="space-y-4">
+                <div className="mx-5 rounded-xl bg-muted px-4 py-8 text-center text-[14px] text-muted-foreground anim-fade-up">
+                  Nothing logged.
+                </div>
+                <div className="px-5">
+                  <button
+                    onClick={() => setEditorOpen(true)}
+                    className="w-full rounded-2xl bg-surface py-4 text-center text-[14px] font-medium text-accent anim-fade-up"
                   >
-                    <div className="min-w-0 flex-1 pr-3">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-[16px] font-semibold tracking-tight">
-                          {slot?.name ?? "Untitled"}
-                        </span>
-                        <span className="text-[12px] text-muted-foreground">· {setCount} sets</span>
+                    Log daily numbers
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="space-y-4">
+              {hasLog ? (
+                <button
+                  onClick={() => setEditorOpen(true)}
+                  className="mx-5 flex flex-col gap-2 rounded-2xl bg-surface px-5 py-4 text-left anim-fade-up w-[calc(100%-40px)]"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-[16px] font-semibold tracking-tight">Daily Summary</span>
+                    {selectedLog.isCheatDay && (
+                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-widest text-destructive">
+                        Cheat Day
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-[13px]">
+                    {selectedLog.calories !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">Cal:</span>{" "}
+                        <span className="font-medium tnum">{selectedLog.calories}</span>
                       </div>
-                    </div>
-                    <span className="text-[12px] text-muted-foreground">
-                      {fmtTime(session.startedAt)}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                    )}
+                    {selectedLog.protein !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">P:</span>{" "}
+                        <span className="font-medium tnum">{selectedLog.protein}g</span>
+                      </div>
+                    )}
+                    {selectedLog.carbs !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">C:</span>{" "}
+                        <span className="font-medium tnum">{selectedLog.carbs}g</span>
+                      </div>
+                    )}
+                    {selectedLog.fat !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">F:</span>{" "}
+                        <span className="font-medium tnum">{selectedLog.fat}g</span>
+                      </div>
+                    )}
+                    {selectedLog.steps !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">Steps:</span>{" "}
+                        <span className="font-medium tnum">{selectedLog.steps}</span>
+                      </div>
+                    )}
+                    {selectedLog.bodyweight !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">BW:</span>{" "}
+                        <span className="font-medium tnum">
+                          {selectedLog.bodyweight} {unit}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ) : (
+                <div className="px-5">
+                  <button
+                    onClick={() => setEditorOpen(true)}
+                    className="w-full rounded-2xl bg-surface py-4 text-center text-[14px] font-medium text-accent anim-fade-up"
+                  >
+                    Log daily numbers
+                  </button>
+                </div>
+              )}
+
+              {hasSessions && (
+                <ul className="space-y-3 px-5">
+                  {selectedSessions.map((session, i) => {
+                    const slot = slots.find((sl) => sl.id === session.splitSlotId);
+                    const setCount = sets.filter((x) => x.sessionId === session.id).length;
+                    return (
+                      <li key={session.id}>
+                        <Link
+                          to="/session/$id"
+                          params={{ id: session.id }}
+                          className="flex items-center justify-between rounded-2xl bg-surface px-5 py-4 anim-fade-up"
+                          style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
+                        >
+                          <div className="min-w-0 flex-1 pr-3">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-[16px] font-semibold tracking-tight">
+                                {slot?.name ?? "Untitled"}
+                              </span>
+                              <span className="text-[12px] text-muted-foreground">
+                                · {setCount} sets
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[12px] text-muted-foreground">
+                            {fmtTime(session.startedAt)}
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })()}
       </section>
+
+      <DayEditorSheet date={selectedKey} open={editorOpen} onClose={() => setEditorOpen(false)} />
     </>
   );
 }
