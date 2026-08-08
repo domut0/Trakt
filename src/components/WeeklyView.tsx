@@ -9,14 +9,14 @@ import {
   parseDayKey,
   type DailyLogAggregates,
 } from "../lib/daily-log";
-import { useStore, type DailyLog } from "../lib/store";
+import { isCardioSession, useStore, type DailyLog } from "../lib/store";
 import { DayEditorSheet } from "./DayEditorSheet";
 
-/** A workout as a day card shows it: which split, how many sets. */
+/** A workout as a day card shows it: which split/exercise, set count or cardio details. */
 interface DaySession {
   id: string;
-  slotName: string;
-  setCount: number;
+  title: string;
+  subtitle?: string;
 }
 
 interface DayCardData {
@@ -37,6 +37,21 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
+function fmtCardioDetails(
+  durationMinutes?: number,
+  distance?: number,
+  unit: "lbs" | "kg" = "lbs",
+): string {
+  const parts: string[] = [];
+  if (durationMinutes != null) {
+    parts.push(`${durationMinutes} min`);
+  }
+  if (distance != null) {
+    parts.push(`${distance} ${unit === "lbs" ? "mi" : "km"}`);
+  }
+  return parts.join(" · ");
+}
+
 /**
  * The History tab's default (Weekly) view: a continuous, newest-first scroll
  * of one card per day that has ANYTHING on it — a workout, some numbers, or a
@@ -49,6 +64,7 @@ function round1(n: number): number {
 export function WeeklyView() {
   const sessions = useStore((s) => s.sessions);
   const slots = useStore((s) => s.slots);
+  const exercises = useStore((s) => s.exercises);
   const sets = useStore((s) => s.sets);
   const dailyLogs = useStore((s) => s.dailyLogs);
   const unit = useStore((s) => s.unit);
@@ -63,19 +79,34 @@ export function WeeklyView() {
   /** Day key -> that day's finished workouts, most recent first. */
   const sessionsByDay = useMemo(() => {
     const map = new Map<string, DaySession[]>();
-    for (const session of [...endedSessions].sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))) {
-      const key = dayKey(new Date(session.endedAt!));
+    for (const session of [...endedSessions].sort((a, b) => b.startedAt - a.startedAt)) {
+      const key = dayKey(new Date(session.startedAt));
+      const isCardio = isCardioSession(session);
+      const slot = !isCardio ? slots.find((sl) => sl.id === session.splitSlotId) : undefined;
+      const cardioEx = isCardio
+        ? exercises.find((e) => e.id === session.cardioExerciseId)
+        : undefined;
+      const title = isCardio ? (cardioEx?.name ?? "Cardio") : (slot?.name ?? "Untitled");
+      const cardioDetails = isCardio
+        ? fmtCardioDetails(session.durationMinutes, session.distance, unit)
+        : null;
+      const subtitle = isCardio
+        ? cardioDetails
+          ? `· ${cardioDetails}`
+          : undefined
+        : `· ${sets.filter((x) => x.sessionId === session.id).length} sets`;
+
       const entry: DaySession = {
         id: session.id,
-        slotName: slots.find((sl) => sl.id === session.splitSlotId)?.name ?? "Untitled",
-        setCount: sets.filter((x) => x.sessionId === session.id).length,
+        title,
+        subtitle,
       };
       const bucket = map.get(key);
       if (bucket) bucket.push(entry);
       else map.set(key, [entry]);
     }
     return map;
-  }, [endedSessions, slots, sets]);
+  }, [endedSessions, slots, exercises, sets, unit]);
 
   const logsByDay = useMemo(() => new Map(dailyLogs.map((l) => [l.date, l])), [dailyLogs]);
 
@@ -256,10 +287,10 @@ function DayCard({
                   onClick={(e) => e.stopPropagation()}
                   className="flex items-baseline gap-2"
                 >
-                  <span className="text-[15px] font-medium tracking-tight">{session.slotName}</span>
-                  <span className="text-[12px] text-muted-foreground">
-                    · {session.setCount} sets
-                  </span>
+                  <span className="text-[15px] font-medium tracking-tight">{session.title}</span>
+                  {session.subtitle && (
+                    <span className="text-[12px] text-muted-foreground">{session.subtitle}</span>
+                  )}
                   <span className="ml-auto shrink-0 text-[12px] text-muted-foreground">›</span>
                 </Link>
               </li>
