@@ -1,69 +1,114 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { estimated1RM, useStore } from "../lib/store";
+import { useStore } from "../lib/store";
+import type { DailyLogNumericField } from "../lib/daily-log";
 
 export const Route = createFileRoute("/charts")({
   head: () => ({
     meta: [
       { title: "Charts" },
-      { name: "description", content: "Estimated 1RM trend per exercise." },
+      { name: "description", content: "Daily metrics over time." },
       { property: "og:title", content: "Charts" },
-      { property: "og:description", content: "Estimated 1RM trend per exercise." },
+      { property: "og:description", content: "Daily metrics over time." },
     ],
   }),
   component: ChartsPage,
 });
 
+const METRICS: { key: DailyLogNumericField; label: string; unit: string | ((appUnit: string) => string) }[] = [
+  { key: "calories", label: "Calories", unit: "kcal" },
+  { key: "protein", label: "Protein", unit: "g" },
+  { key: "carbs", label: "Carbs", unit: "g" },
+  { key: "fat", label: "Fat", unit: "g" },
+  { key: "steps", label: "Steps", unit: "steps" },
+  { key: "bodyweight", label: "Bodyweight", unit: (u) => u },
+];
+
+const RANGES = [
+  { label: "7", days: 7 },
+  { label: "30", days: 30 },
+  { label: "90", days: 90 },
+  { label: "All", days: 0 },
+];
+
 function ChartsPage() {
-  const exercises = useStore((s) => s.exercises);
-  const sets = useStore((s) => s.sets);
+  const dailyLogs = useStore((s) => s.dailyLogs);
   const unit = useStore((s) => s.unit);
 
-  const withData = useMemo(
-    () => exercises.filter((e) => sets.some((s) => s.exerciseId === e.id)),
-    [exercises, sets],
-  );
-  const [selectedId, setSelectedId] = useState<string>(withData[0]?.id ?? "");
+  const [metricKey, setMetricKey] = useState<DailyLogNumericField>("calories");
+  const [rangeDays, setRangeDays] = useState<number>(30);
+
+  const metric = METRICS.find((m) => m.key === metricKey)!;
+  const metricUnit = typeof metric.unit === "function" ? metric.unit(unit) : metric.unit;
 
   const points = useMemo(() => {
-    if (!selectedId) return [];
-    const byDay = new Map<string, number>();
-    for (const s of sets.filter((x) => x.exerciseId === selectedId)) {
-      const day = new Date(s.loggedAt);
-      day.setHours(0, 0, 0, 0);
-      const k = String(day.getTime());
-      const e1rm = estimated1RM(s.weight, s.reps);
-      if (!byDay.has(k) || byDay.get(k)! < e1rm) byDay.set(k, e1rm);
-    }
-    return [...byDay.entries()]
-      .map(([ts, e1rm]) => ({ ts: Number(ts), e1rm }))
+    const metricLogs = dailyLogs
+      .filter((log) => log[metricKey] !== undefined)
+      .map((log) => {
+        const parts = log.date.split("-");
+        const ts = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getTime();
+        return { 
+          ts, 
+          val: log[metricKey]!, 
+          isCheatDay: log.isCheatDay,
+        };
+      })
       .sort((a, b) => a.ts - b.ts);
-  }, [selectedId, sets]);
+      
+    if (rangeDays === 0) return metricLogs;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const cutoff = today.getTime() - (rangeDays - 1) * 86400000;
+    
+    return metricLogs.filter((p) => p.ts >= cutoff);
+  }, [dailyLogs, metricKey, rangeDays]);
 
   return (
     <AppShell>
       <header className="px-5 pb-4 pt-14">
         <h1 className="text-[30px] font-semibold tracking-tight">Charts</h1>
-        <p className="mt-1 text-[14px] text-muted-foreground">Estimated 1RM over time.</p>
+        <p className="mt-1 text-[14px] text-muted-foreground">Daily metrics over time.</p>
       </header>
 
       <div
         data-swipe-ignore
-        className="scrollbar-none flex gap-2 overflow-x-auto px-5 pb-4 anim-fade-up"
+        className="scrollbar-none flex gap-2 overflow-x-auto px-5 pb-2 anim-fade-up"
       >
-        {withData.map((e) => (
+        {METRICS.map((m) => (
           <button
-            key={e.id}
-            onClick={() => setSelectedId(e.id)}
+            key={m.key}
+            onClick={() => setMetricKey(m.key)}
             className={
               "whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors duration-200 " +
-              (selectedId === e.id
+              (metricKey === m.key
                 ? "bg-foreground text-background"
                 : "bg-muted text-muted-foreground")
             }
           >
-            {e.name}
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      <div
+        data-swipe-ignore
+        className="scrollbar-none flex gap-2 overflow-x-auto px-5 pb-4 anim-fade-up"
+        style={{ animationDelay: "20ms" }}
+      >
+        {RANGES.map((r) => (
+          <button
+            key={r.label}
+            onClick={() => setRangeDays(r.days)}
+            className={
+              "whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-medium transition-colors duration-200 " +
+              (rangeDays === r.days
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground")
+            }
+          >
+            {r.label}
           </button>
         ))}
       </div>
@@ -72,22 +117,24 @@ function ChartsPage() {
         className="mx-5 rounded-2xl bg-surface p-5 hairline-t hairline-b anim-fade-up"
         style={{ animationDelay: "40ms" }}
       >
-        <Chart points={points} unit={unit} />
+        <Chart points={points} unit={metricUnit} isCalories={metricKey === "calories"} />
         <div className="mt-4 flex items-baseline justify-between">
           <div>
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Current e1RM
+              Latest {metric.label}
             </div>
             <div className="tnum mt-0.5 text-[26px] font-semibold">
-              {points.length > 0 ? points[points.length - 1].e1rm : "—"}
-              <span className="ml-1 text-[12px] font-normal text-muted-foreground">{unit}</span>
+              {points.length > 0 ? points[points.length - 1].val : "—"}
+              <span className="ml-1 text-[12px] font-normal text-muted-foreground">{metricUnit}</span>
             </div>
           </div>
           <div className="text-right">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Sessions
+              Average
             </div>
-            <div className="tnum mt-0.5 text-[26px] font-semibold">{points.length}</div>
+            <div className="tnum mt-0.5 text-[26px] font-semibold">
+              {points.length > 0 ? Math.round(points.reduce((acc, p) => acc + p.val, 0) / points.length) : "—"}
+            </div>
           </div>
         </div>
       </div>
@@ -95,7 +142,7 @@ function ChartsPage() {
   );
 }
 
-function Chart({ points, unit }: { points: { ts: number; e1rm: number }[]; unit: string }) {
+function Chart({ points, unit, isCalories }: { points: { ts: number; val: number; isCheatDay?: boolean }[]; unit: string; isCalories: boolean }) {
   const W = 320;
   const H = 180;
   const pad = { l: 8, r: 8, t: 12, b: 20 };
@@ -107,7 +154,7 @@ function Chart({ points, unit }: { points: { ts: number; e1rm: number }[]; unit:
     );
   }
   const xs = points.map((p) => p.ts);
-  const ys = points.map((p) => p.e1rm);
+  const ys = points.map((p) => p.val);
   const xMin = Math.min(...xs),
     xMax = Math.max(...xs);
   const yMin = Math.min(...ys),
@@ -117,7 +164,7 @@ function Chart({ points, unit }: { points: { ts: number; e1rm: number }[]; unit:
   const x = (t: number) => pad.l + ((t - xMin) / xSpan) * (W - pad.l - pad.r);
   const y = (v: number) => pad.t + (1 - (v - yMin) / ySpan) * (H - pad.t - pad.b);
   const d = points
-    .map((p, i) => `${i === 0 ? "M" : "L"}${x(p.ts).toFixed(1)},${y(p.e1rm).toFixed(1)}`)
+    .map((p, i) => `${i === 0 ? "M" : "L"}${x(p.ts).toFixed(1)},${y(p.val).toFixed(1)}`)
     .join(" ");
   const areaD = `${d} L${x(xMax)},${H - pad.b} L${x(xMin)},${H - pad.b} Z`;
   return (
@@ -138,7 +185,7 @@ function Chart({ points, unit }: { points: { ts: number; e1rm: number }[]; unit:
         strokeLinejoin="round"
       />
       {points.map((p, i) => (
-        <circle key={i} cx={x(p.ts)} cy={y(p.e1rm)} r={2} fill="var(--color-accent)" />
+        <circle key={i} cx={x(p.ts)} cy={y(p.val)} r={2} fill={isCalories && p.isCheatDay ? "var(--color-destructive)" : "var(--color-accent)"} />
       ))}
       <text x={pad.l} y={H - 6} fontSize={10} fill="var(--color-muted-foreground)">
         {new Date(xMin).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
