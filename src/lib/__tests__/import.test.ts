@@ -12,6 +12,7 @@ const DEFAULT_STATE = {
   slots: [],
   sessions: [],
   sets: [],
+  dailyLogs: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -25,12 +26,18 @@ function sortById<T extends { id: string }>(items: T[]): T[] {
   return [...items].sort((a, b) => a.id.localeCompare(b.id));
 }
 
+/** Same idea as sortById, for daily logs (keyed by `date`, not `id`). */
+function sortByDate<T extends { date: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => a.date.localeCompare(b.date));
+}
+
 async function resetDb() {
   await Promise.all([
     db.exercises.clear(),
     db.slots.clear(),
     db.sessions.clear(),
     db.sets.clear(),
+    db.dailyLogs.clear(),
     db.meta.clear(),
   ]);
 }
@@ -41,12 +48,14 @@ beforeEach(async () => {
 });
 
 const validBackup: BackupData = {
+  version: 2,
   exercises: [{ id: "e1", name: "Bench Press", type: "main" }],
   slots: [{ id: "s1", name: "Heavy Bench", rotationOrder: 0 }],
   sessions: [{ id: "sess1", splitSlotId: "s1", startedAt: 1000, endedAt: 2000 }],
   sets: [
     { id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1500 },
   ],
+  dailyLogs: [{ date: "2026-03-01", calories: 2400, steps: 0, isCheatDay: true }],
   unit: "kg",
 };
 
@@ -127,6 +136,47 @@ describe("parseBackup (validation)", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("rejects a backup whose dailyLogs entry is missing a date", () => {
+    const broken = { ...validBackup, dailyLogs: [{ calories: 2000 }] };
+    const result = parseBackup(JSON.stringify(broken));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("The backup's daily logs list is malformed.");
+  });
+
+  it("rejects a backup whose dailyLogs entry has a non-numeric field", () => {
+    const broken = { ...validBackup, dailyLogs: [{ date: "2026-03-01", calories: "2000" }] };
+    const result = parseBackup(JSON.stringify(broken));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("The backup's daily logs list is malformed.");
+  });
+
+  it("rejects a backup whose dailyLogs is present but not an array", () => {
+    const broken = { ...validBackup, dailyLogs: "nope" };
+    const result = parseBackup(JSON.stringify(broken));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("The backup's daily logs list is malformed.");
+  });
+
+  it("accepts a dailyLogs entry that has only a date, and one with an explicit zero", () => {
+    const ok = {
+      ...validBackup,
+      dailyLogs: [{ date: "2026-03-01" }, { date: "2026-03-02", steps: 0, isCheatDay: false }],
+    };
+    const result = parseBackup(JSON.stringify(ok));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.dailyLogs).toHaveLength(2);
+  });
+
+  it("accepts an unrecognised future version on a best-effort basis", () => {
+    const future = { ...validBackup, version: 99 };
+    const result = parseBackup(JSON.stringify(future));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.version).toBe(99);
+      expect(result.data.dailyLogs).toEqual(validBackup.dailyLogs);
+    }
+  });
+
   it("does not touch IndexedDB or the store when validation fails", async () => {
     await useStore.getState().hydrate();
     const before = useStore.getState();
@@ -146,11 +196,16 @@ describe("importData (full backup restore)", () => {
     // exportJson() in settings.tsx produces.
     await useStore.getState().hydrate();
     const seeded = useStore.getState();
+    // Give the seeded state a couple of daily logs so the round-trip covers them.
+    useStore.getState().upsertDailyLog("2026-02-10", { calories: 2100, protein: 180 });
+    useStore.getState().upsertDailyLog("2026-02-11", { steps: 0, isCheatDay: true });
     const exported: BackupData = {
+      version: 2,
       exercises: seeded.exercises,
       slots: seeded.slots,
       sessions: seeded.sessions,
       sets: seeded.sets,
+      dailyLogs: useStore.getState().dailyLogs,
       unit: seeded.unit,
     };
     // Round-trip through JSON, exactly as a real export/import cycle would.
@@ -169,6 +224,7 @@ describe("importData (full backup restore)", () => {
     expect(restored.slots).toEqual(exported.slots);
     expect(restored.sessions).toEqual(exported.sessions);
     expect(restored.sets).toEqual(exported.sets);
+    expect(restored.dailyLogs).toEqual(exported.dailyLogs);
     expect(restored.unit).toBe(exported.unit);
 
     // Also survives a simulated reload — i.e. it actually landed in Dexie,
@@ -180,6 +236,7 @@ describe("importData (full backup restore)", () => {
     expect(sortById(reloaded.slots)).toEqual(sortById(exported.slots));
     expect(sortById(reloaded.sessions)).toEqual(sortById(exported.sessions));
     expect(sortById(reloaded.sets)).toEqual(sortById(exported.sets));
+    expect(sortByDate(reloaded.dailyLogs)).toEqual(sortByDate(exported.dailyLogs));
     expect(reloaded.unit).toBe(exported.unit);
   });
 
@@ -198,6 +255,40 @@ describe("importData (full backup restore)", () => {
 
     expect(state.exercises).toEqual(validBackup.exercises);
     expect(state.unit).toBe(validBackup.unit);
+  });
+
+  it("parses and imports a v1 backup with no version and no dailyLogs key", async () => {
+    // The shape every export written before daily logging produced.
+    const v1Backup: Record<string, unknown> = { ...validBackup };
+    delete v1Backup.version;
+    delete v1Backup.dailyLogs;
+    expect("dailyLogs" in v1Backup).toBe(false);
+
+    const result = parseBackup(JSON.stringify(v1Backup));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.version).toBe(1);
+    expect(result.data.dailyLogs).toEqual([]);
+
+    await useStore.getState().hydrate();
+    await useStore.getState().importData(result.data);
+
+    expect(useStore.getState().dailyLogs).toEqual([]);
+    expect(useStore.getState().exercises).toEqual(validBackup.exercises);
+    expect(await db.dailyLogs.count()).toBe(0);
+  });
+
+  it("restores daily logs into IndexedDB, not just into memory", async () => {
+    await useStore.getState().hydrate();
+    await useStore.getState().importData(validBackup);
+
+    expect(useStore.getState().dailyLogs).toEqual(validBackup.dailyLogs);
+    expect(await db.dailyLogs.get("2026-03-01")).toMatchObject({
+      date: "2026-03-01",
+      calories: 2400,
+      steps: 0,
+      isCheatDay: true,
+    });
   });
 
   it("replaces existing data rather than merging with it", async () => {

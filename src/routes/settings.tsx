@@ -1,7 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { parseBackup, useStore, type BackupData } from "../lib/store";
+import { BACKUP_VERSION, parseBackup, useStore, type BackupData } from "../lib/store";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -39,10 +39,17 @@ function SettingsPage() {
   };
 
   const exportJson = () => {
-    const { exercises, slots, sessions, sets, unit } = useStore.getState();
-    const blob = new Blob([JSON.stringify({ exercises, slots, sessions, sets, unit }, null, 2)], {
-      type: "application/json",
-    });
+    const { exercises, slots, sessions, sets, dailyLogs, unit } = useStore.getState();
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          { version: BACKUP_VERSION, exercises, slots, sessions, sets, dailyLogs, unit },
+          null,
+          2,
+        ),
+      ],
+      { type: "application/json" },
+    );
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -155,8 +162,9 @@ function SettingsPage() {
           <div className="px-5 py-3.5 hairline-t">
             <div className="text-[13px] text-muted-foreground">
               This file has {pendingImport.exercises.length} exercises,{" "}
-              {pendingImport.sessions.length} sessions and {pendingImport.sets.length} sets.
-              Importing will replace all data currently on this device. This cannot be undone.
+              {pendingImport.sessions.length} sessions, {pendingImport.sets.length} sets and{" "}
+              {pendingImport.dailyLogs.length} logged days. Importing will replace all data
+              currently on this device. This cannot be undone.
             </div>
             <div className="mt-3 flex gap-2">
               <button

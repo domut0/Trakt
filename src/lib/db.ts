@@ -1,5 +1,12 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { BackupData, Exercise, SplitSlot, WorkoutSession, WorkoutSet } from "./store";
+import type {
+  BackupData,
+  DailyLog,
+  Exercise,
+  SplitSlot,
+  WorkoutSession,
+  WorkoutSet,
+} from "./store";
 
 /**
  * IndexedDB persistence via Dexie.
@@ -41,6 +48,7 @@ class WorkoutDb extends Dexie {
   sessions!: EntityTable<WorkoutSession, "id">;
   sets!: EntityTable<WorkoutSet, "id">;
   meta!: EntityTable<MetaRecord, "key">;
+  dailyLogs!: EntityTable<DailyLog, "date">;
 
   constructor() {
     super("workout-tracker");
@@ -50,6 +58,13 @@ class WorkoutDb extends Dexie {
       sessions: "id",
       sets: "id, sessionId",
       meta: "key",
+    });
+    // v2 adds daily numeric logging. Only the NEW table is declared: Dexie
+    // carries every table from the previous version forward untouched, and
+    // adding a table needs no data migration, so an existing v1 database
+    // upgrades in place with all workout data intact.
+    this.version(2).stores({
+      dailyLogs: "date",
     });
   }
 }
@@ -78,25 +93,29 @@ export interface AllData {
   slots: SplitSlot[];
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
+  dailyLogs: DailyLog[];
   settings: SettingsMeta;
   activeSession: ActiveSessionMeta;
 }
 
 /** Reads every table. Client-only. */
 export async function loadAll(): Promise<AllData> {
-  const [exercises, slots, sessions, sets, settingsMeta, activeSessionMeta] = await Promise.all([
-    db.exercises.toArray(),
-    db.slots.toArray(),
-    db.sessions.toArray(),
-    db.sets.toArray(),
-    db.meta.get("settings"),
-    db.meta.get("activeSession"),
-  ]);
+  const [exercises, slots, sessions, sets, dailyLogs, settingsMeta, activeSessionMeta] =
+    await Promise.all([
+      db.exercises.toArray(),
+      db.slots.toArray(),
+      db.sessions.toArray(),
+      db.sets.toArray(),
+      db.dailyLogs.toArray(),
+      db.meta.get("settings"),
+      db.meta.get("activeSession"),
+    ]);
   return {
     exercises,
     slots,
     sessions,
     sets,
+    dailyLogs,
     settings: (settingsMeta as SettingsMeta) ?? DEFAULT_SETTINGS,
     activeSession: (activeSessionMeta as ActiveSessionMeta) ?? EMPTY_ACTIVE_SESSION,
   };
@@ -116,19 +135,25 @@ export async function seedDb(data: {
   sets: WorkoutSet[];
   settings: SettingsMeta;
 }): Promise<void> {
-  await db.transaction("rw", db.exercises, db.slots, db.sessions, db.sets, db.meta, async () => {
-    await db.exercises.bulkPut(data.exercises);
-    await db.slots.bulkPut(data.slots);
-    await db.sessions.bulkPut(data.sessions);
-    await db.sets.bulkPut(data.sets);
-    await db.meta.put(data.settings);
-    await db.meta.put(EMPTY_ACTIVE_SESSION);
-  });
+  // dailyLogs is in the transaction scope but intentionally never written:
+  // a first run seeds no daily logs, so the table starts empty.
+  await db.transaction(
+    "rw",
+    [db.exercises, db.slots, db.sessions, db.sets, db.dailyLogs, db.meta],
+    async () => {
+      await db.exercises.bulkPut(data.exercises);
+      await db.slots.bulkPut(data.slots);
+      await db.sessions.bulkPut(data.sessions);
+      await db.sets.bulkPut(data.sets);
+      await db.meta.put(data.settings);
+      await db.meta.put(EMPTY_ACTIVE_SESSION);
+    },
+  );
 }
 
 /**
  * Full backup restore: replaces the entire dataset (exercises, slots,
- * sessions, sets, settings) and clears any in-progress workout, in a single
+ * sessions, sets, daily logs, settings) and clears any in-progress workout, in a single
  * Dexie transaction. Either everything lands or nothing does — a failure
  * partway through rolls the whole transaction back, so existing data is
  * never left half-overwritten. Client-only. Caller must have already fully
@@ -136,21 +161,27 @@ export async function seedDb(data: {
  * input completely.
  */
 export async function replaceAllData(data: BackupData): Promise<void> {
-  await db.transaction("rw", db.exercises, db.slots, db.sessions, db.sets, db.meta, async () => {
-    await db.exercises.clear();
-    await db.slots.clear();
-    await db.sessions.clear();
-    await db.sets.clear();
-    await db.exercises.bulkPut(data.exercises);
-    await db.slots.bulkPut(data.slots);
-    await db.sessions.bulkPut(data.sessions);
-    await db.sets.bulkPut(data.sets);
-    await db.meta.put({
-      key: "settings",
-      unit: data.unit,
-    });
-    await db.meta.put(EMPTY_ACTIVE_SESSION);
-  });
+  await db.transaction(
+    "rw",
+    [db.exercises, db.slots, db.sessions, db.sets, db.dailyLogs, db.meta],
+    async () => {
+      await db.exercises.clear();
+      await db.slots.clear();
+      await db.sessions.clear();
+      await db.sets.clear();
+      await db.dailyLogs.clear();
+      await db.exercises.bulkPut(data.exercises);
+      await db.slots.bulkPut(data.slots);
+      await db.sessions.bulkPut(data.sessions);
+      await db.sets.bulkPut(data.sets);
+      await db.dailyLogs.bulkPut(data.dailyLogs);
+      await db.meta.put({
+        key: "settings",
+        unit: data.unit,
+      });
+      await db.meta.put(EMPTY_ACTIVE_SESSION);
+    },
+  );
 }
 
 export async function putSettingsMeta(settings: SettingsMeta): Promise<void> {

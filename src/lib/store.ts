@@ -10,6 +10,7 @@ import {
   setWriteErrorHandler,
   type SettingsMeta,
 } from "./db";
+import { isDailyLogEmpty } from "./daily-log";
 import { seedExercises } from "./exercise-library";
 
 export type ExerciseType = "main" | "accessory";
@@ -53,16 +54,43 @@ export interface WorkoutSet {
   loggedAt: number;
 }
 
+/**
+ * One row per calendar day of self-reported numbers, upserted as the day is
+ * edited. Every field is optional: a day where only bodyweight was recorded is
+ * perfectly valid. A record with nothing in it at all is never stored (see
+ * `isDailyLogEmpty` / `upsertDailyLog`).
+ */
+export interface DailyLog {
+  /** LOCAL calendar date as "yyyy-MM-dd". Primary key — see `dayKey`. */
+  date: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  steps?: number;
+  /** In the app's current global lbs/kg unit; the number is stored as typed, not converted. */
+  bodyweight?: number;
+  isCheatDay?: boolean;
+}
+
 /** The shape produced by Settings' "Export backup" action, and the shape
  * `importData` / `replaceAllData` expect back in. Kept flat (no meta
- * nesting) to match the exported JSON exactly. */
+ * nesting) to match the exported JSON exactly.
+ *
+ * `version` tracks the backup format, not the app: v1 files predate daily
+ * logging and have neither key. `parseBackup` reads both tolerantly. */
 export interface BackupData {
+  version: number;
   exercises: Exercise[];
   slots: SplitSlot[];
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
+  dailyLogs: DailyLog[];
   unit: "lbs" | "kg";
 }
+
+/** Current backup format version, written by Settings' export. */
+export const BACKUP_VERSION = 2;
 
 type CurrentBlock = {
   blockGroupId: string;
@@ -80,6 +108,7 @@ interface State {
   slots: SplitSlot[];
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
+  dailyLogs: DailyLog[];
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
@@ -110,6 +139,13 @@ interface State {
    * clears the in-progress workout if the deleted session was the active one. */
   deleteSession: (sessionId: string) => void;
   updateSet: (setId: string, patch: Partial<WorkoutSet>) => void;
+  /** Merge `patch` into the daily log for `date`, creating the record if there
+   * isn't one. If the merged result carries no information (`isDailyLogEmpty`),
+   * the record is DELETED instead of stored, so clearing every field leaves no
+   * empty shell behind. */
+  upsertDailyLog: (date: string, patch: Partial<Omit<DailyLog, "date">>) => void;
+  deleteDailyLog: (date: string) => void;
+  dailyLogFor: (date: string) => DailyLog | undefined;
   setUnit: (u: "lbs" | "kg") => void;
   setChartsEnabled: (v: boolean) => void;
   reorderSlots: (fromId: string, toId: string) => void;
@@ -511,12 +547,35 @@ function isWorkoutSet(v: unknown): v is WorkoutSet {
   return true;
 }
 
+function isOptionalNumber(v: unknown): boolean {
+  return v === undefined || typeof v === "number";
+}
+
+function isDailyLog(v: unknown): v is DailyLog {
+  if (!isPlainObject(v)) return false;
+  if (typeof v.date !== "string" || v.date.length === 0) return false;
+  if (!isOptionalNumber(v.calories)) return false;
+  if (!isOptionalNumber(v.protein)) return false;
+  if (!isOptionalNumber(v.carbs)) return false;
+  if (!isOptionalNumber(v.fat)) return false;
+  if (!isOptionalNumber(v.steps)) return false;
+  if (!isOptionalNumber(v.bodyweight)) return false;
+  if (v.isCheatDay !== undefined && typeof v.isCheatDay !== "boolean") return false;
+  return true;
+}
+
 /**
  * Parses and fully validates a backup JSON string against the exact shape
  * `exportJson` in Settings produces. Pure — no IndexedDB, no store, no DOM —
  * so the import flow can validate a file completely before touching
  * persistence, and this can be unit-tested directly. Never throws; returns a
  * discriminated result instead.
+ *
+ * Deliberately TOLERANT about the format version. A v1 file (written before
+ * daily logging existed) has no `version` and no `dailyLogs`; both default
+ * rather than failing. A version number from the future is also accepted on a
+ * best-effort basis — the keys we understand are read, the rest ignored. The
+ * only hard failures are structural: keys that ARE present but the wrong shape.
  */
 export function parseBackup(text: string): ParseBackupResult {
   let parsed: unknown;
@@ -528,7 +587,7 @@ export function parseBackup(text: string): ParseBackupResult {
   if (!isPlainObject(parsed)) {
     return { ok: false, error: "That file does not contain a backup." };
   }
-  const { exercises, slots, sessions, sets, unit } = parsed;
+  const { exercises, slots, sessions, sets, dailyLogs, unit, version } = parsed;
   if (!Array.isArray(exercises) || !exercises.every(isExercise)) {
     return { ok: false, error: "The backup's exercises list is missing or malformed." };
   }
@@ -541,16 +600,25 @@ export function parseBackup(text: string): ParseBackupResult {
   if (!Array.isArray(sets) || !sets.every(isWorkoutSet)) {
     return { ok: false, error: "The backup's sets list is missing or malformed." };
   }
+  // Absent entirely = a pre-v2 backup, which simply had no daily logs. Present
+  // but not a well-formed array = a corrupt file, which is a real error.
+  if (dailyLogs !== undefined && (!Array.isArray(dailyLogs) || !dailyLogs.every(isDailyLog))) {
+    return { ok: false, error: "The backup's daily logs list is malformed." };
+  }
   if (unit !== "lbs" && unit !== "kg") {
     return { ok: false, error: "The backup's unit must be lbs or kg." };
   }
   return {
     ok: true,
     data: {
+      // No `version` means a v1 file. An unrecognised version is kept as-is and
+      // imported anyway rather than rejected.
+      version: typeof version === "number" ? version : 1,
       exercises: exercises as Exercise[],
       slots: slots as SplitSlot[],
       sessions: sessions as WorkoutSession[],
       sets: sets as WorkoutSet[],
+      dailyLogs: (dailyLogs as DailyLog[] | undefined) ?? [],
       unit,
     },
   };
@@ -590,6 +658,7 @@ export const useStore = create<State>((set, get) => ({
   slots: [],
   sessions: [],
   sets: [],
+  dailyLogs: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -624,6 +693,7 @@ export const useStore = create<State>((set, get) => ({
           slots: seedSlots,
           sessions: seedSessions,
           sets: seedSets,
+          dailyLogs: [], // a first run seeds no daily logs
           unit: settings.unit,
           chartsEnabled: true,
           activeSessionId: undefined,
@@ -639,6 +709,7 @@ export const useStore = create<State>((set, get) => ({
         slots: data.slots,
         sessions: data.sessions,
         sets: data.sets,
+        dailyLogs: data.dailyLogs,
         unit: data.settings.unit,
         chartsEnabled: data.settings.chartsEnabled ?? true,
         activeSessionId: data.activeSession.activeSessionId,
@@ -843,6 +914,32 @@ export const useStore = create<State>((set, get) => ({
     if (updated) safeWrite(() => db.sets.put(updated));
   },
 
+  upsertDailyLog: (date, patch) => {
+    const existing = get().dailyLogs.find((l) => l.date === date);
+    const merged: DailyLog = { ...(existing ?? { date }), ...patch, date };
+    if (isDailyLogEmpty(merged)) {
+      // Everything was cleared. Drop the row rather than keeping a shell that
+      // would show up as a "logged" day everywhere it's counted.
+      if (!existing) return;
+      set({ dailyLogs: get().dailyLogs.filter((l) => l.date !== date) });
+      safeWrite(() => db.dailyLogs.delete(date));
+      return;
+    }
+    set({
+      dailyLogs: existing
+        ? get().dailyLogs.map((l) => (l.date === date ? merged : l))
+        : [...get().dailyLogs, merged],
+    });
+    safeWrite(() => db.dailyLogs.put(merged));
+  },
+
+  deleteDailyLog: (date) => {
+    set({ dailyLogs: get().dailyLogs.filter((l) => l.date !== date) });
+    safeWrite(() => db.dailyLogs.delete(date));
+  },
+
+  dailyLogFor: (date) => get().dailyLogs.find((l) => l.date === date),
+
   setUnit: (u) => {
     set({ unit: u });
     persistSettings(u, get().chartsEnabled);
@@ -876,6 +973,7 @@ export const useStore = create<State>((set, get) => ({
       slots: data.slots,
       sessions: data.sessions,
       sets: data.sets,
+      dailyLogs: data.dailyLogs,
       unit: data.unit,
       chartsEnabled: true,
       activeSessionId: undefined,
@@ -890,10 +988,12 @@ export const useStore = create<State>((set, get) => ({
     // the presets means the DB is not "empty", so hydrate() won't re-seed the
     // demo history on the next load — the clean slate persists.
     await replaceAllData({
+      version: BACKUP_VERSION,
       exercises: seedExercises,
       slots: [],
       sessions: [],
       sets: [],
+      dailyLogs: [],
       unit: "lbs",
     });
     set({
@@ -901,6 +1001,7 @@ export const useStore = create<State>((set, get) => ({
       slots: [],
       sessions: [],
       sets: [],
+      dailyLogs: [],
       unit: "lbs",
       chartsEnabled: true,
       activeSessionId: undefined,
