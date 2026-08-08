@@ -13,7 +13,7 @@ import {
 import { isDailyLogEmpty } from "./daily-log";
 import { seedExercises } from "./exercise-library";
 
-export type ExerciseType = "main" | "accessory";
+export type ExerciseType = "main" | "accessory" | "cardio";
 
 export interface Exercise {
   id: string;
@@ -29,11 +29,47 @@ export interface SplitSlot {
   lastLoggedAt?: number;
 }
 
+/**
+ * A logged workout. Two variants share this one record, discriminated by `kind`:
+ *
+ * - **strength** (the default): started via `startWorkout`, belongs to a Split
+ *   Slot, accumulates `WorkoutSet`s, and drives every rotation / suggestion /
+ *   prefill heuristic in this file.
+ * - **cardio**: written in one shot by `logCardio` AFTER the fact. It has NO
+ *   Split Slot, no sets, and must stay invisible to all of that strength logic.
+ *
+ * `kind` is optional and `undefined` MUST read as "strength" — every session
+ * recorded before cardio existed has no `kind` at all. Never compare the string
+ * inline; go through `isCardioSession` so that default stays in one place.
+ *
+ * `splitSlotId` is optional for the same reason cardio exists at all: a cardio
+ * entry has no slot. Anything matching sessions BY slot has to be careful, since
+ * two cardio sessions both carry `undefined` and would otherwise compare equal.
+ */
 export interface WorkoutSession {
   id: string;
-  splitSlotId: string;
+  /** Absent on cardio sessions. Always present on strength sessions. */
+  splitSlotId?: string;
   startedAt: number;
   endedAt?: number;
+  /** Undefined means "strength" — see `isCardioSession`. */
+  kind?: "strength" | "cardio";
+  /** Cardio only: the Exercise (of type "cardio") that was performed. */
+  cardioExerciseId?: string;
+  /** Cardio only. Used to back-compute `startedAt` from the moment it was logged. */
+  durationMinutes?: number;
+  /** Cardio only. Miles when the unit is lbs, km when the unit is kg. */
+  distance?: number;
+  /** Cardio only. Snapshot at log time, same pattern as `WorkoutSet.setupNote`. */
+  setupNote?: string;
+}
+
+/**
+ * The single source of truth for the strength/cardio split. A session with no
+ * `kind` is strength, which is what keeps every pre-cardio record valid.
+ */
+export function isCardioSession(s: WorkoutSession): boolean {
+  return s.kind === "cardio";
 }
 
 export interface WorkoutSet {
@@ -89,8 +125,13 @@ export interface BackupData {
   unit: "lbs" | "kg";
 }
 
-/** Current backup format version, written by Settings' export. */
-export const BACKUP_VERSION = 2;
+/** Current backup format version, written by Settings' export.
+ *
+ * v3 adds cardio: sessions may carry `kind`/`cardioExerciseId`/`durationMinutes`/
+ * `distance`/`setupNote` and may omit `splitSlotId`, and exercises may be of type
+ * "cardio". Every one of those is optional, so a v1 or v2 file still imports
+ * unchanged and its sessions read as strength. */
+export const BACKUP_VERSION = 3;
 
 type CurrentBlock = {
   blockGroupId: string;
@@ -133,6 +174,22 @@ interface State {
     targetSets: number;
   }) => void;
   logNextInBlock: (overrides?: { reps?: number }) => void;
+  /** Record a completed cardio bout in one shot, after the fact — there is no
+   * start/end flow and no stopwatch. Creates a session that is already ended,
+   * with no Split Slot and no sets, and returns its id.
+   *
+   * When a duration is given, `startedAt` is back-computed from it (a 28 minute
+   * entry saved at 08:30 records startedAt 08:02) so the bout lands on the
+   * timeline where it actually happened. With no duration, startedAt == endedAt.
+   *
+   * Deliberately does NOT touch activeSessionId / currentExerciseId /
+   * currentBlock: logging cardio never puts the app into workout mode. */
+  logCardio: (input: {
+    exerciseId: string;
+    durationMinutes?: number;
+    distance?: number;
+    setupNote?: string;
+  }) => string;
   deleteSet: (setId: string) => void;
   /** Delete an entire logged workout: the session and every set in it. Recomputes
    * the affected split slot's lastLoggedAt from the sessions that remain, and
@@ -430,9 +487,40 @@ export function matchSlot(slots: SplitSlot[], name: string): SplitSlot | undefin
 }
 
 /**
+ * Finds the previous completed occurrence of the same Split Slot as `sess`,
+ * for the "pull from last time" heuristics below.
+ *
+ * Two guards matter here, and both exist because cardio sessions live in this
+ * same array. Cardio sessions are excluded outright, and a session with no
+ * `splitSlotId` never matches anything — otherwise two cardio bouts, which BOTH
+ * carry `splitSlotId === undefined`, would compare equal to each other and to
+ * any other slot-less session, and a treadmill run would start feeding the
+ * suggestion and prefill engines.
+ */
+function findLastSessionForSlot(
+  sessions: WorkoutSession[],
+  sess: WorkoutSession,
+): WorkoutSession | undefined {
+  if (isCardioSession(sess) || sess.splitSlotId == null) return undefined;
+  return sessions
+    .filter(
+      (s) =>
+        !isCardioSession(s) &&
+        s.splitSlotId != null &&
+        s.splitSlotId === sess.splitSlotId &&
+        s.id !== sess.id &&
+        s.endedAt,
+    )
+    .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0];
+}
+
+/**
  * "Next Exercise" suggestion: pulls from the last occurrence of the SAME
  * Split Slot, advancing one exercise at a time in the order they were logged
  * that day, skipping exercises already done in the current session.
+ *
+ * Strength-only: cardio sessions are neither a source nor a target (see
+ * `findLastSessionForSlot`).
  */
 export function suggestNextExercise(
   sessions: WorkoutSession[],
@@ -444,10 +532,8 @@ export function suggestNextExercise(
   const doneExerciseIds = new Set(
     sets.filter((s) => s.sessionId === sessionId).map((s) => s.exerciseId),
   );
-  // Last session of this slot (excluding current)
-  const lastSess = sessions
-    .filter((s) => s.splitSlotId === sess.splitSlotId && s.id !== sessionId && s.endedAt)
-    .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0];
+  // Last strength session of this slot (excluding current)
+  const lastSess = findLastSessionForSlot(sessions, sess);
   if (!lastSess) return undefined;
   const setsInLast = sets
     .filter((s) => s.sessionId === lastSess.id)
@@ -465,6 +551,9 @@ export function suggestNextExercise(
  * for an exercise in today's session prefills from the Nth distinct
  * weight/rep block logged for that exercise the last time this same Split
  * Slot occurred.
+ *
+ * Strength-only: cardio sessions are neither a source nor a target (see
+ * `findLastSessionForSlot`).
  */
 export function computePrefill(
   sessions: WorkoutSession[],
@@ -476,9 +565,7 @@ export function computePrefill(
   if (!sess) return {};
   const setsToday = sets.filter((s) => s.sessionId === sessionId && s.exerciseId === exerciseId);
   const distinctToday = new Set(setsToday.map((s) => `${s.weight}x${s.reps}`)).size;
-  const lastSess = sessions
-    .filter((s) => s.splitSlotId === sess.splitSlotId && s.id !== sessionId && s.endedAt)
-    .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0];
+  const lastSess = findLastSessionForSlot(sessions, sess);
   if (!lastSess) return {};
   const lastSets = sets
     .filter((s) => s.sessionId === lastSess.id && s.exerciseId === exerciseId)
@@ -507,7 +594,7 @@ function isExercise(v: unknown): v is Exercise {
   if (!isPlainObject(v)) return false;
   if (typeof v.id !== "string" || v.id.length === 0) return false;
   if (typeof v.name !== "string") return false;
-  if (v.type !== "main" && v.type !== "accessory") return false;
+  if (v.type !== "main" && v.type !== "accessory" && v.type !== "cardio") return false;
   if (v.setupNote !== undefined && typeof v.setupNote !== "string") return false;
   return true;
 }
@@ -524,9 +611,18 @@ function isSplitSlot(v: unknown): v is SplitSlot {
 function isWorkoutSession(v: unknown): v is WorkoutSession {
   if (!isPlainObject(v)) return false;
   if (typeof v.id !== "string" || v.id.length === 0) return false;
-  if (typeof v.splitSlotId !== "string") return false;
+  // Optional as of v3: cardio sessions have no Split Slot. Still must be a
+  // string when it IS present, so a malformed strength session is caught.
+  if (v.splitSlotId !== undefined && typeof v.splitSlotId !== "string") return false;
   if (typeof v.startedAt !== "number") return false;
   if (v.endedAt !== undefined && typeof v.endedAt !== "number") return false;
+  // Absent entirely = a pre-v3 session, which is strength by definition. Present
+  // but not one of the two known kinds = a corrupt file.
+  if (v.kind !== undefined && v.kind !== "strength" && v.kind !== "cardio") return false;
+  if (v.cardioExerciseId !== undefined && typeof v.cardioExerciseId !== "string") return false;
+  if (!isOptionalNumber(v.durationMinutes)) return false;
+  if (!isOptionalNumber(v.distance)) return false;
+  if (v.setupNote !== undefined && typeof v.setupNote !== "string") return false;
   return true;
 }
 
@@ -757,9 +853,15 @@ export const useStore = create<State>((set, get) => ({
     const sess = get().sessions.find((s) => s.id === id);
     const endedAt = Date.now();
     const updatedSessions = get().sessions.map((s) => (s.id === id ? { ...s, endedAt } : s));
-    const updatedSlots = get().slots.map((sl) =>
-      sess && sl.id === sess.splitSlotId ? { ...sl, lastLoggedAt: endedAt } : sl,
-    );
+    // Rotation bookkeeping is strength-only. A cardio session (or any session
+    // without a Split Slot) must never stamp a slot's lastLoggedAt, or it would
+    // advance the round-robin and make the app predict the wrong next workout.
+    const touchesSlot = sess != null && !isCardioSession(sess) && sess.splitSlotId != null;
+    const updatedSlots = touchesSlot
+      ? get().slots.map((sl) =>
+          sl.id === sess.splitSlotId ? { ...sl, lastLoggedAt: endedAt } : sl,
+        )
+      : get().slots;
     set({
       sessions: updatedSessions,
       slots: updatedSlots,
@@ -769,7 +871,7 @@ export const useStore = create<State>((set, get) => ({
     });
     const updatedSession = updatedSessions.find((s) => s.id === id);
     if (updatedSession) safeWrite(() => db.sessions.put(updatedSession));
-    if (sess) {
+    if (touchesSlot) {
       const updatedSlot = updatedSlots.find((sl) => sl.id === sess.splitSlotId);
       if (updatedSlot) safeWrite(() => db.slots.put(updatedSlot));
     }
@@ -863,6 +965,34 @@ export const useStore = create<State>((set, get) => ({
     });
   },
 
+  logCardio: ({ exerciseId, durationMinutes, distance, setupNote }) => {
+    const endedAt = Date.now();
+    // The bout finished now, so a duration tells us when it STARTED: 28 minutes
+    // logged at 08:30 began at 08:02. Back-computing here is what lets cardio
+    // land on the timeline at the right time despite being entered after the
+    // fact. No duration means there is nothing to subtract.
+    const startedAt =
+      durationMinutes != null ? endedAt - Math.round(durationMinutes * 60_000) : endedAt;
+    const note = setupNote?.trim();
+    const session: WorkoutSession = {
+      id: uid(),
+      // No splitSlotId: cardio is outside the rotation entirely.
+      startedAt,
+      endedAt,
+      kind: "cardio",
+      cardioExerciseId: exerciseId,
+      durationMinutes,
+      distance,
+      setupNote: note || undefined,
+    };
+    // Sessions only. No sets are created, and activeSessionId /
+    // currentExerciseId / currentBlock are deliberately left alone — logging
+    // cardio after the fact must never put the app into workout mode.
+    set({ sessions: [...get().sessions, session] });
+    safeWrite(() => db.sessions.put(session));
+    return session.id;
+  },
+
   deleteSet: (setId) => {
     set({ sets: get().sets.filter((s) => s.id !== setId) });
     safeWrite(() => db.sets.delete(setId));
@@ -873,9 +1003,19 @@ export const useStore = create<State>((set, get) => ({
     const sessions = get().sessions.filter((s) => s.id !== sessionId);
     const sets = get().sets.filter((s) => s.sessionId !== sessionId);
     let slots = get().slots;
-    if (sess) {
+    // Only a strength session owns a slot's lastLoggedAt, so only deleting one
+    // recomputes it — and the recomputation itself counts strength sessions
+    // only. Without that second filter, a cardio session sitting in the same
+    // array would be picked up here (its splitSlotId is undefined, which would
+    // match any other slot-less session) and resurrect a bogus timestamp.
+    const recomputesSlot = sess != null && !isCardioSession(sess) && sess.splitSlotId != null;
+    if (recomputesSlot) {
       const remainingForSlot = sessions.filter(
-        (s) => s.splitSlotId === sess.splitSlotId && s.endedAt != null,
+        (s) =>
+          !isCardioSession(s) &&
+          s.splitSlotId != null &&
+          s.splitSlotId === sess.splitSlotId &&
+          s.endedAt != null,
       );
       const newLast = remainingForSlot.length
         ? Math.max(...remainingForSlot.map((s) => s.endedAt!))
@@ -895,7 +1035,7 @@ export const useStore = create<State>((set, get) => ({
     });
     safeWrite(() => db.sessions.delete(sessionId));
     safeWrite(() => db.sets.where("sessionId").equals(sessionId).delete());
-    if (sess) {
+    if (recomputesSlot) {
       const updatedSlot = slots.find((sl) => sl.id === sess.splitSlotId);
       if (updatedSlot) safeWrite(() => db.slots.put(updatedSlot));
     }

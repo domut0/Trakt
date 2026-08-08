@@ -66,6 +66,13 @@ class WorkoutDb extends Dexie {
     this.version(2).stores({
       dailyLogs: "date",
     });
+    // NO version(3) for cardio, deliberately. stores() declares only primary
+    // keys and indexes, and every field cardio adds to a session (kind,
+    // cardioExerciseId, durationMinutes, distance, setupNote) is non-indexed —
+    // as is splitSlotId becoming optional. Dexie stores whole objects, so those
+    // records round-trip through the v2 schema untouched. Bumping the version
+    // here would cost an upgrade transaction on every existing install and buy
+    // nothing. Only add version(3) if cardio ever needs a real INDEX.
   }
 }
 

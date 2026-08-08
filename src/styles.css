@@ -17,6 +17,10 @@
   --color-nutrition: var(--nutrition);
   --color-steps: var(--steps);
   --color-bodyweight: var(--bodyweight);
+  --color-cardio: var(--cardio);
+  --color-carbs: var(--carbs);
+  --color-fat: var(--fat);
+  --color-protein: var(--protein);
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -38,6 +42,14 @@
   --nutrition: #4fa97a;
   --steps: #c2a25a;
   --bodyweight: #9179c9;
+  /* Cardio workout dot. Deliberately not blue: it shares the dot slot with the
+     strength accent and has to read as a different kind of day at a glance. */
+  --cardio: #cf6f8f;
+  /* Macro ring segments. Close cousins of --bodyweight / --steps but
+     intentionally distinct values; they are not duplicates to be merged. */
+  --carbs: #4bb3a2;
+  --fat: #a97fd0;
+  --protein: #e0a44f;
 }
 
 @layer base {

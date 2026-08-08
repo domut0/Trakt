@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../db";
-import { parseBackup, useStore, type BackupData } from "../store";
+import { BACKUP_VERSION, isCardioSession, parseBackup, useStore, type BackupData } from "../store";
 
 // fake-indexeddb/auto (loaded globally in src/test/setup.ts) gives us a real
 // IndexedDB implementation backed by memory, so the round-trip test below
@@ -107,9 +107,20 @@ describe("parseBackup (validation)", () => {
   });
 
   it("rejects a backup with a malformed exercise item (invalid type)", () => {
-    const broken = { ...validBackup, exercises: [{ id: "e1", name: "Bad Type", type: "cardio" }] };
+    // NB: "cardio" used to be the example of an invalid type here. It is a real
+    // ExerciseType as of backup v3, so this needs a genuinely unknown value.
+    const broken = {
+      ...validBackup,
+      exercises: [{ id: "e1", name: "Bad Type", type: "mobility" }],
+    };
     const result = parseBackup(JSON.stringify(broken));
     expect(result.ok).toBe(false);
+  });
+
+  it("accepts an exercise of type cardio", () => {
+    const ok = { ...validBackup, exercises: [{ id: "e1", name: "Treadmill", type: "cardio" }] };
+    const result = parseBackup(JSON.stringify(ok));
+    expect(result.ok).toBe(true);
   });
 
   it("rejects a backup with a malformed set item (weight not a number)", () => {
@@ -320,6 +331,93 @@ describe("importData (full backup restore)", () => {
 
     const activeSessionMeta = await db.meta.get("activeSession");
     expect(activeSessionMeta).toEqual({ key: "activeSession" });
+  });
+
+  it("imports a v2 backup that has no kind on any session", async () => {
+    // validBackup is exactly that shape: version 2, sessions with a splitSlotId
+    // and no kind. Those sessions must come back reading as strength.
+    expect(validBackup.sessions.every((s) => !("kind" in s))).toBe(true);
+    const result = parseBackup(JSON.stringify(validBackup));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    await useStore.getState().hydrate();
+    await useStore.getState().importData(result.data);
+
+    const restored = useStore.getState().sessions;
+    expect(restored).toEqual(validBackup.sessions);
+    expect(restored.every((s) => !isCardioSession(s))).toBe(true);
+  });
+
+  it("round-trips a v3 backup carrying cardio sessions and a cardio exercise", async () => {
+    const v3Backup: BackupData = {
+      version: BACKUP_VERSION,
+      exercises: [
+        { id: "e1", name: "Bench Press", type: "main" },
+        { id: "e2", name: "Treadmill", type: "cardio" },
+      ],
+      slots: [{ id: "s1", name: "Heavy Bench", rotationOrder: 0 }],
+      sessions: [
+        { id: "sess1", splitSlotId: "s1", startedAt: 1000, endedAt: 2000 },
+        {
+          id: "run1",
+          startedAt: 3000,
+          endedAt: 4680,
+          kind: "cardio",
+          cardioExerciseId: "e2",
+          durationMinutes: 28,
+          distance: 3.1,
+          setupNote: "incline 2",
+        },
+      ],
+      sets: [
+        { id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1500 },
+      ],
+      dailyLogs: [],
+      unit: "lbs",
+    };
+    expect(v3Backup.version).toBe(3);
+
+    const result = parseBackup(JSON.stringify(v3Backup));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data).toEqual(v3Backup);
+
+    await useStore.getState().hydrate();
+    await useStore.getState().importData(result.data);
+    expect(useStore.getState().sessions).toEqual(v3Backup.sessions);
+
+    // And it actually landed in Dexie, not just in memory.
+    useStore.setState({ ...DEFAULT_STATE, hydrated: false });
+    await useStore.getState().hydrate();
+    const reloaded = useStore.getState();
+    expect(sortById(reloaded.sessions)).toEqual(sortById(v3Backup.sessions));
+    expect(sortById(reloaded.exercises)).toEqual(sortById(v3Backup.exercises));
+    expect(reloaded.sessions.filter(isCardioSession)).toHaveLength(1);
+  });
+
+  it("rejects a session whose kind is neither strength nor cardio", () => {
+    const broken = {
+      ...validBackup,
+      sessions: [{ id: "sess1", splitSlotId: "s1", startedAt: 1000, kind: "swimming" }],
+    };
+    const result = parseBackup(JSON.stringify(broken));
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a session whose splitSlotId is present but not a string", () => {
+    const broken = { ...validBackup, sessions: [{ id: "sess1", splitSlotId: 7, startedAt: 1000 }] };
+    const result = parseBackup(JSON.stringify(broken));
+    expect(result.ok).toBe(false);
+  });
+
+  it("accepts a session with no splitSlotId at all", () => {
+    const ok = {
+      ...validBackup,
+      sessions: [{ id: "run1", startedAt: 1000, endedAt: 2000, kind: "cardio" }],
+    };
+    const result = parseBackup(JSON.stringify(ok));
+    expect(result.ok).toBe(true);
   });
 
   it("persists the imported unit to the settings meta record", async () => {
