@@ -18,8 +18,6 @@ export const Route = createFileRoute("/settings")({
 function SettingsPage() {
   const unit = useStore((s) => s.unit);
   const setUnit = useStore((s) => s.setUnit);
-  const motivationEnabled = useStore((s) => s.motivationEnabled);
-  const toggleMotivation = useStore((s) => s.toggleMotivation);
   const chartsEnabled = useStore((s) => s.chartsEnabled);
   const setChartsEnabled = useStore((s) => s.setChartsEnabled);
   const calendarEnabled = useStore((s) => s.calendarEnabled);
@@ -43,11 +41,10 @@ function SettingsPage() {
   };
 
   const exportJson = () => {
-    const { exercises, slots, sessions, sets, unit, motivationEnabled } = useStore.getState();
-    const blob = new Blob(
-      [JSON.stringify({ exercises, slots, sessions, sets, unit, motivationEnabled }, null, 2)],
-      { type: "application/json" },
-    );
+    const { exercises, slots, sessions, sets, unit } = useStore.getState();
+    const blob = new Blob([JSON.stringify({ exercises, slots, sessions, sets, unit }, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -117,19 +114,7 @@ function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="Feedback" delay={40}>
-        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
-          <div>
-            <div className="text-[15px]">Motivational messages</div>
-            <div className="text-[12px] text-muted-foreground">
-              In-app toasts after qualifying sets.
-            </div>
-          </div>
-          <Toggle checked={motivationEnabled} onChange={toggleMotivation} />
-        </div>
-      </Section>
-
-      <Section title="Tabs" delay={80}>
+      <Section title="Tabs" delay={40}>
         <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
           <div>
             <div className="text-[15px]">Charts tab</div>
@@ -148,7 +133,7 @@ function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="Data" delay={120}>
+      <Section title="Data" delay={80}>
         <button
           onClick={exportJson}
           className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
@@ -208,7 +193,7 @@ function SettingsPage() {
         )}
       </Section>
 
-      <Section title="Reset" delay={160}>
+      <Section title="Reset" delay={120}>
         {!showClearConfirm ? (
           <button
             onClick={() => setShowClearConfirm(true)}

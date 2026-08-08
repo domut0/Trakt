@@ -7,6 +7,7 @@ import {
   replaceAllData,
   safeWrite,
   seedDb,
+  setWriteErrorHandler,
   type SettingsMeta,
 } from "./db";
 
@@ -60,7 +61,6 @@ export interface BackupData {
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
   unit: "lbs" | "kg";
-  motivationEnabled: boolean;
 }
 
 type CurrentBlock = {
@@ -74,7 +74,6 @@ type CurrentBlock = {
 
 interface State {
   unit: "lbs" | "kg";
-  motivationEnabled: boolean;
   chartsEnabled: boolean;
   calendarEnabled: boolean;
   exercises: Exercise[];
@@ -86,6 +85,9 @@ interface State {
   currentBlock?: CurrentBlock;
   /** True once the client-side IndexedDB load (or first-run seed) has completed. */
   hydrated: boolean;
+  /** True when the most recent IndexedDB write failed. Ephemeral UI state only:
+   * never persisted, never included in a backup. */
+  writeFailed: boolean;
 
   /** Client-only. Loads persisted state from IndexedDB, seeding it on first-ever run. Idempotent. */
   hydrate: () => Promise<void>;
@@ -108,7 +110,6 @@ interface State {
    * clears the in-progress workout if the deleted session was the active one. */
   deleteSession: (sessionId: string) => void;
   updateSet: (setId: string, patch: Partial<WorkoutSet>) => void;
-  toggleMotivation: () => void;
   setUnit: (u: "lbs" | "kg") => void;
   setChartsEnabled: (v: boolean) => void;
   setCalendarEnabled: (v: boolean) => void;
@@ -136,6 +137,9 @@ interface State {
    * non-empty per-set note, falling back to the exercise's base note. Persists
    * across workouts so last week's setup shows up as a grey hint this week. */
   lastSetupNoteFor: (exerciseId: string) => string | undefined;
+  /** Clears the write-failure banner. Does not retry the write; the in-memory
+   * state is already current, this only dismisses the notice. */
+  dismissWriteError: () => void;
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -667,7 +671,7 @@ export function parseBackup(text: string): ParseBackupResult {
   if (!isPlainObject(parsed)) {
     return { ok: false, error: "That file does not contain a backup." };
   }
-  const { exercises, slots, sessions, sets, unit, motivationEnabled } = parsed;
+  const { exercises, slots, sessions, sets, unit } = parsed;
   if (!Array.isArray(exercises) || !exercises.every(isExercise)) {
     return { ok: false, error: "The backup's exercises list is missing or malformed." };
   }
@@ -683,9 +687,6 @@ export function parseBackup(text: string): ParseBackupResult {
   if (unit !== "lbs" && unit !== "kg") {
     return { ok: false, error: "The backup's unit must be lbs or kg." };
   }
-  if (typeof motivationEnabled !== "boolean") {
-    return { ok: false, error: "The backup's motivationEnabled setting is missing or malformed." };
-  }
   return {
     ok: true,
     data: {
@@ -694,7 +695,6 @@ export function parseBackup(text: string): ParseBackupResult {
       sessions: sessions as WorkoutSession[],
       sets: sets as WorkoutSet[],
       unit,
-      motivationEnabled,
     },
   };
 }
@@ -722,20 +722,12 @@ function persistActiveMeta(meta: {
   );
 }
 
-function persistSettings(
-  unit: "lbs" | "kg",
-  motivationEnabled: boolean,
-  chartsEnabled: boolean,
-  calendarEnabled: boolean,
-) {
-  safeWrite(() =>
-    db.meta.put({ key: "settings", unit, motivationEnabled, chartsEnabled, calendarEnabled }),
-  );
+function persistSettings(unit: "lbs" | "kg", chartsEnabled: boolean, calendarEnabled: boolean) {
+  safeWrite(() => db.meta.put({ key: "settings", unit, chartsEnabled, calendarEnabled }));
 }
 
 export const useStore = create<State>((set, get) => ({
   unit: "lbs",
-  motivationEnabled: true,
   chartsEnabled: true,
   calendarEnabled: true,
   exercises: [],
@@ -746,6 +738,7 @@ export const useStore = create<State>((set, get) => ({
   currentExerciseId: undefined,
   currentBlock: undefined,
   hydrated: false,
+  writeFailed: false,
 
   hydrate: async () => {
     if (get().hydrated) return; // idempotent — never double-seed/duplicate on repeat calls
@@ -761,7 +754,6 @@ export const useStore = create<State>((set, get) => ({
         const settings: SettingsMeta = {
           key: "settings",
           unit: "lbs",
-          motivationEnabled: true,
           chartsEnabled: true,
           calendarEnabled: true,
         };
@@ -778,7 +770,6 @@ export const useStore = create<State>((set, get) => ({
           sessions: seedSessions,
           sets: seedSets,
           unit: settings.unit,
-          motivationEnabled: settings.motivationEnabled,
           chartsEnabled: true,
           calendarEnabled: true,
           activeSessionId: undefined,
@@ -795,7 +786,6 @@ export const useStore = create<State>((set, get) => ({
         sessions: data.sessions,
         sets: data.sets,
         unit: data.settings.unit,
-        motivationEnabled: data.settings.motivationEnabled,
         chartsEnabled: data.settings.chartsEnabled ?? true,
         calendarEnabled: data.settings.calendarEnabled ?? true,
         activeSessionId: data.activeSession.activeSessionId,
@@ -1000,25 +990,19 @@ export const useStore = create<State>((set, get) => ({
     if (updated) safeWrite(() => db.sets.put(updated));
   },
 
-  toggleMotivation: () => {
-    const next = !get().motivationEnabled;
-    set({ motivationEnabled: next });
-    persistSettings(get().unit, next, get().chartsEnabled, get().calendarEnabled);
-  },
-
   setUnit: (u) => {
     set({ unit: u });
-    persistSettings(u, get().motivationEnabled, get().chartsEnabled, get().calendarEnabled);
+    persistSettings(u, get().chartsEnabled, get().calendarEnabled);
   },
 
   setChartsEnabled: (v) => {
     set({ chartsEnabled: v });
-    persistSettings(get().unit, get().motivationEnabled, v, get().calendarEnabled);
+    persistSettings(get().unit, v, get().calendarEnabled);
   },
 
   setCalendarEnabled: (v) => {
     set({ calendarEnabled: v });
-    persistSettings(get().unit, get().motivationEnabled, get().chartsEnabled, v);
+    persistSettings(get().unit, get().chartsEnabled, v);
   },
 
   reorderSlots: (fromId, toId) => {
@@ -1045,7 +1029,6 @@ export const useStore = create<State>((set, get) => ({
       sessions: data.sessions,
       sets: data.sets,
       unit: data.unit,
-      motivationEnabled: data.motivationEnabled,
       chartsEnabled: true,
       calendarEnabled: true,
       activeSessionId: undefined,
@@ -1065,7 +1048,6 @@ export const useStore = create<State>((set, get) => ({
       sessions: [],
       sets: [],
       unit: "lbs",
-      motivationEnabled: true,
     });
     set({
       exercises: seedExercises,
@@ -1073,7 +1055,6 @@ export const useStore = create<State>((set, get) => ({
       sessions: [],
       sets: [],
       unit: "lbs",
-      motivationEnabled: true,
       chartsEnabled: true,
       calendarEnabled: true,
       activeSessionId: undefined,
@@ -1096,7 +1077,18 @@ export const useStore = create<State>((set, get) => ({
       mostRecentWithNote?.setupNote ?? get().exercises.find((e) => e.id === exerciseId)?.setupNote
     );
   },
+
+  dismissWriteError: () => set({ writeFailed: false }),
 }));
+
+// Registered at module scope so any failed IndexedDB write (from db.ts's
+// safeWrite) surfaces as store state. db.ts cannot import this module back
+// (store.ts already imports db.ts — that would be circular), so it exposes
+// this setter instead. SSR-safe: this only assigns a function reference and
+// never touches IndexedDB itself.
+setWriteErrorHandler(() => {
+  useStore.setState({ writeFailed: true });
+});
 
 export function estimated1RM(weight: number, reps: number): number {
   if (reps <= 0) return 0;

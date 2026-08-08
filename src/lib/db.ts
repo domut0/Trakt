@@ -16,7 +16,6 @@ export type MetaKey = "settings" | "activeSession";
 export interface SettingsMeta {
   key: "settings";
   unit: "lbs" | "kg";
-  motivationEnabled: boolean;
   chartsEnabled?: boolean;
   calendarEnabled?: boolean;
 }
@@ -68,7 +67,6 @@ export function isIndexedDbAvailable(): boolean {
 export const DEFAULT_SETTINGS: SettingsMeta = {
   key: "settings",
   unit: "lbs",
-  motivationEnabled: true,
   chartsEnabled: true,
   calendarEnabled: true,
 };
@@ -152,7 +150,6 @@ export async function replaceAllData(data: BackupData): Promise<void> {
     await db.meta.put({
       key: "settings",
       unit: data.unit,
-      motivationEnabled: data.motivationEnabled,
     });
     await db.meta.put(EMPTY_ACTIVE_SESSION);
   });
@@ -164,6 +161,15 @@ export async function putSettingsMeta(settings: SettingsMeta): Promise<void> {
 
 export async function putActiveSessionMeta(meta: ActiveSessionMeta): Promise<void> {
   await db.meta.put(meta);
+}
+
+// Set by store.ts at module scope so a failed write can surface as UI state
+// (a banner) without db.ts importing store.ts back — store.ts already
+// imports db.ts, and that import would be circular.
+let writeErrorHandler: ((err: unknown) => void) | null = null;
+
+export function setWriteErrorHandler(fn: ((err: unknown) => void) | null): void {
+  writeErrorHandler = fn;
 }
 
 /**
@@ -181,8 +187,10 @@ export function safeWrite(op: () => Promise<unknown>): void {
     const result = op();
     Promise.resolve(result).catch((err: unknown) => {
       console.error("[db] write failed", err);
+      writeErrorHandler?.(err);
     });
   } catch (err) {
     console.error("[db] write failed", err);
+    writeErrorHandler?.(err);
   }
 }

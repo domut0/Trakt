@@ -8,7 +8,6 @@ import { parseBackup, useStore, type BackupData } from "../store";
 
 const DEFAULT_STATE = {
   unit: "lbs" as const,
-  motivationEnabled: true,
   exercises: [],
   slots: [],
   sessions: [],
@@ -49,7 +48,6 @@ const validBackup: BackupData = {
     { id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1500 },
   ],
   unit: "kg",
-  motivationEnabled: false,
 };
 
 describe("parseBackup (validation)", () => {
@@ -129,12 +127,6 @@ describe("parseBackup (validation)", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("rejects a backup with a non-boolean motivationEnabled", () => {
-    const broken = { ...validBackup, motivationEnabled: "yes" };
-    const result = parseBackup(JSON.stringify(broken));
-    expect(result.ok).toBe(false);
-  });
-
   it("does not touch IndexedDB or the store when validation fails", async () => {
     await useStore.getState().hydrate();
     const before = useStore.getState();
@@ -160,7 +152,6 @@ describe("importData (full backup restore)", () => {
       sessions: seeded.sessions,
       sets: seeded.sets,
       unit: seeded.unit,
-      motivationEnabled: seeded.motivationEnabled,
     };
     // Round-trip through JSON, exactly as a real export/import cycle would.
     const roundTripped = parseBackup(JSON.stringify(exported));
@@ -179,7 +170,6 @@ describe("importData (full backup restore)", () => {
     expect(restored.sessions).toEqual(exported.sessions);
     expect(restored.sets).toEqual(exported.sets);
     expect(restored.unit).toBe(exported.unit);
-    expect(restored.motivationEnabled).toBe(exported.motivationEnabled);
 
     // Also survives a simulated reload — i.e. it actually landed in Dexie,
     // not just in memory.
@@ -191,7 +181,23 @@ describe("importData (full backup restore)", () => {
     expect(sortById(reloaded.sessions)).toEqual(sortById(exported.sessions));
     expect(sortById(reloaded.sets)).toEqual(sortById(exported.sets));
     expect(reloaded.unit).toBe(exported.unit);
-    expect(reloaded.motivationEnabled).toBe(exported.motivationEnabled);
+  });
+
+  it("parses and imports an old-format backup that still contains a motivationEnabled key", async () => {
+    // Old exports included a motivationEnabled field that no longer exists in
+    // BackupData. parseBackup's type guards only check known properties and
+    // ignore extras, so a file like this must still parse and import cleanly.
+    const oldFormatBackup = { ...validBackup, motivationEnabled: true };
+    const result = parseBackup(JSON.stringify(oldFormatBackup));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    await useStore.getState().hydrate();
+    await useStore.getState().importData(result.data);
+    const state = useStore.getState();
+
+    expect(state.exercises).toEqual(validBackup.exercises);
+    expect(state.unit).toBe(validBackup.unit);
   });
 
   it("replaces existing data rather than merging with it", async () => {
@@ -225,11 +231,11 @@ describe("importData (full backup restore)", () => {
     expect(activeSessionMeta).toEqual({ key: "activeSession" });
   });
 
-  it("persists the imported unit and motivationEnabled to the settings meta record", async () => {
+  it("persists the imported unit to the settings meta record", async () => {
     await useStore.getState().hydrate();
     await useStore.getState().importData(validBackup);
 
     const settingsMeta = await db.meta.get("settings");
-    expect(settingsMeta).toMatchObject({ unit: "kg", motivationEnabled: false });
+    expect(settingsMeta).toMatchObject({ unit: "kg" });
   });
 });

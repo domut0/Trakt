@@ -8,7 +8,6 @@ import { useStore } from "../store";
 
 const DEFAULT_STATE = {
   unit: "lbs" as const,
-  motivationEnabled: true,
   exercises: [],
   slots: [],
   sessions: [],
@@ -51,7 +50,6 @@ describe("Dexie persistence (hydrate + write-through)", () => {
     expect(state.sessions.length).toBe(3);
     expect(state.sets.length).toBeGreaterThan(0);
     expect(state.unit).toBe("lbs");
-    expect(state.motivationEnabled).toBe(true);
 
     // The seed actually landed in IndexedDB, not just in memory.
     expect(await db.exercises.count()).toBe(state.exercises.length);
@@ -87,7 +85,7 @@ describe("Dexie persistence (hydrate + write-through)", () => {
     const sessionId = useStore.getState().startWorkout("Reload Test Slot");
     useStore.getState().logSet({ exerciseId: exercise.id, weight: 135, reps: 5, targetSets: 1 });
     useStore.getState().setUnit("kg");
-    useStore.getState().toggleMotivation();
+    useStore.getState().setChartsEnabled(false);
     await flush();
 
     // Simulate closing and reopening the app: fresh in-memory store, same DB.
@@ -96,7 +94,7 @@ describe("Dexie persistence (hydrate + write-through)", () => {
     const reloaded = useStore.getState();
 
     expect(reloaded.unit).toBe("kg");
-    expect(reloaded.motivationEnabled).toBe(false);
+    expect(reloaded.chartsEnabled).toBe(false);
     expect(reloaded.activeSessionId).toBe(sessionId);
 
     const persistedSets = reloaded.sets.filter((s) => s.sessionId === sessionId);
