@@ -1,0 +1,116 @@
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { CardioLogCard } from "./CardioLogCard";
+
+function StrengthIcon() {
+  return (
+    <svg
+      width={26}
+      height={26}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M2 12h2M4 9v6M6 12h2M9 8v8M15 8v8M16 12h2M18 9v6M20 12h2" />
+    </svg>
+  );
+}
+
+function CardioIcon() {
+  return (
+    <svg
+      width={26}
+      height={26}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 12h4l2 6 4-12 2 6h6" />
+    </svg>
+  );
+}
+
+/**
+ * Opened by the nav bar's Workout button when no session is active. A single
+ * centred popup that starts as a two-way chooser (Strength / Cardio) and, if
+ * Cardio is tapped, swaps its own content for CardioLogCard in place -- one
+ * surface changing what it shows, not a second modal stacked on top.
+ *
+ * Strength instead delegates out: it closes this popup and hands off to
+ * `onChooseStrength`, which the caller (AppShell) wires to the existing
+ * StartWorkoutSheet.
+ */
+export function WorkoutChooserSheet({
+  open,
+  onClose,
+  onChooseStrength,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onChooseStrength: () => void;
+}) {
+  const [mode, setMode] = useState<"choose" | "cardio">("choose");
+
+  useEffect(() => {
+    if (open) setMode("choose");
+  }, [open]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-6 anim-backdrop"
+      style={{
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-3xl bg-surface p-5 anim-popup"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {mode === "choose" ? (
+          <div>
+            <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-border" />
+            <h2 className="mt-3 text-center text-[15px] font-medium text-muted-foreground">
+              Log a workout
+            </h2>
+            <div className="mt-5 flex items-center justify-center gap-10 py-2">
+              <button onClick={onChooseStrength} className="flex flex-col items-center gap-2">
+                <span className="flex h-20 w-20 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                  <StrengthIcon />
+                </span>
+                <span className="text-[13px] font-medium">Strength training</span>
+              </button>
+              <button
+                onClick={() => setMode("cardio")}
+                className="flex flex-col items-center gap-2"
+              >
+                <span className="flex h-20 w-20 items-center justify-center rounded-full bg-muted text-foreground">
+                  <CardioIcon />
+                </span>
+                <span className="text-[13px] font-medium">Cardio</span>
+              </button>
+            </div>
+            <button
+              onClick={onClose}
+              className="mt-4 w-full rounded-full py-3 text-[15px] font-medium text-muted-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <CardioLogCard onBack={() => setMode("choose")} onDone={onClose} />
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}

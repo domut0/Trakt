@@ -1,6 +1,8 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useStore } from "../lib/store";
+import { StartWorkoutSheet } from "./StartWorkoutSheet";
+import { WorkoutChooserSheet } from "./WorkoutChooserSheet";
 
 type TabPath = "/" | "/history" | "/charts" | "/settings";
 type TabItem = {
@@ -107,6 +109,20 @@ function Icon({ name }: { name: "home" | "chart" | "calendar" | "settings" }) {
   );
 }
 
+/**
+ * The nav bar's Workout action button, filled (not stroked) so it reads as
+ * the accent colour rather than picking up the outline treatment every
+ * routed tab icon uses -- it's an action, not a destination. Sized to match
+ * `Icon` above (22x22, viewBox 0 0 24 24).
+ */
+function FlameIcon() {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" />
+    </svg>
+  );
+}
+
 export function ActiveSessionBanner() {
   const activeSessionId = useStore((s) => s.activeSessionId);
   const sessions = useStore((s) => s.sessions);
@@ -134,41 +150,69 @@ export function ActiveSessionBanner() {
   );
 }
 
-export function BottomNav() {
+export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   const location = useLocation();
+  const router = useRouter();
   const activeSessionId = useStore((s) => s.activeSessionId);
   const chartsEnabled = useStore((s) => s.chartsEnabled);
   if (location.pathname === "/workout") return null;
   const items = getEnabledTabs(chartsEnabled);
   const currentIndex = items.findIndex((it) => it.to === location.pathname);
+
+  // Split the ROUTED tabs (never the Workout button) into two halves so the
+  // action button lands in the middle of the row regardless of whether
+  // Charts is showing -- 3 routed tabs (4 total incl. Workout) or 4 routed
+  // tabs (5 total). Deriving the split from the array length, rather than a
+  // fixed index, is what keeps it centred as that count changes.
+  const splitAt = Math.ceil(items.length / 2);
+  const leftItems = items.slice(0, splitAt);
+  const rightItems = items.slice(splitAt);
+
+  const renderTab = (it: TabItem, i: number) => {
+    const active = location.pathname === it.to;
+    return (
+      <li key={it.to} className="flex-1">
+        <Link
+          to={it.to}
+          onClick={() => {
+            // Record travel direction before the route change so the
+            // page we're about to mount knows which way to slide in.
+            if (currentIndex !== -1 && i !== currentIndex) {
+              lastNavDirection = i > currentIndex ? "forward" : "back";
+            }
+          }}
+          className="flex flex-col items-center gap-0.5 py-1"
+          style={{ color: active ? "var(--color-accent)" : "var(--color-muted-foreground)" }}
+        >
+          <Icon name={it.icon} />
+          <span className="text-[11px] font-medium tracking-tight">{it.label}</span>
+        </Link>
+      </li>
+    );
+  };
+
   return (
     <nav
       className="relative z-30 shrink-0 hairline-t bg-background"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
     >
       <ul className="mx-auto flex max-w-md items-stretch justify-around px-2 pt-2">
-        {items.map((it, i) => {
-          const active = location.pathname === it.to;
-          return (
-            <li key={it.to} className="flex-1">
-              <Link
-                to={it.to}
-                onClick={() => {
-                  // Record travel direction before the route change so the
-                  // page we're about to mount knows which way to slide in.
-                  if (currentIndex !== -1 && i !== currentIndex) {
-                    lastNavDirection = i > currentIndex ? "forward" : "back";
-                  }
-                }}
-                className="flex flex-col items-center gap-0.5 py-1"
-                style={{ color: active ? "var(--color-accent)" : "var(--color-muted-foreground)" }}
-              >
-                <Icon name={it.icon} />
-                <span className="text-[11px] font-medium tracking-tight">{it.label}</span>
-              </Link>
-            </li>
-          );
-        })}
+        {leftItems.map((it, i) => renderTab(it, i))}
+        <li className="flex-1">
+          <button
+            onClick={() =>
+              activeSessionId ? router.navigate({ to: "/workout" }) : onOpenChooser()
+            }
+            className="flex w-full flex-col items-center gap-0.5 py-1"
+            style={{ color: "var(--color-accent)" }}
+          >
+            <FlameIcon />
+            <span className="text-[11px] font-semibold tracking-tight">
+              {activeSessionId ? "Return" : "Workout"}
+            </span>
+          </button>
+        </li>
+        {rightItems.map((it, i) => renderTab(it, splitAt + i))}
       </ul>
       {activeSessionId && (
         <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-accent/40" />
@@ -183,6 +227,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const router = useRouter();
   const showBanner = activeSessionId && location.pathname !== "/workout";
+
+  // Workout chooser + strength start flow, owned here so the nav's Workout
+  // button works from every tab. StartWorkoutSheet is mounted from AppShell
+  // (not a route) specifically so it survives index.tsx's own mount of it
+  // being removed elsewhere -- this is now the flow's only entry point that
+  // doesn't require an active session already existing.
+  const [chooserOpen, setChooserOpen] = useState(false);
+  const [startSheetOpen, setStartSheetOpen] = useState(false);
 
   // Ordered enabled-tab paths, for both swipe navigation and figuring out
   // whether the current page is a tab at all (swipes only act on tabs --
@@ -251,7 +303,23 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {children}
       </main>
-      <BottomNav />
+      <BottomNav onOpenChooser={() => setChooserOpen(true)} />
+      <WorkoutChooserSheet
+        open={chooserOpen}
+        onClose={() => setChooserOpen(false)}
+        onChooseStrength={() => {
+          setChooserOpen(false);
+          setStartSheetOpen(true);
+        }}
+      />
+      <StartWorkoutSheet
+        open={startSheetOpen}
+        onClose={() => setStartSheetOpen(false)}
+        onStart={() => {
+          setStartSheetOpen(false);
+          router.navigate({ to: "/workout" });
+        }}
+      />
     </div>
   );
 }
