@@ -35,9 +35,9 @@
   --accent: #4b82f5;
   --accent-foreground: #ffffff;
   --destructive: #f0554e;
-  --nutrition: #4FA97A;
-  --steps: #C2A25A;
-  --bodyweight: #9179C9;
+  --nutrition: #4fa97a;
+  --steps: #c2a25a;
+  --bodyweight: #9179c9;
 }
 
 @layer base {

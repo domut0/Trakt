@@ -16,7 +16,11 @@ export const Route = createFileRoute("/charts")({
   component: ChartsPage,
 });
 
-const METRICS: { key: DailyLogNumericField; label: string; unit: string | ((appUnit: string) => string) }[] = [
+const METRICS: {
+  key: DailyLogNumericField;
+  label: string;
+  unit: string | ((appUnit: string) => string);
+}[] = [
   { key: "calories", label: "Calories", unit: "kcal" },
   { key: "protein", label: "Protein", unit: "g" },
   { key: "carbs", label: "Carbs", unit: "g" },
@@ -47,21 +51,25 @@ function ChartsPage() {
       .filter((log) => log[metricKey] !== undefined)
       .map((log) => {
         const parts = log.date.split("-");
-        const ts = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getTime();
-        return { 
-          ts, 
-          val: log[metricKey]!, 
+        const ts = new Date(
+          parseInt(parts[0]),
+          parseInt(parts[1]) - 1,
+          parseInt(parts[2]),
+        ).getTime();
+        return {
+          ts,
+          val: log[metricKey]!,
           isCheatDay: log.isCheatDay,
         };
       })
       .sort((a, b) => a.ts - b.ts);
-      
+
     if (rangeDays === 0) return metricLogs;
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const cutoff = today.getTime() - (rangeDays - 1) * 86400000;
-    
+
     return metricLogs.filter((p) => p.ts >= cutoff);
   }, [dailyLogs, metricKey, rangeDays]);
 
@@ -103,9 +111,7 @@ function ChartsPage() {
             onClick={() => setRangeDays(r.days)}
             className={
               "whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-medium transition-colors duration-200 " +
-              (rangeDays === r.days
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground")
+              (rangeDays === r.days ? "bg-muted text-foreground" : "text-muted-foreground")
             }
           >
             {r.label}
@@ -125,7 +131,9 @@ function ChartsPage() {
             </div>
             <div className="tnum mt-0.5 text-[26px] font-semibold">
               {points.length > 0 ? points[points.length - 1].val : "—"}
-              <span className="ml-1 text-[12px] font-normal text-muted-foreground">{metricUnit}</span>
+              <span className="ml-1 text-[12px] font-normal text-muted-foreground">
+                {metricUnit}
+              </span>
             </div>
           </div>
           <div className="text-right">
@@ -133,7 +141,9 @@ function ChartsPage() {
               Average
             </div>
             <div className="tnum mt-0.5 text-[26px] font-semibold">
-              {points.length > 0 ? Math.round(points.reduce((acc, p) => acc + p.val, 0) / points.length) : "—"}
+              {points.length > 0
+                ? Math.round(points.reduce((acc, p) => acc + p.val, 0) / points.length)
+                : "—"}
             </div>
           </div>
         </div>
@@ -142,7 +152,15 @@ function ChartsPage() {
   );
 }
 
-function Chart({ points, unit, isCalories }: { points: { ts: number; val: number; isCheatDay?: boolean }[]; unit: string; isCalories: boolean }) {
+function Chart({
+  points,
+  unit,
+  isCalories,
+}: {
+  points: { ts: number; val: number; isCheatDay?: boolean }[];
+  unit: string;
+  isCalories: boolean;
+}) {
   const W = 320;
   const H = 180;
   const pad = { l: 8, r: 8, t: 12, b: 20 };
@@ -185,7 +203,13 @@ function Chart({ points, unit, isCalories }: { points: { ts: number; val: number
         strokeLinejoin="round"
       />
       {points.map((p, i) => (
-        <circle key={i} cx={x(p.ts)} cy={y(p.val)} r={2} fill={isCalories && p.isCheatDay ? "var(--color-destructive)" : "var(--color-accent)"} />
+        <circle
+          key={i}
+          cx={x(p.ts)}
+          cy={y(p.val)}
+          r={2}
+          fill={isCalories && p.isCheatDay ? "var(--color-destructive)" : "var(--color-accent)"}
+        />
       ))}
       <text x={pad.l} y={H - 6} fontSize={10} fill="var(--color-muted-foreground)">
         {new Date(xMin).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
