@@ -1,186 +1,296 @@
-import { useRouter } from "@tanstack/react-router";
-import { Trash2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
-import { useStore } from "../lib/store";
+import { Link } from "@tanstack/react-router";
+import { format, isToday, isYesterday } from "date-fns";
+import { useMemo, useState } from "react";
+import {
+  aggregateDailyLogs,
+  countSessionsTrained,
+  dayKey,
+  groupDayKeysByWeek,
+  parseDayKey,
+  type DailyLogAggregates,
+} from "../lib/daily-log";
+import { useStore, type DailyLog } from "../lib/store";
+import { DayEditorSheet } from "./DayEditorSheet";
 
-function fmtDate(ts: number) {
-  const d = new Date(ts);
-  const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  const y = new Date(now);
-  y.setDate(now.getDate() - 1);
-  const isYest = d.toDateString() === y.toDateString();
-  if (isToday) return "Today";
-  if (isYest) return "Yesterday";
-  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+/** A workout as a day card shows it: which split, how many sets. */
+interface DaySession {
+  id: string;
+  slotName: string;
+  setCount: number;
+}
+
+interface DayCardData {
+  date: string;
+  sessions: DaySession[];
+  log: DailyLog | undefined;
+}
+
+/** "Wed 4", or the friendlier label for the two days people actually recognise. */
+function dayLabel(date: string): string {
+  const d = parseDayKey(date);
+  if (isToday(d)) return "Today";
+  if (isYesterday(d)) return "Yesterday";
+  return format(d, "EEE d");
+}
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
 }
 
 /**
- * The History tab's default (Weekly) view: the flat, most-recent-first list
- * of every logged session. Moved here verbatim from the old Home screen — a
- * later slice replaces this with day cards, so avoid pre-empting that here.
+ * The History tab's default (Weekly) view: a continuous, newest-first scroll
+ * of one card per day that has ANYTHING on it — a workout, some numbers, or a
+ * cheat-day flag — broken up by a summary header for each Monday-start week.
+ *
+ * Days with nothing logged are skipped rather than rendered blank, so a
+ * fortnight off collapses to a gap between two week headers instead of
+ * fourteen empty rows.
  */
 export function WeeklyView() {
   const sessions = useStore((s) => s.sessions);
   const slots = useStore((s) => s.slots);
   const sets = useStore((s) => s.sets);
-  const exercises = useStore((s) => s.exercises);
+  const dailyLogs = useStore((s) => s.dailyLogs);
+  const unit = useStore((s) => s.unit);
 
-  const history = useMemo(() => {
-    return [...sessions]
-      .filter((s) => s.endedAt)
-      .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))
-      .map((s) => {
-        const slot = slots.find((sl) => sl.id === s.splitSlotId);
-        const inSess = sets.filter((x) => x.sessionId === s.id);
-        const exNames = Array.from(
-          new Set(
-            inSess.map((x) => exercises.find((e) => e.id === x.exerciseId)?.name).filter(Boolean),
-          ),
-        );
-        return {
-          session: s,
-          slotName: slot?.name ?? "Untitled",
-          setCount: inSess.length,
-          exercises: exNames as string[],
-        };
-      });
-  }, [sessions, slots, sets, exercises]);
+  // Which day the editor is open on. null = closed. The sheet stays mounted
+  // with the last date while it animates out, so this is not cleared on close.
+  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  const endedSessions = useMemo(() => sessions.filter((s) => s.endedAt != null), [sessions]);
+
+  /** Day key -> that day's finished workouts, most recent first. */
+  const sessionsByDay = useMemo(() => {
+    const map = new Map<string, DaySession[]>();
+    for (const session of [...endedSessions].sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))) {
+      const key = dayKey(new Date(session.endedAt!));
+      const entry: DaySession = {
+        id: session.id,
+        slotName: slots.find((sl) => sl.id === session.splitSlotId)?.name ?? "Untitled",
+        setCount: sets.filter((x) => x.sessionId === session.id).length,
+      };
+      const bucket = map.get(key);
+      if (bucket) bucket.push(entry);
+      else map.set(key, [entry]);
+    }
+    return map;
+  }, [endedSessions, slots, sets]);
+
+  const logsByDay = useMemo(() => new Map(dailyLogs.map((l) => [l.date, l])), [dailyLogs]);
+
+  // Every day with something on it. A stored daily log is never an empty shell
+  // (upsertDailyLog deletes those), so its mere presence earns a card.
+  const weeks = useMemo(
+    () => groupDayKeysByWeek([...sessionsByDay.keys(), ...logsByDay.keys()]),
+    [sessionsByDay, logsByDay],
+  );
+
+  const openEditor = (date: string) => {
+    setEditingDate(date);
+    setEditorOpen(true);
+  };
+
+  if (weeks.length === 0) {
+    return (
+      <div className="mx-5 rounded-xl bg-muted px-4 py-8 text-center text-[14px] text-muted-foreground">
+        Nothing logged yet.
+      </div>
+    );
+  }
+
+  let cardIndex = 0;
 
   return (
-    <section className="mt-9">
-      <div className="flex items-baseline justify-between px-5 pb-2">
-        <h2 className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
-          History
-        </h2>
-        <span className="text-[12px] text-muted-foreground">{history.length} sessions</span>
-      </div>
+    <>
+      {weeks.map((week) => {
+        const weekLogs = week.days
+          .map((d) => logsByDay.get(d))
+          .filter((l): l is DailyLog => l !== undefined);
+        return (
+          <section key={week.weekStart} className="mb-7 last:mb-0">
+            <WeekHeader
+              weekStart={week.weekStart}
+              aggregates={aggregateDailyLogs(weekLogs)}
+              sessionCount={countSessionsTrained(endedSessions, week.weekStart)}
+              unit={unit}
+            />
+            <ul className="space-y-3 px-5">
+              {week.days.map((date) => (
+                <DayCard
+                  key={date}
+                  data={{
+                    date,
+                    sessions: sessionsByDay.get(date) ?? [],
+                    log: logsByDay.get(date),
+                  }}
+                  unit={unit}
+                  onOpenEditor={openEditor}
+                  delayMs={Math.min(cardIndex++, 6) * 35}
+                />
+              ))}
+            </ul>
+          </section>
+        );
+      })}
 
-      {history.length === 0 && (
-        <div className="mx-5 rounded-xl bg-muted px-4 py-8 text-center text-[14px] text-muted-foreground">
-          Nothing logged yet.
-        </div>
-      )}
-
-      <ul className="space-y-3 px-5">
-        {history.map(({ session, slotName, setCount, exercises: exNames }, i) => (
-          <HistoryCard
-            key={session.id}
-            sessionId={session.id}
-            slotName={slotName}
-            setCount={setCount}
-            exNames={exNames}
-            dateLabel={fmtDate(session.endedAt!)}
-            delayMs={Math.min(i, 6) * 35}
-          />
-        ))}
-      </ul>
-    </section>
+      <DayEditorSheet
+        date={editingDate ?? dayKey(new Date())}
+        open={editorOpen}
+        onClose={() => setEditorOpen(false)}
+      />
+    </>
   );
 }
 
 /**
- * A history row that opens the session on tap, and reveals a red delete button
- * on the left when swiped right (iOS-style). Marked `data-swipe-ignore` so the
- * AppShell's between-tabs swipe never fires from a card gesture. The reveal is
- * right-only, which also can't collide with tab-swipe (Home is the first tab,
- * so swipe-right there is already a tab no-op).
+ * The divider between weeks. Deliberately quiet — small, uppercase and muted,
+ * matching the app's other section headings — so it reads as a label over the
+ * day cards rather than competing with them.
  */
-function HistoryCard({
-  sessionId,
-  slotName,
-  setCount,
-  exNames,
-  dateLabel,
-  delayMs,
+function WeekHeader({
+  weekStart,
+  aggregates,
+  sessionCount,
+  unit,
 }: {
-  sessionId: string;
-  slotName: string;
-  setCount: number;
-  exNames: string[];
-  dateLabel: string;
-  delayMs: number;
+  weekStart: string;
+  aggregates: DailyLogAggregates;
+  sessionCount: number;
+  unit: "lbs" | "kg";
 }) {
-  const router = useRouter();
-  const deleteSession = useStore((s) => s.deleteSession);
-  const [dx, setDx] = useState(0);
-  const [revealed, setRevealed] = useState(false);
-  const start = useRef<{ x: number; y: number } | null>(null);
-  const swiping = useRef(false);
-  const OPEN = 76;
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    swiping.current = false;
-  };
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (!start.current) return;
-    const dxRaw = e.touches[0].clientX - start.current.x;
-    const dyRaw = e.touches[0].clientY - start.current.y;
-    if (!swiping.current && Math.abs(dxRaw) > Math.abs(dyRaw) && Math.abs(dxRaw) > 8) {
-      swiping.current = true;
-    }
-    if (!swiping.current) return;
-    const base = revealed ? OPEN : 0;
-    setDx(Math.max(0, Math.min(OPEN + 16, base + dxRaw)));
-  };
-  const onTouchEnd = () => {
-    start.current = null;
-    if (dx > OPEN / 2) {
-      setRevealed(true);
-      setDx(OPEN);
-    } else {
-      setRevealed(false);
-      setDx(0);
-    }
-  };
-
-  const handleTap = () => {
-    if (swiping.current) return; // ignore the click that ends a swipe
-    if (revealed) {
-      setRevealed(false);
-      setDx(0);
-      return;
-    }
-    router.navigate({ to: "/session/$id", params: { id: sessionId } });
-  };
+  // Only averages worth glancing at. Macros are per-day detail, not a weekly
+  // headline, so they stay on the cards.
+  const stats: string[] = [];
+  const { calories, steps, bodyweight } = aggregates;
+  if (calories) {
+    stats.push(
+      `${Math.round(calories.average).toLocaleString()} avg cal · ${calories.loggedDays} of 7 days`,
+    );
+  }
+  if (steps) {
+    stats.push(
+      `${Math.round(steps.average).toLocaleString()} avg steps · ${steps.loggedDays} of 7 days`,
+    );
+  }
+  if (bodyweight) {
+    stats.push(`${round1(bodyweight.average)} avg ${unit} · ${bodyweight.loggedDays} of 7 days`);
+  }
 
   return (
-    <li data-swipe-ignore className="anim-fade-up" style={{ animationDelay: `${delayMs}ms` }}>
-      <div className="relative overflow-hidden rounded-2xl">
-        <button
-          aria-label="Delete workout"
-          onClick={() => deleteSession(sessionId)}
-          className="absolute inset-y-0 left-0 flex w-[76px] items-center justify-center bg-destructive text-white"
-        >
-          <Trash2 size={20} />
-        </button>
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={handleTap}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          className="relative flex cursor-pointer items-center justify-between bg-surface px-5 py-4"
-          style={{
-            transform: `translateX(${dx}px)`,
-            transition: start.current ? "none" : "transform 0.22s cubic-bezier(0.32,0.72,0,1)",
-          }}
-        >
-          <div className="min-w-0 flex-1 pr-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-[16px] font-semibold tracking-tight">{slotName}</span>
-              <span className="text-[12px] text-muted-foreground">· {setCount} sets</span>
-            </div>
-            <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
-              {exNames.slice(0, 4).join(" · ")}
-              {exNames.length > 4 ? " · …" : ""}
-            </p>
-          </div>
-          <span className="text-[12px] text-muted-foreground">{dateLabel}</span>
+    <div className="px-5 pb-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
+          Week of {format(parseDayKey(weekStart), "MMM d")}
+        </h2>
+        <span className="shrink-0 text-[12px] text-muted-foreground">
+          {sessionCount === 0
+            ? "No sessions"
+            : `${sessionCount} session${sessionCount === 1 ? "" : "s"}`}
+        </span>
+      </div>
+      {stats.length > 0 && (
+        <div className="mt-0.5 flex flex-wrap gap-x-4 text-[12px] text-muted-foreground">
+          {stats.map((s) => (
+            <span key={s} className="tnum">
+              {s}
+            </span>
+          ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One day. Tapping anywhere except a workout row opens the day editor, so any
+ * past day can be corrected in place.
+ *
+ * There is deliberately no swipe-to-delete here. The card is composite — a
+ * workout plus macros plus steps plus bodyweight — and one accidental gesture
+ * should not be able to take all of that with it. Deleting a workout lives on
+ * the session screen; clearing numbers lives in the editor.
+ */
+function DayCard({
+  data,
+  unit,
+  onOpenEditor,
+  delayMs,
+}: {
+  data: DayCardData;
+  unit: "lbs" | "kg";
+  onOpenEditor: (date: string) => void;
+  delayMs: number;
+}) {
+  const { date, sessions, log } = data;
+  const stats = log ? dayStats(log, unit) : [];
+
+  return (
+    <li className="anim-fade-up" style={{ animationDelay: `${delayMs}ms` }}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Edit ${format(parseDayKey(date), "EEEE, MMMM d")}`}
+        onClick={() => onOpenEditor(date)}
+        className="cursor-pointer rounded-2xl bg-surface px-5 py-4"
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[16px] font-semibold tracking-tight">{dayLabel(date)}</span>
+          {log?.isCheatDay && (
+            <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-medium text-destructive">
+              <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+              Cheat day
+            </span>
+          )}
+        </div>
+
+        {sessions.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {sessions.map((session) => (
+              <li key={session.id}>
+                <Link
+                  to="/session/$id"
+                  params={{ id: session.id }}
+                  // The card behind this opens the editor; a workout row must
+                  // not do both.
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-baseline gap-2"
+                >
+                  <span className="text-[15px] font-medium tracking-tight">{session.slotName}</span>
+                  <span className="text-[12px] text-muted-foreground">
+                    · {session.setCount} sets
+                  </span>
+                  <span className="ml-auto shrink-0 text-[12px] text-muted-foreground">›</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {stats.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            {stats.map((s) => (
+              <span key={s.label} className="text-[14px]">
+                <span className="tnum font-semibold">{s.value}</span>{" "}
+                <span className="text-[12px] text-muted-foreground">{s.label}</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </li>
   );
+}
+
+/** Only the fields actually logged, so a bodyweight-only day reads as one
+ * clean stat instead of a grid of dashes. Mirrors the Today card's summary. */
+function dayStats(log: DailyLog, unit: "lbs" | "kg"): { label: string; value: string }[] {
+  const stats: { label: string; value: string }[] = [];
+  if (log.calories !== undefined) stats.push({ label: "kcal", value: String(log.calories) });
+  if (log.protein !== undefined) stats.push({ label: "P", value: `${log.protein}g` });
+  if (log.carbs !== undefined) stats.push({ label: "C", value: `${log.carbs}g` });
+  if (log.fat !== undefined) stats.push({ label: "F", value: `${log.fat}g` });
+  if (log.steps !== undefined) stats.push({ label: "steps", value: log.steps.toLocaleString() });
+  if (log.bodyweight !== undefined) stats.push({ label: unit, value: String(log.bodyweight) });
+  return stats;
 }
