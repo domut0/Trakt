@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { useStore } from "../lib/store";
 import { PwaUpdatePrompt } from "../components/PwaUpdatePrompt";
+import { WriteErrorBanner } from "../components/WriteErrorBanner";
 
 function NotFoundComponent() {
   return (
@@ -145,6 +146,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <StoreHydrator />
       <PwaUpdatePrompt />
+      <WriteErrorBanner />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>

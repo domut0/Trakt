@@ -7,10 +7,13 @@ import {
   replaceAllData,
   safeWrite,
   seedDb,
+  setWriteErrorHandler,
   type SettingsMeta,
 } from "./db";
+import { isDailyLogEmpty } from "./daily-log";
+import { seedExercises } from "./exercise-library";
 
-export type ExerciseType = "main" | "accessory";
+export type ExerciseType = "main" | "accessory" | "cardio";
 
 export interface Exercise {
   id: string;
@@ -26,11 +29,47 @@ export interface SplitSlot {
   lastLoggedAt?: number;
 }
 
+/**
+ * A logged workout. Two variants share this one record, discriminated by `kind`:
+ *
+ * - **strength** (the default): started via `startWorkout`, belongs to a Split
+ *   Slot, accumulates `WorkoutSet`s, and drives every rotation / suggestion /
+ *   prefill heuristic in this file.
+ * - **cardio**: written in one shot by `logCardio` AFTER the fact. It has NO
+ *   Split Slot, no sets, and must stay invisible to all of that strength logic.
+ *
+ * `kind` is optional and `undefined` MUST read as "strength" — every session
+ * recorded before cardio existed has no `kind` at all. Never compare the string
+ * inline; go through `isCardioSession` so that default stays in one place.
+ *
+ * `splitSlotId` is optional for the same reason cardio exists at all: a cardio
+ * entry has no slot. Anything matching sessions BY slot has to be careful, since
+ * two cardio sessions both carry `undefined` and would otherwise compare equal.
+ */
 export interface WorkoutSession {
   id: string;
-  splitSlotId: string;
+  /** Absent on cardio sessions. Always present on strength sessions. */
+  splitSlotId?: string;
   startedAt: number;
   endedAt?: number;
+  /** Undefined means "strength" — see `isCardioSession`. */
+  kind?: "strength" | "cardio";
+  /** Cardio only: the Exercise (of type "cardio") that was performed. */
+  cardioExerciseId?: string;
+  /** Cardio only. Used to back-compute `startedAt` from the moment it was logged. */
+  durationMinutes?: number;
+  /** Cardio only. Miles when the unit is lbs, km when the unit is kg. */
+  distance?: number;
+  /** Cardio only. Snapshot at log time, same pattern as `WorkoutSet.setupNote`. */
+  setupNote?: string;
+}
+
+/**
+ * The single source of truth for the strength/cardio split. A session with no
+ * `kind` is strength, which is what keeps every pre-cardio record valid.
+ */
+export function isCardioSession(s: WorkoutSession): boolean {
+  return s.kind === "cardio";
 }
 
 export interface WorkoutSet {
@@ -51,17 +90,48 @@ export interface WorkoutSet {
   loggedAt: number;
 }
 
+/**
+ * One row per calendar day of self-reported numbers, upserted as the day is
+ * edited. Every field is optional: a day where only bodyweight was recorded is
+ * perfectly valid. A record with nothing in it at all is never stored (see
+ * `isDailyLogEmpty` / `upsertDailyLog`).
+ */
+export interface DailyLog {
+  /** LOCAL calendar date as "yyyy-MM-dd". Primary key — see `dayKey`. */
+  date: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  steps?: number;
+  /** In the app's current global lbs/kg unit; the number is stored as typed, not converted. */
+  bodyweight?: number;
+  isCheatDay?: boolean;
+}
+
 /** The shape produced by Settings' "Export backup" action, and the shape
  * `importData` / `replaceAllData` expect back in. Kept flat (no meta
- * nesting) to match the exported JSON exactly. */
+ * nesting) to match the exported JSON exactly.
+ *
+ * `version` tracks the backup format, not the app: v1 files predate daily
+ * logging and have neither key. `parseBackup` reads both tolerantly. */
 export interface BackupData {
+  version: number;
   exercises: Exercise[];
   slots: SplitSlot[];
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
+  dailyLogs: DailyLog[];
   unit: "lbs" | "kg";
-  motivationEnabled: boolean;
 }
+
+/** Current backup format version, written by Settings' export.
+ *
+ * v3 adds cardio: sessions may carry `kind`/`cardioExerciseId`/`durationMinutes`/
+ * `distance`/`setupNote` and may omit `splitSlotId`, and exercises may be of type
+ * "cardio". Every one of those is optional, so a v1 or v2 file still imports
+ * unchanged and its sessions read as strength. */
+export const BACKUP_VERSION = 3;
 
 type CurrentBlock = {
   blockGroupId: string;
@@ -74,18 +144,20 @@ type CurrentBlock = {
 
 interface State {
   unit: "lbs" | "kg";
-  motivationEnabled: boolean;
   chartsEnabled: boolean;
-  calendarEnabled: boolean;
   exercises: Exercise[];
   slots: SplitSlot[];
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
+  dailyLogs: DailyLog[];
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
   /** True once the client-side IndexedDB load (or first-run seed) has completed. */
   hydrated: boolean;
+  /** True when the most recent IndexedDB write failed. Ephemeral UI state only:
+   * never persisted, never included in a backup. */
+  writeFailed: boolean;
 
   /** Client-only. Loads persisted state from IndexedDB, seeding it on first-ever run. Idempotent. */
   hydrate: () => Promise<void>;
@@ -102,16 +174,37 @@ interface State {
     targetSets: number;
   }) => void;
   logNextInBlock: (overrides?: { reps?: number }) => void;
+  /** Record a completed cardio bout in one shot, after the fact — there is no
+   * start/end flow and no stopwatch. Creates a session that is already ended,
+   * with no Split Slot and no sets, and returns its id.
+   *
+   * When a duration is given, `startedAt` is back-computed from it (a 28 minute
+   * entry saved at 08:30 records startedAt 08:02) so the bout lands on the
+   * timeline where it actually happened. With no duration, startedAt == endedAt.
+   *
+   * Deliberately does NOT touch activeSessionId / currentExerciseId /
+   * currentBlock: logging cardio never puts the app into workout mode. */
+  logCardio: (input: {
+    exerciseId: string;
+    durationMinutes?: number;
+    distance?: number;
+    setupNote?: string;
+  }) => string;
   deleteSet: (setId: string) => void;
   /** Delete an entire logged workout: the session and every set in it. Recomputes
    * the affected split slot's lastLoggedAt from the sessions that remain, and
    * clears the in-progress workout if the deleted session was the active one. */
   deleteSession: (sessionId: string) => void;
   updateSet: (setId: string, patch: Partial<WorkoutSet>) => void;
-  toggleMotivation: () => void;
+  /** Merge `patch` into the daily log for `date`, creating the record if there
+   * isn't one. If the merged result carries no information (`isDailyLogEmpty`),
+   * the record is DELETED instead of stored, so clearing every field leaves no
+   * empty shell behind. */
+  upsertDailyLog: (date: string, patch: Partial<Omit<DailyLog, "date">>) => void;
+  deleteDailyLog: (date: string) => void;
+  dailyLogFor: (date: string) => DailyLog | undefined;
   setUnit: (u: "lbs" | "kg") => void;
   setChartsEnabled: (v: boolean) => void;
-  setCalendarEnabled: (v: boolean) => void;
   reorderSlots: (fromId: string, toId: string) => void;
   /** Full backup restore. Assumes `data` has already been validated by
    * `parseBackup` — replaces IndexedDB first (single transaction; a failure
@@ -136,6 +229,9 @@ interface State {
    * non-empty per-set note, falling back to the exercise's base note. Persists
    * across workouts so last week's setup shows up as a grey hint this week. */
   lastSetupNoteFor: (exerciseId: string) => string | undefined;
+  /** Clears the write-failure banner. Does not retry the write; the in-memory
+   * state is already current, this only dismisses the notice. */
+  dismissWriteError: () => void;
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -146,148 +242,6 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 // constants are no longer read directly as the default state.
 const now = Date.now();
 const day = 86400000;
-
-const seedExercises: Exercise[] = [
-  { id: "e_bench", name: "Bench Press", type: "main" },
-  { id: "e_squat", name: "Back Squat", type: "main" },
-  { id: "e_dead", name: "Deadlift", type: "main" },
-  { id: "e_flap", name: "Keenan Flaps", type: "accessory", setupNote: "seat: 4, pins: 12" },
-  { id: "e_push", name: "Tricep Pushdown", type: "accessory" },
-  { id: "e_curl", name: "Incline DB Curl", type: "accessory" },
-  { id: "e_row", name: "Chest-Supported Row", type: "accessory" },
-
-  // Chest
-  { id: "e_incline_bench", name: "Incline Bench Press", type: "main" },
-  { id: "e_decline_bench", name: "Decline Bench Press", type: "main" },
-  { id: "e_close_grip_bench", name: "Close-Grip Bench Press", type: "main" },
-  { id: "e_paused_bench", name: "Paused Bench Press", type: "main" },
-  { id: "e_db_bench", name: "Dumbbell Bench Press", type: "accessory" },
-  { id: "e_incline_db_press", name: "Incline Dumbbell Press", type: "accessory" },
-  { id: "e_decline_db_press", name: "Decline Dumbbell Press", type: "accessory" },
-  { id: "e_db_fly", name: "Dumbbell Fly", type: "accessory" },
-  { id: "e_incline_db_fly", name: "Incline Dumbbell Fly", type: "accessory" },
-  { id: "e_cable_fly", name: "Cable Fly", type: "accessory" },
-  { id: "e_low_high_cable_fly", name: "Low-to-High Cable Fly", type: "accessory" },
-  { id: "e_pec_deck", name: "Pec Deck", type: "accessory" },
-  { id: "e_machine_chest_press", name: "Machine Chest Press", type: "accessory" },
-  { id: "e_pushup", name: "Push-Up", type: "accessory" },
-  { id: "e_chest_dip", name: "Chest Dip", type: "accessory" },
-  { id: "e_landmine_press", name: "Landmine Press", type: "accessory" },
-  { id: "e_smith_bench", name: "Smith Machine Bench Press", type: "accessory" },
-  { id: "e_db_pullover", name: "Dumbbell Pullover", type: "accessory" },
-
-  // Back
-  { id: "e_rdl", name: "Romanian Deadlift", type: "main" },
-  { id: "e_sumo_dead", name: "Sumo Deadlift", type: "main" },
-  { id: "e_deficit_dead", name: "Deficit Deadlift", type: "main" },
-  { id: "e_trap_bar_dead", name: "Trap Bar Deadlift", type: "main" },
-  { id: "e_barbell_row", name: "Barbell Row", type: "accessory" },
-  { id: "e_pendlay_row", name: "Pendlay Row", type: "accessory" },
-  { id: "e_tbar_row", name: "T-Bar Row", type: "accessory" },
-  { id: "e_seated_cable_row", name: "Seated Cable Row", type: "accessory" },
-  { id: "e_lat_pulldown", name: "Lat Pulldown", type: "accessory" },
-  { id: "e_wide_lat_pulldown", name: "Wide-Grip Lat Pulldown", type: "accessory" },
-  { id: "e_close_lat_pulldown", name: "Close-Grip Lat Pulldown", type: "accessory" },
-  { id: "e_single_db_row", name: "Single-Arm Dumbbell Row", type: "accessory" },
-  { id: "e_pullup", name: "Pull-Up", type: "accessory" },
-  { id: "e_chinup", name: "Chin-Up", type: "accessory" },
-  { id: "e_straight_arm_pulldown", name: "Straight-Arm Pulldown", type: "accessory" },
-  { id: "e_reverse_hyper", name: "Reverse Hyperextension", type: "accessory" },
-  { id: "e_back_extension", name: "Back Extension", type: "accessory" },
-  { id: "e_barbell_shrug", name: "Barbell Shrug", type: "accessory" },
-  { id: "e_db_shrug", name: "Dumbbell Shrug", type: "accessory" },
-  { id: "e_smith_row", name: "Smith Machine Row", type: "accessory" },
-
-  // Shoulders
-  { id: "e_ohp", name: "Overhead Press", type: "main" },
-  { id: "e_push_press", name: "Push Press", type: "accessory" },
-  { id: "e_seated_db_press", name: "Seated Dumbbell Shoulder Press", type: "accessory" },
-  { id: "e_arnold_press", name: "Arnold Press", type: "accessory" },
-  { id: "e_db_lateral_raise", name: "Dumbbell Lateral Raise", type: "accessory" },
-  { id: "e_cable_lateral_raise", name: "Cable Lateral Raise", type: "accessory" },
-  { id: "e_db_front_raise", name: "Dumbbell Front Raise", type: "accessory" },
-  { id: "e_db_rear_delt_fly", name: "Dumbbell Rear Delt Fly", type: "accessory" },
-  { id: "e_reverse_pec_deck", name: "Reverse Pec Deck", type: "accessory" },
-  { id: "e_face_pull", name: "Face Pull", type: "accessory" },
-  { id: "e_machine_shoulder_press", name: "Machine Shoulder Press", type: "accessory" },
-  { id: "e_upright_row", name: "Upright Row", type: "accessory" },
-
-  // Quads
-  { id: "e_front_squat", name: "Front Squat", type: "main" },
-  { id: "e_box_squat", name: "Box Squat", type: "main" },
-  { id: "e_leg_press", name: "Leg Press", type: "accessory" },
-  { id: "e_hack_squat", name: "Hack Squat", type: "accessory" },
-  { id: "e_leg_extension", name: "Leg Extension", type: "accessory" },
-  { id: "e_bulgarian_split_squat", name: "Bulgarian Split Squat", type: "accessory" },
-  { id: "e_walking_lunge", name: "Walking Lunge", type: "accessory" },
-  { id: "e_goblet_squat", name: "Goblet Squat", type: "accessory" },
-  { id: "e_step_up", name: "Step-Up", type: "accessory" },
-  { id: "e_safety_bar_squat", name: "Safety Bar Squat", type: "accessory" },
-  { id: "e_smith_squat", name: "Smith Machine Squat", type: "accessory" },
-
-  // Hamstrings / Glutes
-  { id: "e_stiff_leg_dead", name: "Stiff-Leg Deadlift", type: "accessory" },
-  { id: "e_lying_leg_curl", name: "Lying Leg Curl", type: "accessory" },
-  { id: "e_seated_leg_curl", name: "Seated Leg Curl", type: "accessory" },
-  { id: "e_glute_ham_raise", name: "Glute Ham Raise", type: "accessory" },
-  { id: "e_hip_thrust", name: "Hip Thrust", type: "accessory" },
-  { id: "e_cable_pull_through", name: "Cable Pull-Through", type: "accessory" },
-  { id: "e_good_morning", name: "Good Morning", type: "accessory" },
-  { id: "e_cable_glute_kickback", name: "Cable Glute Kickback", type: "accessory" },
-  { id: "e_nordic_curl", name: "Nordic Curl", type: "accessory" },
-  { id: "e_hip_abduction_machine", name: "Hip Abduction Machine", type: "accessory" },
-  { id: "e_hip_adduction_machine", name: "Hip Adduction Machine", type: "accessory" },
-
-  // Biceps
-  { id: "e_barbell_curl", name: "Barbell Curl", type: "accessory" },
-  { id: "e_ezbar_curl", name: "EZ-Bar Curl", type: "accessory" },
-  { id: "e_db_curl", name: "Standing Dumbbell Curl", type: "accessory" },
-  { id: "e_hammer_curl", name: "Hammer Curl", type: "accessory" },
-  { id: "e_preacher_curl", name: "Preacher Curl", type: "accessory" },
-  { id: "e_cable_curl", name: "Cable Curl", type: "accessory" },
-  { id: "e_concentration_curl", name: "Concentration Curl", type: "accessory" },
-  { id: "e_spider_curl", name: "Spider Curl", type: "accessory" },
-  { id: "e_zottman_curl", name: "Zottman Curl", type: "accessory" },
-
-  // Triceps
-  { id: "e_skull_crusher", name: "Skull Crusher", type: "accessory" },
-  { id: "e_overhead_tricep_ext", name: "Overhead Tricep Extension", type: "accessory" },
-  { id: "e_cable_overhead_tricep_ext", name: "Cable Overhead Tricep Extension", type: "accessory" },
-  { id: "e_tricep_dip", name: "Tricep Dip", type: "accessory" },
-  { id: "e_tricep_kickback", name: "Tricep Kickback", type: "accessory" },
-  { id: "e_jm_press", name: "JM Press", type: "accessory" },
-  { id: "e_diamond_pushup", name: "Diamond Push-Up", type: "accessory" },
-
-  // Calves
-  { id: "e_standing_calf_raise", name: "Standing Calf Raise", type: "accessory" },
-  { id: "e_seated_calf_raise", name: "Seated Calf Raise", type: "accessory" },
-  { id: "e_leg_press_calf_raise", name: "Leg Press Calf Raise", type: "accessory" },
-
-  // Core
-  { id: "e_plank", name: "Plank", type: "accessory" },
-  { id: "e_side_plank", name: "Side Plank", type: "accessory" },
-  { id: "e_hanging_leg_raise", name: "Hanging Leg Raise", type: "accessory" },
-  { id: "e_cable_crunch", name: "Cable Crunch", type: "accessory" },
-  { id: "e_ab_wheel_rollout", name: "Ab Wheel Rollout", type: "accessory" },
-  { id: "e_russian_twist", name: "Russian Twist", type: "accessory" },
-  { id: "e_weighted_situp", name: "Weighted Sit-Up", type: "accessory" },
-  { id: "e_machine_crunch", name: "Machine Crunch", type: "accessory" },
-  { id: "e_cable_woodchopper", name: "Cable Woodchopper", type: "accessory" },
-  { id: "e_bicycle_crunch", name: "Bicycle Crunch", type: "accessory" },
-  { id: "e_v_up", name: "V-Up", type: "accessory" },
-  { id: "e_dead_bug", name: "Dead Bug", type: "accessory" },
-  { id: "e_pallof_press", name: "Pallof Press", type: "accessory" },
-
-  // Forearms / Traps
-  { id: "e_wrist_curl", name: "Wrist Curl", type: "accessory" },
-  { id: "e_reverse_wrist_curl", name: "Reverse Wrist Curl", type: "accessory" },
-  { id: "e_farmers_carry", name: "Farmer's Carry", type: "accessory" },
-  { id: "e_reverse_curl", name: "Reverse Curl", type: "accessory" },
-
-  // Machine variety
-  { id: "e_assisted_pullup", name: "Assisted Pull-Up Machine", type: "accessory" },
-  { id: "e_assisted_dip", name: "Assisted Dip Machine", type: "accessory" },
-];
 
 const seedSlots: SplitSlot[] = [
   { id: "s_hb", name: "Heavy Bench", rotationOrder: 0, lastLoggedAt: now - 3 * day },
@@ -533,9 +487,40 @@ export function matchSlot(slots: SplitSlot[], name: string): SplitSlot | undefin
 }
 
 /**
+ * Finds the previous completed occurrence of the same Split Slot as `sess`,
+ * for the "pull from last time" heuristics below.
+ *
+ * Two guards matter here, and both exist because cardio sessions live in this
+ * same array. Cardio sessions are excluded outright, and a session with no
+ * `splitSlotId` never matches anything — otherwise two cardio bouts, which BOTH
+ * carry `splitSlotId === undefined`, would compare equal to each other and to
+ * any other slot-less session, and a treadmill run would start feeding the
+ * suggestion and prefill engines.
+ */
+function findLastSessionForSlot(
+  sessions: WorkoutSession[],
+  sess: WorkoutSession,
+): WorkoutSession | undefined {
+  if (isCardioSession(sess) || sess.splitSlotId == null) return undefined;
+  return sessions
+    .filter(
+      (s) =>
+        !isCardioSession(s) &&
+        s.splitSlotId != null &&
+        s.splitSlotId === sess.splitSlotId &&
+        s.id !== sess.id &&
+        s.endedAt,
+    )
+    .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0];
+}
+
+/**
  * "Next Exercise" suggestion: pulls from the last occurrence of the SAME
  * Split Slot, advancing one exercise at a time in the order they were logged
  * that day, skipping exercises already done in the current session.
+ *
+ * Strength-only: cardio sessions are neither a source nor a target (see
+ * `findLastSessionForSlot`).
  */
 export function suggestNextExercise(
   sessions: WorkoutSession[],
@@ -547,10 +532,8 @@ export function suggestNextExercise(
   const doneExerciseIds = new Set(
     sets.filter((s) => s.sessionId === sessionId).map((s) => s.exerciseId),
   );
-  // Last session of this slot (excluding current)
-  const lastSess = sessions
-    .filter((s) => s.splitSlotId === sess.splitSlotId && s.id !== sessionId && s.endedAt)
-    .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0];
+  // Last strength session of this slot (excluding current)
+  const lastSess = findLastSessionForSlot(sessions, sess);
   if (!lastSess) return undefined;
   const setsInLast = sets
     .filter((s) => s.sessionId === lastSess.id)
@@ -568,6 +551,9 @@ export function suggestNextExercise(
  * for an exercise in today's session prefills from the Nth distinct
  * weight/rep block logged for that exercise the last time this same Split
  * Slot occurred.
+ *
+ * Strength-only: cardio sessions are neither a source nor a target (see
+ * `findLastSessionForSlot`).
  */
 export function computePrefill(
   sessions: WorkoutSession[],
@@ -579,9 +565,7 @@ export function computePrefill(
   if (!sess) return {};
   const setsToday = sets.filter((s) => s.sessionId === sessionId && s.exerciseId === exerciseId);
   const distinctToday = new Set(setsToday.map((s) => `${s.weight}x${s.reps}`)).size;
-  const lastSess = sessions
-    .filter((s) => s.splitSlotId === sess.splitSlotId && s.id !== sessionId && s.endedAt)
-    .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0];
+  const lastSess = findLastSessionForSlot(sessions, sess);
   if (!lastSess) return {};
   const lastSets = sets
     .filter((s) => s.sessionId === lastSess.id && s.exerciseId === exerciseId)
@@ -610,7 +594,7 @@ function isExercise(v: unknown): v is Exercise {
   if (!isPlainObject(v)) return false;
   if (typeof v.id !== "string" || v.id.length === 0) return false;
   if (typeof v.name !== "string") return false;
-  if (v.type !== "main" && v.type !== "accessory") return false;
+  if (v.type !== "main" && v.type !== "accessory" && v.type !== "cardio") return false;
   if (v.setupNote !== undefined && typeof v.setupNote !== "string") return false;
   return true;
 }
@@ -627,9 +611,18 @@ function isSplitSlot(v: unknown): v is SplitSlot {
 function isWorkoutSession(v: unknown): v is WorkoutSession {
   if (!isPlainObject(v)) return false;
   if (typeof v.id !== "string" || v.id.length === 0) return false;
-  if (typeof v.splitSlotId !== "string") return false;
+  // Optional as of v3: cardio sessions have no Split Slot. Still must be a
+  // string when it IS present, so a malformed strength session is caught.
+  if (v.splitSlotId !== undefined && typeof v.splitSlotId !== "string") return false;
   if (typeof v.startedAt !== "number") return false;
   if (v.endedAt !== undefined && typeof v.endedAt !== "number") return false;
+  // Absent entirely = a pre-v3 session, which is strength by definition. Present
+  // but not one of the two known kinds = a corrupt file.
+  if (v.kind !== undefined && v.kind !== "strength" && v.kind !== "cardio") return false;
+  if (v.cardioExerciseId !== undefined && typeof v.cardioExerciseId !== "string") return false;
+  if (!isOptionalNumber(v.durationMinutes)) return false;
+  if (!isOptionalNumber(v.distance)) return false;
+  if (v.setupNote !== undefined && typeof v.setupNote !== "string") return false;
   return true;
 }
 
@@ -650,12 +643,35 @@ function isWorkoutSet(v: unknown): v is WorkoutSet {
   return true;
 }
 
+function isOptionalNumber(v: unknown): boolean {
+  return v === undefined || typeof v === "number";
+}
+
+function isDailyLog(v: unknown): v is DailyLog {
+  if (!isPlainObject(v)) return false;
+  if (typeof v.date !== "string" || v.date.length === 0) return false;
+  if (!isOptionalNumber(v.calories)) return false;
+  if (!isOptionalNumber(v.protein)) return false;
+  if (!isOptionalNumber(v.carbs)) return false;
+  if (!isOptionalNumber(v.fat)) return false;
+  if (!isOptionalNumber(v.steps)) return false;
+  if (!isOptionalNumber(v.bodyweight)) return false;
+  if (v.isCheatDay !== undefined && typeof v.isCheatDay !== "boolean") return false;
+  return true;
+}
+
 /**
  * Parses and fully validates a backup JSON string against the exact shape
  * `exportJson` in Settings produces. Pure — no IndexedDB, no store, no DOM —
  * so the import flow can validate a file completely before touching
  * persistence, and this can be unit-tested directly. Never throws; returns a
  * discriminated result instead.
+ *
+ * Deliberately TOLERANT about the format version. A v1 file (written before
+ * daily logging existed) has no `version` and no `dailyLogs`; both default
+ * rather than failing. A version number from the future is also accepted on a
+ * best-effort basis — the keys we understand are read, the rest ignored. The
+ * only hard failures are structural: keys that ARE present but the wrong shape.
  */
 export function parseBackup(text: string): ParseBackupResult {
   let parsed: unknown;
@@ -667,7 +683,7 @@ export function parseBackup(text: string): ParseBackupResult {
   if (!isPlainObject(parsed)) {
     return { ok: false, error: "That file does not contain a backup." };
   }
-  const { exercises, slots, sessions, sets, unit, motivationEnabled } = parsed;
+  const { exercises, slots, sessions, sets, dailyLogs, unit, version } = parsed;
   if (!Array.isArray(exercises) || !exercises.every(isExercise)) {
     return { ok: false, error: "The backup's exercises list is missing or malformed." };
   }
@@ -680,21 +696,26 @@ export function parseBackup(text: string): ParseBackupResult {
   if (!Array.isArray(sets) || !sets.every(isWorkoutSet)) {
     return { ok: false, error: "The backup's sets list is missing or malformed." };
   }
+  // Absent entirely = a pre-v2 backup, which simply had no daily logs. Present
+  // but not a well-formed array = a corrupt file, which is a real error.
+  if (dailyLogs !== undefined && (!Array.isArray(dailyLogs) || !dailyLogs.every(isDailyLog))) {
+    return { ok: false, error: "The backup's daily logs list is malformed." };
+  }
   if (unit !== "lbs" && unit !== "kg") {
     return { ok: false, error: "The backup's unit must be lbs or kg." };
-  }
-  if (typeof motivationEnabled !== "boolean") {
-    return { ok: false, error: "The backup's motivationEnabled setting is missing or malformed." };
   }
   return {
     ok: true,
     data: {
+      // No `version` means a v1 file. An unrecognised version is kept as-is and
+      // imported anyway rather than rejected.
+      version: typeof version === "number" ? version : 1,
       exercises: exercises as Exercise[],
       slots: slots as SplitSlot[],
       sessions: sessions as WorkoutSession[],
       sets: sets as WorkoutSet[],
+      dailyLogs: (dailyLogs as DailyLog[] | undefined) ?? [],
       unit,
-      motivationEnabled,
     },
   };
 }
@@ -722,30 +743,23 @@ function persistActiveMeta(meta: {
   );
 }
 
-function persistSettings(
-  unit: "lbs" | "kg",
-  motivationEnabled: boolean,
-  chartsEnabled: boolean,
-  calendarEnabled: boolean,
-) {
-  safeWrite(() =>
-    db.meta.put({ key: "settings", unit, motivationEnabled, chartsEnabled, calendarEnabled }),
-  );
+function persistSettings(unit: "lbs" | "kg", chartsEnabled: boolean) {
+  safeWrite(() => db.meta.put({ key: "settings", unit, chartsEnabled }));
 }
 
 export const useStore = create<State>((set, get) => ({
   unit: "lbs",
-  motivationEnabled: true,
   chartsEnabled: true,
-  calendarEnabled: true,
   exercises: [],
   slots: [],
   sessions: [],
   sets: [],
+  dailyLogs: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
   hydrated: false,
+  writeFailed: false,
 
   hydrate: async () => {
     if (get().hydrated) return; // idempotent — never double-seed/duplicate on repeat calls
@@ -761,9 +775,7 @@ export const useStore = create<State>((set, get) => ({
         const settings: SettingsMeta = {
           key: "settings",
           unit: "lbs",
-          motivationEnabled: true,
           chartsEnabled: true,
-          calendarEnabled: true,
         };
         await seedDb({
           exercises: seedExercises,
@@ -777,10 +789,9 @@ export const useStore = create<State>((set, get) => ({
           slots: seedSlots,
           sessions: seedSessions,
           sets: seedSets,
+          dailyLogs: [], // a first run seeds no daily logs
           unit: settings.unit,
-          motivationEnabled: settings.motivationEnabled,
           chartsEnabled: true,
-          calendarEnabled: true,
           activeSessionId: undefined,
           currentExerciseId: undefined,
           currentBlock: undefined,
@@ -794,10 +805,9 @@ export const useStore = create<State>((set, get) => ({
         slots: data.slots,
         sessions: data.sessions,
         sets: data.sets,
+        dailyLogs: data.dailyLogs,
         unit: data.settings.unit,
-        motivationEnabled: data.settings.motivationEnabled,
         chartsEnabled: data.settings.chartsEnabled ?? true,
-        calendarEnabled: data.settings.calendarEnabled ?? true,
         activeSessionId: data.activeSession.activeSessionId,
         currentExerciseId: data.activeSession.currentExerciseId,
         currentBlock: data.activeSession.currentBlock,
@@ -843,9 +853,15 @@ export const useStore = create<State>((set, get) => ({
     const sess = get().sessions.find((s) => s.id === id);
     const endedAt = Date.now();
     const updatedSessions = get().sessions.map((s) => (s.id === id ? { ...s, endedAt } : s));
-    const updatedSlots = get().slots.map((sl) =>
-      sess && sl.id === sess.splitSlotId ? { ...sl, lastLoggedAt: endedAt } : sl,
-    );
+    // Rotation bookkeeping is strength-only. A cardio session (or any session
+    // without a Split Slot) must never stamp a slot's lastLoggedAt, or it would
+    // advance the round-robin and make the app predict the wrong next workout.
+    const touchesSlot = sess != null && !isCardioSession(sess) && sess.splitSlotId != null;
+    const updatedSlots = touchesSlot
+      ? get().slots.map((sl) =>
+          sl.id === sess.splitSlotId ? { ...sl, lastLoggedAt: endedAt } : sl,
+        )
+      : get().slots;
     set({
       sessions: updatedSessions,
       slots: updatedSlots,
@@ -855,7 +871,7 @@ export const useStore = create<State>((set, get) => ({
     });
     const updatedSession = updatedSessions.find((s) => s.id === id);
     if (updatedSession) safeWrite(() => db.sessions.put(updatedSession));
-    if (sess) {
+    if (touchesSlot) {
       const updatedSlot = updatedSlots.find((sl) => sl.id === sess.splitSlotId);
       if (updatedSlot) safeWrite(() => db.slots.put(updatedSlot));
     }
@@ -949,6 +965,34 @@ export const useStore = create<State>((set, get) => ({
     });
   },
 
+  logCardio: ({ exerciseId, durationMinutes, distance, setupNote }) => {
+    const endedAt = Date.now();
+    // The bout finished now, so a duration tells us when it STARTED: 28 minutes
+    // logged at 08:30 began at 08:02. Back-computing here is what lets cardio
+    // land on the timeline at the right time despite being entered after the
+    // fact. No duration means there is nothing to subtract.
+    const startedAt =
+      durationMinutes != null ? endedAt - Math.round(durationMinutes * 60_000) : endedAt;
+    const note = setupNote?.trim();
+    const session: WorkoutSession = {
+      id: uid(),
+      // No splitSlotId: cardio is outside the rotation entirely.
+      startedAt,
+      endedAt,
+      kind: "cardio",
+      cardioExerciseId: exerciseId,
+      durationMinutes,
+      distance,
+      setupNote: note || undefined,
+    };
+    // Sessions only. No sets are created, and activeSessionId /
+    // currentExerciseId / currentBlock are deliberately left alone — logging
+    // cardio after the fact must never put the app into workout mode.
+    set({ sessions: [...get().sessions, session] });
+    safeWrite(() => db.sessions.put(session));
+    return session.id;
+  },
+
   deleteSet: (setId) => {
     set({ sets: get().sets.filter((s) => s.id !== setId) });
     safeWrite(() => db.sets.delete(setId));
@@ -959,9 +1003,19 @@ export const useStore = create<State>((set, get) => ({
     const sessions = get().sessions.filter((s) => s.id !== sessionId);
     const sets = get().sets.filter((s) => s.sessionId !== sessionId);
     let slots = get().slots;
-    if (sess) {
+    // Only a strength session owns a slot's lastLoggedAt, so only deleting one
+    // recomputes it — and the recomputation itself counts strength sessions
+    // only. Without that second filter, a cardio session sitting in the same
+    // array would be picked up here (its splitSlotId is undefined, which would
+    // match any other slot-less session) and resurrect a bogus timestamp.
+    const recomputesSlot = sess != null && !isCardioSession(sess) && sess.splitSlotId != null;
+    if (recomputesSlot) {
       const remainingForSlot = sessions.filter(
-        (s) => s.splitSlotId === sess.splitSlotId && s.endedAt != null,
+        (s) =>
+          !isCardioSession(s) &&
+          s.splitSlotId != null &&
+          s.splitSlotId === sess.splitSlotId &&
+          s.endedAt != null,
       );
       const newLast = remainingForSlot.length
         ? Math.max(...remainingForSlot.map((s) => s.endedAt!))
@@ -981,7 +1035,7 @@ export const useStore = create<State>((set, get) => ({
     });
     safeWrite(() => db.sessions.delete(sessionId));
     safeWrite(() => db.sets.where("sessionId").equals(sessionId).delete());
-    if (sess) {
+    if (recomputesSlot) {
       const updatedSlot = slots.find((sl) => sl.id === sess.splitSlotId);
       if (updatedSlot) safeWrite(() => db.slots.put(updatedSlot));
     }
@@ -1000,25 +1054,40 @@ export const useStore = create<State>((set, get) => ({
     if (updated) safeWrite(() => db.sets.put(updated));
   },
 
-  toggleMotivation: () => {
-    const next = !get().motivationEnabled;
-    set({ motivationEnabled: next });
-    persistSettings(get().unit, next, get().chartsEnabled, get().calendarEnabled);
+  upsertDailyLog: (date, patch) => {
+    const existing = get().dailyLogs.find((l) => l.date === date);
+    const merged: DailyLog = { ...(existing ?? { date }), ...patch, date };
+    if (isDailyLogEmpty(merged)) {
+      // Everything was cleared. Drop the row rather than keeping a shell that
+      // would show up as a "logged" day everywhere it's counted.
+      if (!existing) return;
+      set({ dailyLogs: get().dailyLogs.filter((l) => l.date !== date) });
+      safeWrite(() => db.dailyLogs.delete(date));
+      return;
+    }
+    set({
+      dailyLogs: existing
+        ? get().dailyLogs.map((l) => (l.date === date ? merged : l))
+        : [...get().dailyLogs, merged],
+    });
+    safeWrite(() => db.dailyLogs.put(merged));
   },
+
+  deleteDailyLog: (date) => {
+    set({ dailyLogs: get().dailyLogs.filter((l) => l.date !== date) });
+    safeWrite(() => db.dailyLogs.delete(date));
+  },
+
+  dailyLogFor: (date) => get().dailyLogs.find((l) => l.date === date),
 
   setUnit: (u) => {
     set({ unit: u });
-    persistSettings(u, get().motivationEnabled, get().chartsEnabled, get().calendarEnabled);
+    persistSettings(u, get().chartsEnabled);
   },
 
   setChartsEnabled: (v) => {
     set({ chartsEnabled: v });
-    persistSettings(get().unit, get().motivationEnabled, v, get().calendarEnabled);
-  },
-
-  setCalendarEnabled: (v) => {
-    set({ calendarEnabled: v });
-    persistSettings(get().unit, get().motivationEnabled, get().chartsEnabled, v);
+    persistSettings(get().unit, v);
   },
 
   reorderSlots: (fromId, toId) => {
@@ -1044,10 +1113,9 @@ export const useStore = create<State>((set, get) => ({
       slots: data.slots,
       sessions: data.sessions,
       sets: data.sets,
+      dailyLogs: data.dailyLogs,
       unit: data.unit,
-      motivationEnabled: data.motivationEnabled,
       chartsEnabled: true,
-      calendarEnabled: true,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
@@ -1060,22 +1128,22 @@ export const useStore = create<State>((set, get) => ({
     // the presets means the DB is not "empty", so hydrate() won't re-seed the
     // demo history on the next load — the clean slate persists.
     await replaceAllData({
+      version: BACKUP_VERSION,
       exercises: seedExercises,
       slots: [],
       sessions: [],
       sets: [],
+      dailyLogs: [],
       unit: "lbs",
-      motivationEnabled: true,
     });
     set({
       exercises: seedExercises,
       slots: [],
       sessions: [],
       sets: [],
+      dailyLogs: [],
       unit: "lbs",
-      motivationEnabled: true,
       chartsEnabled: true,
-      calendarEnabled: true,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
@@ -1096,11 +1164,15 @@ export const useStore = create<State>((set, get) => ({
       mostRecentWithNote?.setupNote ?? get().exercises.find((e) => e.id === exerciseId)?.setupNote
     );
   },
+
+  dismissWriteError: () => set({ writeFailed: false }),
 }));
 
-export function estimated1RM(weight: number, reps: number): number {
-  if (reps <= 0) return 0;
-  if (reps === 1) return weight;
-  // Epley
-  return Math.round(weight * (1 + reps / 30));
-}
+// Registered at module scope so any failed IndexedDB write (from db.ts's
+// safeWrite) surfaces as store state. db.ts cannot import this module back
+// (store.ts already imports db.ts — that would be circular), so it exposes
+// this setter instead. SSR-safe: this only assigns a function reference and
+// never touches IndexedDB itself.
+setWriteErrorHandler(() => {
+  useStore.setState({ writeFailed: true });
+});

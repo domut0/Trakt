@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { DeleteWorkoutButton } from "../components/DeleteWorkoutButton";
 import { LogSetSheet } from "../components/LogSetSheet";
 import { SessionView } from "../components/SessionView";
-import { detectSessionPRs, formatPRMessage } from "../lib/pr-detection";
 import { useStore } from "../lib/store";
 
 export const Route = createFileRoute("/workout")({
@@ -51,8 +50,6 @@ function WorkoutPage() {
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showView, setShowView] = useState(false);
-  const [motivationMsg, setMotivationMsg] = useState<string | null>(null);
-  const motivationEnabled = useStore((s) => s.motivationEnabled);
 
   // "Set logged" confirmation toast. The nonce keys the toast element so each
   // log remounts it and replays the slide-up/fade animation, even on rapid
@@ -87,26 +84,8 @@ function WorkoutPage() {
   const inBlock = !!currentBlock && currentBlock.loggedInBlock < currentBlock.targetSets;
 
   const handleEnd = () => {
-    const msg = motivationEnabled
-      ? formatPRMessage(
-          detectSessionPRs({ sessionSets: sessSets, allSets: sets, exercises, now: Date.now() }),
-        )
-      : null;
-    if (msg) {
-      // Show the toast on this screen before ending the workout: ending
-      // clears activeSessionId, which the effect above turns into an
-      // immediate navigate away, unmounting this screen (and the toast)
-      // before it could be seen.
-      setMotivationMsg(msg);
-      setTimeout(() => {
-        setMotivationMsg(null);
-        endWorkout();
-        router.navigate({ to: "/" });
-      }, 2600);
-    } else {
-      endWorkout();
-      router.navigate({ to: "/" });
-    }
+    endWorkout();
+    router.navigate({ to: "/" });
   };
 
   if (!session || !slot) return null;
@@ -242,12 +221,6 @@ function WorkoutPage() {
               <SessionView sessionId={session.id} />
             </div>
           </div>
-        </div>
-      )}
-
-      {motivationMsg && (
-        <div className="pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full bg-foreground px-5 py-3 text-[13px] font-medium text-background shadow-lg anim-fade-up">
-          {motivationMsg}
         </div>
       )}
 

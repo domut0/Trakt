@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { useStore } from "../lib/store";
+import { useStore, type ExerciseType } from "../lib/store";
+
+/** Handles all three exercise types even though the picker above filters
+ * cardio out entirely -- kept exhaustive so a future caller (or a stray
+ * cardio id) never falls through to a wrong label. */
+function exerciseTypeLabel(type: ExerciseType): string {
+  if (type === "main") return "Main";
+  if (type === "accessory") return "Accessory";
+  return "Cardio";
+}
 
 export function LogSetSheet({
   open,
@@ -56,11 +65,20 @@ export function LogSetSheet({
   const chosen = exercises.find((e) => e.id === exerciseId);
   const suggestedNote = exerciseId ? lastSetupNoteFor(exerciseId) : undefined;
 
+  // Cardio lives in the same `exercises` table but has its own picker
+  // (CardioLogCard) -- it must never show up while logging a strength set.
+  const strengthExercises = useMemo(
+    () => exercises.filter((e) => e.type !== "cardio"),
+    [exercises],
+  );
+
   const filtered = useMemo(() => {
     const q = exerciseQuery.trim().toLowerCase();
-    const list = q ? exercises.filter((e) => e.name.toLowerCase().includes(q)) : exercises;
+    const list = q
+      ? strengthExercises.filter((e) => e.name.toLowerCase().includes(q))
+      : strengthExercises;
     return list.slice(0, 20);
-  }, [exercises, exerciseQuery]);
+  }, [strengthExercises, exerciseQuery]);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -125,7 +143,7 @@ export function LogSetSheet({
                   >
                     <span className="text-[16px]">{e.name}</span>
                     <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                      {e.type === "main" ? "Main" : "Accessory"}
+                      {exerciseTypeLabel(e.type)}
                     </span>
                   </button>
                 </li>
@@ -253,7 +271,7 @@ export function LogSetSheet({
   );
 }
 
-function NumField({
+export function NumField({
   label,
   value,
   onChange,

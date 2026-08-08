@@ -14,6 +14,13 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-nutrition: var(--nutrition);
+  --color-steps: var(--steps);
+  --color-bodyweight: var(--bodyweight);
+  --color-cardio: var(--cardio);
+  --color-carbs: var(--carbs);
+  --color-fat: var(--fat);
+  --color-protein: var(--protein);
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -32,6 +39,17 @@
   --accent: #4b82f5;
   --accent-foreground: #ffffff;
   --destructive: #f0554e;
+  --nutrition: #4fa97a;
+  --steps: #c2a25a;
+  --bodyweight: #9179c9;
+  /* Cardio workout dot. Deliberately not blue: it shares the dot slot with the
+     strength accent and has to read as a different kind of day at a glance. */
+  --cardio: #cf6f8f;
+  /* Macro ring segments. Close cousins of --bodyweight / --steps but
+     intentionally distinct values; they are not duplicates to be merged. */
+  --carbs: #4bb3a2;
+  --fat: #a97fd0;
+  --protein: #e0a44f;
 }
 
 @layer base {
@@ -117,6 +135,24 @@
 }
 @utility anim-backdrop {
   animation: backdrop-in 0.25s ease;
+}
+
+/* Centred popup (workout chooser): a fast up-and-in entrance, distinct from
+   anim-sheet's bottom-sheet slide -- this one is a rounded rectangle that
+   settles into the middle of the viewport, not a full-width sheet, so it
+   needs a shorter, snappier animation. */
+@keyframes popup-up {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@utility anim-popup {
+  animation: popup-up 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 @utility anim-fade-up {
   animation: fade-up 0.35s ease both;

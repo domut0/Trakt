@@ -1,7 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { parseBackup, useStore, type BackupData } from "../lib/store";
+import { BACKUP_VERSION, parseBackup, useStore, type BackupData } from "../lib/store";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -18,12 +18,8 @@ export const Route = createFileRoute("/settings")({
 function SettingsPage() {
   const unit = useStore((s) => s.unit);
   const setUnit = useStore((s) => s.setUnit);
-  const motivationEnabled = useStore((s) => s.motivationEnabled);
-  const toggleMotivation = useStore((s) => s.toggleMotivation);
   const chartsEnabled = useStore((s) => s.chartsEnabled);
   const setChartsEnabled = useStore((s) => s.setChartsEnabled);
-  const calendarEnabled = useStore((s) => s.calendarEnabled);
-  const setCalendarEnabled = useStore((s) => s.setCalendarEnabled);
   const importData = useStore((s) => s.importData);
   const clearAllData = useStore((s) => s.clearAllData);
   const router = useRouter();
@@ -43,9 +39,15 @@ function SettingsPage() {
   };
 
   const exportJson = () => {
-    const { exercises, slots, sessions, sets, unit, motivationEnabled } = useStore.getState();
+    const { exercises, slots, sessions, sets, dailyLogs, unit } = useStore.getState();
     const blob = new Blob(
-      [JSON.stringify({ exercises, slots, sessions, sets, unit, motivationEnabled }, null, 2)],
+      [
+        JSON.stringify(
+          { version: BACKUP_VERSION, exercises, slots, sessions, sets, dailyLogs, unit },
+          null,
+          2,
+        ),
+      ],
       { type: "application/json" },
     );
     const url = URL.createObjectURL(blob);
@@ -117,19 +119,7 @@ function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="Feedback" delay={40}>
-        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
-          <div>
-            <div className="text-[15px]">Motivational messages</div>
-            <div className="text-[12px] text-muted-foreground">
-              In-app toasts after qualifying sets.
-            </div>
-          </div>
-          <Toggle checked={motivationEnabled} onChange={toggleMotivation} />
-        </div>
-      </Section>
-
-      <Section title="Tabs" delay={80}>
+      <Section title="Tabs" delay={40}>
         <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
           <div>
             <div className="text-[15px]">Charts tab</div>
@@ -137,18 +127,9 @@ function SettingsPage() {
           </div>
           <Toggle checked={chartsEnabled} onChange={() => setChartsEnabled(!chartsEnabled)} />
         </div>
-        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
-          <div>
-            <div className="text-[15px]">Calendar tab</div>
-            <div className="text-[12px] text-muted-foreground">
-              Show the Calendar tab in the nav.
-            </div>
-          </div>
-          <Toggle checked={calendarEnabled} onChange={() => setCalendarEnabled(!calendarEnabled)} />
-        </div>
       </Section>
 
-      <Section title="Data" delay={120}>
+      <Section title="Data" delay={80}>
         <button
           onClick={exportJson}
           className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
@@ -181,8 +162,9 @@ function SettingsPage() {
           <div className="px-5 py-3.5 hairline-t">
             <div className="text-[13px] text-muted-foreground">
               This file has {pendingImport.exercises.length} exercises,{" "}
-              {pendingImport.sessions.length} sessions and {pendingImport.sets.length} sets.
-              Importing will replace all data currently on this device. This cannot be undone.
+              {pendingImport.sessions.length} sessions, {pendingImport.sets.length} sets and{" "}
+              {pendingImport.dailyLogs.length} logged days. Importing will replace all data
+              currently on this device. This cannot be undone.
             </div>
             <div className="mt-3 flex gap-2">
               <button
@@ -208,7 +190,7 @@ function SettingsPage() {
         )}
       </Section>
 
-      <Section title="Reset" delay={160}>
+      <Section title="Reset" delay={120}>
         {!showClearConfirm ? (
           <button
             onClick={() => setShowClearConfirm(true)}
