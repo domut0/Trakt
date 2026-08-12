@@ -124,8 +124,17 @@ export function WeeklyView() {
 
   if (weeks.length === 0) {
     return (
-      <div className="mx-5 rounded-xl bg-muted px-4 py-8 text-center text-[14px] text-muted-foreground">
-        Nothing logged yet.
+      <div className="mx-5 rounded-2xl bg-surface px-5 py-8 text-center space-y-3">
+        <h3 className="text-[16px] font-semibold tracking-tight">No history logged</h3>
+        <p className="text-[13px] text-muted-foreground">
+          Track your bodyweight, steps, or macros to start building your log.
+        </p>
+        <button
+          onClick={() => openEditor(dayKey(new Date()))}
+          className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-accent px-5 py-2.5 text-[14px] font-semibold text-accent-foreground"
+        >
+          Log today's numbers
+        </button>
       </div>
     );
   }

@@ -210,18 +210,17 @@ export function CalendarView() {
 
           if (!hasSessions && !hasLog) {
             return (
-              <div className="space-y-4">
-                <div className="mx-5 rounded-xl bg-muted px-4 py-8 text-center text-[14px] text-muted-foreground anim-fade-up">
-                  Nothing logged.
-                </div>
-                <div className="px-5">
-                  <button
-                    onClick={() => setEditorOpen(true)}
-                    className="w-full rounded-2xl bg-surface py-4 text-center text-[14px] font-medium text-accent anim-fade-up"
-                  >
-                    Log daily numbers
-                  </button>
-                </div>
+              <div className="mx-5 rounded-2xl bg-surface px-5 py-8 text-center space-y-3 anim-fade-up">
+                <h3 className="text-[16px] font-semibold tracking-tight">No entry for this date</h3>
+                <p className="text-[13px] text-muted-foreground">
+                  Record your daily numbers or complete a workout to fill this day.
+                </p>
+                <button
+                  onClick={() => setEditorOpen(true)}
+                  className="w-full min-h-[44px] rounded-2xl bg-muted py-3.5 text-center text-[14px] font-semibold text-accent"
+                >
+                  Log daily numbers
+                </button>
               </div>
             );
           }
