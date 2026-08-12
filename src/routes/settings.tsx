@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { dailyLogsToCsv, setsToCsv } from "../lib/csv";
 import { BACKUP_VERSION, parseBackup, useStore, type BackupData } from "../lib/store";
 
 export const Route = createFileRoute("/settings")({
@@ -54,6 +55,30 @@ function SettingsPage() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `workout-log-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportSetsCsv = () => {
+    const { sets, sessions, exercises, slots, unit } = useStore.getState();
+    const csv = setsToCsv(sets, sessions, exercises, slots, unit);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `abtn-sets-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportDailyLogsCsv = () => {
+    const { dailyLogs, unit } = useStore.getState();
+    const csv = dailyLogsToCsv(dailyLogs, unit);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `abtn-daily-log-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -137,6 +162,30 @@ function SettingsPage() {
           <div>
             <div className="text-[15px]">Export backup</div>
             <div className="text-[12px] text-muted-foreground">Download all data as JSON.</div>
+          </div>
+          <span className="text-accent">→</span>
+        </button>
+        <button
+          onClick={exportSetsCsv}
+          className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+        >
+          <div>
+            <div className="text-[15px]">Export sets (CSV)</div>
+            <div className="text-[12px] text-muted-foreground">
+              Download set history for spreadsheets.
+            </div>
+          </div>
+          <span className="text-accent">→</span>
+        </button>
+        <button
+          onClick={exportDailyLogsCsv}
+          className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+        >
+          <div>
+            <div className="text-[15px]">Export daily log (CSV)</div>
+            <div className="text-[12px] text-muted-foreground">
+              Download nutrition and bodyweight history.
+            </div>
           </div>
           <span className="text-accent">→</span>
         </button>

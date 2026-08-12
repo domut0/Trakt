@@ -39,7 +39,7 @@ function getEnabledTabs(chartsEnabled: boolean): TabItem[] {
  * because each tab page mounts a fresh AppShell instance, so this can't live
  * in component state. Never touched during SSR (only DOM event handlers
  * write to it), so it's always null on the server and on a fresh client
- * load -- no hydration mismatch.
+ * load - no hydration mismatch.
  */
 type NavDirection = "forward" | "back" | null;
 let lastNavDirection: NavDirection = null;
@@ -112,7 +112,7 @@ function Icon({ name }: { name: "home" | "chart" | "calendar" | "settings" }) {
 /**
  * The nav bar's Workout action button, filled (not stroked) so it reads as
  * the accent colour rather than picking up the outline treatment every
- * routed tab icon uses -- it's an action, not a destination. Sized to match
+ * routed tab icon uses - it's an action, not a destination. Sized to match
  * `Icon` above (22x22, viewBox 0 0 24 24).
  */
 function FlameIcon() {
@@ -159,11 +159,10 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   const items = getEnabledTabs(chartsEnabled);
   const currentIndex = items.findIndex((it) => it.to === location.pathname);
 
-  // Split the ROUTED tabs (never the Workout button) into two halves so the
-  // action button lands in the middle of the row regardless of whether
-  // Charts is showing -- 3 routed tabs (4 total incl. Workout) or 4 routed
-  // tabs (5 total). Deriving the split from the array length, rather than a
-  // fixed index, is what keeps it centred as that count changes.
+  // Split routed tabs into left and right halves around the Workout button.
+  // Symmetric left and right flex-1 containers ensure the center button is
+  // ALWAYS strictly horizontally centered, whether Charts is enabled (2 tabs
+  // on each side) or disabled (2 tabs on left, 1 tab on right).
   const splitAt = Math.ceil(items.length / 2);
   const leftItems = items.slice(0, splitAt);
   const rightItems = items.slice(splitAt);
@@ -196,14 +195,17 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
       className="relative z-30 shrink-0 hairline-t bg-background"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
     >
-      <ul className="mx-auto flex max-w-md items-stretch justify-around px-2 pt-2">
-        {leftItems.map((it, i) => renderTab(it, i))}
-        <li className="flex-1">
+      <div className="mx-auto flex max-w-md items-stretch justify-between px-2 pt-2">
+        <ul className="flex flex-1 items-stretch justify-around">
+          {leftItems.map((it, i) => renderTab(it, i))}
+        </ul>
+        <div className="flex shrink-0 items-center justify-center px-1">
           <button
             onClick={() =>
               activeSessionId ? router.navigate({ to: "/workout" }) : onOpenChooser()
             }
-            className="flex w-full flex-col items-center gap-0.5 py-1"
+            aria-label={activeSessionId ? "Return to active workout" : "Start workout"}
+            className="flex flex-col items-center gap-0.5 py-1"
             style={{ color: "var(--color-accent)" }}
           >
             <FlameIcon />
@@ -211,9 +213,11 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
               {activeSessionId ? "Return" : "Workout"}
             </span>
           </button>
-        </li>
-        {rightItems.map((it, i) => renderTab(it, splitAt + i))}
-      </ul>
+        </div>
+        <ul className="flex flex-1 items-stretch justify-around">
+          {rightItems.map((it, i) => renderTab(it, splitAt + i))}
+        </ul>
+      </div>
       {activeSessionId && (
         <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-accent/40" />
       )}
@@ -231,13 +235,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Workout chooser + strength start flow, owned here so the nav's Workout
   // button works from every tab. StartWorkoutSheet is mounted from AppShell
   // (not a route) specifically so it survives index.tsx's own mount of it
-  // being removed elsewhere -- this is now the flow's only entry point that
+  // being removed elsewhere - this is now the flow's only entry point that
   // doesn't require an active session already existing.
   const [chooserOpen, setChooserOpen] = useState(false);
   const [startSheetOpen, setStartSheetOpen] = useState(false);
 
   // Ordered enabled-tab paths, for both swipe navigation and figuring out
-  // whether the current page is a tab at all (swipes only act on tabs --
+  // whether the current page is a tab at all (swipes only act on tabs,
   // e.g. never on /session/$id, which has its own row swipe gestures).
   const tabPaths = useMemo(() => getEnabledTabs(chartsEnabled).map((t) => t.to), [chartsEnabled]);
   const tabIndex = tabPaths.findIndex((p) => p === location.pathname);
