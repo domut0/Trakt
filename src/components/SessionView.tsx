@@ -1,5 +1,7 @@
+import { Link } from "@tanstack/react-router";
 import { useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
+import { previousSessionExerciseOrder } from "../lib/exercise-history";
 import { useStore, type WorkoutSet } from "../lib/store";
 
 /** Row with swipe-left to delete / swipe-right to edit (touch). */
@@ -102,10 +104,14 @@ export function SessionView({
     () => allSets.filter((x) => x.sessionId === sessionId),
     [allSets, sessionId],
   );
+  const sessions = useStore((s) => s.sessions);
   const exercises = useStore((s) => s.exercises);
+  const currentExerciseId = useStore((s) => s.currentExerciseId);
+  const setCurrentExercise = useStore((s) => s.setCurrentExercise);
   const deleteSet = useStore((s) => s.deleteSet);
   const updateSet = useStore((s) => s.updateSet);
   const [editing, setEditing] = useState<WorkoutSet | null>(null);
+  const [showRepeatList, setShowRepeatList] = useState(true);
 
   const grouped = useMemo(() => {
     const byExercise = new Map<string, WorkoutSet[]>();
@@ -129,20 +135,107 @@ export function SessionView({
     });
   }, [sets, exercises]);
 
+  const repeatExerciseIds = useMemo(
+    () => previousSessionExerciseOrder(sessions, allSets, sessionId),
+    [sessions, allSets, sessionId],
+  );
+
+  const repeatExercises = useMemo(
+    () =>
+      repeatExerciseIds
+        .map((id) => exercises.find((e) => e.id === id))
+        .filter((e): e is NonNullable<typeof e> => e !== undefined),
+    [repeatExerciseIds, exercises],
+  );
+
+  const renderRepeatChecklist = () => {
+    if (repeatExercises.length === 0) return null;
+    return (
+      <div className="mx-4 mt-4 rounded-2xl bg-surface p-4">
+        <button
+          onClick={() => setShowRepeatList((v) => !v)}
+          className="flex w-full items-center justify-between text-left"
+        >
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Repeat last workout
+            </div>
+            <div className="text-[14px] font-semibold tracking-tight">
+              {repeatExercises.length} exercise{repeatExercises.length === 1 ? "" : "s"} from previous session
+            </div>
+          </div>
+          <span className="text-[13px] font-medium text-accent">
+            {showRepeatList ? "Hide" : "Show"}
+          </span>
+        </button>
+        {showRepeatList && (
+          <div className="mt-3 divide-y divide-border border-t border-border pt-1">
+            {repeatExercises.map((ex) => {
+              const isSelected = currentExerciseId === ex.id;
+              const isLogged = sets.some((s) => s.exerciseId === ex.id);
+              return (
+                <button
+                  key={ex.id}
+                  onClick={() => setCurrentExercise(ex.id)}
+                  className={
+                    "flex w-full min-h-[44px] items-center justify-between py-3 text-left transition-colors " +
+                    (isSelected ? "text-accent font-semibold" : "text-foreground")
+                  }
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={
+                        "flex h-5 w-5 items-center justify-center rounded-full border text-[11px] " +
+                        (isLogged
+                          ? "border-accent bg-accent text-accent-foreground"
+                          : isSelected
+                            ? "border-accent text-accent"
+                            : "border-muted-foreground/40 text-transparent")
+                      }
+                    >
+                      ✓
+                    </span>
+                    <span className="text-[15px]">{ex.name}</span>
+                  </div>
+                  <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    {ex.type === "main" ? "Main" : ex.type === "cardio" ? "Cardio" : "Accessory"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (grouped.length === 0) {
     return (
-      <div className="px-6 py-16 text-center text-[15px] text-muted-foreground">
-        No sets logged yet.
+      <div className="pb-6">
+        <div className="mx-4 my-6 rounded-2xl bg-surface px-5 py-8 text-center">
+          <h3 className="text-[16px] font-semibold tracking-tight">No sets logged yet</h3>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            Select an exercise from below or open the set picker to log your first set.
+          </p>
+        </div>
+        {renderRepeatChecklist()}
       </div>
     );
   }
 
   return (
     <div className="pb-6">
+      {renderRepeatChecklist()}
       {grouped.map(({ exercise, sets, setupNote }) => (
         <div key={exercise.id} className="mt-4">
           <div className="flex items-baseline justify-between px-4 pb-2">
-            <h3 className="text-[17px] font-semibold tracking-tight">{exercise.name}</h3>
+            <Link
+              to="/exercise/$id"
+              params={{ id: exercise.id }}
+              className="text-[17px] font-semibold tracking-tight text-foreground hover:text-accent"
+            >
+              {exercise.name}
+            </Link>
             <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
               {exercise.type === "main"
                 ? "Main"
