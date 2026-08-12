@@ -3,7 +3,10 @@ import type {
   BackupData,
   DailyLog,
   Exercise,
+  Habit,
+  HabitEntry,
   SplitSlot,
+  TargetProfile,
   WorkoutSession,
   WorkoutSet,
 } from "./store";
@@ -24,6 +27,25 @@ export interface SettingsMeta {
   key: "settings";
   unit: "lbs" | "kg";
   chartsEnabled?: boolean;
+  /** Opt-in: daily calorie/macro/step targets. Off means the Today ring shows a
+   * pure macro split, exactly as it did before targets existed. */
+  targetsEnabled?: boolean;
+  /** Opt-in: the habit checklist on Today. */
+  habitsEnabled?: boolean;
+  /** Opt-in: the plate and 1RM calculator sheets. */
+  toolsEnabled?: boolean;
+  /**
+   * Named target profiles. Lives on the settings record rather than in its own
+   * table because it is a handful of tiny rows that are always read together
+   * with the rest of the settings, and never queried by anything but id.
+   */
+  targetProfiles?: TargetProfile[];
+  /**
+   * Which profile applies to each weekday, as 7 profile ids, MONDAY FIRST to
+   * match the app's Monday-start week convention everywhere else. Resolve it
+   * through `weekdayIndexFor` in targets.ts, never with a raw `getDay()`.
+   */
+  weekdayTargets?: string[];
 }
 
 export interface ActiveSessionMeta {
@@ -49,6 +71,8 @@ class WorkoutDb extends Dexie {
   sets!: EntityTable<WorkoutSet, "id">;
   meta!: EntityTable<MetaRecord, "key">;
   dailyLogs!: EntityTable<DailyLog, "date">;
+  habits!: EntityTable<Habit, "id">;
+  habitEntries!: EntityTable<HabitEntry, "id">;
 
   constructor() {
     super("workout-tracker");
@@ -73,6 +97,19 @@ class WorkoutDb extends Dexie {
     // records round-trip through the v2 schema untouched. Bumping the version
     // here would cost an upgrade transaction on every existing install and buy
     // nothing. Only add version(3) if cardio ever needs a real INDEX.
+    //
+    // v3 adds habit tracking, which DOES need new tables (and so a real bump).
+    // `habitEntries` is indexed on both `date` and `habitId`: Today reads a
+    // whole day at once, while deleting a habit has to sweep every entry for
+    // that habit across all history.
+    //
+    // Session notes arrived at the same time and are NOT reflected here, for the
+    // same reason cardio was not: `note` is a non-indexed field on an existing
+    // record, so it round-trips through the old schema untouched.
+    this.version(3).stores({
+      habits: "id",
+      habitEntries: "id, date, habitId",
+    });
   }
 }
 
@@ -85,11 +122,42 @@ export function isIndexedDbAvailable(): boolean {
   return typeof indexedDB !== "undefined";
 }
 
-export const DEFAULT_SETTINGS: SettingsMeta = {
-  key: "settings",
-  unit: "lbs",
-  chartsEnabled: true,
-};
+/** The id of the profile every weekday points at until the user splits them up. */
+export const DEFAULT_TARGET_PROFILE_ID = "tp_default";
+
+/**
+ * A fresh set of target profiles: exactly one, applied to all seven days.
+ *
+ * A factory rather than a const because the result contains arrays that end up
+ * in store state, and a shared frozen-by-convention literal is one careless
+ * `.push` away from mutating every caller's copy.
+ *
+ * Targets ship pre-seeded even while `targetsEnabled` is false, so flipping the
+ * toggle on lands the user in a usable editor instead of an empty screen.
+ */
+export function defaultTargets(): {
+  targetProfiles: TargetProfile[];
+  weekdayTargets: string[];
+} {
+  return {
+    targetProfiles: [{ id: DEFAULT_TARGET_PROFILE_ID, name: "Every day" }],
+    weekdayTargets: Array.from({ length: 7 }, () => DEFAULT_TARGET_PROFILE_ID),
+  };
+}
+
+export function defaultSettings(): SettingsMeta {
+  return {
+    key: "settings",
+    unit: "lbs",
+    chartsEnabled: true,
+    targetsEnabled: false,
+    habitsEnabled: false,
+    toolsEnabled: false,
+    ...defaultTargets(),
+  };
+}
+
+export const DEFAULT_SETTINGS: SettingsMeta = defaultSettings();
 
 export const EMPTY_ACTIVE_SESSION: ActiveSessionMeta = {
   key: "activeSession",
@@ -101,29 +169,56 @@ export interface AllData {
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
   dailyLogs: DailyLog[];
+  habits: Habit[];
+  habitEntries: HabitEntry[];
   settings: SettingsMeta;
   activeSession: ActiveSessionMeta;
 }
 
 /** Reads every table. Client-only. */
 export async function loadAll(): Promise<AllData> {
-  const [exercises, slots, sessions, sets, dailyLogs, settingsMeta, activeSessionMeta] =
-    await Promise.all([
-      db.exercises.toArray(),
-      db.slots.toArray(),
-      db.sessions.toArray(),
-      db.sets.toArray(),
-      db.dailyLogs.toArray(),
-      db.meta.get("settings"),
-      db.meta.get("activeSession"),
-    ]);
+  const [
+    exercises,
+    slots,
+    sessions,
+    sets,
+    dailyLogs,
+    habits,
+    habitEntries,
+    settingsMeta,
+    activeSessionMeta,
+  ] = await Promise.all([
+    db.exercises.toArray(),
+    db.slots.toArray(),
+    db.sessions.toArray(),
+    db.sets.toArray(),
+    db.dailyLogs.toArray(),
+    db.habits.toArray(),
+    db.habitEntries.toArray(),
+    db.meta.get("settings"),
+    db.meta.get("activeSession"),
+  ]);
+  // A settings record written before targets existed has no profiles at all.
+  // Fill them in on read so nothing downstream has to cope with the empty case,
+  // and so enabling targets later never lands on a profile-less screen.
+  const stored = settingsMeta as SettingsMeta | undefined;
+  const settings: SettingsMeta = stored
+    ? {
+        ...stored,
+        ...(stored.targetProfiles?.length && stored.weekdayTargets?.length === 7
+          ? {}
+          : defaultTargets()),
+      }
+    : defaultSettings();
   return {
     exercises,
     slots,
     sessions,
     sets,
     dailyLogs,
-    settings: (settingsMeta as SettingsMeta) ?? DEFAULT_SETTINGS,
+    habits,
+    habitEntries,
+    settings,
     activeSession: (activeSessionMeta as ActiveSessionMeta) ?? EMPTY_ACTIVE_SESSION,
   };
 }
@@ -142,11 +237,14 @@ export async function seedDb(data: {
   sets: WorkoutSet[];
   settings: SettingsMeta;
 }): Promise<void> {
-  // dailyLogs is in the transaction scope but intentionally never written:
-  // a first run seeds no daily logs, so the table starts empty.
+  // dailyLogs, habits and habitEntries are in the transaction scope but
+  // intentionally never written: a first run seeds no daily logs and no habits,
+  // so those tables start empty. They are still listed because Dexie requires
+  // every table a transaction MIGHT touch to be in scope, and clearing them is
+  // part of the same atomic unit if this is ever extended.
   await db.transaction(
     "rw",
-    [db.exercises, db.slots, db.sessions, db.sets, db.dailyLogs, db.meta],
+    [db.exercises, db.slots, db.sessions, db.sets, db.dailyLogs, db.habits, db.habitEntries, db.meta],
     async () => {
       await db.exercises.bulkPut(data.exercises);
       await db.slots.bulkPut(data.slots);
@@ -170,22 +268,36 @@ export async function seedDb(data: {
 export async function replaceAllData(data: BackupData): Promise<void> {
   await db.transaction(
     "rw",
-    [db.exercises, db.slots, db.sessions, db.sets, db.dailyLogs, db.meta],
+    [db.exercises, db.slots, db.sessions, db.sets, db.dailyLogs, db.habits, db.habitEntries, db.meta],
     async () => {
       await db.exercises.clear();
       await db.slots.clear();
       await db.sessions.clear();
       await db.sets.clear();
       await db.dailyLogs.clear();
+      await db.habits.clear();
+      await db.habitEntries.clear();
       await db.exercises.bulkPut(data.exercises);
       await db.slots.bulkPut(data.slots);
       await db.sessions.bulkPut(data.sessions);
       await db.sets.bulkPut(data.sets);
       await db.dailyLogs.bulkPut(data.dailyLogs);
-      await db.meta.put({
+      await db.habits.bulkPut(data.habits);
+      await db.habitEntries.bulkPut(data.habitEntries);
+      // Annotated as SettingsMeta rather than inlined: `meta` is a union table,
+      // and an inline literal makes Dexie's InsertType resolve against the wrong
+      // arm of the union, which is a type error even though the value is valid.
+      const settings: SettingsMeta = {
         key: "settings",
         unit: data.unit,
-      });
+        chartsEnabled: true,
+        targetsEnabled: data.targetsEnabled,
+        habitsEnabled: data.habitsEnabled,
+        toolsEnabled: data.toolsEnabled,
+        targetProfiles: data.targetProfiles,
+        weekdayTargets: data.weekdayTargets,
+      };
+      await db.meta.put(settings);
       await db.meta.put(EMPTY_ACTIVE_SESSION);
     },
   );

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   db,
+  defaultTargets,
   isDbEmpty,
   isIndexedDbAvailable,
   loadAll,
@@ -11,6 +12,7 @@ import {
   type SettingsMeta,
 } from "./db";
 import { isDailyLogEmpty } from "./daily-log";
+import { targetProfileFor } from "./targets";
 import { seedExercises } from "./exercise-library";
 
 export type ExerciseType = "main" | "accessory" | "cardio";
@@ -62,6 +64,9 @@ export interface WorkoutSession {
   distance?: number;
   /** Cardio only. Snapshot at log time, same pattern as `WorkoutSet.setupNote`. */
   setupNote?: string;
+  /** Free-text note for the whole session ("felt flat", "shoulder tweaked").
+   * Non-indexed, so adding it needed no Dexie version bump. */
+  note?: string;
 }
 
 /**
@@ -109,6 +114,59 @@ export interface DailyLog {
   isCheatDay?: boolean;
 }
 
+/**
+ * A named set of daily nutrition targets, assigned to weekdays rather than to
+ * dates. See targets.ts for why that indirection exists.
+ *
+ * Every field is optional: targeting calories and protein but not carbs is a
+ * completely normal way to eat, and an unset field renders no progress row.
+ */
+export interface TargetProfile {
+  id: string;
+  name: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  steps?: number;
+}
+
+/**
+ * A tracked daily habit, for example a supplement. Order is explicit so the
+ * checklist can be reordered without touching ids.
+ *
+ * Archiving rather than deleting keeps historical `HabitEntry` rows meaningful:
+ * a habit you stopped in March should not silently erase the fact that you did
+ * it every day in February.
+ */
+export interface Habit {
+  id: string;
+  name: string;
+  order: number;
+  archived?: boolean;
+}
+
+/**
+ * One habit completed on one day. PRESENCE means done; there is no `done: false`
+ * row, so an untouched habit costs no storage at all.
+ *
+ * `id` is the derived `${date}|${habitId}` composite rather than a random uid,
+ * which makes a toggle an idempotent put/delete by key and makes double-tapping
+ * impossible to turn into two rows. It is a plain string primary key rather than
+ * a Dexie compound index because Dexie's EntityTable typing wants a single key
+ * property.
+ */
+export interface HabitEntry {
+  id: string;
+  date: string;
+  habitId: string;
+}
+
+/** The one place the `HabitEntry.id` composite is built. */
+export function habitEntryId(date: string, habitId: string): string {
+  return `${date}|${habitId}`;
+}
+
 /** The shape produced by Settings' "Export backup" action, and the shape
  * `importData` / `replaceAllData` expect back in. Kept flat (no meta
  * nesting) to match the exported JSON exactly.
@@ -122,6 +180,13 @@ export interface BackupData {
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
   dailyLogs: DailyLog[];
+  habits: Habit[];
+  habitEntries: HabitEntry[];
+  targetProfiles: TargetProfile[];
+  weekdayTargets: string[];
+  targetsEnabled: boolean;
+  habitsEnabled: boolean;
+  toolsEnabled: boolean;
   unit: "lbs" | "kg";
 }
 
@@ -130,8 +195,13 @@ export interface BackupData {
  * v3 adds cardio: sessions may carry `kind`/`cardioExerciseId`/`durationMinutes`/
  * `distance`/`setupNote` and may omit `splitSlotId`, and exercises may be of type
  * "cardio". Every one of those is optional, so a v1 or v2 file still imports
- * unchanged and its sessions read as strength. */
-export const BACKUP_VERSION = 3;
+ * unchanged and its sessions read as strength.
+ *
+ * v4 adds habit tracking, per-weekday nutrition targets, the three feature
+ * toggles they hang off, and session notes. Every one of those is optional on
+ * read (see `parseBackup`), so a v1, v2 or v3 file still imports unchanged and
+ * simply lands with no habits and a single uniform target profile. */
+export const BACKUP_VERSION = 4;
 
 type CurrentBlock = {
   blockGroupId: string;
@@ -145,11 +215,22 @@ type CurrentBlock = {
 interface State {
   unit: "lbs" | "kg";
   chartsEnabled: boolean;
+  /** Feature toggles for the three opt-in additions. Off by default: each one
+   * adds a surface to a screen whose whole point is having nothing in the way,
+   * so the user turns them on deliberately. */
+  targetsEnabled: boolean;
+  habitsEnabled: boolean;
+  toolsEnabled: boolean;
   exercises: Exercise[];
   slots: SplitSlot[];
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
   dailyLogs: DailyLog[];
+  habits: Habit[];
+  habitEntries: HabitEntry[];
+  targetProfiles: TargetProfile[];
+  /** 7 profile ids, MONDAY FIRST. Resolve through targets.ts, never `getDay()`. */
+  weekdayTargets: string[];
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
@@ -205,6 +286,38 @@ interface State {
   dailyLogFor: (date: string) => DailyLog | undefined;
   setUnit: (u: "lbs" | "kg") => void;
   setChartsEnabled: (v: boolean) => void;
+  setTargetsEnabled: (v: boolean) => void;
+  setHabitsEnabled: (v: boolean) => void;
+  setToolsEnabled: (v: boolean) => void;
+
+  /** Free-text note on a whole session. */
+  updateSession: (sessionId: string, patch: Pick<WorkoutSession, "note">) => void;
+
+  // --- Per-weekday nutrition targets -------------------------------------
+  addTargetProfile: (name: string) => TargetProfile;
+  updateTargetProfile: (id: string, patch: Partial<Omit<TargetProfile, "id">>) => void;
+  /** Removes a profile and repoints every weekday that used it at the first
+   * remaining profile, so no weekday is ever left dangling. Refuses to delete
+   * the last profile: zero profiles would make the targets editor unreachable
+   * with the toggle still on. */
+  deleteTargetProfile: (id: string) => void;
+  /** `weekdayIndex` is MONDAY-FIRST (0 = Monday). */
+  assignWeekdayTarget: (weekdayIndex: number, profileId: string) => void;
+  /** The profile in effect on a "yyyy-MM-dd" day key, if any. */
+  targetProfileForDate: (date: string) => TargetProfile | undefined;
+
+  // --- Habits ------------------------------------------------------------
+  addHabit: (name: string) => Habit;
+  renameHabit: (id: string, name: string) => void;
+  /** Deletes the habit AND every entry ever recorded for it. */
+  deleteHabit: (id: string) => void;
+  setHabitArchived: (id: string, archived: boolean) => void;
+  reorderHabits: (fromId: string, toId: string) => void;
+  /** Flips a habit for a day. Idempotent per (date, habit) by construction:
+   * the row's key is derived from both, so there can never be duplicates. */
+  toggleHabit: (date: string, habitId: string) => void;
+  /** Habit ids completed on a day key. */
+  habitsDoneOn: (date: string) => string[];
   reorderSlots: (fromId: string, toId: string) => void;
   /** Full backup restore. Assumes `data` has already been validated by
    * `parseBackup` — replaces IndexedDB first (single transaction; a failure
@@ -673,6 +786,38 @@ function isDailyLog(v: unknown): v is DailyLog {
  * best-effort basis — the keys we understand are read, the rest ignored. The
  * only hard failures are structural: keys that ARE present but the wrong shape.
  */
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === "string" && v.length > 0;
+}
+
+function isTargetProfile(v: unknown): v is TargetProfile {
+  if (!isPlainObject(v)) return false;
+  return (
+    isNonEmptyString(v.id) &&
+    typeof v.name === "string" &&
+    isOptionalNumber(v.calories) &&
+    isOptionalNumber(v.protein) &&
+    isOptionalNumber(v.carbs) &&
+    isOptionalNumber(v.fat) &&
+    isOptionalNumber(v.steps)
+  );
+}
+
+function isHabit(v: unknown): v is Habit {
+  if (!isPlainObject(v)) return false;
+  return (
+    isNonEmptyString(v.id) &&
+    typeof v.name === "string" &&
+    typeof v.order === "number" &&
+    (v.archived === undefined || typeof v.archived === "boolean")
+  );
+}
+
+function isHabitEntry(v: unknown): v is HabitEntry {
+  if (!isPlainObject(v)) return false;
+  return isNonEmptyString(v.id) && isNonEmptyString(v.date) && isNonEmptyString(v.habitId);
+}
+
 export function parseBackup(text: string): ParseBackupResult {
   let parsed: unknown;
   try {
@@ -704,6 +849,32 @@ export function parseBackup(text: string): ParseBackupResult {
   if (unit !== "lbs" && unit !== "kg") {
     return { ok: false, error: "The backup's unit must be lbs or kg." };
   }
+  // Everything v4 added is read tolerantly rather than validated hard: a v1-v3
+  // file legitimately has none of it, and a partially-hand-edited file should
+  // land with those features empty rather than fail the whole import. The
+  // weekdayTargets length check matters because targets.ts treats any array that
+  // is not exactly 7 long as "no target", so a malformed one would silently
+  // disable targets instead of being replaced with a working default.
+  const fallbackTargets = defaultTargets();
+  const rawWeekdays = (parsed as { weekdayTargets?: unknown }).weekdayTargets;
+  const rawProfiles = (parsed as { targetProfiles?: unknown }).targetProfiles;
+  const rawHabits = (parsed as { habits?: unknown }).habits;
+  const rawHabitEntries = (parsed as { habitEntries?: unknown }).habitEntries;
+  const weekdayTargets =
+    Array.isArray(rawWeekdays) && rawWeekdays.length === 7 && rawWeekdays.every(isNonEmptyString)
+      ? (rawWeekdays as string[])
+      : fallbackTargets.weekdayTargets;
+  const targetProfiles =
+    Array.isArray(rawProfiles) && rawProfiles.every(isTargetProfile) && rawProfiles.length > 0
+      ? (rawProfiles as TargetProfile[])
+      : fallbackTargets.targetProfiles;
+  // If the profiles fell back but the assignments did not, every weekday would
+  // point at an id that no longer exists. Re-derive both together in that case.
+  const profileIds = new Set(targetProfiles.map((p) => p.id));
+  const safeWeekdays = weekdayTargets.every((id) => profileIds.has(id))
+    ? weekdayTargets
+    : fallbackTargets.weekdayTargets;
+
   return {
     ok: true,
     data: {
@@ -715,6 +886,16 @@ export function parseBackup(text: string): ParseBackupResult {
       sessions: sessions as WorkoutSession[],
       sets: sets as WorkoutSet[],
       dailyLogs: (dailyLogs as DailyLog[] | undefined) ?? [],
+      habits: Array.isArray(rawHabits) && rawHabits.every(isHabit) ? (rawHabits as Habit[]) : [],
+      habitEntries:
+        Array.isArray(rawHabitEntries) && rawHabitEntries.every(isHabitEntry)
+          ? (rawHabitEntries as HabitEntry[])
+          : [],
+      targetProfiles,
+      weekdayTargets: safeWeekdays,
+      targetsEnabled: (parsed as { targetsEnabled?: unknown }).targetsEnabled === true,
+      habitsEnabled: (parsed as { habitsEnabled?: unknown }).habitsEnabled === true,
+      toolsEnabled: (parsed as { toolsEnabled?: unknown }).toolsEnabled === true,
       unit,
     },
   };
@@ -743,18 +924,46 @@ function persistActiveMeta(meta: {
   );
 }
 
-function persistSettings(unit: "lbs" | "kg", chartsEnabled: boolean) {
-  safeWrite(() => db.meta.put({ key: "settings", unit, chartsEnabled }));
+/**
+ * Writes the whole settings record from current store state.
+ *
+ * Takes no arguments deliberately. The previous signature listed every field,
+ * and each new setting silently changed it, so a caller that forgot to thread a
+ * value through would persist a stale one. Reading straight from the store means
+ * callers only have to `set()` first and the mirror always matches.
+ *
+ * Annotated as SettingsMeta before the put: `meta` is a union table, and an
+ * inline literal makes Dexie's InsertType resolve against the wrong arm of the
+ * union, which is a type error even though the value is perfectly valid.
+ */
+function persistSettingsFrom(s: State) {
+  const settings: SettingsMeta = {
+    key: "settings",
+    unit: s.unit,
+    chartsEnabled: s.chartsEnabled,
+    targetsEnabled: s.targetsEnabled,
+    habitsEnabled: s.habitsEnabled,
+    toolsEnabled: s.toolsEnabled,
+    targetProfiles: s.targetProfiles,
+    weekdayTargets: s.weekdayTargets,
+  };
+  safeWrite(() => db.meta.put(settings));
 }
 
 export const useStore = create<State>((set, get) => ({
   unit: "lbs",
   chartsEnabled: true,
+  targetsEnabled: false,
+  habitsEnabled: false,
+  toolsEnabled: false,
   exercises: [],
   slots: [],
   sessions: [],
   sets: [],
   dailyLogs: [],
+  habits: [],
+  habitEntries: [],
+  ...defaultTargets(),
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -772,10 +981,15 @@ export const useStore = create<State>((set, get) => ({
     try {
       const empty = await isDbEmpty();
       if (empty) {
+        const targets = defaultTargets();
         const settings: SettingsMeta = {
           key: "settings",
           unit: "lbs",
           chartsEnabled: true,
+          targetsEnabled: false,
+          habitsEnabled: false,
+          toolsEnabled: false,
+          ...targets,
         };
         await seedDb({
           exercises: seedExercises,
@@ -790,8 +1004,14 @@ export const useStore = create<State>((set, get) => ({
           sessions: seedSessions,
           sets: seedSets,
           dailyLogs: [], // a first run seeds no daily logs
+          habits: [], // nor any habits: the checklist starts empty and opt-in
+          habitEntries: [],
           unit: settings.unit,
           chartsEnabled: true,
+          targetsEnabled: false,
+          habitsEnabled: false,
+          toolsEnabled: false,
+          ...targets,
           activeSessionId: undefined,
           currentExerciseId: undefined,
           currentBlock: undefined,
@@ -800,14 +1020,23 @@ export const useStore = create<State>((set, get) => ({
         return;
       }
       const data = await loadAll();
+      // loadAll already backfills targetProfiles/weekdayTargets for records
+      // written before targets existed, so these two are safe to trust here.
       set({
         exercises: data.exercises,
         slots: data.slots,
         sessions: data.sessions,
         sets: data.sets,
         dailyLogs: data.dailyLogs,
+        habits: data.habits,
+        habitEntries: data.habitEntries,
         unit: data.settings.unit,
         chartsEnabled: data.settings.chartsEnabled ?? true,
+        targetsEnabled: data.settings.targetsEnabled ?? false,
+        habitsEnabled: data.settings.habitsEnabled ?? false,
+        toolsEnabled: data.settings.toolsEnabled ?? false,
+        targetProfiles: data.settings.targetProfiles ?? defaultTargets().targetProfiles,
+        weekdayTargets: data.settings.weekdayTargets ?? defaultTargets().weekdayTargets,
         activeSessionId: data.activeSession.activeSessionId,
         currentExerciseId: data.activeSession.currentExerciseId,
         currentBlock: data.activeSession.currentBlock,
@@ -1082,13 +1311,146 @@ export const useStore = create<State>((set, get) => ({
 
   setUnit: (u) => {
     set({ unit: u });
-    persistSettings(u, get().chartsEnabled);
+    persistSettingsFrom(get());
   },
 
   setChartsEnabled: (v) => {
     set({ chartsEnabled: v });
-    persistSettings(get().unit, v);
+    persistSettingsFrom(get());
   },
+
+  setTargetsEnabled: (v) => {
+    set({ targetsEnabled: v });
+    persistSettingsFrom(get());
+  },
+
+  setHabitsEnabled: (v) => {
+    set({ habitsEnabled: v });
+    persistSettingsFrom(get());
+  },
+
+  setToolsEnabled: (v) => {
+    set({ toolsEnabled: v });
+    persistSettingsFrom(get());
+  },
+
+  updateSession: (sessionId, patch) => {
+    set({ sessions: get().sessions.map((s) => (s.id === sessionId ? { ...s, ...patch } : s)) });
+    const updated = get().sessions.find((s) => s.id === sessionId);
+    if (updated) safeWrite(() => db.sessions.put(updated));
+  },
+
+  // --- Per-weekday nutrition targets -------------------------------------
+
+  addTargetProfile: (name) => {
+    const profile: TargetProfile = { id: `tp_${uid()}`, name: name.trim() || "Untitled" };
+    set({ targetProfiles: [...get().targetProfiles, profile] });
+    persistSettingsFrom(get());
+    return profile;
+  },
+
+  updateTargetProfile: (id, patch) => {
+    set({
+      targetProfiles: get().targetProfiles.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    });
+    persistSettingsFrom(get());
+  },
+
+  deleteTargetProfile: (id) => {
+    const remaining = get().targetProfiles.filter((p) => p.id !== id);
+    // Deleting the last profile would leave the targets editor with nothing to
+    // edit while the feature is still switched on. Turning the feature off is
+    // the way to get rid of targets; this is not it.
+    if (remaining.length === 0) return;
+    const fallback = remaining[0].id;
+    set({
+      targetProfiles: remaining,
+      weekdayTargets: get().weekdayTargets.map((assigned) =>
+        assigned === id ? fallback : assigned,
+      ),
+    });
+    persistSettingsFrom(get());
+  },
+
+  assignWeekdayTarget: (weekdayIndex, profileId) => {
+    if (weekdayIndex < 0 || weekdayIndex > 6) return;
+    if (!get().targetProfiles.some((p) => p.id === profileId)) return;
+    const next = [...get().weekdayTargets];
+    next[weekdayIndex] = profileId;
+    set({ weekdayTargets: next });
+    persistSettingsFrom(get());
+  },
+
+  targetProfileForDate: (date) =>
+    targetProfileFor(date, get().targetProfiles, get().weekdayTargets),
+
+  // --- Habits ------------------------------------------------------------
+
+  addHabit: (name) => {
+    const orders = get().habits.map((h) => h.order);
+    const habit: Habit = {
+      id: `h_${uid()}`,
+      name: name.trim() || "Untitled",
+      order: orders.length ? Math.max(...orders) + 1 : 0,
+    };
+    set({ habits: [...get().habits, habit] });
+    safeWrite(() => db.habits.put(habit));
+    return habit;
+  },
+
+  renameHabit: (id, name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    set({ habits: get().habits.map((h) => (h.id === id ? { ...h, name: trimmed } : h)) });
+    const updated = get().habits.find((h) => h.id === id);
+    if (updated) safeWrite(() => db.habits.put(updated));
+  },
+
+  deleteHabit: (id) => {
+    set({
+      habits: get().habits.filter((h) => h.id !== id),
+      habitEntries: get().habitEntries.filter((e) => e.habitId !== id),
+    });
+    safeWrite(() => db.habits.delete(id));
+    // Indexed on habitId precisely so this sweep does not have to scan the table.
+    safeWrite(() => db.habitEntries.where("habitId").equals(id).delete());
+  },
+
+  setHabitArchived: (id, archived) => {
+    set({ habits: get().habits.map((h) => (h.id === id ? { ...h, archived } : h)) });
+    const updated = get().habits.find((h) => h.id === id);
+    if (updated) safeWrite(() => db.habits.put(updated));
+  },
+
+  reorderHabits: (fromId, toId) => {
+    const habits = [...get().habits].sort((a, b) => a.order - b.order);
+    const fromIdx = habits.findIndex((h) => h.id === fromId);
+    const toIdx = habits.findIndex((h) => h.id === toId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = habits.splice(fromIdx, 1);
+    habits.splice(toIdx, 0, moved);
+    const reordered = habits.map((h, i) => ({ ...h, order: i }));
+    set({ habits: reordered });
+    safeWrite(() => db.habits.bulkPut(reordered));
+  },
+
+  toggleHabit: (date, habitId) => {
+    const id = habitEntryId(date, habitId);
+    const existing = get().habitEntries.find((e) => e.id === id);
+    if (existing) {
+      set({ habitEntries: get().habitEntries.filter((e) => e.id !== id) });
+      safeWrite(() => db.habitEntries.delete(id));
+      return;
+    }
+    const entry: HabitEntry = { id, date, habitId };
+    set({ habitEntries: [...get().habitEntries, entry] });
+    safeWrite(() => db.habitEntries.put(entry));
+  },
+
+  habitsDoneOn: (date) =>
+    get()
+      .habitEntries.filter((e) => e.date === date)
+      .map((e) => e.habitId),
 
   reorderSlots: (fromId, toId) => {
     const slots = [...get().slots].sort((a, b) => a.rotationOrder - b.rotationOrder);
@@ -1114,6 +1476,13 @@ export const useStore = create<State>((set, get) => ({
       sessions: data.sessions,
       sets: data.sets,
       dailyLogs: data.dailyLogs,
+      habits: data.habits,
+      habitEntries: data.habitEntries,
+      targetProfiles: data.targetProfiles,
+      weekdayTargets: data.weekdayTargets,
+      targetsEnabled: data.targetsEnabled,
+      habitsEnabled: data.habitsEnabled,
+      toolsEnabled: data.toolsEnabled,
       unit: data.unit,
       chartsEnabled: true,
       activeSessionId: undefined,
@@ -1127,6 +1496,7 @@ export const useStore = create<State>((set, get) => ({
     // exercise preset library with empty history and default settings. Keeping
     // the presets means the DB is not "empty", so hydrate() won't re-seed the
     // demo history on the next load — the clean slate persists.
+    const targets = defaultTargets();
     await replaceAllData({
       version: BACKUP_VERSION,
       exercises: seedExercises,
@@ -1134,6 +1504,12 @@ export const useStore = create<State>((set, get) => ({
       sessions: [],
       sets: [],
       dailyLogs: [],
+      habits: [],
+      habitEntries: [],
+      ...targets,
+      targetsEnabled: false,
+      habitsEnabled: false,
+      toolsEnabled: false,
       unit: "lbs",
     });
     set({
@@ -1142,6 +1518,12 @@ export const useStore = create<State>((set, get) => ({
       sessions: [],
       sets: [],
       dailyLogs: [],
+      habits: [],
+      habitEntries: [],
+      ...targets,
+      targetsEnabled: false,
+      habitsEnabled: false,
+      toolsEnabled: false,
       unit: "lbs",
       chartsEnabled: true,
       activeSessionId: undefined,
