@@ -9,6 +9,7 @@ import {
   safeWrite,
   seedDb,
   setWriteErrorHandler,
+  type ActiveSessionMeta,
   type SettingsMeta,
 } from "./db";
 import { isDailyLogEmpty } from "./daily-log";
@@ -914,14 +915,15 @@ function persistActiveMeta(meta: {
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
 }) {
-  safeWrite(() =>
-    db.meta.put({
-      key: "activeSession",
-      activeSessionId: meta.activeSessionId,
-      currentExerciseId: meta.currentExerciseId,
-      currentBlock: meta.currentBlock,
-    }),
-  );
+  // Annotated before the put for the same reason as persistSettingsFrom: `meta`
+  // is a union table, and an inline literal resolves against the wrong arm.
+  const record: ActiveSessionMeta = {
+    key: "activeSession",
+    activeSessionId: meta.activeSessionId,
+    currentExerciseId: meta.currentExerciseId,
+    currentBlock: meta.currentBlock,
+  };
+  safeWrite(() => db.meta.put(record));
 }
 
 /**

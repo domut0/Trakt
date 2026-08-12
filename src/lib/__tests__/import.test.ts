@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { db } from "../db";
+import { db, defaultTargets } from "../db";
 import { BACKUP_VERSION, isCardioSession, parseBackup, useStore, type BackupData } from "../store";
 
 // fake-indexeddb/auto (loaded globally in src/test/setup.ts) gives us a real
@@ -13,6 +13,8 @@ const DEFAULT_STATE = {
   sessions: [],
   sets: [],
   dailyLogs: [],
+  habits: [],
+  habitEntries: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -47,7 +49,23 @@ beforeEach(async () => {
   useStore.setState({ ...DEFAULT_STATE });
 });
 
+/**
+ * What a pre-v4 backup necessarily carries once parsed: no habits, and the
+ * single uniform target profile `parseBackup` substitutes in. Spread into the
+ * fixtures below so each one keeps saying only what its own version is ABOUT,
+ * rather than restating seven fields that are the same in all of them.
+ */
+const V4_DEFAULTS = {
+  habits: [],
+  habitEntries: [],
+  ...defaultTargets(),
+  targetsEnabled: false,
+  habitsEnabled: false,
+  toolsEnabled: false,
+};
+
 const validBackup: BackupData = {
+  ...V4_DEFAULTS,
   version: 2,
   exercises: [{ id: "e1", name: "Bench Press", type: "main" }],
   slots: [{ id: "s1", name: "Heavy Bench", rotationOrder: 0 }],
@@ -211,6 +229,7 @@ describe("importData (full backup restore)", () => {
     useStore.getState().upsertDailyLog("2026-02-10", { calories: 2100, protein: 180 });
     useStore.getState().upsertDailyLog("2026-02-11", { steps: 0, isCheatDay: true });
     const exported: BackupData = {
+      ...V4_DEFAULTS,
       version: 2,
       exercises: seeded.exercises,
       slots: seeded.slots,
@@ -351,6 +370,7 @@ describe("importData (full backup restore)", () => {
 
   it("round-trips a v3 backup carrying cardio sessions and a cardio exercise", async () => {
     const v3Backup: BackupData = {
+      ...V4_DEFAULTS,
       version: BACKUP_VERSION,
       exercises: [
         { id: "e1", name: "Bench Press", type: "main" },

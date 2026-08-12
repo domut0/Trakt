@@ -13,6 +13,8 @@ const DEFAULT_STATE = {
   sessions: [],
   sets: [],
   dailyLogs: [],
+  habits: [],
+  habitEntries: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
