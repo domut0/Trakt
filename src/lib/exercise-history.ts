@@ -21,23 +21,25 @@ export interface GroupedSessionSets {
 
 /**
  * Returns sets for a specific exercise ID, ordered newest first by loggedAt timestamp.
- * If optional `sessions` is provided, sets belonging to cardio sessions are excluded.
+ *
+ * `sessions` is REQUIRED, not optional: a set is only returned once its session
+ * has been found and confirmed to be strength. Making the guard skippable is how
+ * a treadmill entry ends up in a personal-best calculation, so there is no
+ * overload that omits it. This is also what keeps a "total sets" count derived
+ * from this function consistent with `groupSetsBySession`, which applies the
+ * same rule.
  */
 export function setsForExercise(
   sets: WorkoutSet[],
   exerciseId: string,
-  sessions?: WorkoutSession[],
+  sessions: WorkoutSession[],
 ): WorkoutSet[] {
-  let filtered = sets.filter((s) => s.exerciseId === exerciseId);
-  if (sessions && sessions.length > 0) {
-    const cardioSessionIds = new Set(
-      sessions.filter((sess) => isCardio(sess)).map((sess) => sess.id),
-    );
-    if (cardioSessionIds.size > 0) {
-      filtered = filtered.filter((s) => !cardioSessionIds.has(s.sessionId));
-    }
-  }
-  return [...filtered].sort((a, b) => b.loggedAt - a.loggedAt);
+  const strengthSessionIds = new Set(
+    sessions.filter((sess) => !isCardio(sess)).map((sess) => sess.id),
+  );
+  return sets
+    .filter((s) => s.exerciseId === exerciseId && strengthSessionIds.has(s.sessionId))
+    .sort((a, b) => b.loggedAt - a.loggedAt);
 }
 
 /**

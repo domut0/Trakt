@@ -184,9 +184,12 @@ export function splitIntoSegments<T extends Point>(
  *
  * Returns null if the prior window contains no data points.
  */
+// Takes only the `val` half of a Point, not a whole Point: this compares two
+// window AVERAGES and never looks at a timestamp, so demanding `ts` would force
+// callers (and tests) to invent data the function cannot use.
 export function computeWindowChange(
-  currentPoints: readonly Point[],
-  priorPoints: readonly Point[],
+  currentPoints: readonly Pick<Point, "val">[],
+  priorPoints: readonly Pick<Point, "val">[],
 ): number | null {
   if (currentPoints.length === 0 || priorPoints.length === 0) return null;
 

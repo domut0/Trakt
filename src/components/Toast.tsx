@@ -1,5 +1,3 @@
-// NOTE: ToastProvider must be mounted in src/routes/__root.tsx to render toasts.
-
 import {
   createContext,
   useCallback,

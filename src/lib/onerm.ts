@@ -16,18 +16,47 @@ export interface OneRmPercentageRow {
 }
 
 /**
- * Rounds a number to 1 decimal place to prevent floating-point noise in displays.
+ * Brzycki's denominator is (37 - reps), which hits exactly zero at 37 reps
+ * (Infinity) and goes negative beyond it (a negative 1RM). Reps are clamped
+ * here so the denominator stays at or above 1.
+ */
+export const BRZYCKI_MAX_REPS = 36;
+
+/**
+ * Above this many reps both formulas drift badly from reality, so the UI warns
+ * rather than presenting the number as trustworthy.
+ */
+export const RELIABLE_REP_LIMIT = 12;
+
+/**
+ * Rounds a number to 1 decimal place to prevent floating-point noise in
+ * displays. Non-finite results (a weight so large the formula overflows to
+ * Infinity) collapse to 0 so nothing can render "Infinity" or "NaN".
  */
 function round1Decimal(n: number): number {
+  if (!Number.isFinite(n)) return 0;
   return Math.round(n * 10) / 10;
 }
 
 /**
  * Rounds a weight to the nearest 2.5 (e.g. 299.25 to 300, 283.5 to 282.5).
  * Standard plate increments in both lbs and kg round to 2.5 / 1.25 multiples.
+ *
+ * The input is trimmed to 4 decimals first so binary noise (236.24999999999997
+ * for what is mathematically 236.25) cannot fall on the wrong side of a
+ * half-increment boundary.
  */
 function roundToNearest2Point5(n: number): number {
-  return Math.round(n / 2.5) * 2.5;
+  if (!Number.isFinite(n)) return 0;
+  const clean = Math.round(n * 10000) / 10000;
+  return Math.round(clean / 2.5) * 2.5;
+}
+
+/** True for a usable weight/reps pair; anything else estimates to 0. */
+function validInput(weight: number, reps: number): boolean {
+  return (
+    Number.isFinite(weight) && weight > 0 && Number.isFinite(reps) && reps > 0
+  );
 }
 
 /**
@@ -37,9 +66,7 @@ function roundToNearest2Point5(n: number): number {
  * artificially inflated above the weight actually lifted.
  */
 export function epley(weight: number, reps: number): number {
-  if (!Number.isFinite(weight) || weight <= 0 || !Number.isFinite(reps) || reps <= 0) {
-    return 0;
-  }
+  if (!validInput(weight, reps)) return 0;
   if (reps === 1) return weight;
   return round1Decimal(weight * (1 + reps / 30));
 }
@@ -48,18 +75,17 @@ export function epley(weight: number, reps: number): number {
  * Brzycki formula for estimated 1RM: weight * (36 / (37 - reps)).
  *
  * The denominator (37 - reps) reaches zero at 37 reps and becomes negative
- * beyond it. To prevent division by zero and extreme linear inflation on high-rep
- * sets, reps are capped at 36. Single-rep sets return weight directly without
- * inflation.
+ * beyond it, so reps are clamped to BRZYCKI_MAX_REPS (36), keeping the
+ * denominator at 1 or more. That is a guard against division by zero and a
+ * negative 1RM, not an accuracy claim: past roughly 12 reps the formula's
+ * linear model is already unreliable. Single-rep sets return weight directly
+ * without inflation.
  */
 export function brzycki(weight: number, reps: number): number {
-  if (!Number.isFinite(weight) || weight <= 0 || !Number.isFinite(reps) || reps <= 0) {
-    return 0;
-  }
+  if (!validInput(weight, reps)) return 0;
   if (reps === 1) return weight;
 
-  // Clamping at 36 keeps the denominator positive (>= 1).
-  const safeReps = Math.min(reps, 36);
+  const safeReps = Math.min(reps, BRZYCKI_MAX_REPS);
   return round1Decimal(weight * (36 / (37 - safeReps)));
 }
 
@@ -69,11 +95,10 @@ export function brzycki(weight: number, reps: number): number {
 export function estimate1RM(weight: number, reps: number): OneRmEstimate {
   const e = epley(weight, reps);
   const b = brzycki(weight, reps);
-  const avg = round1Decimal((e + b) / 2);
   return {
     epley: e,
     brzycki: b,
-    average: avg,
+    average: round1Decimal((e + b) / 2),
   };
 }
 
@@ -91,23 +116,15 @@ const PERCENTAGE_REP_RANGES: readonly { percentage: number; reps: string }[] = [
 
 /**
  * Generates a standard percentage table (95% down to 60%) for a given 1RM.
- * Each row weight is rounded to the nearest 2.5 increment to match usable plate weights.
+ * Each row weight is rounded to the nearest 2.5 increment, which is loadable in
+ * both units (2.5 lb plates, a pair of 1.25 kg plates).
  */
 export function percentageTable(oneRm: number): OneRmPercentageRow[] {
-  if (!Number.isFinite(oneRm) || oneRm <= 0) {
-    return PERCENTAGE_REP_RANGES.map((row) => ({
-      percentage: row.percentage,
-      weight: 0,
-      reps: row.reps,
-    }));
-  }
+  const usable = Number.isFinite(oneRm) && oneRm > 0 ? oneRm : 0;
 
-  return PERCENTAGE_REP_RANGES.map((row) => {
-    const rawWeight = oneRm * (row.percentage / 100);
-    return {
-      percentage: row.percentage,
-      weight: roundToNearest2Point5(rawWeight),
-      reps: row.reps,
-    };
-  });
+  return PERCENTAGE_REP_RANGES.map((row) => ({
+    percentage: row.percentage,
+    weight: usable === 0 ? 0 : roundToNearest2Point5(usable * (row.percentage / 100)),
+    reps: row.reps,
+  }));
 }

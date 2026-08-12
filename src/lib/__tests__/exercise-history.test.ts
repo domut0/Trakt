@@ -17,8 +17,14 @@ describe("setsForExercise", () => {
       { id: "s2", sessionId: "sess1", exerciseId: "ex2", weight: 50, reps: 10, loggedAt: t0 + 10 },
       { id: "s3", sessionId: "sess2", exerciseId: "ex1", weight: 110, reps: 5, loggedAt: t0 + 200 },
     ];
+    // Both strength: `sessions` is a required argument precisely so a set can
+    // never be counted without its session having been confirmed non-cardio.
+    const sessions: WorkoutSession[] = [
+      { id: "sess1", splitSlotId: "slotA", startedAt: t0, endedAt: t0 + 100 },
+      { id: "sess2", splitSlotId: "slotA", startedAt: t0 + 150, endedAt: t0 + 300 },
+    ];
 
-    const result = setsForExercise(sets, "ex1");
+    const result = setsForExercise(sets, "ex1", sessions);
     expect(result).toHaveLength(2);
     expect(result[0].id).toBe("s3");
     expect(result[1].id).toBe("s1");

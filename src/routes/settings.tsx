@@ -1,6 +1,9 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { OneRmCalculatorSheet } from "../components/OneRmCalculatorSheet";
+import { PlateCalculatorSheet } from "../components/PlateCalculatorSheet";
+import { TargetsEditor } from "../components/TargetsEditor";
 import { dailyLogsToCsv, setsToCsv } from "../lib/csv";
 import { BACKUP_VERSION, parseBackup, useStore, type BackupData } from "../lib/store";
 
@@ -21,6 +24,12 @@ function SettingsPage() {
   const setUnit = useStore((s) => s.setUnit);
   const chartsEnabled = useStore((s) => s.chartsEnabled);
   const setChartsEnabled = useStore((s) => s.setChartsEnabled);
+  const targetsEnabled = useStore((s) => s.targetsEnabled);
+  const setTargetsEnabled = useStore((s) => s.setTargetsEnabled);
+  const habitsEnabled = useStore((s) => s.habitsEnabled);
+  const setHabitsEnabled = useStore((s) => s.setHabitsEnabled);
+  const toolsEnabled = useStore((s) => s.toolsEnabled);
+  const setToolsEnabled = useStore((s) => s.setToolsEnabled);
   const importData = useStore((s) => s.importData);
   const clearAllData = useStore((s) => s.clearAllData);
   const router = useRouter();
@@ -32,6 +41,8 @@ function SettingsPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [plateSheetOpen, setPlateSheetOpen] = useState(false);
+  const [oneRmSheetOpen, setOneRmSheetOpen] = useState(false);
 
   const confirmClear = async () => {
     await clearAllData();
@@ -40,17 +51,46 @@ function SettingsPage() {
   };
 
   const exportJson = () => {
-    const { exercises, slots, sessions, sets, dailyLogs, unit } = useStore.getState();
-    const blob = new Blob(
-      [
-        JSON.stringify(
-          { version: BACKUP_VERSION, exercises, slots, sessions, sets, dailyLogs, unit },
-          null,
-          2,
-        ),
-      ],
-      { type: "application/json" },
-    );
+    const {
+      exercises,
+      slots,
+      sessions,
+      sets,
+      dailyLogs,
+      habits,
+      habitEntries,
+      targetProfiles,
+      weekdayTargets,
+      targetsEnabled,
+      habitsEnabled,
+      toolsEnabled,
+      unit,
+    } = useStore.getState();
+    // Annotated as BackupData on purpose. This object literal used to be built
+    // inline inside JSON.stringify, where an excess/missing key is invisible to
+    // the type checker: when BackupData grew to v4 the export quietly kept
+    // writing v3 files, so restoring a backup wiped the user's habits and
+    // targets. The annotation makes the next widening of BackupData a build
+    // error here instead of silent data loss for whoever restores the file.
+    const backup: BackupData = {
+      version: BACKUP_VERSION,
+      exercises,
+      slots,
+      sessions,
+      sets,
+      dailyLogs,
+      habits,
+      habitEntries,
+      targetProfiles,
+      weekdayTargets,
+      targetsEnabled,
+      habitsEnabled,
+      toolsEnabled,
+      unit,
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -150,11 +190,94 @@ function SettingsPage() {
             <div className="text-[15px]">Charts tab</div>
             <div className="text-[12px] text-muted-foreground">Show the Charts tab in the nav.</div>
           </div>
-          <Toggle checked={chartsEnabled} onChange={() => setChartsEnabled(!chartsEnabled)} />
+          <Toggle
+            checked={chartsEnabled}
+            onChange={() => setChartsEnabled(!chartsEnabled)}
+            label="Charts tab"
+          />
         </div>
       </Section>
 
-      <Section title="Data" delay={80}>
+      <Section title="Features" delay={80}>
+        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
+          <div>
+            <div className="text-[15px]">Daily targets</div>
+            <div className="text-[12px] text-muted-foreground">
+              Show goal progress on the daily log.
+            </div>
+          </div>
+          <Toggle
+            checked={targetsEnabled}
+            onChange={() => setTargetsEnabled(!targetsEnabled)}
+            label="Daily targets"
+          />
+        </div>
+        {/* Inline editor, not a sheet: the profiles only mean anything while
+            targets are on, so they live under the switch that turns them on. */}
+        {targetsEnabled && (
+          <div className="px-5 py-4 hairline-t">
+            <TargetsEditor />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
+          <div>
+            <div className="text-[15px]">Habits</div>
+            <div className="text-[12px] text-muted-foreground">
+              Adds a daily checklist to the Today tab, for supplements and the like.
+            </div>
+          </div>
+          <Toggle
+            checked={habitsEnabled}
+            onChange={() => setHabitsEnabled(!habitsEnabled)}
+            label="Habits"
+          />
+        </div>
+
+        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
+          <div>
+            <div className="text-[15px]">Calculators</div>
+            <div className="text-[12px] text-muted-foreground">
+              Add plate loading and 1RM tools here.
+            </div>
+          </div>
+          <Toggle
+            checked={toolsEnabled}
+            onChange={() => setToolsEnabled(!toolsEnabled)}
+            label="Calculators"
+          />
+        </div>
+        {toolsEnabled && (
+          <>
+            <button
+              onClick={() => setPlateSheetOpen(true)}
+              className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+            >
+              <div>
+                <div className="text-[15px]">Plate calculator</div>
+                <div className="text-[12px] text-muted-foreground">
+                  Work out what to load per side.
+                </div>
+              </div>
+              <span className="text-accent">→</span>
+            </button>
+            <button
+              onClick={() => setOneRmSheetOpen(true)}
+              className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+            >
+              <div>
+                <div className="text-[15px]">1RM estimator</div>
+                <div className="text-[12px] text-muted-foreground">
+                  Estimate a max from a weight and reps.
+                </div>
+              </div>
+              <span className="text-accent">→</span>
+            </button>
+          </>
+        )}
+      </Section>
+
+      <Section title="Data" delay={120}>
         <button
           onClick={exportJson}
           className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
@@ -239,7 +362,7 @@ function SettingsPage() {
         )}
       </Section>
 
-      <Section title="Reset" delay={120}>
+      <Section title="Reset" delay={160}>
         {!showClearConfirm ? (
           <button
             onClick={() => setShowClearConfirm(true)}
@@ -280,6 +403,15 @@ function SettingsPage() {
       <p className="px-5 pt-6 text-[12px] text-muted-foreground">
         v0.1 · local only · no accounts, no sync.
       </p>
+
+      {/* Gated on toolsEnabled as well as their own open state, so switching
+          Calculators off while a sheet is up cannot leave it stranded. */}
+      {toolsEnabled && (
+        <>
+          <PlateCalculatorSheet open={plateSheetOpen} onClose={() => setPlateSheetOpen(false)} />
+          <OneRmCalculatorSheet open={oneRmSheetOpen} onClose={() => setOneRmSheetOpen(false)} />
+        </>
+      )}
     </AppShell>
   );
 }
@@ -303,11 +435,29 @@ function Section({
   );
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  /** Names the switch for screen readers. The visible row title is a plain div,
+   * not a <label>, so without this the control announces as unlabelled. */
+  label: string;
+}) {
   return (
     <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
       onClick={onChange}
-      className="relative h-7 w-12 rounded-full transition-colors"
+      // The pill stays 28px tall to keep rows compact, so the 44px tap target is
+      // added as an absolutely positioned overlay rather than as padding, which
+      // would make every settings row taller. shrink-0 keeps long descriptions
+      // from squeezing the switch out of shape at 390px.
+      className="relative h-7 w-12 shrink-0 rounded-full transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-['']"
       style={{ backgroundColor: checked ? "var(--color-accent)" : "var(--color-border)" }}
     >
       <span

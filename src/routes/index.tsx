@@ -2,13 +2,19 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { DayEditorSheet } from "../components/DayEditorSheet";
+import { HabitsCard } from "../components/HabitsCard";
 import { dayKey, isDailyLogEmpty } from "../lib/daily-log";
-import { isCardioSession, useStore, type DailyLog, type WorkoutSession } from "../lib/store";
+import {
+  isCardioSession,
+  useStore,
+  type DailyLog,
+  type TargetProfile,
+  type WorkoutSession,
+} from "../lib/store";
 import {
   targetProgressFor,
   WEEKDAY_LABELS,
   weekdayIndexFor,
-  type TargetProfile,
   type TargetProgress,
 } from "../lib/targets";
 
@@ -59,6 +65,7 @@ function Home() {
   const unit = useStore((s) => s.unit);
   const exercises = useStore((s) => s.exercises);
   const targetsEnabled = useStore((s) => s.targetsEnabled);
+  const habitsEnabled = useStore((s) => s.habitsEnabled);
   const targetProfileForDate = useStore((s) => s.targetProfileForDate);
   const upsertDailyLog = useStore((s) => s.upsertDailyLog);
 
@@ -124,6 +131,27 @@ function Home() {
 
       {/* Consistency strip: visual dot status for the last 7 calendar days */}
       <ConsistencyStrip dailyLogs={dailyLogs} sessions={sessions} />
+
+      {/*
+        First card on the screen, ahead of the daily log, because this is the
+        one thing that gets tapped every single morning and it needs to sit at
+        the same y-offset every time. Below the daily log its position would
+        drift by 100px or more depending on whether macros, target bars and the
+        copy-yesterday button happen to be showing, so the thumb could not
+        learn it.
+
+        No HabitEditorSheet here on purpose: HabitsCard already owns the sheet
+        and its open state internally, so mounting one here too would give the
+        screen a second, independent editor.
+      */}
+      {habitsEnabled && (
+        <div className="mt-6 px-5 anim-fade-up">
+          <h2 className="pb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Supplements
+          </h2>
+          <HabitsCard date={todayKey} />
+        </div>
+      )}
 
       <div className="mt-6 px-5 anim-fade-up">
         <h2 className="pb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
