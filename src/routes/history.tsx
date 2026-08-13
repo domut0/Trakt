@@ -29,7 +29,7 @@ function HistoryPage() {
   return (
     <AppShell>
       <header className="flex items-center justify-between px-5 pb-4 pt-14">
-        <h1 className="text-[30px] font-semibold tracking-tight">History</h1>
+        <h1 className="t-title text-foreground">History</h1>
         <div
           data-swipe-ignore
           role="group"
@@ -45,8 +45,8 @@ function HistoryPage() {
             onClick={() => setView("weekly")}
             aria-pressed={view === "weekly"}
             className={
-              "relative rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] " +
-              (view === "weekly" ? "bg-foreground text-background" : "text-muted-foreground")
+              "relative rounded-full px-3 py-1.5 t-label font-medium transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] " +
+              (view === "weekly" ? "bg-accent text-accent-foreground" : "text-muted-foreground")
             }
           >
             Weekly
@@ -55,8 +55,8 @@ function HistoryPage() {
             onClick={() => setView("calendar")}
             aria-pressed={view === "calendar"}
             className={
-              "relative rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] " +
-              (view === "calendar" ? "bg-foreground text-background" : "text-muted-foreground")
+              "relative rounded-full px-3 py-1.5 t-label font-medium transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] " +
+              (view === "calendar" ? "bg-accent text-accent-foreground" : "text-muted-foreground")
             }
           >
             Calendar
