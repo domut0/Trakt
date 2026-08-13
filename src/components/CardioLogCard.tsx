@@ -191,8 +191,10 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
             <input
               id="cardio-duration"
               inputMode="decimal"
+              enterKeyHint="next"
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
+              onFocus={(e) => e.currentTarget.select()}
               placeholder="0"
               className="t-stat w-20 text-right bg-transparent outline-none placeholder:text-muted-foreground"
             />
@@ -205,11 +207,18 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
             Distance
           </label>
           <div className="flex items-center gap-1.5 min-w-0">
+            {/* enterKeyHint and select-on-focus are not decoration: these two
+                fields used to render through NumField and lost both when the
+                restyle inlined them. Selecting on entry is what lets a typed
+                value overwrite the previous one instead of appending to it,
+                which is the difference between one tap and three. */}
             <input
               id="cardio-distance"
               inputMode="decimal"
+              enterKeyHint="done"
               value={distance}
               onChange={(e) => setDistance(e.target.value)}
+              onFocus={(e) => e.currentTarget.select()}
               placeholder="0"
               className="t-stat w-20 text-right bg-transparent outline-none placeholder:text-muted-foreground"
             />

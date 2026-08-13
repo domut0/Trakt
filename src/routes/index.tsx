@@ -133,6 +133,7 @@ function Home() {
       <ConsistencyStrip
         dailyLogs={dailyLogs}
         sessions={sessions}
+        todayKey={todayKey}
         onSelectDate={(key) => setEditingDate(key)}
       />
 
@@ -265,16 +266,28 @@ function Home() {
 function ConsistencyStrip({
   dailyLogs,
   sessions,
+  todayKey,
   onSelectDate,
 }: {
   dailyLogs: DailyLog[];
   sessions: WorkoutSession[];
+  /**
+   * Passed in rather than derived here, and it is what keeps this memo honest.
+   *
+   * The window below is relative to "now", but a useMemo keyed only on the data
+   * has no reason to re-run when the DATE changes. Left to compute its own key,
+   * this strip would sit on yesterday's seven days and mark the wrong cell as
+   * today for as long as the app stayed open across midnight, while the parent's
+   * own `todayKey` moved on correctly. Taking it as a prop puts the date in the
+   * dependency list, so midnight invalidates the memo like any other input.
+   */
+  todayKey: string;
   onSelectDate: (dateKey: string) => void;
 }) {
   const days = useMemo(() => {
     const result = [];
     const now = new Date();
-    const todayK = dayKey(now);
+    const todayK = todayKey;
     // 7 days ending with today (i=6 down to 0)
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now);
@@ -290,7 +303,7 @@ function ConsistencyStrip({
       result.push({ key, date: d, weekdayLabel, hasLog, hasWorkout, isToday });
     }
     return result;
-  }, [dailyLogs, sessions]);
+  }, [dailyLogs, sessions, todayKey]);
 
   return (
     <section className="px-5 section-gap anim-fade-up">
