@@ -94,60 +94,48 @@ function WorkoutPage() {
     <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
       {/* Top bar */}
       <div className="grid grid-cols-3 items-center px-5 pt-14">
-        {/* The negative vertical margin is what lets a 20px line of text carry a
-            44px touch target without making the top bar taller: 44 - 2*12 = 20,
-            so the row occupies exactly the height it did before. Same pattern as
-            the Back button on the exercise screen. */}
+        {/* Negative vertical margin matches touch target height without taller header bar */}
         <button
           onClick={() => router.navigate({ to: "/" })}
-          className="-my-3 flex min-h-[44px] items-center justify-self-start text-[15px] font-medium text-accent"
+          className="-my-3 flex min-h-[44px] items-center justify-self-start t-body font-medium text-accent"
         >
           Home
         </button>
         <div className="min-w-0 justify-self-center text-center">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Split
-          </div>
-          <h1 className="truncate text-[15px] font-semibold tracking-tight">{slot.name}</h1>
+          <div className="t-caption text-muted-foreground">Split</div>
+          <h1 className="truncate t-body font-semibold">{slot.name}</h1>
         </div>
         <button
           onClick={handleEnd}
-          className="-my-3 flex min-h-[44px] items-center justify-self-end text-[15px] font-medium text-muted-foreground"
+          className="-my-3 flex min-h-[44px] items-center justify-self-end t-body font-medium text-muted-foreground"
         >
           End
         </button>
       </div>
 
       {/* Stopwatch */}
-      <div className="mt-6 flex flex-col items-center">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Time between sets
-        </div>
+      <div className="section-gap flex flex-col items-center">
+        <div className="t-caption text-muted-foreground">Time between sets</div>
         <div className="tnum mt-1 text-[44px] font-semibold leading-none tracking-tight">
           {sessSets.length === 0 ? "0:00" : fmtTime(elapsedSinceLast)}
         </div>
       </div>
 
       {/* Current exercise */}
-      <div className="mt-6 flex flex-col items-center px-5 text-center">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Current exercise
-        </div>
-        {/* break-words, not truncate: this is the hero of the screen and a long
-            exercise name is better on two lines than clipped. text-balance keeps
-            the second line from being a one-word orphan at 320px. */}
-        <h2 className="mt-1 text-balance break-words text-[26px] font-semibold tracking-tight">
+      <div className="section-gap flex flex-col items-center px-5 text-center">
+        <div className="t-caption text-muted-foreground">Current exercise</div>
+        <h2 className="mt-1 text-balance break-words t-title">
           {currentExercise?.name ?? <span className="text-muted-foreground">-</span>}
         </h2>
         {currentSetupNote && (
-          <div className="mt-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-muted-foreground">
+          <div className="mt-2 rounded-lg bg-muted px-3 py-2 t-label text-muted-foreground">
             {currentSetupNote}
           </div>
         )}
       </div>
 
       {/* Primary action */}
-      <div className="mt-6 flex flex-col items-center px-5">
+      <div className="section-gap flex flex-col items-center px-5">
         <button
           onClick={() => {
             if (inBlock) {
@@ -157,8 +145,6 @@ function WorkoutPage() {
               setSheetOpen(true);
             }
           }}
-          // Icon-only: the "Log set" / "Next set" caption below is a sibling, not
-          // this button's content, so without a label it announces as "button".
           aria-label={inBlock ? "Log the next set in this block" : "Log a set"}
           className="flex h-[88px] w-[88px] items-center justify-center rounded-full bg-accent text-accent-foreground"
         >
@@ -166,43 +152,41 @@ function WorkoutPage() {
         </button>
         {inBlock && currentBlock ? (
           <div className="mt-2 text-center">
-            <div className="text-[13px] font-medium text-accent">Next set</div>
-            <div className="tnum text-[12px] text-muted-foreground">
+            <div className="t-label font-medium text-accent">Next set</div>
+            <div className="tnum t-label text-muted-foreground">
               {currentBlock.loggedInBlock + 1} of {currentBlock.targetSets} · {currentBlock.weight}{" "}
               × {currentBlock.reps}
               {currentBlock.rpe != null ? ` @ ${currentBlock.rpe}` : ""}
             </div>
           </div>
         ) : (
-          <div className="mt-2 text-[13px] font-medium text-accent">Log set</div>
+          <div className="mt-2 t-label font-medium text-accent">Log set</div>
         )}
       </div>
 
-      {/* Bottom row: session summary (left) + View Workout (right) */}
+      {/* Bottom row: session summary (left) + View workout (right) */}
       <div
-        className="mt-auto flex items-end justify-between px-5 pt-8"
+        className="mt-auto flex items-end justify-between px-5 pt-7"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
         <div>
-          <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            This session
-          </div>
+          <div className="t-caption text-muted-foreground">This session</div>
           <div className="mt-1 flex items-baseline gap-4">
             <div>
-              <span className="tnum text-[22px] font-semibold">{sessSets.length}</span>{" "}
-              <span className="text-[12px] text-muted-foreground">sets</span>
+              <span className="t-stat">{sessSets.length}</span>{" "}
+              <span className="t-label text-muted-foreground">sets</span>
             </div>
             <div>
-              <span className="tnum text-[22px] font-semibold">
+              <span className="t-stat">
                 {new Set(sessSets.map((s) => s.exerciseId)).size}
               </span>{" "}
-              <span className="text-[12px] text-muted-foreground">exercises</span>
+              <span className="t-label text-muted-foreground">exercises</span>
             </div>
           </div>
         </div>
         <button
           onClick={() => setShowView(true)}
-          className="flex min-h-[44px] shrink-0 items-center rounded-full bg-surface px-4 py-2 text-[13px] font-medium hairline-t hairline-b"
+          className="flex min-h-[44px] shrink-0 items-center rounded-full bg-surface px-4 py-2 t-body font-medium"
         >
           View workout
         </button>
@@ -222,11 +206,11 @@ function WorkoutPage() {
             <div className="flex items-center justify-between gap-3 px-5 pt-14 pb-3">
               <button
                 onClick={() => setShowView(false)}
-                className="-my-3 flex min-h-[44px] shrink-0 items-center text-[15px] font-medium text-accent"
+                className="-my-3 flex min-h-[44px] shrink-0 items-center t-body font-medium text-accent"
               >
                 Done
               </button>
-              <div className="min-w-0 truncate text-[15px] font-semibold tracking-tight">
+              <div className="min-w-0 truncate t-body font-semibold">
                 {slot.name}
               </div>
               <DeleteWorkoutButton sessionId={session.id} onDeleted={() => setShowView(false)} />
@@ -243,7 +227,7 @@ function WorkoutPage() {
           key={loggedToast}
           role="status"
           aria-live="polite"
-          className="anim-toast pointer-events-none fixed bottom-36 left-1/2 z-[60] flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-[13px] font-semibold text-background shadow-lg"
+          className="anim-toast pointer-events-none fixed bottom-36 left-1/2 z-[60] flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 t-label font-semibold text-background shadow-lg"
         >
           <span className="flex h-4 w-4 items-center justify-center rounded-full bg-accent">
             <Check size={11} strokeWidth={3.5} className="text-accent-foreground" />

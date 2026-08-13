@@ -35,7 +35,7 @@ function ExercisePage() {
   if (!exercise) {
     return (
       <AppShell>
-        <div className="px-5 py-20 text-center text-[15px] text-muted-foreground">
+        <div className="px-5 py-20 text-center t-body text-muted-foreground">
           Exercise not found.
         </div>
       </AppShell>
@@ -47,99 +47,82 @@ function ExercisePage() {
   const grouped = groupSetsBySession(exSets, sessions);
 
   const typeLabel =
-    exercise.type === "main" ? "Main Lift" : exercise.type === "cardio" ? "Cardio" : "Accessory";
+    exercise.type === "main" ? "Main lift" : exercise.type === "cardio" ? "Cardio" : "Accessory";
 
   return (
     <AppShell>
       <div className="flex items-center justify-between px-5 pt-14 pb-2">
-        {/* The negative vertical margin is what lets a 22px line of text carry a
-            44px touch target without pushing the title down: 44 - 2*11 = 22, so
-            the row occupies exactly the height it did before. */}
         <button
           onClick={goBack}
-          className="-my-[11px] flex min-h-[44px] items-center text-[15px] font-medium text-accent"
+          className="-my-[11px] flex min-h-[44px] items-center t-body font-medium text-accent"
         >
           Back
         </button>
       </div>
 
       <header className="px-5 pb-4">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="t-caption text-muted-foreground">
           {typeLabel}
         </div>
-        <h1 className="mt-1 text-balance break-words text-[30px] font-semibold tracking-tight">
+        <h1 className="mt-1 text-balance break-words t-title">
           {exercise.name}
         </h1>
         {exercise.setupNote && (
-          <div className="mt-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-muted-foreground">
+          <div className="mt-2 rounded-lg bg-muted px-3 py-2 t-label text-muted-foreground">
             {exercise.setupNote}
           </div>
         )}
       </header>
 
       {/* Personal bests and set totals */}
-      <div className="px-5 pb-6">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="min-w-0 rounded-2xl bg-surface p-4">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Best Set
-            </div>
-            <div className="tnum mt-1 text-[20px] font-semibold tracking-tight">
+      <div className="px-5">
+        <div className="group-list">
+          <div className="group-row">
+            <span className="t-body text-muted-foreground">Best set</span>
+            <span className="t-stat">
               {best ? (
                 <>
                   {best.weight}{" "}
-                  <span className="text-[13px] font-normal text-muted-foreground">{unit}</span>
+                  <span className="t-label text-muted-foreground">{unit}</span>
                   {" × "}
                   {best.reps}
                   {best.rpe != null && (
-                    <span className="text-[13px] font-normal text-muted-foreground">
-                      {" "}
-                      @ {best.rpe}
-                    </span>
+                    <span className="t-label text-muted-foreground"> @ {best.rpe}</span>
                   )}
                 </>
               ) : (
-                <span className="text-[15px] font-normal text-muted-foreground">None</span>
+                <span className="t-body text-muted-foreground">None</span>
               )}
-            </div>
+            </span>
           </div>
-
-          <div className="min-w-0 rounded-2xl bg-surface p-4">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Total Sets
-            </div>
-            <div className="tnum mt-1 text-[20px] font-semibold tracking-tight">
-              {exSets.length}
-            </div>
+          <div className="group-row group-row-sep">
+            <span className="t-body text-muted-foreground">Total sets</span>
+            <span className="t-stat">{exSets.length}</span>
           </div>
         </div>
       </div>
 
       {/* Chronological per-session history */}
-      <section className="px-5 pb-10">
-        <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <section className="section-gap px-5 pb-10">
+        <h2 className="group-header px-0 t-caption">
           History
         </h2>
 
         {grouped.length === 0 ? (
-          <div className="rounded-2xl bg-surface p-6 text-center">
-            <h3 className="text-[16px] font-semibold tracking-tight">No history logged</h3>
-            {/* A cardio exercise can never fill this screen: `logCardio` writes a
-                session with duration and distance and no sets at all, so telling
-                someone to log sets for it would be advice that cannot be
-                followed. */}
-            <p className="mt-1 text-[13px] text-muted-foreground">
+          <div className="group-list p-6 text-center">
+            <h3 className="t-heading">No history logged</h3>
+            <p className="mt-1 t-label text-muted-foreground">
               {exercise.type === "cardio"
                 ? `${exercise.name} is logged as a bout with duration and distance rather than sets. Those appear on the History tab.`
                 : `Log sets for ${exercise.name} during a workout to track your progress here.`}
             </p>
           </div>
         ) : (
-          <ul className="space-y-4">
+          <div className="space-y-4">
             {grouped.map(({ session, date, sets }) => (
-              <li key={session.id} className="rounded-2xl bg-surface p-4">
-                <div className="flex items-baseline justify-between gap-3 border-b border-border pb-2.5 mb-2.5">
-                  <span className="tnum text-[14px] font-semibold tracking-tight">
+              <div key={session.id}>
+                <div className="group-header flex items-baseline justify-between px-0 pb-2">
+                  <span className="t-body font-semibold text-foreground">
                     {date.toLocaleDateString(undefined, {
                       weekday: "short",
                       month: "short",
@@ -147,27 +130,31 @@ function ExercisePage() {
                       year: "numeric",
                     })}
                   </span>
-                  <span className="tnum shrink-0 text-[12px] text-muted-foreground">
+                  <span className="t-label text-muted-foreground">
                     {sets.length} {sets.length === 1 ? "set" : "sets"}
                   </span>
                 </div>
-                <div className="space-y-2">
+                <div className="group-list">
                   {sets.map((s, idx) => (
-                    <div key={s.id} className="flex items-center justify-between text-[15px]">
-                      <div className="flex min-w-0 flex-wrap items-baseline gap-2">
-                        <span className="tnum w-5 shrink-0 text-[13px] text-muted-foreground">
+                    <div
+                      key={s.id}
+                      className={`group-row ${idx > 0 ? "group-row-sep" : ""}`}
+                    >
+                      <div className="flex min-w-0 flex-wrap items-baseline gap-3">
+                        <span className="t-label w-5 shrink-0 text-muted-foreground">
                           {idx + 1}
                         </span>
-                        <span className="tnum font-medium">
-                          {s.weight}{" "}
-                          <span className="text-[12px] text-muted-foreground">{unit}</span> ×{" "}
-                          {s.reps}
+                        <span className="t-stat">
+                          {s.weight}
+                          <span className="t-label text-muted-foreground"> {unit}</span>
                         </span>
+                        <span className="text-muted-foreground">×</span>
+                        <span className="t-stat">{s.reps}</span>
                         {s.rpe != null && (
-                          <span className="tnum text-[13px] text-muted-foreground">@ {s.rpe}</span>
+                          <span className="t-label text-muted-foreground">@ {s.rpe}</span>
                         )}
                         {s.isDropsetOrPartial && (
-                          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                          <span className="rounded-full bg-muted px-1.5 py-0.5 t-caption text-muted-foreground">
                             drop
                           </span>
                         )}
@@ -175,9 +162,9 @@ function ExercisePage() {
                     </div>
                   ))}
                 </div>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </section>
     </AppShell>
