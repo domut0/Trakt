@@ -65,24 +65,28 @@ export function StartWorkoutSheet({
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" />
-        <h2 className="text-[15px] font-medium text-muted-foreground">Today's session</h2>
+        <h2 className="t-caption text-muted-foreground">Today's session</h2>
         <input
           ref={inputRef}
+          aria-label="Today's session name"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={predicted ? `suggested: ${predicted}` : "Heavy Bench, D2, Arms…"}
-          className="mt-2 w-full bg-transparent text-[26px] font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
+          className="mt-2 w-full bg-transparent t-title font-semibold tracking-tight outline-none placeholder:t-title placeholder:font-normal placeholder:text-muted-foreground"
           onKeyDown={(e) => {
             if (e.key === "Enter") handleStart();
           }}
         />
         {suggestions.length > 0 && (
-          <ul className="mt-3 space-y-1">
-            {suggestions.map((s) => (
+          <ul className="mt-3 group-list bg-muted/40">
+            {suggestions.map((s, idx) => (
               <li key={s.id}>
                 <button
+                  type="button"
                   onClick={() => handleStart(s.name)}
-                  className="w-full rounded-md px-2 py-1.5 text-left text-[15px] hover:bg-muted"
+                  className={`group-row w-full text-left t-body text-foreground hover:bg-muted ${
+                    idx > 0 ? "group-row-sep" : ""
+                  }`}
                 >
                   {s.name}
                 </button>
@@ -92,15 +96,17 @@ export function StartWorkoutSheet({
         )}
         <div className="mt-6 flex items-center gap-2">
           <button
+            type="button"
             onClick={onClose}
-            className="flex-1 rounded-full py-3 text-[15px] font-medium text-muted-foreground hairline-t"
+            className="flex-1 min-h-[44px] rounded-full py-3 t-body font-medium text-muted-foreground"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={() => handleStart()}
             disabled={!(trimmed || predicted)}
-            className="flex-[2] rounded-full bg-accent py-3 text-[15px] font-semibold text-accent-foreground disabled:opacity-40"
+            className="flex-[2] min-h-[44px] rounded-full bg-accent py-3 t-body font-semibold text-accent-foreground disabled:opacity-40"
           >
             Start
           </button>

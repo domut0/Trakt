@@ -103,12 +103,13 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
 
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            <div className="t-caption text-muted-foreground">
               Calculator
             </div>
-            <h2 className="text-[20px] font-semibold tracking-tight">Plate loading</h2>
+            <h2 className="t-heading font-semibold tracking-tight">Plate loading</h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close plate calculator"
             className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground transition-transform active:scale-95"
@@ -120,7 +121,7 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
         {/* Input & Bar Selection */}
         <div className="mt-4 space-y-3">
           <div className="rounded-xl bg-muted p-3">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            <div className="t-caption text-muted-foreground">
               Target weight ({unit})
             </div>
             <div className="mt-1 flex items-baseline gap-1">
@@ -131,14 +132,14 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
                 value={targetStr}
                 onChange={(e) => setTargetStr(e.target.value)}
                 placeholder="0"
-                className="tnum w-full min-w-0 bg-transparent text-[26px] font-semibold outline-none placeholder:text-muted-foreground"
+                className="t-stat w-full min-w-0 bg-transparent outline-none placeholder:t-stat placeholder:text-muted-foreground"
               />
-              <span className="text-[14px] font-medium text-muted-foreground">{unit}</span>
+              <span className="t-body font-medium text-muted-foreground">{unit}</span>
             </div>
           </div>
 
           <div>
-            <div className="mb-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
+            <div className="mb-1.5 t-caption text-muted-foreground">
               Bar weight
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -150,7 +151,7 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
                     type="button"
                     onClick={() => setBarWeight(w)}
                     aria-label={`Select ${w} ${unit} bar`}
-                    className={`flex h-11 items-center justify-center rounded-xl text-[14px] font-medium transition-colors ${
+                    className={`flex min-h-[44px] h-11 items-center justify-center rounded-xl t-body font-medium transition-colors ${
                       isSelected
                         ? "bg-accent text-accent-foreground font-semibold"
                         : "bg-muted text-foreground hover:bg-border"
@@ -165,13 +166,13 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
         </div>
 
         {/* Visual Sleeve & Per Side Loading */}
-        <div className="mt-5 rounded-2xl bg-muted/50 p-4 hairline-t">
+        <div className="mt-5 rounded-2xl bg-muted/40 p-4">
           <div className="flex items-center justify-between">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="t-caption text-muted-foreground">
               Plates per side
             </span>
             {stack.remainder > 0 && (
-              <span className="rounded-full bg-border px-2.5 py-0.5 text-[12px] font-medium text-muted-foreground">
+              <span className="rounded-full bg-border px-2.5 py-0.5 t-label font-medium text-muted-foreground">
                 {stack.remainder} {unit} short
               </span>
             )}
@@ -185,7 +186,7 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
             />
 
             {expandedPlates.length === 0 ? (
-              <div className="flex h-14 flex-1 items-center justify-center rounded-lg border border-dashed border-border px-3 text-[13px] text-muted-foreground">
+              <div className="flex h-14 flex-1 items-center justify-center rounded-lg bg-muted px-3 t-body text-muted-foreground">
                 Bar only (no plates)
               </div>
             ) : (
@@ -198,10 +199,10 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
                   <div
                     key={`${weight}-${idx}`}
                     style={{ minWidth: `${minWidth}px` }}
-                    className="flex h-14 shrink-0 flex-col items-center justify-center rounded-lg border border-border bg-muted px-1.5 text-foreground shadow-sm transition-all"
+                    className="flex h-14 shrink-0 flex-col items-center justify-center rounded-lg bg-muted px-1.5 text-foreground transition-all"
                   >
-                    <span className="tnum text-[15px] font-bold leading-none">{weight}</span>
-                    <span className="mt-0.5 text-[9px] uppercase leading-none text-muted-foreground">
+                    <span className="t-stat font-bold leading-none">{weight}</span>
+                    <span className="mt-0.5 t-caption leading-none text-muted-foreground">
                       {unit}
                     </span>
                   </div>
@@ -210,19 +211,20 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
             )}
           </div>
 
-          <div className="mt-3 flex items-center justify-between text-[13px] text-muted-foreground hairline-t pt-2.5">
+          <div className="mt-3 flex items-center justify-between t-body text-muted-foreground pt-2.5">
             <span>
               Bar: {barWeight} {unit}
             </span>
-            <span className="tnum font-semibold text-foreground">
+            <span className="t-stat text-foreground">
               Total: {stack.achieved} {unit}
             </span>
           </div>
         </div>
 
         <button
+          type="button"
           onClick={onClose}
-          className="mt-5 h-12 w-full rounded-full bg-accent py-3 text-[15px] font-semibold text-accent-foreground"
+          className="mt-5 min-h-[44px] h-12 w-full rounded-full bg-accent py-3 t-body font-semibold text-accent-foreground"
         >
           Done
         </button>

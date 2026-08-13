@@ -6,6 +6,9 @@ import { useStore, type ExerciseType } from "../lib/store";
 /** Handles all three exercise types even though the picker above filters
  * cardio out entirely -- kept exhaustive so a future caller (or a stray
  * cardio id) never falls through to a wrong label. */
+/** Handles all three exercise types even though the picker above filters
+ * cardio out entirely - kept exhaustive so a future caller (or a stray
+ * cardio id) never falls through to a wrong label. */
 function exerciseTypeLabel(type: ExerciseType): string {
   if (type === "main") return "Main";
   if (type === "accessory") return "Accessory";
@@ -111,7 +114,7 @@ export function LogSetSheet({
   const suggestedNote = exerciseId ? lastSetupNoteFor(exerciseId) : undefined;
 
   // Cardio lives in the same `exercises` table but has its own picker
-  // (CardioLogCard) -- it must never show up while logging a strength set.
+  // (CardioLogCard) - it must never show up while logging a strength set.
   const strengthExercises = useMemo(
     () => exercises.filter((e) => e.type !== "cardio"),
     [exercises],
@@ -146,20 +149,6 @@ export function LogSetSheet({
       setupNote: note.trim() || suggestedNote,
       targetSets,
     });
-    // No toast raised here, on purpose, and no Undo. Two separate reasons:
-    //
-    // 1. `onLogged` is the confirmation. The /workout route already flashes a
-    //    "Set logged" toast in response to it, at the same z-index this one
-    //    would use, so raising a second one stacks two overlapping
-    //    confirmations of the same action with different lifetimes.
-    // 2. An Undo could not be made correct from here anyway. `logSet` returns
-    //    void, and it does more than append a row: it sets currentExerciseId,
-    //    opens a currentBlock when targetSets > 1, derives the next set's
-    //    timeBetweenSetsSeconds from this one, and persists the active-workout
-    //    meta. A `deleteSet` alone would leave a block whose only set is gone,
-    //    and `logNextInBlock` then takes its exerciseId from whatever set is
-    //    now most recent, which is how an Undo turns into a set logged against
-    //    the wrong exercise. A broken Undo is worse than no Undo.
     onLogged?.();
     onClose();
   };
@@ -216,12 +205,6 @@ export function LogSetSheet({
     }
   };
 
-  // `data-swipe-ignore` is belt-and-braces: /workout bypasses AppShell today,
-  // so nothing here reaches the swipe-between-tabs handler. React portals
-  // bubble along the React tree though, so the moment this sheet is rendered
-  // from a route that IS wrapped in AppShell, a drag with any horizontal
-  // component would navigate away mid-set. The attribute costs nothing and is
-  // resolved by a DOM `closest` in AppShell's shouldIgnoreSwipe.
   return createPortal(
     <div
       data-swipe-ignore
@@ -238,8 +221,6 @@ export function LogSetSheet({
           transition: isDragging ? "none" : "transform 0.2s cubic-bezier(0.32, 0.72, 0, 1)",
         }}
       >
-        {/* min-h-[44px], not the visual height of the 4px grabber: this is the
-            drag-to-dismiss target, and py-3 alone gave it a 28px hit area. */}
         <div
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -259,166 +240,256 @@ export function LogSetSheet({
               value={exerciseQuery}
               onChange={(e) => setExerciseQuery(e.target.value)}
               placeholder="Search or add exercise"
-              className="w-full bg-transparent text-[22px] font-semibold tracking-tight outline-none placeholder:text-muted-foreground/50"
+              className="w-full bg-transparent t-heading font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
             />
-            <ul className="mt-3 max-h-72 divide-y divide-border overflow-y-auto">
-              {filtered.map((e) => (
-                <li key={e.id}>
+            <div className="mt-3 group-list bg-muted/40 max-h-72 overflow-y-auto">
+              {filtered.map((e, idx) => (
+                <button
+                  key={e.id}
+                  onClick={() => {
+                    setExerciseId(e.id);
+                    setCurrentExercise(e.id);
+                    setPickingExercise(false);
+                    setWeight("");
+                    setReps("");
+                    setRpe("");
+                    setNote("");
+                  }}
+                  className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""}`}
+                >
+                  <span className="t-body font-medium">{e.name}</span>
+                  <span className="t-caption text-muted-foreground">
+                    {exerciseTypeLabel(e.type)}
+                  </span>
+                </button>
+              ))}
+              {exerciseQuery.trim() &&
+                !filtered.some(
+                  (e) => e.name.toLowerCase() === exerciseQuery.trim().toLowerCase(),
+                ) && (
                   <button
                     onClick={() => {
-                      setExerciseId(e.id);
-                      setCurrentExercise(e.id);
+                      const ex = addExercise(exerciseQuery.trim(), "accessory");
+                      setExerciseId(ex.id);
+                      setCurrentExercise(ex.id);
                       setPickingExercise(false);
                       setWeight("");
                       setReps("");
                       setRpe("");
                       setNote("");
                     }}
-                    className="flex w-full min-h-[44px] items-center justify-between py-3 text-left"
+                    className={`group-row w-full text-left text-accent ${
+                      filtered.length > 0 ? "group-row-sep" : ""
+                    }`}
                   >
-                    <span className="text-[16px]">{e.name}</span>
-                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                      {exerciseTypeLabel(e.type)}
-                    </span>
+                    <span className="t-body font-medium">Add "{exerciseQuery.trim()}"</span>
+                    <span className="t-caption">New</span>
                   </button>
-                </li>
-              ))}
-              {exerciseQuery.trim() &&
-                !filtered.some(
-                  (e) => e.name.toLowerCase() === exerciseQuery.trim().toLowerCase(),
-                ) && (
-                  <li>
-                    <button
-                      onClick={() => {
-                        const ex = addExercise(exerciseQuery.trim(), "accessory");
-                        setExerciseId(ex.id);
-                        setCurrentExercise(ex.id);
-                        setPickingExercise(false);
-                        setWeight("");
-                        setReps("");
-                        setRpe("");
-                        setNote("");
-                      }}
-                      className="flex w-full min-h-[44px] items-center justify-between py-3 text-left text-accent"
-                    >
-                      <span className="text-[16px]">Add "{exerciseQuery.trim()}"</span>
-                      <span className="text-[11px] uppercase tracking-wider">New</span>
-                    </button>
-                  </li>
                 )}
-            </ul>
+            </div>
           </div>
         ) : (
           <div className="px-5 pb-5">
             <div className="flex items-baseline justify-between">
               <button onClick={() => setPickingExercise(true)} className="text-left">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                <div className="t-caption text-muted-foreground">
                   Exercise
                 </div>
-                <div className="mt-0.5 text-[22px] font-semibold tracking-tight">
+                <div className="mt-0.5 t-heading font-semibold tracking-tight">
                   {chosen?.name}
                 </div>
               </button>
               <button
                 onClick={() => setPickingExercise(true)}
-                className="flex min-h-[44px] items-center text-[13px] font-medium text-accent"
+                className="flex min-h-[44px] items-center t-label font-medium text-accent"
               >
                 Change
               </button>
             </div>
 
-            <div className="mt-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-              <span className="shrink-0 text-[11px] uppercase tracking-wider text-muted-foreground">
-                Setup
-              </span>
-              <input
-                // The visible "Setup" text is a sibling span, not a <label>,
-                // and the placeholder is whatever note was used last time, so
-                // neither one names this field to a screen reader.
-                aria-label="Setup note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                enterKeyHint="next"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    inputRefs.current[0]?.focus();
-                  }
-                }}
-                placeholder={suggestedNote ?? "Add notes - seat, pins, grip…"}
-                className="w-full bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
-              />
-            </div>
+            {/* Grouped list of labelled set logging rows */}
+            <div className="mt-4 group-list bg-muted/40">
+              {/* Setup note */}
+              <div className="group-row">
+                <label htmlFor="set-field-note" className="t-body font-medium text-foreground shrink-0">
+                  Setup
+                </label>
+                <input
+                  id="set-field-note"
+                  aria-label="Setup note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  enterKeyHint="next"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      inputRefs.current[0]?.focus();
+                    }
+                  }}
+                  placeholder={suggestedNote ?? "Add notes: seat, pins, grip..."}
+                  className="t-body w-full bg-transparent text-right outline-none placeholder:text-muted-foreground"
+                />
+              </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <NumField
-                label="Weight"
-                suffix={unit}
-                value={weight}
-                onChange={setWeight}
-                placeholder={suggestion.weight != null ? String(suggestion.weight) : "0"}
-                inputMode="decimal"
-                enterKeyHint="next"
-                onEnter={() => focusNextOrLog(0)}
-                inputRef={(el) => {
-                  inputRefs.current[0] = el;
-                }}
-              />
-              <NumField
-                label="Reps"
-                value={reps}
-                onChange={setReps}
-                placeholder={suggestion.reps != null ? String(suggestion.reps) : "0"}
-                inputMode="numeric"
-                enterKeyHint="next"
-                onEnter={() => focusNextOrLog(1)}
-                onStep={stepReps}
-                inputRef={(el) => {
-                  inputRefs.current[1] = el;
-                }}
-              />
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <NumField
-                label="RPE"
-                placeholder={suggestion.rpe != null ? String(suggestion.rpe) : "-"}
-                value={rpe}
-                onChange={setRpe}
-                inputMode="decimal"
-                enterKeyHint="done"
-                onEnter={() => focusNextOrLog(2)}
-                onStep={stepRpe}
-                inputRef={(el) => {
-                  inputRefs.current[2] = el;
-                }}
-              />
-              <div className="rounded-xl bg-muted p-3">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                  Sets
+              {/* Weight */}
+              <div className="group-row group-row-sep">
+                <label htmlFor="set-field-weight" className="t-body font-medium text-foreground">
+                  Weight
+                </label>
+                <div className="flex min-w-0 items-baseline justify-end gap-1">
+                  <input
+                    id="set-field-weight"
+                    ref={(el) => {
+                      inputRefs.current[0] = el;
+                    }}
+                    inputMode="decimal"
+                    enterKeyHint="next"
+                    aria-label="Weight"
+                    value={weight}
+                    onChange={(e) => setWeight(e.target.value)}
+                    onFocus={(e) => {
+                      selectAllOnEntry(e.currentTarget);
+                      e.currentTarget.scrollIntoView({ block: "nearest" });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        focusNextOrLog(0);
+                      }
+                    }}
+                    placeholder={suggestion.weight != null ? String(suggestion.weight) : "0"}
+                    className="t-stat w-28 bg-transparent text-right outline-none placeholder:t-body placeholder:text-muted-foreground"
+                  />
+                  <span className="t-label text-muted-foreground">{unit}</span>
                 </div>
-                {/* tabIndex={-1} + preventDefault on mousedown, matching the
-                    steppers in NumField: without them these take focus off
-                    whichever numeric field the user is filling, collapsing the
-                    soft keyboard on every tap. */}
-                <div className="mt-1 flex items-center justify-between">
+              </div>
+
+              {/* Reps */}
+              <div className="group-row group-row-sep">
+                <label htmlFor="set-field-reps" className="t-body font-medium text-foreground">
+                  Reps
+                </label>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label="Decrease reps"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => stepReps(-1)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
+                  >
+                    −
+                  </button>
+                  <input
+                    id="set-field-reps"
+                    ref={(el) => {
+                      inputRefs.current[1] = el;
+                    }}
+                    inputMode="numeric"
+                    enterKeyHint="next"
+                    aria-label="Reps"
+                    value={reps}
+                    onChange={(e) => setReps(e.target.value)}
+                    onFocus={(e) => {
+                      selectAllOnEntry(e.currentTarget);
+                      e.currentTarget.scrollIntoView({ block: "nearest" });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        focusNextOrLog(1);
+                      }
+                    }}
+                    placeholder={suggestion.reps != null ? String(suggestion.reps) : "0"}
+                    className="t-stat w-20 bg-transparent text-center outline-none placeholder:t-body placeholder:text-muted-foreground"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label="Increase reps"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => stepReps(1)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* RPE */}
+              <div className="group-row group-row-sep">
+                <label htmlFor="set-field-rpe" className="t-body font-medium text-foreground">
+                  RPE
+                </label>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label="Decrease RPE"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => stepRpe(-1)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
+                  >
+                    −
+                  </button>
+                  <input
+                    id="set-field-rpe"
+                    ref={(el) => {
+                      inputRefs.current[2] = el;
+                    }}
+                    inputMode="decimal"
+                    enterKeyHint="done"
+                    aria-label="RPE"
+                    value={rpe}
+                    onChange={(e) => setRpe(e.target.value)}
+                    onFocus={(e) => {
+                      selectAllOnEntry(e.currentTarget);
+                      e.currentTarget.scrollIntoView({ block: "nearest" });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        focusNextOrLog(2);
+                      }
+                    }}
+                    placeholder={suggestion.rpe != null ? String(suggestion.rpe) : "-"}
+                    className="t-stat w-20 bg-transparent text-center outline-none placeholder:t-body placeholder:text-muted-foreground"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label="Increase RPE"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => stepRpe(1)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Sets */}
+              <div className="group-row group-row-sep">
+                <span className="t-body font-medium text-foreground">Target sets</span>
+                <div className="flex items-center gap-1.5 min-w-0">
                   <button
                     type="button"
                     tabIndex={-1}
                     aria-label="Decrease sets"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setTargetSets(Math.max(1, targetSets - 1))}
-                    className="flex h-11 w-11 items-center justify-center rounded-full bg-surface text-[18px] font-semibold text-foreground hairline-t hairline-b active:scale-95"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
                   >
                     −
                   </button>
-                  <span className="tnum text-[22px] font-semibold">{targetSets}</span>
+                  <span className="t-stat font-semibold text-foreground w-12 text-center">{targetSets}</span>
                   <button
                     type="button"
                     tabIndex={-1}
                     aria-label="Increase sets"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setTargetSets(targetSets + 1)}
-                    className="flex h-11 w-11 items-center justify-center rounded-full bg-surface text-[18px] font-semibold text-foreground hairline-t hairline-b active:scale-95"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
                   >
                     +
                   </button>
@@ -426,17 +497,17 @@ export function LogSetSheet({
               </div>
             </div>
 
-            <div className="mt-6 flex items-center gap-2">
+            <div className="mt-5 flex items-center gap-2">
               <button
                 onClick={onClose}
-                className="flex-1 min-h-[44px] rounded-full py-3 text-[15px] font-medium text-muted-foreground"
+                className="flex-1 min-h-[44px] rounded-full py-3 t-body font-medium text-muted-foreground"
               >
                 Cancel
               </button>
               <button
                 onClick={doLog}
                 disabled={!canLog}
-                className="flex-[2] min-h-[44px] rounded-full bg-accent py-3 text-[15px] font-semibold text-accent-foreground disabled:opacity-40"
+                className="flex-[2] min-h-[44px] rounded-full bg-accent py-3 t-body font-semibold text-accent-foreground disabled:opacity-40"
               >
                 {targetSets > 1 ? `Log set 1 of ${targetSets}` : "Log set"}
               </button>
@@ -502,7 +573,7 @@ export function NumField({
 }) {
   return (
     <div className="rounded-xl bg-muted p-3">
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="t-caption text-muted-foreground">{label}</div>
       <div className="mt-1 flex items-center justify-between gap-1">
         {onStep && (
           <button
@@ -511,7 +582,7 @@ export function NumField({
             aria-label={`Decrease ${label}`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onStep(-1)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface text-[18px] font-semibold text-foreground hairline-t hairline-b active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface t-heading font-semibold text-foreground hairline-t hairline-b active:scale-95"
           >
             −
           </button>
@@ -530,11 +601,6 @@ export function NumField({
             onChange={(e) => onChange(e.target.value)}
             onFocus={(e) => {
               selectAllOnEntry(e.currentTarget);
-              // `block: "nearest"` with no `behavior`, deliberately. A JS
-              // smooth scroll is not covered by styles.css's global
-              // prefers-reduced-motion clamp (that only flattens CSS
-              // durations), and on iOS it also races the keyboard resize that
-              // the visualViewport lift above already handles.
               e.currentTarget.scrollIntoView({ block: "nearest" });
             }}
             onKeyDown={(e) => {
@@ -544,11 +610,11 @@ export function NumField({
               }
             }}
             placeholder={placeholder ?? "0"}
-            className={`tnum w-full bg-transparent text-[22px] font-semibold outline-none placeholder:text-muted-foreground ${
+            className={`t-stat w-full bg-transparent font-semibold outline-none placeholder:t-body placeholder:text-muted-foreground ${
               onStep ? "text-center" : ""
             }`}
           />
-          {suffix && <span className="text-[12px] text-muted-foreground">{suffix}</span>}
+          {suffix && <span className="t-label text-muted-foreground">{suffix}</span>}
         </div>
         {onStep && (
           <button
@@ -557,7 +623,7 @@ export function NumField({
             aria-label={`Increase ${label}`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onStep(1)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface text-[18px] font-semibold text-foreground hairline-t hairline-b active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface t-heading font-semibold text-foreground hairline-t hairline-b active:scale-95"
           >
             +
           </button>
