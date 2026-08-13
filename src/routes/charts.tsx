@@ -183,67 +183,73 @@ function ChartsPage() {
   return (
     <AppShell>
       <header className="px-5 pb-4 pt-14">
-        <h1 className="text-[30px] font-semibold tracking-tight">Charts</h1>
-        <p className="mt-1 text-[14px] text-muted-foreground">Daily metrics over time.</p>
+        <h1 className="t-title">Charts</h1>
+        <p className="mt-1 t-label text-muted-foreground">Daily metrics over time.</p>
       </header>
 
-      <div
-        data-swipe-ignore
-        role="group"
-        aria-label="Metric"
-        className="scrollbar-none flex gap-2 overflow-x-auto px-5 pb-2 anim-fade-up"
-      >
-        {METRICS.map((m) => (
-          <button
-            key={m.key}
-            onClick={() => setMetricKey(m.key)}
-            aria-pressed={metricKey === m.key}
-            className={
-              "min-h-[44px] whitespace-nowrap rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors duration-200 flex items-center justify-center " +
-              (metricKey === m.key
-                ? "bg-foreground text-background"
-                : "bg-muted text-muted-foreground")
-            }
-          >
-            {m.label}
-          </button>
-        ))}
+      {/* Metric and date range selection cluster tightened into a single calm block */}
+      <div className="mb-4 flex flex-col gap-2.5 anim-fade-up">
+        <div
+          data-swipe-ignore
+          role="group"
+          aria-label="Metric"
+          className="scrollbar-none flex gap-2 overflow-x-auto px-5"
+        >
+          {METRICS.map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => setMetricKey(m.key)}
+              aria-pressed={metricKey === m.key}
+              className={
+                "flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-full px-4 py-2 t-label font-medium transition-colors duration-150 " +
+                (metricKey === m.key
+                  ? "bg-foreground text-background"
+                  : "bg-surface text-muted-foreground")
+              }
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+
+        <div
+          data-swipe-ignore
+          role="group"
+          aria-label="Date range"
+          className="scrollbar-none flex gap-2 overflow-x-auto px-5"
+        >
+          {RANGES.map((r) => (
+            <button
+              key={r.label}
+              type="button"
+              onClick={() => setRangeDays(r.days)}
+              aria-pressed={rangeDays === r.days}
+              // A bare "7" or "90" names nothing out loud, so the visible chip
+              // stays terse and the accessible name spells out the range.
+              aria-label={r.days === 0 ? "All time" : `Last ${r.days} days`}
+              className={
+                // min-w matters as much as min-h here: the "7" chip is a single
+                // character and would otherwise be a 34px-wide tap target.
+                "flex min-h-[44px] min-w-[44px] items-center justify-center whitespace-nowrap rounded-full px-3.5 py-2 t-label font-medium transition-colors duration-150 tnum " +
+                (rangeDays === r.days
+                  ? "bg-foreground text-background"
+                  : "bg-surface text-muted-foreground")
+              }
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div
-        data-swipe-ignore
-        role="group"
-        aria-label="Date range"
-        className="scrollbar-none flex gap-2 overflow-x-auto px-5 pb-4 anim-fade-up"
-        style={{ animationDelay: "20ms" }}
-      >
-        {RANGES.map((r) => (
-          <button
-            key={r.label}
-            onClick={() => setRangeDays(r.days)}
-            aria-pressed={rangeDays === r.days}
-            // A bare "7" or "90" names nothing out loud, so the visible chip
-            // stays terse and the accessible name spells out the range.
-            aria-label={r.days === 0 ? "All time" : `Last ${r.days} days`}
-            className={
-              // min-w matters as much as min-h here: the "7" chip is a single
-              // character and would otherwise be a 34px-wide tap target.
-              "min-h-[44px] min-w-[44px] whitespace-nowrap rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors duration-200 flex items-center justify-center tnum " +
-              (rangeDays === r.days ? "bg-muted text-foreground" : "text-muted-foreground")
-            }
-          >
-            {r.label}
-          </button>
-        ))}
-      </div>
-
-      <div
-        className="mx-5 rounded-2xl bg-surface p-5 hairline-t hairline-b anim-fade-up"
+        className="mx-5 rounded-2xl bg-surface p-5 anim-fade-up"
         style={{ animationDelay: "40ms" }}
       >
         {/* Inline segmented control on chart card to toggle raw vs smoothed series */}
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="min-w-0 truncate text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <h2 className="t-caption text-muted-foreground truncate">
             {metric.label}
           </h2>
           <div
@@ -252,10 +258,11 @@ function ChartsPage() {
             className="inline-flex rounded-xl bg-muted p-1 gap-1"
           >
             <button
+              type="button"
               onClick={() => setViewMode("daily")}
               aria-pressed={viewMode === "daily"}
               className={
-                "min-h-[44px] min-w-[60px] px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors duration-150 flex items-center justify-center " +
+                "flex min-h-[44px] min-w-[60px] items-center justify-center rounded-lg px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
                 (viewMode === "daily"
                   ? "bg-surface text-foreground shadow-xs"
                   : "text-muted-foreground")
@@ -264,10 +271,11 @@ function ChartsPage() {
               Daily
             </button>
             <button
+              type="button"
               onClick={() => setViewMode("avg7")}
               aria-pressed={viewMode === "avg7"}
               className={
-                "min-h-[44px] min-w-[76px] px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors duration-150 flex items-center justify-center " +
+                "flex min-h-[44px] min-w-[76px] items-center justify-center rounded-lg px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
                 (viewMode === "avg7"
                   ? "bg-surface text-foreground shadow-xs"
                   : "text-muted-foreground")
@@ -291,43 +299,33 @@ function ChartsPage() {
 
         {/* Rate readout derived from linear regression slope */}
         {rateReadoutText && (
-          <div className="tnum mt-3 text-center text-[12px] font-medium text-muted-foreground">
+          <div className="mt-3 text-center t-label font-medium text-muted-foreground tnum">
             Trend: {rateReadoutText}
           </div>
         )}
 
-        {/* 4-cell stats row: Latest, Average, Range, Change */}
-        <div className="mt-4 grid grid-cols-2 gap-y-4 gap-x-4 pt-4 hairline-t sm:grid-cols-4">
-          <div className="min-w-0">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Latest
-            </div>
-            <div className="tnum mt-0.5 text-[20px] font-semibold">
+        {/* Grouped 2x2 stats grid with hairline separators: Latest, Average, Range, Change */}
+        <div className="mt-4 grid grid-cols-2 pt-4 hairline-t">
+          <div className="pr-3 pb-3">
+            <div className="t-caption text-muted-foreground">Latest</div>
+            <div className="t-stat mt-1">
               {latestValStr}
               {currentPoints.length > 0 && (
-                <span className="ml-1 text-[11px] font-normal text-muted-foreground">
-                  {metricUnit}
-                </span>
+                <span className="ml-1 t-label text-muted-foreground">{metricUnit}</span>
               )}
             </div>
           </div>
-          <div className="min-w-0">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Average
-            </div>
-            <div className="tnum mt-0.5 text-[20px] font-semibold">{avgValStr}</div>
+          <div className="border-l border-border pl-3 pb-3">
+            <div className="t-caption text-muted-foreground">Average</div>
+            <div className="t-stat mt-1">{avgValStr}</div>
           </div>
-          <div className="min-w-0">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Range
-            </div>
-            <div className="tnum mt-0.5 text-[20px] font-semibold">{rangeStr}</div>
+          <div className="hairline-t pr-3 pt-3">
+            <div className="t-caption text-muted-foreground">Range</div>
+            <div className="t-stat mt-1">{rangeStr}</div>
           </div>
-          <div className="min-w-0">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Change
-            </div>
-            <div className="tnum mt-0.5 text-[20px] font-semibold">{changeStr}</div>
+          <div className="hairline-t border-l border-border pl-3 pt-3">
+            <div className="t-caption text-muted-foreground">Change</div>
+            <div className="t-stat mt-1">{changeStr}</div>
           </div>
         </div>
       </div>
@@ -369,8 +367,8 @@ function Chart({
   if (displayedPoints.length === 0) {
     return (
       <div className="flex h-[180px] flex-col items-center justify-center p-4 text-center">
-        <h3 className="text-[16px] font-semibold tracking-tight">No data recorded</h3>
-        <p className="mt-1 text-[13px] text-muted-foreground">
+        <h3 className="t-heading">No data recorded</h3>
+        <p className="mt-1 t-label text-muted-foreground">
           Log your {metricLabel.toLowerCase()} on the Today tab to track progress over time.
         </p>
       </div>
