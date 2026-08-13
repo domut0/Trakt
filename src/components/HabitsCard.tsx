@@ -40,7 +40,7 @@ function CheckIcon() {
 }
 
 /**
- * Daily supplement checklist card for the Today screen.
+ * Daily habit checklist card for the Today screen.
  *
  * `date` is passed directly as a local "yyyy-MM-dd" key. Toggling completion is
  * a synchronous store mutation for instant tactile feedback.
@@ -66,44 +66,43 @@ export function HabitsCard({ date }: { date: string }) {
   const totalCount = activeHabits.length;
 
   return (
-    <div className="rounded-2xl border border-border/40 bg-surface px-5 py-4">
+    <div className="rounded-2xl bg-surface p-4">
       {/* Header with compact progress indicator and editor button.
           No card title here: the only caller (Today) already renders a
-          "Supplements" section heading directly above this card, so a second one
+          "Habits" section heading directly above this card, so a second one
           inside it printed the same word twice, one line apart. */}
-      <div className="flex items-center justify-between gap-3 pb-2">
+      <div className="flex items-center justify-between gap-3 pb-3">
         <div className="flex min-w-0 items-center gap-2">
           {totalCount > 0 && (
-            <span className="tnum rounded-full bg-muted px-2 py-0.5 text-[12px] font-medium text-muted-foreground">
+            <span className="tnum rounded-full bg-muted px-2.5 py-0.5 t-label font-medium text-muted-foreground">
               {doneCount} of {totalCount}
             </span>
           )}
         </div>
         {/* The visible circle stays 32px so the header does not turn into a
-            toolbar, while an inset pseudo-element carries the hit area past 44px.
-            Same trick as the toggle in settings.tsx. */}
+            toolbar, while an inset pseudo-element carries the hit area past 44px. */}
         <button
           type="button"
           onClick={() => setEditorOpen(true)}
-          aria-label="Edit supplements"
+          aria-label="Edit habits"
           className="relative flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:bg-muted hover:text-foreground"
         >
           <SettingsIcon />
         </button>
       </div>
 
-      {/* Checklist items or prompt to add the first supplement */}
+      {/* Checklist items or prompt to add the first habit */}
       {totalCount === 0 ? (
         <button
           type="button"
           onClick={() => setEditorOpen(true)}
-          className="flex min-h-[44px] w-full items-center justify-center rounded-xl bg-muted/50 px-4 py-3 text-[14px] font-medium text-accent hover:bg-muted"
+          className="flex min-h-[44px] w-full items-center justify-center rounded-xl bg-muted px-4 py-3 t-body font-medium text-accent hover:bg-muted"
         >
-          + Add your first supplement
+          + Add your first habit
         </button>
       ) : (
-        <ul className="divide-y divide-border/40">
-          {activeHabits.map((habit) => {
+        <ul className="group-list">
+          {activeHabits.map((habit, idx) => {
             const isDone = completedIds.has(habit.id);
             return (
               <li key={habit.id}>
@@ -112,20 +111,22 @@ export function HabitsCard({ date }: { date: string }) {
                   role="checkbox"
                   aria-checked={isDone}
                   onClick={() => toggleHabit(date, habit.id)}
-                  className="flex min-h-[44px] w-full items-center gap-3 py-3 text-left transition-colors"
+                  className={`group-row w-full text-left transition-colors ${
+                    idx > 0 ? "group-row-sep" : ""
+                  }`}
                 >
                   <span
                     aria-hidden="true"
                     className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors ${
                       isDone
                         ? "bg-accent text-accent-foreground"
-                        : "border border-border bg-muted/30"
+                        : "border border-border bg-muted"
                     }`}
                   >
                     {isDone && <CheckIcon />}
                   </span>
                   <span
-                    className={`truncate text-[15px] transition-colors ${
+                    className={`flex-1 truncate t-body transition-colors ${
                       isDone ? "text-muted-foreground font-normal" : "text-foreground font-medium"
                     }`}
                   >

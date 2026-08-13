@@ -40,7 +40,7 @@ function CardioIcon() {
 /**
  * Opened by the nav bar's Workout button when no session is active. A single
  * centred popup that starts as a two-way chooser (Strength / Cardio) and, if
- * Cardio is tapped, swaps its own content for CardioLogCard in place -- one
+ * Cardio is tapped, swaps its own content for CardioLogCard in place - one
  * surface changing what it shows, not a second modal stacked on top.
  *
  * Strength instead delegates out: it closes this popup and hands off to
@@ -87,29 +87,37 @@ export function WorkoutChooserSheet({
         {mode === "choose" ? (
           <div>
             <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-border" />
-            <h2 className="mt-3 text-center text-[15px] font-medium text-muted-foreground">
+            <h2 className="mt-3 text-center t-heading font-medium text-muted-foreground">
               Log a workout
             </h2>
             <div className="mt-5 flex items-center justify-center gap-10 py-2">
-              <button onClick={onChooseStrength} className="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={onChooseStrength}
+                aria-label="Log strength training workout"
+                className="flex flex-col items-center gap-2"
+              >
                 <span className="flex h-20 w-20 items-center justify-center rounded-full bg-accent text-accent-foreground">
                   <StrengthIcon />
                 </span>
-                <span className="text-[13px] font-medium">Strength training</span>
+                <span className="t-label font-medium text-foreground">Strength training</span>
               </button>
               <button
+                type="button"
                 onClick={() => setMode("cardio")}
+                aria-label="Log cardio workout"
                 className="flex flex-col items-center gap-2"
               >
                 <span className="flex h-20 w-20 items-center justify-center rounded-full bg-muted text-foreground">
                   <CardioIcon />
                 </span>
-                <span className="text-[13px] font-medium">Cardio</span>
+                <span className="t-label font-medium text-foreground">Cardio</span>
               </button>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="mt-4 w-full rounded-full py-3 text-[15px] font-medium text-muted-foreground"
+              className="mt-4 flex min-h-[44px] w-full items-center justify-center rounded-full py-3 t-body font-medium text-muted-foreground"
             >
               Cancel
             </button>
