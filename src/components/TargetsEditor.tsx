@@ -103,11 +103,9 @@ export function TargetsEditor() {
     <div className="space-y-6">
       {showDayAssignments && (
         <>
-          <div className="rounded-2xl border border-border/40 bg-surface p-4">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              This week
-            </div>
-            <div className="tnum mt-1.5 space-y-1 text-[13px] font-medium text-foreground">
+          <div className="rounded-2xl bg-muted p-4">
+            <div className="t-caption text-muted-foreground">This week</div>
+            <div className="tnum mt-1.5 space-y-1 t-label font-medium text-foreground">
               {summaryLines.map((line) => (
                 <div key={line.key}>{line.text}</div>
               ))}
@@ -118,10 +116,8 @@ export function TargetsEditor() {
           </div>
 
           <div>
-            <h2 className="mb-1 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Day assignments
-            </h2>
-            <p className="mb-2 text-[12px] text-muted-foreground">
+            <h2 className="mb-1 t-caption text-muted-foreground">Day assignments</h2>
+            <p className="mb-2 t-label text-muted-foreground">
               Tap a day to cycle through your profiles.
             </p>
             <div
@@ -141,17 +137,14 @@ export function TargetsEditor() {
                     type="button"
                     aria-label={`${label}, currently ${assignedName}. Tap to change.`}
                     onClick={() => handleRotateDayTarget(idx)}
-                    className="flex min-h-[52px] min-w-0 flex-col items-center justify-center rounded-xl border border-border/40 bg-surface p-1 text-center transition-transform active:scale-95"
+                    className="flex min-h-[52px] min-w-0 flex-col items-center justify-center rounded-xl bg-muted p-1 text-center transition-transform active:scale-95"
                   >
-                    <span
-                      aria-hidden="true"
-                      className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-                    >
+                    <span aria-hidden="true" className="t-caption text-muted-foreground">
                       {label}
                     </span>
                     <span
                       aria-hidden="true"
-                      className={`mt-0.5 max-w-full truncate px-0.5 text-[11px] font-semibold ${
+                      className={`mt-0.5 max-w-full truncate px-0.5 t-caption ${
                         assigned ? "text-accent" : "text-muted-foreground"
                       }`}
                     >
@@ -168,13 +161,11 @@ export function TargetsEditor() {
       <div className="space-y-4">
         {showDayAssignments && (
           <div className="flex items-center justify-between">
-            <h2 className="text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Target profiles
-            </h2>
+            <h2 className="t-caption text-muted-foreground">Target profiles</h2>
             <button
               type="button"
               onClick={() => addTargetProfile("New profile")}
-              className="flex min-h-[44px] items-center text-[13px] font-medium text-accent"
+              className="flex min-h-[44px] items-center t-body font-medium text-accent"
             >
               + Add profile
             </button>
@@ -192,7 +183,7 @@ export function TargetsEditor() {
         ))}
 
         {!canDeleteProfiles && (
-          <p className="text-[12px] text-muted-foreground">
+          <p className="t-label text-muted-foreground">
             At least one profile is required while targets are on. Turn targets off to remove them
             all.
           </p>
@@ -202,7 +193,7 @@ export function TargetsEditor() {
           <button
             type="button"
             onClick={handleSplitTargets}
-            className="flex min-h-[44px] w-full items-center text-[13px] font-medium text-accent"
+            className="flex min-h-[44px] w-full items-center t-body font-medium text-accent"
           >
             Use different targets on some days
           </button>
@@ -224,7 +215,7 @@ function ProfileCard({
   onDelete: () => void;
 }) {
   return (
-    <div className="space-y-4 rounded-2xl border border-border/40 bg-surface p-4">
+    <div className="space-y-4 rounded-2xl bg-muted p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex-1">
           <label htmlFor={`profile-name-${profile.id}`} className="sr-only">
@@ -236,7 +227,7 @@ function ProfileCard({
             value={profile.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
             placeholder="Profile name"
-            className="min-h-[44px] w-full border-b border-transparent bg-transparent text-[18px] font-semibold tracking-tight outline-none focus:border-border"
+            className="min-h-[44px] w-full border-b border-transparent bg-transparent t-heading font-semibold outline-none focus:border-border"
           />
         </div>
         <button
@@ -340,11 +331,8 @@ function TargetFieldInput({
   const shown = draft ?? (value !== undefined ? String(value) : "");
 
   return (
-    <div className="rounded-xl bg-muted p-3">
-      <label
-        htmlFor={id}
-        className="block text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
-      >
+    <div className="rounded-xl bg-surface p-3">
+      <label htmlFor={id} className="block t-caption text-muted-foreground">
         {label}
       </label>
       <div className="mt-1 flex items-baseline gap-1">
@@ -363,9 +351,9 @@ function TargetFieldInput({
           }}
           onBlur={() => setDraft(null)}
           placeholder="No target"
-          className="tnum min-h-[44px] w-full min-w-0 bg-transparent text-[18px] font-semibold outline-none placeholder:text-[13px] placeholder:font-normal placeholder:text-muted-foreground"
+          className="tnum min-h-[44px] w-full min-w-0 bg-transparent t-heading font-semibold outline-none placeholder:t-label placeholder:font-normal placeholder:text-muted-foreground"
         />
-        {suffix && <span className="text-[12px] text-muted-foreground">{suffix}</span>}
+        {suffix && <span className="t-label text-muted-foreground">{suffix}</span>}
       </div>
     </div>
   );

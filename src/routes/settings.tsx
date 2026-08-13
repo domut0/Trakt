@@ -191,17 +191,18 @@ function SettingsPage() {
   return (
     <AppShell>
       <header className="px-5 pb-4 pt-14">
-        <h1 className="text-[30px] font-semibold tracking-tight">Settings</h1>
+        <h1 className="t-title">Settings</h1>
       </header>
 
       <Section title="Units" delay={0}>
-        <div className="flex gap-2 px-5 py-3">
+        <div className="flex gap-2 p-3">
           {(["lbs", "kg"] as const).map((u) => (
             <button
               key={u}
+              type="button"
               onClick={() => setUnit(u)}
               className={
-                "flex-1 rounded-full py-2.5 text-[14px] font-medium transition-colors " +
+                "flex-1 rounded-full py-2.5 t-body font-medium transition-colors " +
                 (unit === u ? "bg-foreground text-background" : "bg-muted text-muted-foreground")
               }
             >
@@ -212,10 +213,10 @@ function SettingsPage() {
       </Section>
 
       <Section title="Tabs" delay={40}>
-        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
+        <div className="group-row">
           <div>
-            <div className="text-[15px]">Charts tab</div>
-            <div className="text-[12px] text-muted-foreground">Show the Charts tab in the nav.</div>
+            <div className="t-body">Charts tab</div>
+            <div className="t-label text-muted-foreground">Show the Charts tab in the nav.</div>
           </div>
           <Toggle
             checked={chartsEnabled}
@@ -226,10 +227,10 @@ function SettingsPage() {
       </Section>
 
       <Section title="Features" delay={80}>
-        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
+        <div className="group-row">
           <div>
-            <div className="text-[15px]">Daily targets</div>
-            <div className="text-[12px] text-muted-foreground">
+            <div className="t-body">Daily targets</div>
+            <div className="t-label text-muted-foreground">
               Show goal progress on the daily log.
             </div>
           </div>
@@ -242,16 +243,16 @@ function SettingsPage() {
         {/* Inline editor, not a sheet: the profiles only mean anything while
             targets are on, so they live under the switch that turns them on. */}
         {targetsEnabled && (
-          <div className="px-5 py-4 hairline-t">
+          <div className="group-row-sep px-5 py-4">
             <TargetsEditor />
           </div>
         )}
 
-        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
+        <div className="group-row group-row-sep">
           <div>
-            <div className="text-[15px]">Habits</div>
-            <div className="text-[12px] text-muted-foreground">
-              Adds a daily checklist to the Today tab, for supplements and the like.
+            <div className="t-body">Habits</div>
+            <div className="t-label text-muted-foreground">
+              Adds a daily checklist to the Today tab.
             </div>
           </div>
           <Toggle
@@ -261,10 +262,10 @@ function SettingsPage() {
           />
         </div>
 
-        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
+        <div className="group-row group-row-sep">
           <div>
-            <div className="text-[15px]">Calculators</div>
-            <div className="text-[12px] text-muted-foreground">
+            <div className="t-body">Calculators</div>
+            <div className="t-label text-muted-foreground">
               Add plate loading and 1RM tools here.
             </div>
           </div>
@@ -277,28 +278,30 @@ function SettingsPage() {
         {toolsEnabled && (
           <>
             <button
+              type="button"
               onClick={() => setPlateSheetOpen(true)}
-              className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+              className="group-row group-row-sep w-full text-left"
             >
               <div>
-                <div className="text-[15px]">Plate calculator</div>
-                <div className="text-[12px] text-muted-foreground">
+                <div className="t-body">Plate calculator</div>
+                <div className="t-label text-muted-foreground">
                   Work out what to load per side.
                 </div>
               </div>
-              <span className="text-accent">→</span>
+              <span className="text-accent" aria-hidden="true">→</span>
             </button>
             <button
+              type="button"
               onClick={() => setOneRmSheetOpen(true)}
-              className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+              className="group-row group-row-sep w-full text-left"
             >
               <div>
-                <div className="text-[15px]">1RM estimator</div>
-                <div className="text-[12px] text-muted-foreground">
+                <div className="t-body">1RM estimator</div>
+                <div className="t-label text-muted-foreground">
                   Estimate a max from a weight and reps.
                 </div>
               </div>
-              <span className="text-accent">→</span>
+              <span className="text-accent" aria-hidden="true">→</span>
             </button>
           </>
         )}
@@ -306,43 +309,46 @@ function SettingsPage() {
 
       <Section title="Data" delay={120}>
         <button
+          type="button"
           onClick={exportJson}
-          className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+          className="group-row w-full text-left"
         >
           <div>
-            <div className="text-[15px]">Export backup</div>
-            <div className="text-[12px] text-muted-foreground">Download all data as JSON.</div>
+            <div className="t-body">Export backup</div>
+            <div className="t-label text-muted-foreground">Download all data as JSON.</div>
           </div>
-          <span className="text-accent">→</span>
+          <span className="text-accent" aria-hidden="true">→</span>
         </button>
         <button
+          type="button"
           onClick={exportSetsCsv}
-          className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+          className="group-row group-row-sep w-full text-left"
         >
           <div>
-            <div className="text-[15px]">Export sets (CSV)</div>
-            <div className="text-[12px] text-muted-foreground">
+            <div className="t-body">Export sets (CSV)</div>
+            <div className="t-label text-muted-foreground">
               Download set history for spreadsheets.
             </div>
           </div>
-          <span className="text-accent">→</span>
+          <span className="text-accent" aria-hidden="true">→</span>
         </button>
         <button
+          type="button"
           onClick={exportDailyLogsCsv}
-          className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+          className="group-row group-row-sep w-full text-left"
         >
           <div>
-            <div className="text-[15px]">Export daily log (CSV)</div>
-            <div className="text-[12px] text-muted-foreground">
+            <div className="t-body">Export daily log (CSV)</div>
+            <div className="t-label text-muted-foreground">
               Download nutrition and bodyweight history.
             </div>
           </div>
-          <span className="text-accent">→</span>
+          <span className="text-accent" aria-hidden="true">→</span>
         </button>
-        <label className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t">
+        <label className="group-row group-row-sep w-full cursor-pointer text-left">
           <div>
-            <div className="text-[15px]">Import backup</div>
-            <div className="text-[12px] text-muted-foreground">Restore from a previous export.</div>
+            <div className="t-body">Import backup</div>
+            <div className="t-label text-muted-foreground">Restore from a previous export.</div>
           </div>
           <input
             type="file"
@@ -350,16 +356,16 @@ function SettingsPage() {
             className="hidden"
             onChange={handleFileChange}
           />
-          <span className="text-accent">→</span>
+          <span className="text-accent" aria-hidden="true">→</span>
         </label>
 
         {importError && (
-          <div className="px-5 py-3 text-[13px] text-destructive hairline-t">{importError}</div>
+          <div className="group-row-sep px-5 py-3 t-label text-destructive">{importError}</div>
         )}
 
         {pendingImport && (
-          <div className="px-5 py-3.5 hairline-t">
-            <div className="text-[13px] text-muted-foreground">
+          <div className="group-row-sep space-y-3 p-4">
+            <div className="t-label text-muted-foreground">
               Backup format v{pendingImport.version}
               {pendingImport.version < BACKUP_VERSION
                 ? ", written by an older version of the app"
@@ -368,15 +374,16 @@ function SettingsPage() {
               device, along with your unit and feature switches. This cannot be undone.
             </div>
             {losses.length > 0 && (
-              <div className="mt-3 text-[13px] text-destructive">
+              <div className="t-label text-destructive">
                 Importing this file deletes {joinList(losses)}. The file contains none of it. Export
                 a backup first if you want to keep it.
               </div>
             )}
-            <div className="mt-3 flex gap-2">
+            <div className="flex gap-2">
               <button
+                type="button"
                 onClick={cancelImport}
-                className="flex-1 rounded-full bg-muted py-2.5 text-[14px] font-medium text-muted-foreground"
+                className="flex-1 rounded-full bg-muted py-2.5 t-body font-medium text-muted-foreground"
               >
                 Cancel
               </button>
@@ -387,9 +394,10 @@ function SettingsPage() {
                   tap target of a confirm this final only makes it easier to hit
                   by mistake. */}
               <button
+                type="button"
                 onClick={confirmImport}
                 className={
-                  "flex-1 rounded-full py-2.5 text-[14px] font-medium " +
+                  "flex-1 rounded-full py-2.5 t-body font-medium " +
                   (losses.length > 0
                     ? "bg-destructive text-white"
                     : "bg-foreground text-background")
@@ -402,7 +410,7 @@ function SettingsPage() {
         )}
 
         {importSuccess && (
-          <div className="px-5 py-3 text-[13px] text-muted-foreground hairline-t">
+          <div className="group-row-sep px-5 py-3 t-label text-muted-foreground">
             Backup imported.
           </div>
         )}
@@ -411,33 +419,36 @@ function SettingsPage() {
       <Section title="Reset" delay={160}>
         {!showClearConfirm ? (
           <button
+            type="button"
             onClick={() => setShowClearConfirm(true)}
-            className="flex w-full items-center justify-between px-5 py-3.5 text-left"
+            className="group-row w-full text-left"
           >
             <div>
-              <div className="text-[15px] text-destructive">Clear all data</div>
-              <div className="text-[12px] text-muted-foreground">
+              <div className="t-body text-destructive">Clear all data</div>
+              <div className="t-label text-muted-foreground">
                 Wipe all workouts and start fresh.
               </div>
             </div>
-            <span className="text-destructive">→</span>
+            <span className="text-destructive" aria-hidden="true">→</span>
           </button>
         ) : (
-          <div className="px-5 py-3.5">
-            <div className="text-[13px] text-muted-foreground">
+          <div className="space-y-3 p-4">
+            <div className="t-label text-muted-foreground">
               This permanently deletes every split, session, and set on this device and resets your
               settings. The exercise library is kept. This cannot be undone.
             </div>
-            <div className="mt-3 flex gap-2">
+            <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => setShowClearConfirm(false)}
-                className="flex-1 rounded-full bg-muted py-2.5 text-[14px] font-medium text-muted-foreground"
+                className="flex-1 rounded-full bg-muted py-2.5 t-body font-medium text-muted-foreground"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={confirmClear}
-                className="flex-1 rounded-full bg-destructive py-2.5 text-[14px] font-medium text-white"
+                className="flex-1 rounded-full bg-destructive py-2.5 t-body font-medium text-white"
               >
                 Clear all data
               </button>
@@ -446,7 +457,7 @@ function SettingsPage() {
         )}
       </Section>
 
-      <p className="px-5 pt-6 text-[12px] text-muted-foreground">
+      <p className="px-5 pt-6 t-label text-muted-foreground">
         v0.1 · local only · no accounts, no sync.
       </p>
 
@@ -559,11 +570,9 @@ function Section({
   delay?: number;
 }) {
   return (
-    <section className="mt-6 anim-fade-up" style={{ animationDelay: `${delay}ms` }}>
-      <div className="px-5 pb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
-        {title}
-      </div>
-      <div className="bg-surface hairline-t hairline-b">{children}</div>
+    <section className="section-gap anim-fade-up" style={{ animationDelay: `${delay}ms` }}>
+      <h2 className="group-header t-caption">{title}</h2>
+      <div className="group-list mx-5">{children}</div>
     </section>
   );
 }
