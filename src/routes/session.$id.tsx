@@ -22,7 +22,7 @@ function SessionPage() {
   if (!session) {
     return (
       <AppShell>
-        <div className="px-5 py-20 text-center text-[15px] text-muted-foreground">
+        <div className="px-5 py-20 text-center t-body text-muted-foreground">
           Session not found.
         </div>
       </AppShell>
@@ -36,7 +36,7 @@ function SessionPage() {
   if (!isCardio && !slot) {
     return (
       <AppShell>
-        <div className="px-5 py-20 text-center text-[15px] text-muted-foreground">
+        <div className="px-5 py-20 text-center t-body text-muted-foreground">
           Session not found.
         </div>
       </AppShell>
@@ -49,12 +49,9 @@ function SessionPage() {
   return (
     <AppShell>
       <div className="flex items-center justify-between px-5 pt-14 pb-2">
-        {/* The negative vertical margin is what lets a 20px line of text carry a
-            44px touch target without pushing the header down: 44 - 2*12 = 20, so
-            the row occupies exactly the height it did before. */}
         <button
           onClick={() => router.navigate({ to: "/" })}
-          className="-my-3 flex min-h-[44px] items-center text-[15px] font-medium text-accent"
+          className="-my-3 flex min-h-[44px] items-center t-body font-medium text-accent"
         >
           Back
         </button>
@@ -64,53 +61,51 @@ function SessionPage() {
         />
       </div>
       <header className="px-5 pb-2">
-        <div className="tnum text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="t-caption text-muted-foreground">
           {d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
         </div>
-        <h1 className="mt-1 text-balance break-words text-[30px] font-semibold tracking-tight">
+        <h1 className="mt-1 text-balance break-words t-title">
           {title}
         </h1>
       </header>
       {isCardio ? (
-        <div className="mt-4 px-5 space-y-4">
-          {(session.durationMinutes != null || session.distance != null) && (
-            <div className="flex gap-3">
-              {session.durationMinutes != null && (
-                <div className="min-w-0 flex-1 rounded-2xl bg-surface p-4">
-                  <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Duration
-                  </div>
-                  <div className="tnum mt-1 text-[22px] font-semibold tracking-tight">
-                    {session.durationMinutes}{" "}
-                    <span className="text-[14px] font-normal text-muted-foreground">min</span>
-                  </div>
-                </div>
-              )}
-              {session.distance != null && (
-                <div className="min-w-0 flex-1 rounded-2xl bg-surface p-4">
-                  <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Distance
-                  </div>
-                  <div className="tnum mt-1 text-[22px] font-semibold tracking-tight">
-                    {session.distance}{" "}
-                    <span className="text-[14px] font-normal text-muted-foreground">
-                      {unit === "lbs" ? "mi" : "km"}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          {session.setupNote && (
-            <div className="rounded-2xl bg-surface p-4">
-              <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                Notes
+        <div className="section-gap px-5">
+          <div className="group-list">
+            {session.durationMinutes != null && (
+              <div className="group-row">
+                <span className="t-body text-muted-foreground">Duration</span>
+                <span className="t-stat">
+                  {session.durationMinutes}{" "}
+                  <span className="t-label text-muted-foreground">min</span>
+                </span>
               </div>
-              <div className="mt-1 text-[15px] text-foreground whitespace-pre-wrap">
-                {session.setupNote}
+            )}
+            {session.distance != null && (
+              <div className={`group-row ${session.durationMinutes != null ? "group-row-sep" : ""}`}>
+                <span className="t-body text-muted-foreground">Distance</span>
+                <span className="t-stat">
+                  {session.distance}{" "}
+                  <span className="t-label text-muted-foreground">
+                    {unit === "lbs" ? "mi" : "km"}
+                  </span>
+                </span>
               </div>
-            </div>
-          )}
+            )}
+            {session.setupNote && (
+              <div
+                className={`group-row flex-col items-start ${
+                  session.durationMinutes != null || session.distance != null
+                    ? "group-row-sep"
+                    : ""
+                }`}
+              >
+                <span className="t-caption text-muted-foreground">Notes</span>
+                <div className="mt-1 t-body text-foreground whitespace-pre-wrap">
+                  {session.setupNote}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <SessionView sessionId={session.id} />

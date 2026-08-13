@@ -6,7 +6,7 @@ import { useStore } from "../lib/store";
 /**
  * Red trash-icon button that deletes an entire logged workout after a
  * confirmation sheet. Used in the workout-review headers (in-workout "View
- * Workout" overlay and the /session/$id screen). `onDeleted` fires after the
+ * workout" overlay and the /session/$id screen). `onDeleted` fires after the
  * delete so the caller can navigate away / close the overlay.
  */
 export function DeleteWorkoutButton({
@@ -51,20 +51,20 @@ export function DeleteWorkoutButton({
               style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
             >
               <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" />
-              <h2 className="text-[17px] font-semibold tracking-tight">Delete this workout?</h2>
-              <p className="mt-1 text-[13px] text-muted-foreground">
+              <h2 className="t-heading">Delete this workout?</h2>
+              <p className="mt-1 t-label text-muted-foreground">
                 This permanently removes the session and all its sets. This can't be undone.
               </p>
               <div className="mt-5 flex gap-2">
                 <button
                   onClick={() => setConfirming(false)}
-                  className="flex min-h-[44px] flex-1 items-center justify-center rounded-full bg-muted py-3 text-[15px] font-medium text-muted-foreground"
+                  className="flex min-h-[44px] flex-1 items-center justify-center rounded-full bg-muted py-3 t-body font-medium text-muted-foreground"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={doDelete}
-                  className="flex min-h-[44px] flex-1 items-center justify-center rounded-full bg-destructive py-3 text-[15px] font-semibold text-white"
+                  className="flex min-h-[44px] flex-1 items-center justify-center rounded-full bg-destructive py-3 t-body font-semibold text-white"
                 >
                   Delete
                 </button>

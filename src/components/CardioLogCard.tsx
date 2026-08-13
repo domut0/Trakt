@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { NumField } from "./LogSetSheet";
 import { useStore, type Exercise } from "../lib/store";
 
 /**
@@ -109,53 +108,49 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
           value={exerciseQuery}
           onChange={(e) => setExerciseQuery(e.target.value)}
           placeholder="Search or add activity"
-          // A placeholder is not an accessible name: it disappears the moment
-          // anything is typed, so the field needs its own label.
           aria-label="Search or add a cardio activity"
-          className="mt-3 min-h-[44px] w-full bg-transparent text-[20px] font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
+          className="mt-3 min-h-[44px] w-full bg-transparent t-heading outline-none placeholder:text-muted-foreground"
         />
-        <ul className="mt-3 max-h-72 divide-y divide-border overflow-y-auto">
-          {filteredRows.map((r) =>
+        <div className="mt-3 max-h-72 overflow-y-auto group-list">
+          {filteredRows.map((r, idx) =>
             r.kind === "existing" ? (
-              <li key={r.exercise.id}>
-                <button
-                  onClick={() => selectExercise(r.exercise.id)}
-                  className="flex min-h-[44px] w-full items-center justify-between gap-3 py-3 text-left"
-                >
-                  <span className="truncate text-[16px]">{r.exercise.name}</span>
-                </button>
-              </li>
+              <button
+                key={r.exercise.id}
+                onClick={() => selectExercise(r.exercise.id)}
+                className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""}`}
+              >
+                <span className="truncate t-body">{r.exercise.name}</span>
+              </button>
             ) : (
-              <li key={r.name}>
-                <button
-                  onClick={() => addCustom(r.name)}
-                  className="flex min-h-[44px] w-full items-center justify-between gap-3 py-3 text-left"
-                >
-                  <span className="truncate text-[16px] text-muted-foreground">{r.name}</span>
-                  <span className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-accent">
-                    Suggested
-                  </span>
-                </button>
-              </li>
+              <button
+                key={r.name}
+                onClick={() => addCustom(r.name)}
+                className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""}`}
+              >
+                <span className="truncate t-body text-muted-foreground">{r.name}</span>
+                <span className="shrink-0 t-caption text-muted-foreground">
+                  Suggested
+                </span>
+              </button>
             ),
           )}
           {showAddRow && (
-            <li>
-              <button
-                onClick={() => addCustom(trimmedQuery)}
-                className="flex min-h-[44px] w-full items-center justify-between gap-3 py-3 text-left text-accent"
-              >
-                <span className="truncate text-[16px]">Add "{trimmedQuery}"</span>
-                <span className="shrink-0 text-[11px] font-medium uppercase tracking-wider">
-                  New
-                </span>
-              </button>
-            </li>
+            <button
+              onClick={() => addCustom(trimmedQuery)}
+              className={`group-row w-full text-left text-accent ${
+                filteredRows.length > 0 ? "group-row-sep" : ""
+              }`}
+            >
+              <span className="truncate t-body">Add "{trimmedQuery}"</span>
+              <span className="shrink-0 t-caption">
+                New
+              </span>
+            </button>
           )}
-        </ul>
+        </div>
         <button
           onClick={onBack}
-          className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-full py-3 text-[15px] font-medium text-muted-foreground"
+          className="mt-4 flex min-h-[44px] w-full items-center justify-center rounded-full py-3 t-body font-medium text-muted-foreground"
         >
           Cancel
         </button>
@@ -166,63 +161,86 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
   return (
     <div>
       <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-border" />
-      <div className="mt-3 flex items-center justify-between gap-3">
+      <div className="mt-3 group-list">
         <button
           onClick={() => setPickingExercise(true)}
           aria-label={`Change activity, currently ${chosen?.name ?? "not set"}`}
-          className="min-h-[44px] min-w-0 text-left"
+          className="group-row w-full text-left"
         >
-          <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Activity
+          <div className="min-w-0 flex-1">
+            <div className="t-caption text-muted-foreground">
+              Activity
+            </div>
+            <div className="truncate t-heading">
+              {chosen?.name}
+            </div>
           </div>
-          <div className="mt-0.5 truncate text-[20px] font-semibold tracking-tight">
-            {chosen?.name}
+          <span className="shrink-0 t-label font-medium text-accent">
+            Change
+          </span>
+        </button>
+
+        <div className="group-row group-row-sep">
+          <label
+            htmlFor="cardio-setup-note"
+            className="shrink-0 t-caption text-muted-foreground"
+          >
+            Setup
+          </label>
+          <input
+            id="cardio-setup-note"
+            value={setupNote}
+            onChange={(e) => setSetupNote(e.target.value)}
+            placeholder={suggestedNote ?? "Incline, resistance"}
+            className="min-h-[44px] w-full min-w-0 bg-transparent t-body outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+
+        <div className="group-row group-row-sep">
+          <label htmlFor="cardio-duration" className="shrink-0 t-body text-muted-foreground">
+            Duration
+          </label>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <input
+              id="cardio-duration"
+              inputMode="decimal"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              placeholder="0"
+              className="t-stat w-20 text-right bg-transparent outline-none placeholder:text-muted-foreground"
+            />
+            <span className="t-label text-muted-foreground">min</span>
           </div>
-        </button>
-        <button
-          onClick={() => setPickingExercise(true)}
-          className="flex min-h-[44px] shrink-0 items-center text-[13px] font-medium text-accent"
-        >
-          Change
-        </button>
-      </div>
+        </div>
 
-      <div className="mt-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-        <label
-          htmlFor="cardio-setup-note"
-          className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
-        >
-          Setup
-        </label>
-        <input
-          id="cardio-setup-note"
-          value={setupNote}
-          onChange={(e) => setSetupNote(e.target.value)}
-          placeholder={suggestedNote ?? "Add notes: incline, resistance"}
-          className="min-h-[44px] w-full min-w-0 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
-        />
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <NumField label="Duration" suffix="min" value={duration} onChange={setDuration} />
-        <NumField
-          label="Distance"
-          suffix={unit === "lbs" ? "mi" : "km"}
-          value={distance}
-          onChange={setDistance}
-        />
+        <div className="group-row group-row-sep">
+          <label htmlFor="cardio-distance" className="shrink-0 t-body text-muted-foreground">
+            Distance
+          </label>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <input
+              id="cardio-distance"
+              inputMode="decimal"
+              value={distance}
+              onChange={(e) => setDistance(e.target.value)}
+              placeholder="0"
+              className="t-stat w-20 text-right bg-transparent outline-none placeholder:text-muted-foreground"
+            />
+            <span className="t-label text-muted-foreground">{unit === "lbs" ? "mi" : "km"}</span>
+          </div>
+        </div>
       </div>
 
       <div className="mt-6 flex items-center gap-2">
         <button
           onClick={onBack}
-          className="flex min-h-[44px] flex-1 items-center justify-center rounded-full py-3 text-[15px] font-medium text-muted-foreground"
+          className="flex min-h-[44px] flex-1 items-center justify-center rounded-full py-3 t-body font-medium text-muted-foreground"
         >
           Back
         </button>
         <button
           onClick={doSave}
-          className="flex min-h-[44px] flex-[2] items-center justify-center rounded-full bg-accent py-3 text-[15px] font-semibold text-accent-foreground"
+          className="flex min-h-[44px] flex-[2] items-center justify-center rounded-full bg-accent py-3 t-body font-semibold text-accent-foreground"
         >
           Save
         </button>
