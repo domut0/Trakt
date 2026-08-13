@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import {
   computePlateStack,
   DEFAULT_BAR_KG,
@@ -55,6 +56,9 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
     };
   }, [open]);
 
+  // Above the guard below, deliberately: hooks cannot live after a return.
+  useSheetDismiss(open, onClose);
+
   if (!open || typeof document === "undefined") return null;
 
   // An empty or half-typed field ("", "-", "abc") parses to NaN, and NaN renders
@@ -76,8 +80,15 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
 
   const maxPlateWeight = unit === "kg" ? DEFAULT_PLATES_KG[0] : DEFAULT_PLATES_LBS[0];
 
+  // `data-swipe-ignore`: this sheet is opened from /settings, which renders
+  // inside AppShell's <main>. React portals bubble along the React tree rather
+  // than the DOM tree, so touches in here still reach <main>'s
+  // swipe-between-tabs handler, and a drag with any horizontal component would
+  // navigate off Settings. The plate sleeve strip below is already spared by
+  // shouldIgnoreSwipe's generic overflow-x check; the rest of the sheet was not.
   return createPortal(
     <div
+      data-swipe-ignore
       className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end justify-center bg-black/30 anim-backdrop"
       onClick={onClose}
     >

@@ -75,6 +75,9 @@ function Icon({ name }: { name: "home" | "chart" | "calendar" | "settings" }) {
     strokeWidth: 1.6,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
+    // Decorative: every tab renders its own visible text label right below the
+    // icon, so exposing the glyph too would just double the announcement.
+    "aria-hidden": true,
   };
   if (name === "home")
     return (
@@ -117,7 +120,7 @@ function Icon({ name }: { name: "home" | "chart" | "calendar" | "settings" }) {
  */
 function FlameIcon() {
   return (
-    <svg width={22} height={22} viewBox="0 0 24 24" fill="currentColor">
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" />
     </svg>
   );
@@ -136,16 +139,19 @@ export function ActiveSessionBanner() {
   return (
     <button
       onClick={() => router.navigate({ to: "/workout" })}
-      className="fixed left-0 right-0 top-0 z-40 flex items-center justify-between bg-accent px-4 py-2.5 text-accent-foreground"
+      // min-h-[44px] is not only the touch-target floor: AppShell already
+      // reserves exactly pt-11 (44px) for this banner, and at py-2.5 the bar
+      // measured ~38px, so the reserved gap never matched the real bar.
+      className="fixed left-0 right-0 top-0 z-40 flex min-h-[44px] items-center justify-between gap-3 bg-accent px-4 py-2.5 text-accent-foreground"
     >
-      <span className="flex items-center gap-2 text-[13px] font-medium">
-        <span className="relative flex h-2 w-2">
+      <span className="flex min-w-0 items-center gap-2 text-[13px] font-medium">
+        <span className="relative flex h-2 w-2 shrink-0">
           <span className="absolute inset-0 animate-ping rounded-full bg-accent-foreground/60" />
           <span className="relative h-2 w-2 rounded-full bg-accent-foreground" />
         </span>
-        Workout in progress · {slot?.name}
+        <span className="truncate">Workout in progress · {slot?.name}</span>
       </span>
-      <span className="text-[13px] font-medium opacity-90">Return →</span>
+      <span className="shrink-0 text-[13px] font-medium opacity-90">Return →</span>
     </button>
   );
 }
@@ -208,6 +214,7 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
 
   return (
     <nav
+      aria-label="Primary"
       className="relative z-30 shrink-0 hairline-t bg-background"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
     >

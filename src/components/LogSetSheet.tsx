@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { useStore, type ExerciseType } from "../lib/store";
 
 /** Handles all three exercise types even though the picker above filters
@@ -88,6 +89,12 @@ export function LogSetSheet({
       vv.removeEventListener("scroll", handleViewportChange);
     };
   }, [open]);
+
+  // Escape closes the sheet outright rather than stepping back out of the
+  // exercise picker. The picker is not a second screen with somewhere to return
+  // to - it is what this sheet shows when no exercise is chosen yet - so a
+  // "back" would have nothing behind it half the time. Same as a backdrop tap.
+  useSheetDismiss(open, onClose);
 
   const suggestion = useMemo(() => {
     if (!exerciseId) return {} as { weight?: number; reps?: number; rpe?: number };

@@ -189,12 +189,15 @@ function ChartsPage() {
 
       <div
         data-swipe-ignore
+        role="group"
+        aria-label="Metric"
         className="scrollbar-none flex gap-2 overflow-x-auto px-5 pb-2 anim-fade-up"
       >
         {METRICS.map((m) => (
           <button
             key={m.key}
             onClick={() => setMetricKey(m.key)}
+            aria-pressed={metricKey === m.key}
             className={
               "min-h-[44px] whitespace-nowrap rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors duration-200 flex items-center justify-center " +
               (metricKey === m.key
@@ -209,6 +212,8 @@ function ChartsPage() {
 
       <div
         data-swipe-ignore
+        role="group"
+        aria-label="Date range"
         className="scrollbar-none flex gap-2 overflow-x-auto px-5 pb-4 anim-fade-up"
         style={{ animationDelay: "20ms" }}
       >
@@ -216,10 +221,14 @@ function ChartsPage() {
           <button
             key={r.label}
             onClick={() => setRangeDays(r.days)}
+            aria-pressed={rangeDays === r.days}
+            // A bare "7" or "90" names nothing out loud, so the visible chip
+            // stays terse and the accessible name spells out the range.
+            aria-label={r.days === 0 ? "All time" : `Last ${r.days} days`}
             className={
               // min-w matters as much as min-h here: the "7" chip is a single
               // character and would otherwise be a 34px-wide tap target.
-              "min-h-[44px] min-w-[44px] whitespace-nowrap rounded-full px-3.5 py-2 text-[11px] font-medium transition-colors duration-200 flex items-center justify-center " +
+              "min-h-[44px] min-w-[44px] whitespace-nowrap rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors duration-200 flex items-center justify-center tnum " +
               (rangeDays === r.days ? "bg-muted text-foreground" : "text-muted-foreground")
             }
           >
@@ -233,11 +242,18 @@ function ChartsPage() {
         style={{ animationDelay: "40ms" }}
       >
         {/* Inline segmented control on chart card to toggle raw vs smoothed series */}
-        <div className="mb-4 flex items-center justify-between">
-          <span className="text-[13px] font-medium text-muted-foreground">{metric.label}</span>
-          <div className="inline-flex rounded-xl bg-muted p-1 gap-1">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="min-w-0 truncate text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
+            {metric.label}
+          </h2>
+          <div
+            role="group"
+            aria-label="Series"
+            className="inline-flex rounded-xl bg-muted p-1 gap-1"
+          >
             <button
               onClick={() => setViewMode("daily")}
+              aria-pressed={viewMode === "daily"}
               className={
                 "min-h-[44px] min-w-[60px] px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors duration-150 flex items-center justify-center " +
                 (viewMode === "daily"
@@ -249,6 +265,7 @@ function ChartsPage() {
             </button>
             <button
               onClick={() => setViewMode("avg7")}
+              aria-pressed={viewMode === "avg7"}
               className={
                 "min-h-[44px] min-w-[76px] px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors duration-150 flex items-center justify-center " +
                 (viewMode === "avg7"
@@ -274,15 +291,17 @@ function ChartsPage() {
 
         {/* Rate readout derived from linear regression slope */}
         {rateReadoutText && (
-          <div className="mt-3 text-center text-[12px] font-medium text-muted-foreground">
+          <div className="tnum mt-3 text-center text-[12px] font-medium text-muted-foreground">
             Trend: {rateReadoutText}
           </div>
         )}
 
         {/* 4-cell stats row: Latest, Average, Range, Change */}
         <div className="mt-4 grid grid-cols-2 gap-y-4 gap-x-4 pt-4 hairline-t sm:grid-cols-4">
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Latest</div>
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Latest
+            </div>
             <div className="tnum mt-0.5 text-[20px] font-semibold">
               {latestValStr}
               {currentPoints.length > 0 && (
@@ -292,18 +311,22 @@ function ChartsPage() {
               )}
             </div>
           </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               Average
             </div>
             <div className="tnum mt-0.5 text-[20px] font-semibold">{avgValStr}</div>
           </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Range</div>
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Range
+            </div>
             <div className="tnum mt-0.5 text-[20px] font-semibold">{rangeStr}</div>
           </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Change</div>
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Change
+            </div>
             <div className="tnum mt-0.5 text-[20px] font-semibold">{changeStr}</div>
           </div>
         </div>
@@ -346,8 +369,8 @@ function Chart({
   if (displayedPoints.length === 0) {
     return (
       <div className="flex h-[180px] flex-col items-center justify-center p-4 text-center">
-        <div className="text-[14px] font-medium text-foreground">No data recorded</div>
-        <p className="mt-1 text-[12px] text-muted-foreground">
+        <h3 className="text-[16px] font-semibold tracking-tight">No data recorded</h3>
+        <p className="mt-1 text-[13px] text-muted-foreground">
           Log your {metricLabel.toLowerCase()} on the Today tab to track progress over time.
         </p>
       </div>
@@ -656,6 +679,7 @@ function Chart({
           fontSize={9}
           textAnchor="middle"
           fill="var(--color-muted-foreground)"
+          className="tnum"
         >
           {t.label}
         </text>

@@ -110,18 +110,22 @@ export function CalendarView() {
       <div className="mx-5 mb-3 flex items-center justify-between">
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(subMonths(m, 1)))}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-[18px] text-foreground"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-[18px] text-foreground"
           aria-label="Previous month"
         >
-          ‹
+          <span aria-hidden="true">‹</span>
         </button>
-        <span className="text-[16px] font-semibold tracking-tight">{monthLabel}</span>
+        {/* Announced on change: stepping the month replaces the whole grid below
+            but moves no focus, so without this the change is silent. */}
+        <span aria-live="polite" className="tnum text-[16px] font-semibold tracking-tight">
+          {monthLabel}
+        </span>
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(addMonths(m, 1)))}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-[18px] text-foreground"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-[18px] text-foreground"
           aria-label="Next month"
         >
-          ›
+          <span aria-hidden="true">›</span>
         </button>
       </div>
 
@@ -130,7 +134,7 @@ export function CalendarView() {
           cell below names its own weekday in full. */}
       <div
         aria-hidden="true"
-        className="mx-5 grid grid-cols-7 text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+        className="mx-5 grid grid-cols-7 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
       >
         {WEEKDAYS.map((w, i) => (
           <div key={i} className="py-1">
@@ -182,8 +186,9 @@ export function CalendarView() {
               }
             >
               <span
+                aria-hidden="true"
                 className={
-                  "flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-medium " +
+                  "tnum flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-medium " +
                   (todayCell ? "bg-accent text-accent-foreground" : "text-foreground")
                 }
               >
@@ -219,7 +224,7 @@ export function CalendarView() {
 
       <section className="mt-6 pb-6" key={selectedKey}>
         <div className="px-5 pb-2 flex items-center justify-between">
-          <h2 className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <h2 className="tnum text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
             {format(selectedDate, "EEEE, MMMM d")}
           </h2>
         </div>
@@ -261,11 +266,11 @@ export function CalendarView() {
                   onClick={() => setEditorOpen(true)}
                   className="mx-5 flex flex-col gap-2 rounded-2xl bg-surface px-5 py-4 text-left anim-fade-up w-[calc(100%-40px)]"
                 >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="text-[16px] font-semibold tracking-tight">Daily Summary</span>
+                  <div className="flex items-center justify-between gap-3 w-full">
+                    <span className="text-[16px] font-semibold tracking-tight">Daily summary</span>
                     {selectedLog.isCheatDay && (
-                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-widest text-destructive">
-                        Cheat Day
+                      <span className="shrink-0 rounded-md bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-destructive">
+                        Cheat day
                       </span>
                     )}
                   </div>
@@ -314,7 +319,7 @@ export function CalendarView() {
                 <div className="px-5">
                   <button
                     onClick={() => setEditorOpen(true)}
-                    className="w-full rounded-2xl bg-surface py-4 text-center text-[14px] font-medium text-accent anim-fade-up"
+                    className="w-full min-h-[44px] rounded-2xl bg-surface py-4 text-center text-[14px] font-semibold text-accent anim-fade-up"
                   >
                     Log daily numbers
                   </button>
@@ -352,18 +357,18 @@ export function CalendarView() {
                           style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
                         >
                           <div className="min-w-0 flex-1 pr-3">
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-[16px] font-semibold tracking-tight">
+                            <div className="flex min-w-0 items-baseline gap-2">
+                              <span className="truncate text-[16px] font-semibold tracking-tight">
                                 {title}
                               </span>
                               {subtitle && (
-                                <span className="text-[12px] text-muted-foreground">
+                                <span className="tnum shrink-0 text-[12px] text-muted-foreground">
                                   {subtitle}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <span className="text-[12px] text-muted-foreground">
+                          <span className="tnum shrink-0 text-[12px] text-muted-foreground">
                             {fmtTime(session.startedAt)}
                           </span>
                         </Link>

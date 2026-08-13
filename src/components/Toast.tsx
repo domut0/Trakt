@@ -179,13 +179,14 @@ function ToastElement({ toast, onDismiss }: { toast: ActiveToast; onDismiss: () 
         opacity: entered ? (offsetY > 0 ? Math.max(0, 1 - offsetY / 120) : 1) : 0,
       }}
     >
-      <span className="text-[14px] font-medium leading-snug">{toast.message}</span>
+      <span className="min-w-0 text-[14px] font-medium leading-snug">{toast.message}</span>
       {toast.actionLabel && toast.onAction && (
+        // No aria-label: the visible label IS the action name, and duplicating it
+        // only risks the two drifting apart.
         <button
           type="button"
           onClick={handleAction}
           className="flex min-h-[44px] shrink-0 items-center justify-center px-2 text-[14px] font-semibold text-accent active:scale-95"
-          aria-label={toast.actionLabel}
         >
           {toast.actionLabel}
         </button>

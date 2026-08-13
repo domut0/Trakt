@@ -35,7 +35,9 @@ function ExercisePage() {
   if (!exercise) {
     return (
       <AppShell>
-        <div className="px-6 py-20 text-center text-muted-foreground">Exercise not found.</div>
+        <div className="px-5 py-20 text-center text-[15px] text-muted-foreground">
+          Exercise not found.
+        </div>
       </AppShell>
     );
   }
@@ -62,10 +64,12 @@ function ExercisePage() {
       </div>
 
       <header className="px-5 pb-4">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           {typeLabel}
         </div>
-        <h1 className="mt-1 text-[30px] font-semibold tracking-tight">{exercise.name}</h1>
+        <h1 className="mt-1 text-balance break-words text-[30px] font-semibold tracking-tight">
+          {exercise.name}
+        </h1>
         {exercise.setupNote && (
           <div className="mt-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-muted-foreground">
             {exercise.setupNote}
@@ -76,7 +80,7 @@ function ExercisePage() {
       {/* Personal bests and set totals */}
       <div className="px-5 pb-6">
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-surface p-4">
+          <div className="min-w-0 rounded-2xl bg-surface p-4">
             <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               Best Set
             </div>
@@ -100,7 +104,7 @@ function ExercisePage() {
             </div>
           </div>
 
-          <div className="rounded-2xl bg-surface p-4">
+          <div className="min-w-0 rounded-2xl bg-surface p-4">
             <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               Total Sets
             </div>
@@ -113,7 +117,7 @@ function ExercisePage() {
 
       {/* Chronological per-session history */}
       <section className="px-5 pb-10">
-        <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
           History
         </h2>
 
@@ -131,11 +135,11 @@ function ExercisePage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <ul className="space-y-4">
             {grouped.map(({ session, date, sets }) => (
-              <div key={session.id} className="rounded-2xl bg-surface p-4">
-                <div className="flex items-baseline justify-between border-b border-border pb-2.5 mb-2.5">
-                  <span className="text-[14px] font-semibold tracking-tight">
+              <li key={session.id} className="rounded-2xl bg-surface p-4">
+                <div className="flex items-baseline justify-between gap-3 border-b border-border pb-2.5 mb-2.5">
+                  <span className="tnum text-[14px] font-semibold tracking-tight">
                     {date.toLocaleDateString(undefined, {
                       weekday: "short",
                       month: "short",
@@ -143,15 +147,15 @@ function ExercisePage() {
                       year: "numeric",
                     })}
                   </span>
-                  <span className="text-[12px] text-muted-foreground">
+                  <span className="tnum shrink-0 text-[12px] text-muted-foreground">
                     {sets.length} {sets.length === 1 ? "set" : "sets"}
                   </span>
                 </div>
                 <div className="space-y-2">
                   {sets.map((s, idx) => (
                     <div key={s.id} className="flex items-center justify-between text-[15px]">
-                      <div className="flex items-baseline gap-2">
-                        <span className="tnum w-5 text-[13px] text-muted-foreground">
+                      <div className="flex min-w-0 flex-wrap items-baseline gap-2">
+                        <span className="tnum w-5 shrink-0 text-[13px] text-muted-foreground">
                           {idx + 1}
                         </span>
                         <span className="tnum font-medium">
@@ -171,9 +175,9 @@ function ExercisePage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </section>
     </AppShell>

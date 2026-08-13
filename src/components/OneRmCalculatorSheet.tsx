@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { estimate1RM, percentageTable, RELIABLE_REP_LIMIT } from "../lib/onerm";
 import { useStore } from "../lib/store";
 
@@ -45,6 +46,9 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
     };
   }, [open]);
 
+  // Above the guard below, deliberately: hooks cannot live after a return.
+  useSheetDismiss(open, onClose);
+
   if (!open || typeof document === "undefined") return null;
 
   // An empty or half-typed field parses to NaN, and NaN renders literally as
@@ -58,8 +62,14 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
   const estimate = estimate1RM(numWeight, numReps);
   const rows = percentageTable(estimate.average);
 
+  // `data-swipe-ignore`: this sheet is opened from /settings, which renders
+  // inside AppShell's <main>. React portals bubble along the React tree rather
+  // than the DOM tree, so touches in here still reach <main>'s
+  // swipe-between-tabs handler, and a drag with any horizontal component would
+  // navigate off Settings while the percentage table is being read.
   return createPortal(
     <div
+      data-swipe-ignore
       className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end justify-center bg-black/30 anim-backdrop"
       onClick={onClose}
     >

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { useStore } from "../lib/store";
 
 function ArrowUpIcon() {
@@ -158,6 +159,16 @@ export function HabitEditorSheet({ open, onClose }: { open: boolean; onClose: ()
     [habits],
   );
 
+  // Above the guard below, deliberately: hooks cannot live after a return.
+  //
+  // This is the one sheet where Escape already meant something before it meant
+  // "close": the rename field binds it to cancel the rename. That field now
+  // calls preventDefault, which useSheetDismiss treats as "already handled", so
+  // one press cancels the rename and a second closes the sheet. Without it a
+  // single press would do both, losing the sheet as collateral damage from
+  // backing out of a typo.
+  useSheetDismiss(open, onClose);
+
   if (!open || typeof document === "undefined") return null;
 
   const handleAdd = () => {
@@ -190,8 +201,17 @@ export function HabitEditorSheet({ open, onClose }: { open: boolean; onClose: ()
     reorderHabits(current.id, next.id);
   };
 
+  // `data-swipe-ignore`: this sheet is owned by HabitsCard, which renders
+  // inside AppShell's <main>. React portals bubble along the React tree rather
+  // than the DOM tree, so touches in here still reach <main>'s
+  // swipe-between-tabs handler, and a drag with any horizontal component would
+  // navigate off Today mid-edit. AppShell's shouldIgnoreSwipe resolves this
+  // attribute with a DOM `closest`, which works from the portal's real position
+  // under document.body. WorkoutChooserSheet and StartWorkoutSheet need no such
+  // attribute: AppShell mounts them as siblings of <main>, not inside it.
   return createPortal(
     <div
+      data-swipe-ignore
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-6 anim-backdrop"
       style={{
         paddingTop: "env(safe-area-inset-top)",
@@ -292,7 +312,13 @@ export function HabitEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                           onBlur={() => commitRename(habit.id)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") commitRename(habit.id);
-                            if (e.key === "Escape") setEditingId(null);
+                            if (e.key === "Escape") {
+                              // Claims the press so useSheetDismiss leaves it
+                              // alone: backing out of a rename must not also
+                              // close the sheet.
+                              e.preventDefault();
+                              setEditingId(null);
+                            }
                           }}
                           className="w-full rounded bg-surface px-2 py-1 text-[15px] font-medium text-foreground outline-none ring-1 ring-accent"
                         />

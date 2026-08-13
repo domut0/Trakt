@@ -1,6 +1,7 @@
 import { parse } from "date-fns";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { useStore, type DailyLog } from "../lib/store";
 import { useToast } from "./Toast";
 
@@ -114,6 +115,13 @@ export function DayEditorSheet({
       vv.removeEventListener("scroll", handleViewportChange);
     };
   }, [open]);
+
+  // Above the guard below, deliberately: hooks cannot live after a return.
+  //
+  // Escape is wired to onClose, not to save, so it behaves exactly like Cancel
+  // and like a backdrop tap: the draft is dropped. A key that silently wrote
+  // half-entered numbers into the log would be the worse of the two.
+  useSheetDismiss(open, onClose);
 
   if (!open || typeof document === "undefined") return null;
 

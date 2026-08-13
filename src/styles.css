@@ -232,5 +232,23 @@
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+    /* Clamping the duration alone is not enough for the staggered list
+       entrances (WeeklyView day cards, the Charts chip rows), which carry an
+       inline animation-delay of up to ~210ms. With `both` fill mode the element
+       holds its `from` keyframe for the whole delay, so the clamp turned a
+       gentle stagger into content that is invisible and then pops in. */
+    animation-delay: 0s !important;
+  }
+
+  /* toast-up is the one animation in the app whose FINAL keyframe is invisible
+     (it fades itself out at 100%), so a clamped duration would land the toast
+     on opacity 0 and the "Set logged" confirmation would never be seen. Every
+     other keyframe here ends on the element's resting state, where clamping is
+     exactly the right behaviour. The -50% X translate is preserved because it
+     is what centres the toast against `left-1/2`. */
+  .anim-toast {
+    animation: none !important;
+    opacity: 1;
+    transform: translate(-50%, 0);
   }
 }

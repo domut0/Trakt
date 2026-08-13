@@ -104,10 +104,10 @@ export function TargetsEditor() {
       {showDayAssignments && (
         <>
           <div className="rounded-2xl border border-border/40 bg-surface p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               This week
             </div>
-            <div className="mt-1.5 space-y-1 text-[13px] font-medium text-foreground">
+            <div className="tnum mt-1.5 space-y-1 text-[13px] font-medium text-foreground">
               {summaryLines.map((line) => (
                 <div key={line.key}>{line.text}</div>
               ))}
@@ -118,13 +118,17 @@ export function TargetsEditor() {
           </div>
 
           <div>
-            <div className="mb-1 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <h2 className="mb-1 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
               Day assignments
-            </div>
+            </h2>
             <p className="mb-2 text-[12px] text-muted-foreground">
               Tap a day to cycle through your profiles.
             </p>
-            <div className="grid grid-cols-7 gap-1.5">
+            <div
+              role="group"
+              aria-label="Weekday target assignments"
+              className="grid grid-cols-7 gap-1.5"
+            >
               {WEEKDAY_LABELS.map((label, idx) => {
                 const assigned = targetProfiles.find((p) => p.id === weekdayTargets[idx]);
                 // Never fall back to profiles[0] for display: claiming an
@@ -137,13 +141,17 @@ export function TargetsEditor() {
                     type="button"
                     aria-label={`${label}, currently ${assignedName}. Tap to change.`}
                     onClick={() => handleRotateDayTarget(idx)}
-                    className="flex min-h-[52px] flex-col items-center justify-center rounded-xl border border-border/40 bg-surface p-1 text-center transition-transform active:scale-95"
+                    className="flex min-h-[52px] min-w-0 flex-col items-center justify-center rounded-xl border border-border/40 bg-surface p-1 text-center transition-transform active:scale-95"
                   >
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <span
+                      aria-hidden="true"
+                      className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                    >
                       {label}
                     </span>
                     <span
-                      className={`mt-0.5 max-w-full truncate px-0.5 text-[11px] font-bold ${
+                      aria-hidden="true"
+                      className={`mt-0.5 max-w-full truncate px-0.5 text-[11px] font-semibold ${
                         assigned ? "text-accent" : "text-muted-foreground"
                       }`}
                     >
@@ -335,7 +343,7 @@ function TargetFieldInput({
     <div className="rounded-xl bg-muted p-3">
       <label
         htmlFor={id}
-        className="block text-[11px] uppercase tracking-wider text-muted-foreground"
+        className="block text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
       >
         {label}
       </label>

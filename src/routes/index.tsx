@@ -126,7 +126,7 @@ function Home() {
   return (
     <AppShell>
       <header className="px-5 pb-4 pt-14">
-        <h1 className="text-[34px] font-semibold leading-none tracking-tight">Today</h1>
+        <h1 className="text-[30px] font-semibold tracking-tight">Today</h1>
       </header>
 
       {/* Consistency strip: visual dot status for the last 7 calendar days */}
@@ -174,7 +174,7 @@ function Home() {
             <div>
               <button
                 onClick={() => setOpenDayEditor(true)}
-                className="w-full text-left text-[13px] text-muted-foreground focus:outline-none"
+                className="flex min-h-[44px] w-full items-center text-left text-[13px] text-muted-foreground focus:outline-none"
               >
                 Nothing logged today. Tap to add calories, macros, steps or bodyweight.
               </button>
@@ -195,7 +195,7 @@ function Home() {
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
                     <span className="font-semibold text-accent shrink-0">Copy yesterday</span>
-                    <span className="text-[12px] text-muted-foreground truncate">
+                    <span className="tnum truncate text-[12px] text-muted-foreground">
                       ({formatYesterdaySummary(yesterdayLog)})
                     </span>
                   </div>
@@ -222,14 +222,22 @@ function Home() {
                   className="flex w-full items-center justify-between rounded-2xl bg-surface px-5 py-4 text-left border border-border/40"
                 >
                   <div className="min-w-0 flex-1 pr-3">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-[16px] font-semibold tracking-tight">{title}</span>
+                    {/* The subtitle and the time need shrink-0 for the title's
+                        `truncate` to be the thing that gives: otherwise flex
+                        compresses "· 12 sets" and "3 PM" first and a long split
+                        name still pushes the row wide. */}
+                    <div className="flex min-w-0 items-baseline gap-2">
+                      <span className="truncate text-[16px] font-semibold tracking-tight">
+                        {title}
+                      </span>
                       {subtitle && (
-                        <span className="text-[12px] text-muted-foreground">· {subtitle}</span>
+                        <span className="tnum shrink-0 text-[12px] text-muted-foreground">
+                          · {subtitle}
+                        </span>
                       )}
                     </div>
                   </div>
-                  <span className="text-[12px] text-muted-foreground">
+                  <span className="tnum shrink-0 text-[12px] text-muted-foreground">
                     {fmtTime(session.startedAt)}
                   </span>
                 </button>
@@ -289,9 +297,9 @@ function ConsistencyStrip({
         <h2 className="text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
           Consistency
         </h2>
-        <span className="text-[11px] text-muted-foreground">Last 7 days</span>
+        <span className="shrink-0 text-[12px] text-muted-foreground">Last 7 days</span>
       </div>
-      <div className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3 border border-border/40">
+      <ul className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3 border border-border/40">
         {days.map((d) => {
           let statusText = "Nothing tracked";
           if (d.hasWorkout && d.hasLog) statusText = "Workout and daily log";
@@ -299,12 +307,17 @@ function ConsistencyStrip({
           else if (d.hasLog) statusText = "Daily log recorded";
 
           return (
-            <div
+            // role="img" is what makes the aria-label announce at all: on a bare
+            // container element the label is ignored, so the dots (which carry
+            // the entire meaning here) read as nothing.
+            <li
               key={d.key}
+              role="img"
               aria-label={`${d.weekdayLabel}: ${statusText}${d.isToday ? " (Today)" : ""}`}
               className="flex flex-col items-center gap-1.5"
             >
               <span
+                aria-hidden="true"
                 className={`text-[11px] font-semibold uppercase tracking-wider ${
                   d.isToday ? "text-accent font-bold" : "text-muted-foreground"
                 }`}
@@ -328,10 +341,10 @@ function ConsistencyStrip({
                   <div className="h-2.5 w-2.5 rounded-full bg-muted border border-border/60" />
                 )}
               </div>
-            </div>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </div>
   );
 }
@@ -372,7 +385,9 @@ function DayLogSummary({
   return (
     <div className="flex flex-col gap-5">
       {showRing && (
-        <div className="flex items-center gap-6">
+        // gap-4, not gap-6: at 320px the 72px ring plus three macro columns plus
+        // a 24px gap overflows the card by a couple of pixels.
+        <div className="flex items-center gap-4">
           {targetsEnabled && calProgress ? (
             <CalorieTargetRing
               logged={calProgress.logged}
@@ -427,7 +442,7 @@ function DayLogSummary({
       {(stats.length > 0 || log.isCheatDay) && (
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           {stats.map((s) => (
-            <span key={s.label} className="text-[15px]">
+            <span key={s.label} className="text-[14px]">
               <span className="tnum font-semibold">{s.value}</span>{" "}
               <span className="text-[12px] text-muted-foreground">{s.label}</span>
             </span>
@@ -556,7 +571,7 @@ function CalorieTargetRing({
         >
           {logged.toLocaleString()}
         </span>
-        <span className="mt-0.5 text-[10px] font-medium leading-none text-muted-foreground">
+        <span className="tnum mt-0.5 text-[10px] font-medium leading-none text-muted-foreground">
           / {target.toLocaleString()}
         </span>
       </div>
@@ -580,7 +595,7 @@ function MacroColumn({
   const pct = Math.round((cal / total) * 100);
   return (
     <div className="flex flex-col items-center">
-      <span className={`text-[12px] font-semibold ${colorClass}`}>{pct}%</span>
+      <span className={`tnum text-[12px] font-semibold ${colorClass}`}>{pct}%</span>
       <span className="tnum mt-0.5 text-[18px] font-bold leading-none">{grams}g</span>
       <span className="mt-1 text-[12px] text-muted-foreground">{name}</span>
     </div>

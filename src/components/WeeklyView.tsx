@@ -125,7 +125,9 @@ export function WeeklyView() {
   if (weeks.length === 0) {
     return (
       <div className="mx-5 rounded-2xl bg-surface px-5 py-8 text-center space-y-3">
-        <h3 className="text-[16px] font-semibold tracking-tight">No history logged</h3>
+        {/* h2, not h3: this replaces the whole week list, so there is no section
+            heading above it to be a sub-level of. */}
+        <h2 className="text-[16px] font-semibold tracking-tight">No history logged</h2>
         <p className="text-[13px] text-muted-foreground">
           Track your bodyweight, steps, or macros to start building your log.
         </p>
@@ -220,10 +222,10 @@ function WeekHeader({
   return (
     <div className="px-5 pb-2">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <h2 className="tnum min-w-0 truncate text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
           Week of {format(parseDayKey(weekStart), "MMM d")}
         </h2>
-        <span className="shrink-0 text-[12px] text-muted-foreground">
+        <span className="tnum shrink-0 text-[12px] text-muted-foreground">
           {sessionCount === 0
             ? "No sessions"
             : `${sessionCount} session${sessionCount === 1 ? "" : "s"}`}
@@ -287,7 +289,7 @@ function DayCard({
         className="cursor-pointer rounded-2xl bg-surface px-5 py-4"
       >
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[16px] font-semibold tracking-tight">{dayLabel(date)}</span>
+          <span className="tnum text-[16px] font-semibold tracking-tight">{dayLabel(date)}</span>
           {log?.isCheatDay && (
             <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-medium text-destructive">
               <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
@@ -297,22 +299,34 @@ function DayCard({
         </div>
 
         {sessions.length > 0 && (
-          <ul className="mt-2 space-y-1">
+          <ul className="mt-1">
             {sessions.map((session) => (
               <li key={session.id}>
+                {/* min-h-[44px] rather than an inset overlay: two workouts on one
+                    day put these rows 4px apart, so overlapping hit areas would
+                    have let the upper row swallow taps meant for the lower. */}
                 <Link
                   to="/session/$id"
                   params={{ id: session.id }}
                   // The card behind this opens the editor; a workout row must
                   // not do both.
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-baseline gap-2"
+                  className="flex min-h-[44px] items-center gap-2"
                 >
-                  <span className="text-[15px] font-medium tracking-tight">{session.title}</span>
+                  <span className="truncate text-[15px] font-medium tracking-tight">
+                    {session.title}
+                  </span>
                   {session.subtitle && (
-                    <span className="text-[12px] text-muted-foreground">{session.subtitle}</span>
+                    <span className="tnum shrink-0 text-[12px] text-muted-foreground">
+                      {session.subtitle}
+                    </span>
                   )}
-                  <span className="ml-auto shrink-0 text-[12px] text-muted-foreground">›</span>
+                  <span
+                    aria-hidden="true"
+                    className="ml-auto shrink-0 text-[12px] text-muted-foreground"
+                  >
+                    ›
+                  </span>
                 </Link>
               </li>
             ))}

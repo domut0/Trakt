@@ -27,12 +27,15 @@ export function DeleteWorkoutButton({
 
   return (
     <>
+      {/* The visible circle stays 36px so the header row it sits in keeps its
+          height, while an inset pseudo-element carries the hit area out to 44px.
+          Same trick as the switch in settings.tsx. */}
       <button
         onClick={() => setConfirming(true)}
         aria-label="Delete workout"
-        className="flex h-9 w-9 items-center justify-center rounded-full text-destructive"
+        className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-destructive after:absolute after:-inset-1 after:content-['']"
       >
-        <Trash2 size={20} />
+        <Trash2 size={20} aria-hidden="true" />
       </button>
 
       {confirming &&
@@ -55,13 +58,13 @@ export function DeleteWorkoutButton({
               <div className="mt-5 flex gap-2">
                 <button
                   onClick={() => setConfirming(false)}
-                  className="flex-1 rounded-full bg-muted py-3 text-[15px] font-medium text-muted-foreground"
+                  className="flex min-h-[44px] flex-1 items-center justify-center rounded-full bg-muted py-3 text-[15px] font-medium text-muted-foreground"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={doDelete}
-                  className="flex-1 rounded-full bg-destructive py-3 text-[15px] font-semibold text-white"
+                  className="flex min-h-[44px] flex-1 items-center justify-center rounded-full bg-destructive py-3 text-[15px] font-semibold text-white"
                 >
                   Delete
                 </button>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { useStore } from "../lib/store";
 
 export function StartWorkoutSheet({
@@ -23,6 +24,15 @@ export function StartWorkoutSheet({
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open, predicted]);
+
+  // Above the guard below, deliberately: hooks cannot live after a return.
+  //
+  // This sheet is the reason the lock is reference-counted rather than a plain
+  // boolean. AppShell hands off from WorkoutChooserSheet by closing it and
+  // opening this one in one batched update, so the chooser's cleanup and this
+  // sheet's setup land in the same commit, cleanup first. A per-sheet lock
+  // would unlock the page in between.
+  useSheetDismiss(open, onClose);
 
   if (!open || typeof document === "undefined") return null;
 

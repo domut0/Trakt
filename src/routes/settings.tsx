@@ -5,7 +5,13 @@ import { OneRmCalculatorSheet } from "../components/OneRmCalculatorSheet";
 import { PlateCalculatorSheet } from "../components/PlateCalculatorSheet";
 import { TargetsEditor } from "../components/TargetsEditor";
 import { dailyLogsToCsv, setsToCsv } from "../lib/csv";
-import { BACKUP_VERSION, parseBackup, useStore, type BackupData } from "../lib/store";
+import {
+  BACKUP_VERSION,
+  parseBackup,
+  useStore,
+  type BackupData,
+  type TargetProfile,
+} from "../lib/store";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -32,6 +38,13 @@ function SettingsPage() {
   const setToolsEnabled = useStore((s) => s.setToolsEnabled);
   const importData = useStore((s) => s.importData);
   const clearAllData = useStore((s) => s.clearAllData);
+  // Read only so the import confirmation can compare the file against what is
+  // already here. An import replaces each of these tables whole, so anything in
+  // them that the file does not carry is deleted, not merged.
+  const dailyLogs = useStore((s) => s.dailyLogs);
+  const habits = useStore((s) => s.habits);
+  const habitEntries = useStore((s) => s.habitEntries);
+  const targetProfiles = useStore((s) => s.targetProfiles);
   const router = useRouter();
 
   // Import flow: a selected file is parsed and fully validated (parseBackup)
@@ -160,6 +173,20 @@ function SettingsPage() {
   const cancelImport = () => {
     setPendingImport(null);
   };
+
+  // Derived for the confirmation below, and deliberately two separate things.
+  // A per-table count of what is in the FILE is not enough on its own: after
+  // parseBackup, a file that predates a feature is indistinguishable from a file
+  // written by someone who never used it, because both arrive as an empty array
+  // (habits) or as the seeded single profile (targets). A count of "0 habits"
+  // therefore reads as "nothing changes" at exactly the moment it means "all of
+  // your habits are about to be deleted". So the losses are computed by
+  // comparing against live state instead, which also means a user who has never
+  // used habits is told nothing about them.
+  const fileCounts = pendingImport ? summarizeBackup(pendingImport) : "";
+  const losses = pendingImport
+    ? describeLosses(pendingImport, { dailyLogs, habits, habitEntries, targetProfiles })
+    : [];
 
   return (
     <AppShell>
@@ -333,11 +360,19 @@ function SettingsPage() {
         {pendingImport && (
           <div className="px-5 py-3.5 hairline-t">
             <div className="text-[13px] text-muted-foreground">
-              This file has {pendingImport.exercises.length} exercises,{" "}
-              {pendingImport.sessions.length} sessions, {pendingImport.sets.length} sets and{" "}
-              {pendingImport.dailyLogs.length} logged days. Importing will replace all data
-              currently on this device. This cannot be undone.
+              Backup format v{pendingImport.version}
+              {pendingImport.version < BACKUP_VERSION
+                ? ", written by an older version of the app"
+                : ""}
+              . This file has {fileCounts}. Importing will replace all data currently on this
+              device, along with your unit and feature switches. This cannot be undone.
             </div>
+            {losses.length > 0 && (
+              <div className="mt-3 text-[13px] text-destructive">
+                Importing this file deletes {joinList(losses)}. The file contains none of it. Export
+                a backup first if you want to keep it.
+              </div>
+            )}
             <div className="mt-3 flex gap-2">
               <button
                 onClick={cancelImport}
@@ -345,9 +380,20 @@ function SettingsPage() {
               >
                 Cancel
               </button>
+              {/* Reads as destructive only when it actually destroys something the
+                  user still has, so the red is a signal rather than the permanent
+                  colour of the import button. Geometry is untouched on purpose:
+                  the hit area stays exactly the visible pill, since widening the
+                  tap target of a confirm this final only makes it easier to hit
+                  by mistake. */}
               <button
                 onClick={confirmImport}
-                className="flex-1 rounded-full bg-foreground py-2.5 text-[14px] font-medium text-background"
+                className={
+                  "flex-1 rounded-full py-2.5 text-[14px] font-medium " +
+                  (losses.length > 0
+                    ? "bg-destructive text-white"
+                    : "bg-foreground text-background")
+                }
               >
                 Replace all data
               </button>
@@ -414,6 +460,93 @@ function SettingsPage() {
       )}
     </AppShell>
   );
+}
+
+/** `${n} thing` / `${n} things`, the same idiom CalendarView and WeeklyView use.
+ * Worth a helper here because a confirmation that says "1 habits" reads like the
+ * file is malformed rather than like a count. */
+function countOf(n: number, singular: string): string {
+  return `${n} ${n === 1 ? singular : `${singular}s`}`;
+}
+
+/** "a", "a and b", "a, b and c". */
+function joinList(items: string[]): string {
+  if (items.length < 2) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/** Every table `replaceAllData` clears, in the order the backup file itself
+ * lists them. All of them are cleared whole, so any table missing from this list
+ * is data the user is never warned about losing. */
+function summarizeBackup(b: BackupData): string {
+  return joinList([
+    countOf(b.exercises.length, "exercise"),
+    countOf(b.slots.length, "split"),
+    countOf(b.sessions.length, "session"),
+    countOf(b.sets.length, "set"),
+    countOf(b.dailyLogs.length, "logged day"),
+    countOf(b.habits.length, "habit"),
+    countOf(b.habitEntries.length, "habit check-off"),
+    countOf(b.targetProfiles.length, "target profile"),
+  ]);
+}
+
+/** True when the target setup is something the user built, as opposed to the
+ * single empty "Every day" profile that `defaultTargets` seeds on first run and
+ * that `parseBackup` substitutes for any file older than v4.
+ *
+ * Content, not version number: a v4 file exported before its author ever opened
+ * the targets editor carries that same empty default, and importing it destroys
+ * the reader's profiles just as thoroughly as a v1 file does. More than one
+ * profile also covers a non-uniform weekday assignment, since seven days can
+ * only differ if there is more than one profile to point at. */
+function hasTargetData(profiles: TargetProfile[]): boolean {
+  if (profiles.length > 1) return true;
+  return profiles.some(
+    (p) =>
+      p.calories !== undefined ||
+      p.protein !== undefined ||
+      p.carbs !== undefined ||
+      p.fat !== undefined ||
+      p.steps !== undefined,
+  );
+}
+
+/**
+ * What this device has that the backup does not, phrased as the thing the user
+ * loses. Each clause fires independently, because the format grew one feature at
+ * a time and a file can be short of any subset: a v1 file has no daily logs, a
+ * v1-v3 file has no habits and no real targets, and a hand-trimmed v4 file can
+ * be missing habit history while still carrying the habits themselves.
+ *
+ * Deliberately does NOT check exercises, splits, sessions or sets. Those four
+ * exist in every format version and are validated hard by `parseBackup`, so a
+ * file with none of them is a genuinely empty backup rather than an old one, and
+ * the counts in the summary already say so plainly.
+ */
+function describeLosses(
+  b: BackupData,
+  current: {
+    dailyLogs: unknown[];
+    habits: unknown[];
+    habitEntries: unknown[];
+    targetProfiles: TargetProfile[];
+  },
+): string[] {
+  const losses: string[] = [];
+  if (b.dailyLogs.length === 0 && current.dailyLogs.length > 0) {
+    losses.push(countOf(current.dailyLogs.length, "logged day"));
+  }
+  if (b.habits.length === 0 && current.habits.length > 0) {
+    losses.push(countOf(current.habits.length, "habit"));
+  }
+  if (b.habitEntries.length === 0 && current.habitEntries.length > 0) {
+    losses.push(countOf(current.habitEntries.length, "recorded habit check-off"));
+  }
+  if (!hasTargetData(b.targetProfiles) && hasTargetData(current.targetProfiles)) {
+    losses.push(countOf(current.targetProfiles.length, "daily target profile"));
+  }
+  return losses;
 }
 
 function Section({
