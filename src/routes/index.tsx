@@ -56,7 +56,7 @@ function formatYesterdaySummary(log: DailyLog): string {
 }
 
 function Home() {
-  const [openDayEditor, setOpenDayEditor] = useState(false);
+  const [editingDate, setEditingDate] = useState<string | null>(null);
   const router = useRouter();
   const sessions = useStore((s) => s.sessions);
   const slots = useStore((s) => s.slots);
@@ -125,12 +125,16 @@ function Home() {
 
   return (
     <AppShell>
-      <header className="px-5 pb-4 pt-14">
-        <h1 className="text-[30px] font-semibold tracking-tight">Today</h1>
+      <header className="px-5 pt-14 pb-2">
+        <h1 className="t-title">Today</h1>
       </header>
 
-      {/* Consistency strip: visual dot status for the last 7 calendar days */}
-      <ConsistencyStrip dailyLogs={dailyLogs} sessions={sessions} />
+      {/* Consistency strip: visual status and backfill entry for the last 7 calendar days */}
+      <ConsistencyStrip
+        dailyLogs={dailyLogs}
+        sessions={sessions}
+        onSelectDate={(key) => setEditingDate(key)}
+      />
 
       {/*
         First card on the screen, ahead of the daily log, because this is the
@@ -145,23 +149,23 @@ function Home() {
         screen a second, independent editor.
       */}
       {habitsEnabled && (
-        <div className="mt-6 px-5 anim-fade-up">
-          <h2 className="pb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Supplements
+        <section className="px-5 section-gap anim-fade-up">
+          <h2 className="group-header px-0 t-caption">
+            Habits
           </h2>
           <HabitsCard date={todayKey} />
-        </div>
+        </section>
       )}
 
-      <div className="mt-6 px-5 anim-fade-up">
-        <h2 className="pb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <section className="px-5 section-gap anim-fade-up">
+        <h2 className="group-header px-0 t-caption">
           Daily log
         </h2>
-        <div className="block w-full rounded-2xl bg-surface px-5 py-4 text-left border border-border/40">
+        <div className="group-list p-5">
           {hasTodayLog ? (
             <button
-              onClick={() => setOpenDayEditor(true)}
-              className="w-full text-left focus:outline-none"
+              onClick={() => setEditingDate(todayKey)}
+              className="w-full text-left focus:outline-none min-h-[44px]"
             >
               <DayLogSummary
                 log={todayLog!}
@@ -171,10 +175,10 @@ function Home() {
               />
             </button>
           ) : (
-            <div>
+            <div className="flex flex-col gap-3">
               <button
-                onClick={() => setOpenDayEditor(true)}
-                className="flex min-h-[44px] w-full items-center text-left text-[13px] text-muted-foreground focus:outline-none"
+                onClick={() => setEditingDate(todayKey)}
+                className="flex min-h-[44px] w-full items-center text-left t-label text-muted-foreground focus:outline-none"
               >
                 Nothing logged today. Tap to add calories, macros, steps or bodyweight.
               </button>
@@ -191,89 +195,96 @@ function Home() {
                       fat: yesterdayLog.fat,
                     });
                   }}
-                  className="mt-3 flex min-h-[44px] w-full items-center justify-between rounded-xl bg-muted px-4 py-2.5 text-left text-[13px] font-medium text-foreground hover:bg-muted/80 transition-colors active:scale-[0.99]"
+                  className="flex min-h-[44px] w-full items-center justify-between border-t border-border pt-3 text-left transition-colors active:opacity-70"
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
-                    <span className="font-semibold text-accent shrink-0">Copy yesterday</span>
-                    <span className="tnum truncate text-[12px] text-muted-foreground">
+                    <span className="t-label font-semibold text-accent shrink-0">Copy yesterday</span>
+                    <span className="t-label truncate text-muted-foreground">
                       ({formatYesterdaySummary(yesterdayLog)})
                     </span>
                   </div>
-                  <span className="text-[12px] font-semibold text-accent shrink-0">Copy</span>
+                  <span className="t-label font-semibold text-accent shrink-0">Copy</span>
                 </button>
               )}
             </div>
           )}
         </div>
-      </div>
+      </section>
 
-      <div className="mt-8 px-5 anim-fade-up">
-        <h2 className="pb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <section className="px-5 section-gap pb-8 anim-fade-up">
+        <h2 className="group-header px-0 t-caption">
           Workouts
         </h2>
         {todaysSessions.length > 0 ? (
-          <ul className="space-y-3">
-            {todaysSessions.map(({ session, title, subtitle }) => (
-              <li key={session.id}>
-                <button
-                  onClick={() =>
-                    router.navigate({ to: "/session/$id", params: { id: session.id } })
-                  }
-                  className="flex w-full items-center justify-between rounded-2xl bg-surface px-5 py-4 text-left border border-border/40"
-                >
-                  <div className="min-w-0 flex-1 pr-3">
-                    {/* The subtitle and the time need shrink-0 for the title's
-                        `truncate` to be the thing that gives: otherwise flex
-                        compresses "· 12 sets" and "3 PM" first and a long split
-                        name still pushes the row wide. */}
-                    <div className="flex min-w-0 items-baseline gap-2">
-                      <span className="truncate text-[16px] font-semibold tracking-tight">
-                        {title}
+          <div className="group-list">
+            {todaysSessions.map(({ session, title, subtitle }, idx) => (
+              <button
+                key={session.id}
+                onClick={() =>
+                  router.navigate({ to: "/session/$id", params: { id: session.id } })
+                }
+                className={`group-row w-full text-left focus:outline-none ${
+                  idx > 0 ? "group-row-sep" : ""
+                }`}
+              >
+                <div className="min-w-0 flex-1 pr-3">
+                  {/* The subtitle and the time need shrink-0 for the title's
+                      `truncate` to be the thing that gives: otherwise flex
+                      compresses "· 12 sets" and "3 PM" first and a long split
+                      name still pushes the row wide. */}
+                  <div className="flex min-w-0 items-baseline gap-2">
+                    <span className="truncate t-body font-semibold tracking-tight">
+                      {title}
+                    </span>
+                    {subtitle && (
+                      <span className="shrink-0 t-label text-muted-foreground">
+                        · {subtitle}
                       </span>
-                      {subtitle && (
-                        <span className="tnum shrink-0 text-[12px] text-muted-foreground">
-                          · {subtitle}
-                        </span>
-                      )}
-                    </div>
+                    )}
                   </div>
-                  <span className="tnum shrink-0 text-[12px] text-muted-foreground">
-                    {fmtTime(session.startedAt)}
-                  </span>
-                </button>
-              </li>
+                </div>
+                <span className="shrink-0 t-label text-muted-foreground">
+                  {fmtTime(session.startedAt)}
+                </span>
+              </button>
             ))}
-          </ul>
+          </div>
         ) : (
-          <div className="text-[13px] text-muted-foreground">No workouts logged today</div>
+          <div className="group-list px-5 py-4">
+            <p className="t-label text-muted-foreground">No workouts logged today</p>
+          </div>
         )}
-      </div>
+      </section>
 
       <DayEditorSheet
-        date={todayKey}
-        open={openDayEditor}
-        onClose={() => setOpenDayEditor(false)}
+        date={editingDate ?? todayKey}
+        open={editingDate !== null}
+        onClose={() => setEditingDate(null)}
       />
     </AppShell>
   );
 }
 
 /**
- * Visual consistency strip showing status dots for the last 7 calendar days.
+ * Visual consistency strip showing status indicators for the last 7 calendar days.
  *
- * Each dot indicates whether a daily log was recorded, a workout was trained,
- * or both. Today is highlighted with an accent ring to anchor the visual timeline.
+ * Each day is tappable to open the day editor and backfill missing entries.
+ * Indicator dots show whether a daily log was recorded (green), a workout was
+ * trained (blue), or both. Today is highlighted with an accent ring.
  */
 function ConsistencyStrip({
   dailyLogs,
   sessions,
+  onSelectDate,
 }: {
   dailyLogs: DailyLog[];
   sessions: WorkoutSession[];
+  onSelectDate: (dateKey: string) => void;
 }) {
   const days = useMemo(() => {
     const result = [];
     const now = new Date();
+    const todayK = dayKey(now);
     // 7 days ending with today (i=6 down to 0)
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now);
@@ -285,67 +296,70 @@ function ConsistencyStrip({
         return dayKey(new Date(s.startedAt)) === key;
       });
       const weekdayLabel = WEEKDAY_LABELS[weekdayIndexFor(d)];
-      const isToday = i === 0;
+      const isToday = key === todayK;
       result.push({ key, date: d, weekdayLabel, hasLog, hasWorkout, isToday });
     }
     return result;
   }, [dailyLogs, sessions]);
 
   return (
-    <div className="mt-2 px-5 anim-fade-up">
-      <div className="flex items-center justify-between pb-2">
-        <h2 className="text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
-          Consistency
-        </h2>
-        <span className="shrink-0 text-[12px] text-muted-foreground">Last 7 days</span>
+    <section className="px-5 section-gap anim-fade-up">
+      <div className="group-header flex items-center justify-between px-0">
+        <h2 className="t-caption">Consistency</h2>
+        <span className="t-label text-muted-foreground">Last 7 days</span>
       </div>
-      <ul className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3 border border-border/40">
-        {days.map((d) => {
-          let statusText = "Nothing tracked";
-          if (d.hasWorkout && d.hasLog) statusText = "Workout and daily log";
-          else if (d.hasWorkout) statusText = "Workout trained";
-          else if (d.hasLog) statusText = "Daily log recorded";
+      <div className="group-list p-3">
+        <div className="grid grid-cols-7 gap-1">
+          {days.map((d) => {
+            let statusText = "Nothing tracked";
+            if (d.hasWorkout && d.hasLog) statusText = "Workout trained and daily log recorded";
+            else if (d.hasWorkout) statusText = "Workout trained";
+            else if (d.hasLog) statusText = "Daily log recorded";
 
-          return (
-            // role="img" is what makes the aria-label announce at all: on a bare
-            // container element the label is ignored, so the dots (which carry
-            // the entire meaning here) read as nothing.
-            <li
-              key={d.key}
-              role="img"
-              aria-label={`${d.weekdayLabel}: ${statusText}${d.isToday ? " (Today)" : ""}`}
-              className="flex flex-col items-center gap-1.5"
-            >
-              <span
-                aria-hidden="true"
-                className={`text-[11px] font-semibold uppercase tracking-wider ${
-                  d.isToday ? "text-accent font-bold" : "text-muted-foreground"
-                }`}
+            return (
+              <button
+                key={d.key}
+                type="button"
+                onClick={() => onSelectDate(d.key)}
+                aria-label={`Log for ${d.weekdayLabel} ${d.date.getDate()}: ${statusText}${d.isToday ? " (Today)" : ""}`}
+                className="flex flex-col items-center justify-center min-h-[44px] py-1.5 px-0.5 rounded-xl transition-colors hover:bg-muted/40 active:scale-95 text-center focus:outline-none"
               >
-                {d.weekdayLabel}
-              </span>
-              <div
-                className={`relative flex h-5 w-5 items-center justify-center rounded-full ${
-                  d.isToday ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : ""
-                }`}
-              >
-                {d.hasWorkout && d.hasLog ? (
-                  <div className="h-3.5 w-3.5 rounded-full bg-accent flex items-center justify-center">
-                    <div className="h-1.5 w-1.5 rounded-full bg-nutrition" />
-                  </div>
-                ) : d.hasWorkout ? (
-                  <div className="h-3.5 w-3.5 rounded-full bg-accent" />
-                ) : d.hasLog ? (
-                  <div className="h-3.5 w-3.5 rounded-full bg-nutrition" />
-                ) : (
-                  <div className="h-2.5 w-2.5 rounded-full bg-muted border border-border/60" />
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+                <span
+                  className={`t-caption ${
+                    d.isToday ? "text-accent font-bold" : "text-muted-foreground"
+                  }`}
+                >
+                  {d.weekdayLabel}
+                </span>
+
+                <div
+                  className={`flex h-7 w-7 items-center justify-center rounded-full t-body font-semibold my-1 ${
+                    d.isToday
+                      ? "ring-2 ring-accent ring-offset-2 ring-offset-surface text-foreground"
+                      : "text-foreground"
+                  }`}
+                >
+                  {d.date.getDate()}
+                </div>
+
+                <div className="flex items-center justify-center gap-1 h-2">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full transition-colors ${
+                      d.hasWorkout ? "bg-accent" : "bg-muted"
+                    }`}
+                  />
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full transition-colors ${
+                      d.hasLog ? "bg-nutrition" : "bg-muted"
+                    }`}
+                  />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -383,10 +397,8 @@ function DayLogSummary({
   if (log.bodyweight !== undefined) stats.push({ label: unit, value: String(log.bodyweight) });
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       {showRing && (
-        // gap-4, not gap-6: at 320px the 72px ring plus three macro columns plus
-        // a 24px gap overflows the card by a couple of pixels.
         <div className="flex items-center gap-4">
           {targetsEnabled && calProgress ? (
             <CalorieTargetRing
@@ -432,7 +444,7 @@ function DayLogSummary({
       )}
 
       {targetsEnabled && otherProgressRows.length > 0 && (
-        <div className="flex flex-col gap-2.5 pt-1 border-t border-border/40">
+        <div className="flex flex-col gap-2.5 pt-3 border-t border-border">
           {otherProgressRows.map((p) => (
             <SlimProgressBar key={p.field} progress={p} />
           ))}
@@ -442,13 +454,13 @@ function DayLogSummary({
       {(stats.length > 0 || log.isCheatDay) && (
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           {stats.map((s) => (
-            <span key={s.label} className="text-[14px]">
-              <span className="tnum font-semibold">{s.value}</span>{" "}
-              <span className="text-[12px] text-muted-foreground">{s.label}</span>
+            <span key={s.label} className="t-body">
+              <span className="t-stat font-semibold">{s.value}</span>{" "}
+              <span className="t-label text-muted-foreground">{s.label}</span>
             </span>
           ))}
           {log.isCheatDay && (
-            <span className="text-[13px] font-medium text-destructive">Cheat day</span>
+            <span className="t-label font-medium text-destructive">Cheat day</span>
           )}
         </div>
       )}
@@ -478,9 +490,9 @@ function SlimProgressBar({ progress }: { progress: TargetProgress }) {
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex justify-between text-[12px]">
+      <div className="flex justify-between t-label">
         <span className="font-medium text-muted-foreground">{label}</span>
-        <span className="tnum font-semibold">
+        <span className="t-label font-semibold">
           {progress.logged.toLocaleString()}
           {unitSuffix}
           <span className="text-muted-foreground font-normal">
@@ -488,7 +500,7 @@ function SlimProgressBar({ progress }: { progress: TargetProgress }) {
             / {progress.target.toLocaleString()}
             {unitSuffix}
           </span>
-          {isOver && <span className="ml-1.5 text-[10px] font-bold text-destructive">OVER</span>}
+          {isOver && <span className="ml-1.5 t-caption text-destructive">OVER</span>}
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -567,11 +579,11 @@ function CalorieTargetRing({
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pt-0.5 text-center">
         <span
-          className={`tnum text-[14px] font-bold leading-none ${isOver ? "text-destructive" : ""}`}
+          className={`t-body font-bold leading-none ${isOver ? "text-destructive" : ""}`}
         >
           {logged.toLocaleString()}
         </span>
-        <span className="tnum mt-0.5 text-[10px] font-medium leading-none text-muted-foreground">
+        <span className="mt-0.5 t-caption leading-none text-muted-foreground font-normal">
           / {target.toLocaleString()}
         </span>
       </div>
@@ -595,9 +607,9 @@ function MacroColumn({
   const pct = Math.round((cal / total) * 100);
   return (
     <div className="flex flex-col items-center">
-      <span className={`tnum text-[12px] font-semibold ${colorClass}`}>{pct}%</span>
-      <span className="tnum mt-0.5 text-[18px] font-bold leading-none">{grams}g</span>
-      <span className="mt-1 text-[12px] text-muted-foreground">{name}</span>
+      <span className={`t-label font-semibold ${colorClass}`}>{pct}%</span>
+      <span className="t-stat mt-0.5 leading-none">{grams}g</span>
+      <span className="mt-1 t-label text-muted-foreground">{name}</span>
     </div>
   );
 }
@@ -670,9 +682,10 @@ function MacroRing({
           })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pt-0.5">
-        <span className="tnum text-[15px] font-bold leading-none">{centerText}</span>
-        <span className="mt-1 text-[11px] font-medium leading-none text-muted-foreground">cal</span>
+        <span className="t-body font-bold leading-none">{centerText}</span>
+        <span className="mt-1 t-caption leading-none text-muted-foreground font-normal">cal</span>
       </div>
     </div>
   );
 }
+
