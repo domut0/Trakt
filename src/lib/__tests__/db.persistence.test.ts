@@ -12,6 +12,8 @@ const DEFAULT_STATE = {
   slots: [],
   sessions: [],
   sets: [],
+  habits: [],
+  habitEntries: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,

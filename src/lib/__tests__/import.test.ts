@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { db } from "../db";
-import { BACKUP_VERSION, isCardioSession, parseBackup, useStore, type BackupData } from "../store";
+import { DEFAULT_TARGET_PROFILE_ID, db, defaultTargets } from "../db";
+import {
+  BACKUP_VERSION,
+  habitEntryId,
+  isCardioSession,
+  parseBackup,
+  useStore,
+  type BackupData,
+} from "../store";
 
 // fake-indexeddb/auto (loaded globally in src/test/setup.ts) gives us a real
 // IndexedDB implementation backed by memory, so the round-trip test below
@@ -13,6 +20,18 @@ const DEFAULT_STATE = {
   sessions: [],
   sets: [],
   dailyLogs: [],
+  habits: [],
+  habitEntries: [],
+  // Cleared to empty/false rather than to the app's defaults, deliberately. This
+  // object stands in for a fresh process that has not read IndexedDB yet, and
+  // pre-filling it with the same values a correct hydrate would produce is
+  // exactly how a "survives a reload" assertion passes without the reload having
+  // read anything at all.
+  targetProfiles: [],
+  weekdayTargets: [],
+  targetsEnabled: false,
+  habitsEnabled: false,
+  toolsEnabled: false,
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -31,6 +50,10 @@ function sortByDate<T extends { date: string }>(items: T[]): T[] {
   return [...items].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// Clears every table the current schema has. habits and habitEntries are not
+// optional extras here: the v4 fixtures below write real rows into them, and a
+// reset that skipped them would leak those rows into the tests that assert an
+// older backup lands with no habits at all.
 async function resetDb() {
   await Promise.all([
     db.exercises.clear(),
@@ -38,6 +61,8 @@ async function resetDb() {
     db.sessions.clear(),
     db.sets.clear(),
     db.dailyLogs.clear(),
+    db.habits.clear(),
+    db.habitEntries.clear(),
     db.meta.clear(),
   ]);
 }
@@ -47,7 +72,28 @@ beforeEach(async () => {
   useStore.setState({ ...DEFAULT_STATE });
 });
 
+/**
+ * What a pre-v4 backup necessarily carries once parsed: no habits, and the
+ * single uniform target profile `parseBackup` substitutes in. Spread into the
+ * fixtures below so each one keeps saying only what its own version is ABOUT,
+ * rather than restating seven fields that are the same in all of them.
+ *
+ * Named for the versions it describes, not for the version that introduced the
+ * fields. Every fixture spreading this one is an OLD file, and a name reading
+ * V4_DEFAULTS invited the misreading that these are what a current backup looks
+ * like - which is what let `version: BACKUP_VERSION` sit in a v3 fixture.
+ */
+const PRE_V4_DEFAULTS = {
+  habits: [],
+  habitEntries: [],
+  ...defaultTargets(),
+  targetsEnabled: false,
+  habitsEnabled: false,
+  toolsEnabled: false,
+};
+
 const validBackup: BackupData = {
+  ...PRE_V4_DEFAULTS,
   version: 2,
   exercises: [{ id: "e1", name: "Bench Press", type: "main" }],
   slots: [{ id: "s1", name: "Heavy Bench", rotationOrder: 0 }],
@@ -211,6 +257,9 @@ describe("importData (full backup restore)", () => {
     useStore.getState().upsertDailyLog("2026-02-10", { calories: 2100, protein: 180 });
     useStore.getState().upsertDailyLog("2026-02-11", { steps: 0, isCheatDay: true });
     const exported: BackupData = {
+      ...PRE_V4_DEFAULTS,
+      // A v2-era export. The current format's own round-trip lives in the
+      // "restores every v4 field" test further down.
       version: 2,
       exercises: seeded.exercises,
       slots: seeded.slots,
@@ -351,7 +400,13 @@ describe("importData (full backup restore)", () => {
 
   it("round-trips a v3 backup carrying cardio sessions and a cardio exercise", async () => {
     const v3Backup: BackupData = {
-      version: BACKUP_VERSION,
+      ...PRE_V4_DEFAULTS,
+      // Hardcoded, never BACKUP_VERSION. This fixture's whole job is to be an
+      // OLD file, and writing it as BACKUP_VERSION only looked right for as long
+      // as the constant happened to equal 3: the moment v4 landed, this stopped
+      // being a v3 test and started claiming to be a v4 file that carried none
+      // of v4's data.
+      version: 3,
       exercises: [
         { id: "e1", name: "Bench Press", type: "main" },
         { id: "e2", name: "Treadmill", type: "cardio" },
@@ -376,11 +431,14 @@ describe("importData (full backup restore)", () => {
       dailyLogs: [],
       unit: "lbs",
     };
-    expect(v3Backup.version).toBe(3);
 
     const result = parseBackup(JSON.stringify(v3Backup));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    // The parser reports the version it read, rather than normalising an old file
+    // up to the current one. Asserting `v3Backup.version` here instead would just
+    // be re-reading the literal three lines above.
+    expect(result.data.version).toBe(3);
     expect(result.data).toEqual(v3Backup);
 
     await useStore.getState().hydrate();
@@ -394,6 +452,182 @@ describe("importData (full backup restore)", () => {
     expect(sortById(reloaded.sessions)).toEqual(sortById(v3Backup.sessions));
     expect(sortById(reloaded.exercises)).toEqual(sortById(v3Backup.exercises));
     expect(reloaded.sessions.filter(isCardioSession)).toHaveLength(1);
+  });
+
+  it("round-trips a v4 backup with every habit, target and toggle field intact", async () => {
+    // The reason this test earns its length: an exported file is the ONLY copy of
+    // this data. There is no backend and no sync, so a v4 field that quietly
+    // failed to survive export -> parse -> import is not a bug the user can work
+    // around, it is data they can never get back.
+    const v4Backup: BackupData = {
+      // Hardcoded for the same reason as the v3 fixture: this fixture IS a v4
+      // file, not "whatever the current version happens to be". When the format
+      // moves to 5, the guard test below fails and the answer is a new v5 fixture
+      // beside this one, not a bump here that would leave v4 uncovered.
+      version: 4,
+      exercises: [{ id: "e1", name: "Bench Press", type: "main" }],
+      slots: [{ id: "s1", name: "Heavy Bench", rotationOrder: 0 }],
+      sessions: [
+        // `note` is the other thing v4 added. It is non-indexed and parseBackup
+        // does not validate it, which is precisely why it needs asserting: it
+        // rides along on the object or it is lost, and nothing else would notice.
+        { id: "sess1", splitSlotId: "s1", startedAt: 1000, endedAt: 2000, note: "felt flat" },
+      ],
+      sets: [
+        { id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1500 },
+      ],
+      dailyLogs: [{ date: "2026-03-01", calories: 2400, steps: 0, isCheatDay: true }],
+      habits: [
+        { id: "h1", name: "Creatine", order: 0 },
+        // One archived habit, because archiving is what keeps old entries
+        // meaningful - dropping the flag on import would resurrect a habit the
+        // user retired.
+        { id: "h2", name: "Evening stretch", order: 1, archived: true },
+      ],
+      habitEntries: [
+        // Built through the same helper the app uses, so this fixture cannot
+        // drift from the real composite-key format.
+        { id: habitEntryId("2026-03-01", "h1"), date: "2026-03-01", habitId: "h1" },
+        { id: habitEntryId("2026-03-02", "h1"), date: "2026-03-02", habitId: "h1" },
+      ],
+      // TWO profiles, spread unevenly across the week, deliberately. With a single
+      // uniform profile this test would still pass if parseBackup discarded the
+      // file's targets and fell back to defaults, because the defaults are exactly
+      // that shape. An uneven assignment is something the fallback cannot produce,
+      // so a fallback shows up here as a failure instead of a false pass.
+      targetProfiles: [
+        { id: "tp_train", name: "Training", calories: 2800, protein: 200, steps: 10000 },
+        { id: "tp_rest", name: "Rest", calories: 2200, protein: 190 },
+      ],
+      // Monday first, matching the store's convention.
+      weekdayTargets: [
+        "tp_train",
+        "tp_rest",
+        "tp_train",
+        "tp_rest",
+        "tp_train",
+        "tp_rest",
+        "tp_rest",
+      ],
+      // All three true for the same anti-false-pass reason: parseBackup reads
+      // these as `=== true`, so a fixture using `false` would be identical to the
+      // field having been dropped on the floor.
+      targetsEnabled: true,
+      habitsEnabled: true,
+      toolsEnabled: true,
+      // Not the default, so a settings record that failed to persist is visible.
+      unit: "kg",
+    };
+
+    const result = parseBackup(JSON.stringify(v4Backup));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Verbatim after a real trip through JSON. `toEqual` on the whole object is
+    // the point: a field added to BackupData later and forgotten in parseBackup
+    // fails here without anyone having to remember to assert it.
+    expect(result.data).toEqual(v4Backup);
+
+    await useStore.getState().hydrate();
+    await useStore.getState().importData(result.data);
+    const restored = useStore.getState();
+    expect(restored.habits).toEqual(v4Backup.habits);
+    expect(restored.habitEntries).toEqual(v4Backup.habitEntries);
+    expect(restored.targetProfiles).toEqual(v4Backup.targetProfiles);
+    expect(restored.weekdayTargets).toEqual(v4Backup.weekdayTargets);
+    expect(restored.targetsEnabled).toBe(true);
+    expect(restored.habitsEnabled).toBe(true);
+    expect(restored.toolsEnabled).toBe(true);
+    expect(restored.sessions).toEqual(v4Backup.sessions);
+
+    // The half that actually matters for a restore: read it back out of
+    // IndexedDB, not out of the store we just set.
+    useStore.setState({ ...DEFAULT_STATE, hydrated: false });
+    await useStore.getState().hydrate();
+    const reloaded = useStore.getState();
+    expect(sortById(reloaded.habits)).toEqual(sortById(v4Backup.habits));
+    expect(sortById(reloaded.habitEntries)).toEqual(sortById(v4Backup.habitEntries));
+    expect(reloaded.targetProfiles).toEqual(v4Backup.targetProfiles);
+    expect(reloaded.weekdayTargets).toEqual(v4Backup.weekdayTargets);
+    expect(reloaded.targetsEnabled).toBe(true);
+    expect(reloaded.habitsEnabled).toBe(true);
+    expect(reloaded.toolsEnabled).toBe(true);
+    expect(reloaded.unit).toBe("kg");
+    expect(sortById(reloaded.sessions)).toEqual(sortById(v4Backup.sessions));
+    expect(sortByDate(reloaded.dailyLogs)).toEqual(sortByDate(v4Backup.dailyLogs));
+    // The habitEntries indexes are what Today and habit deletion query through,
+    // so a restore that landed the rows without them would read as an empty day.
+    expect(await db.habitEntries.where("date").equals("2026-03-01").count()).toBe(1);
+    expect(await db.habitEntries.where("habitId").equals("h1").count()).toBe(2);
+  });
+
+  it("still has 4 as the current backup format", () => {
+    // A tripwire, not a fact worth asserting for its own sake. The round-trip
+    // above is pinned to version 4, so it stops covering the CURRENT format the
+    // moment the format moves on - and the newest format is the one whose export
+    // users are actually holding. When this fails, write the v5 fixture; do not
+    // just bump the number.
+    expect(BACKUP_VERSION).toBe(4);
+  });
+
+  it("imports a v2 file that has no habit, target or toggle keys and lands on the defaults", async () => {
+    // Built by DELETING those keys rather than by setting them empty: the file on
+    // disk genuinely does not have them, and absent takes a different branch
+    // through parseBackup than present-but-empty does.
+    const legacyBackup: Record<string, unknown> = { ...validBackup, version: 2 };
+    for (const key of [
+      "habits",
+      "habitEntries",
+      "targetProfiles",
+      "weekdayTargets",
+      "targetsEnabled",
+      "habitsEnabled",
+      "toolsEnabled",
+    ]) {
+      delete legacyBackup[key];
+    }
+
+    const result = parseBackup(JSON.stringify(legacyBackup));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.version).toBe(2);
+    expect(result.data.habits).toEqual([]);
+    expect(result.data.habitEntries).toEqual([]);
+    // Exactly one profile, and every weekday pointing at it. The count matters as
+    // much as the contents: a weekdayTargets of any length but 7 is treated as
+    // "no target at all" by targets.ts, so a sloppy fallback would silently leave
+    // the feature dead rather than defaulted.
+    expect(result.data.targetProfiles).toEqual(defaultTargets().targetProfiles);
+    expect(result.data.targetProfiles).toHaveLength(1);
+    expect(result.data.weekdayTargets).toHaveLength(7);
+    expect(result.data.weekdayTargets.every((id) => id === DEFAULT_TARGET_PROFILE_ID)).toBe(true);
+    // And the features stay off. An old file cannot consent to a surface that did
+    // not exist when it was written.
+    expect(result.data.targetsEnabled).toBe(false);
+    expect(result.data.habitsEnabled).toBe(false);
+    expect(result.data.toolsEnabled).toBe(false);
+
+    await useStore.getState().hydrate();
+    await useStore.getState().importData(result.data);
+
+    // Empty in the DB too, not just in the store: hydrate is seeded from these
+    // tables on every subsequent launch.
+    expect(await db.habits.count()).toBe(0);
+    expect(await db.habitEntries.count()).toBe(0);
+
+    useStore.setState({ ...DEFAULT_STATE, hydrated: false });
+    await useStore.getState().hydrate();
+    const reloaded = useStore.getState();
+    expect(reloaded.habits).toEqual([]);
+    expect(reloaded.habitEntries).toEqual([]);
+    expect(reloaded.targetProfiles).toEqual(defaultTargets().targetProfiles);
+    expect(reloaded.weekdayTargets).toHaveLength(7);
+    expect(reloaded.weekdayTargets.every((id) => id === DEFAULT_TARGET_PROFILE_ID)).toBe(true);
+    expect(reloaded.targetsEnabled).toBe(false);
+    expect(reloaded.habitsEnabled).toBe(false);
+    expect(reloaded.toolsEnabled).toBe(false);
+    // The workout data the old file DID carry still arrived.
+    expect(sortById(reloaded.exercises)).toEqual(sortById(validBackup.exercises));
+    expect(reloaded.unit).toBe(validBackup.unit);
   });
 
   it("rejects a session whose kind is neither strength nor cardio", () => {

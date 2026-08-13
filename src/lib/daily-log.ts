@@ -151,15 +151,43 @@ export function aggregateDailyLogs(logs: readonly DailyLog[]): DailyLogAggregate
 }
 
 /**
- * How many workouts were finished in the Monday-start week beginning at
- * `weekStart`. Unfinished (still-running) sessions don't count — a workout is
- * "trained" once it has ended, which is also the moment it gets a day.
+ * How many workouts count as "trained" in the Monday-start week beginning at
+ * `weekStart`.
+ *
+ * Two different questions, answered on purpose by two different fields:
+ *
+ * 1. Does the session count at all? `endedAt != null`. A still-running workout
+ *    is not yet a trained session, so an in-progress lift never inflates the
+ *    week it is happening in. This is a COMPLETENESS filter.
+ * 2. Which week does it count in? `startedAt`. The day you began training owns
+ *    the session. This is the DATE ASSIGNMENT, and it is a separate decision
+ *    from (1) even though only finished sessions ever reach it.
+ *
+ * `startedAt` does the bucketing because every surface that LISTS sessions
+ * buckets them that way: WeeklyView's day cards, CalendarView's grid, and the
+ * home route's Today card. Bucketing this count by `endedAt` instead put a
+ * workout begun 23:00 Sunday and finished 00:30 Monday into the FOLLOWING
+ * week's total while the lists still showed it under the Sunday, and WeeklyView
+ * renders that total in the header immediately above that list: the header
+ * could read "No sessions" directly over a card naming a workout. Worse, weeks
+ * with nothing logged in them are never rendered at all, so the displaced count
+ * could vanish from the screen rather than merely land one week late.
+ *
+ * So agreement with the display surfaces decides this, not the otherwise
+ * reasonable claim that a workout becomes "trained" at the instant it ends.
+ * Only one date can be right for both the count and the list, and a visible
+ * number contradicting the list beneath it is a worse failure than a debatable
+ * definition of when the training happened.
+ *
+ * Midnight crossings are not a hypothetical worth waving away: `logCardio`
+ * back-computes `startedAt` from the logged duration, so a bout entered just
+ * after midnight lands on the previous day by construction.
  */
 export function countSessionsTrained(
-  sessions: readonly Pick<WorkoutSession, "endedAt">[],
+  sessions: readonly Pick<WorkoutSession, "startedAt" | "endedAt">[],
   weekStart: string,
 ): number {
   return sessions.filter(
-    (s) => s.endedAt != null && weekStartKey(new Date(s.endedAt)) === weekStart,
+    (s) => s.endedAt != null && weekStartKey(new Date(s.startedAt)) === weekStart,
   ).length;
 }

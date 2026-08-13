@@ -192,27 +192,57 @@ describe("countSessionsTrained", () => {
     return d.getTime();
   };
 
-  it("counts only sessions that ended inside the week", () => {
-    const sessions = [
-      { endedAt: at(MON) },
-      { endedAt: at(WED) },
-      { endedAt: at(SUN) },
-      { endedAt: at(NEXT_MON) },
-    ];
+  /** A finished workout starting at `hour` on `key` and running `hours` long. */
+  const session = (key: string, hour = 18, hours = 1) => ({
+    startedAt: at(key, hour),
+    endedAt: at(key, hour) + hours * 3600_000,
+  });
+
+  it("counts only sessions inside the week", () => {
+    const sessions = [session(MON), session(WED), session(SUN), session(NEXT_MON)];
     expect(countSessionsTrained(sessions, MON)).toBe(3);
     expect(countSessionsTrained(sessions, NEXT_MON)).toBe(1);
   });
 
-  it("ignores sessions that never ended", () => {
-    expect(countSessionsTrained([{ endedAt: undefined }, { endedAt: at(TUE) }], MON)).toBe(1);
+  it("ignores sessions that never ended, even inside the week", () => {
+    // The unfinished one starts squarely inside the week, so only the
+    // completeness guard can be keeping it out of the total.
+    expect(
+      countSessionsTrained([{ startedAt: at(TUE), endedAt: undefined }, session(TUE)], MON),
+    ).toBe(1);
   });
 
   it("returns 0 for a week with no workouts", () => {
-    expect(countSessionsTrained([{ endedAt: at(MON) }], NEXT_MON)).toBe(0);
+    expect(countSessionsTrained([session(MON)], NEXT_MON)).toBe(0);
   });
 
   it("puts a late Sunday workout in the week that started the preceding Monday", () => {
-    expect(countSessionsTrained([{ endedAt: at(SUN, 23) }], MON)).toBe(1);
-    expect(countSessionsTrained([{ endedAt: at(SUN, 23) }], NEXT_MON)).toBe(0);
+    expect(countSessionsTrained([session(SUN, 20)], MON)).toBe(1);
+    expect(countSessionsTrained([session(SUN, 20)], NEXT_MON)).toBe(0);
+  });
+
+  it("counts a workout that runs past midnight in the week it STARTED, not the week it ended", () => {
+    // Sun 23:00 to Mon 00:30. Every surface that lists sessions keys them by
+    // startedAt, so this belongs to the week of the Sunday. Bucketing by
+    // endedAt pushed it into the next week's header while the day card below
+    // that header still listed it under the Sunday.
+    const overnight = session(SUN, 23, 1.5);
+
+    // Proof the fixture really does cross midnight into the next week, so this
+    // test cannot quietly stop exercising the boundary.
+    expect(dayKey(new Date(overnight.startedAt))).toBe(SUN);
+    expect(dayKey(new Date(overnight.endedAt))).toBe(NEXT_MON);
+    expect(weekStartKey(new Date(overnight.endedAt))).toBe(NEXT_MON);
+
+    expect(countSessionsTrained([overnight], MON)).toBe(1);
+    expect(countSessionsTrained([overnight], NEXT_MON)).toBe(0);
+  });
+
+  it("still ignores an overnight session that has not finished yet", () => {
+    // Started 23:00 Sunday and still running. It gets the Sunday's week from
+    // startedAt but no total at all until it ends.
+    const running = { startedAt: at(SUN, 23), endedAt: undefined };
+    expect(countSessionsTrained([running], MON)).toBe(0);
+    expect(countSessionsTrained([running], NEXT_MON)).toBe(0);
   });
 });

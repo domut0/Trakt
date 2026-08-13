@@ -13,12 +13,18 @@ const DEFAULT_STATE = {
   sessions: [],
   sets: [],
   dailyLogs: [],
+  habits: [],
+  habitEntries: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
   hydrated: false,
 };
 
+// Clears every table the current schema has, including the two nothing in this
+// file writes: a reset that misses a table leaks rows into the next test, and
+// "nothing writes it yet" is exactly the assumption that rots when a new test
+// arrives.
 async function resetDb() {
   await Promise.all([
     db.exercises.clear(),
@@ -26,6 +32,8 @@ async function resetDb() {
     db.sessions.clear(),
     db.sets.clear(),
     db.dailyLogs.clear(),
+    db.habits.clear(),
+    db.habitEntries.clear(),
     db.meta.clear(),
   ]);
 }
@@ -47,13 +55,26 @@ beforeEach(async () => {
 });
 
 describe("daily logs (schema + write-through)", () => {
-  it("opens the v2 database with an empty dailyLogs table and seeds no logs", async () => {
+  it("opens the current schema with an empty dailyLogs table and seeds no logs", async () => {
     await useStore.getState().hydrate();
 
-    expect(db.verno).toBe(2);
+    // Hardcoded rather than read off `db`, for the reason spelled out in
+    // db.upgrade.test.ts: Dexie sets `verno` from the version() declarations, so
+    // comparing it against itself could never fail. Bump it by hand, and when
+    // you do, check that a new table has not quietly started out non-empty.
+    expect(db.verno).toBe(3);
+    // The store and the DB have to agree. Checking only the store would pass if
+    // hydrate had invented an empty array over a table that actually had rows.
     expect(useStore.getState().dailyLogs).toEqual([]);
     expect(await db.dailyLogs.count()).toBe(0);
-    // The v1 tables still seeded normally, i.e. the upgrade did not disturb them.
+    // Same claim for the other opt-in tables a first run must leave alone: the
+    // checklist starts empty, so nothing is seeded into either.
+    expect(useStore.getState().habits).toEqual([]);
+    expect(await db.habits.count()).toBe(0);
+    expect(await db.habitEntries.count()).toBe(0);
+    // Meanwhile the tables that DO get seeded were seeded, so "empty" above is a
+    // statement about dailyLogs specifically and not about a seed that failed
+    // wholesale and left every table bare.
     expect(useStore.getState().exercises.length).toBeGreaterThan(100);
   });
 

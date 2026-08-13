@@ -109,7 +109,10 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
           value={exerciseQuery}
           onChange={(e) => setExerciseQuery(e.target.value)}
           placeholder="Search or add activity"
-          className="mt-3 w-full bg-transparent text-[20px] font-semibold tracking-tight outline-none placeholder:text-muted-foreground/50"
+          // A placeholder is not an accessible name: it disappears the moment
+          // anything is typed, so the field needs its own label.
+          aria-label="Search or add a cardio activity"
+          className="mt-3 min-h-[44px] w-full bg-transparent text-[20px] font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
         />
         <ul className="mt-3 max-h-72 divide-y divide-border overflow-y-auto">
           {filteredRows.map((r) =>
@@ -117,19 +120,19 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
               <li key={r.exercise.id}>
                 <button
                   onClick={() => selectExercise(r.exercise.id)}
-                  className="flex w-full items-center justify-between py-3 text-left"
+                  className="flex min-h-[44px] w-full items-center justify-between gap-3 py-3 text-left"
                 >
-                  <span className="text-[16px]">{r.exercise.name}</span>
+                  <span className="truncate text-[16px]">{r.exercise.name}</span>
                 </button>
               </li>
             ) : (
               <li key={r.name}>
                 <button
                   onClick={() => addCustom(r.name)}
-                  className="flex w-full items-center justify-between py-3 text-left"
+                  className="flex min-h-[44px] w-full items-center justify-between gap-3 py-3 text-left"
                 >
-                  <span className="text-[16px] text-muted-foreground">{r.name}</span>
-                  <span className="text-[11px] uppercase tracking-wider text-accent">
+                  <span className="truncate text-[16px] text-muted-foreground">{r.name}</span>
+                  <span className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-accent">
                     Suggested
                   </span>
                 </button>
@@ -140,17 +143,19 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
             <li>
               <button
                 onClick={() => addCustom(trimmedQuery)}
-                className="flex w-full items-center justify-between py-3 text-left text-accent"
+                className="flex min-h-[44px] w-full items-center justify-between gap-3 py-3 text-left text-accent"
               >
-                <span className="text-[16px]">Add "{trimmedQuery}"</span>
-                <span className="text-[11px] uppercase tracking-wider">New</span>
+                <span className="truncate text-[16px]">Add "{trimmedQuery}"</span>
+                <span className="shrink-0 text-[11px] font-medium uppercase tracking-wider">
+                  New
+                </span>
               </button>
             </li>
           )}
         </ul>
         <button
           onClick={onBack}
-          className="mt-2 w-full rounded-full py-3 text-[15px] font-medium text-muted-foreground"
+          className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-full py-3 text-[15px] font-medium text-muted-foreground"
         >
           Cancel
         </button>
@@ -161,28 +166,40 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
   return (
     <div>
       <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-border" />
-      <div className="mt-3 flex items-baseline justify-between">
-        <button onClick={() => setPickingExercise(true)} className="text-left">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Activity</div>
-          <div className="mt-0.5 text-[20px] font-semibold tracking-tight">{chosen?.name}</div>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <button
+          onClick={() => setPickingExercise(true)}
+          aria-label={`Change activity, currently ${chosen?.name ?? "not set"}`}
+          className="min-h-[44px] min-w-0 text-left"
+        >
+          <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Activity
+          </div>
+          <div className="mt-0.5 truncate text-[20px] font-semibold tracking-tight">
+            {chosen?.name}
+          </div>
         </button>
         <button
           onClick={() => setPickingExercise(true)}
-          className="text-[13px] font-medium text-accent"
+          className="flex min-h-[44px] shrink-0 items-center text-[13px] font-medium text-accent"
         >
           Change
         </button>
       </div>
 
       <div className="mt-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-        <span className="shrink-0 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <label
+          htmlFor="cardio-setup-note"
+          className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+        >
           Setup
-        </span>
+        </label>
         <input
+          id="cardio-setup-note"
           value={setupNote}
           onChange={(e) => setSetupNote(e.target.value)}
-          placeholder={suggestedNote ?? "Add notes — incline, resistance…"}
-          className="w-full bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
+          placeholder={suggestedNote ?? "Add notes: incline, resistance"}
+          className="min-h-[44px] w-full min-w-0 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
         />
       </div>
 
@@ -199,13 +216,13 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
       <div className="mt-6 flex items-center gap-2">
         <button
           onClick={onBack}
-          className="flex-1 rounded-full py-3 text-[15px] font-medium text-muted-foreground"
+          className="flex min-h-[44px] flex-1 items-center justify-center rounded-full py-3 text-[15px] font-medium text-muted-foreground"
         >
           Back
         </button>
         <button
           onClick={doSave}
-          className="flex-[2] rounded-full bg-accent py-3 text-[15px] font-semibold text-accent-foreground"
+          className="flex min-h-[44px] flex-[2] items-center justify-center rounded-full bg-accent py-3 text-[15px] font-semibold text-accent-foreground"
         >
           Save
         </button>

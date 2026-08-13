@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { CardioLogCard } from "./CardioLogCard";
 
 function StrengthIcon() {
@@ -60,6 +61,13 @@ export function WorkoutChooserSheet({
   useEffect(() => {
     if (open) setMode("choose");
   }, [open]);
+
+  // Escape closes the whole popup even from cardio mode, matching what a
+  // backdrop tap already does from there. CardioLogCard's own Back button is
+  // the way to step back to the chooser without discarding the popup.
+  //
+  // Above the guard below, deliberately: hooks cannot live after a return.
+  useSheetDismiss(open, onClose);
 
   if (!open || typeof document === "undefined") return null;
 

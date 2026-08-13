@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { useStore } from "../lib/store";
 import { PwaUpdatePrompt } from "../components/PwaUpdatePrompt";
 import { WriteErrorBanner } from "../components/WriteErrorBanner";
+import { ToastProvider } from "../components/Toast";
 
 function NotFoundComponent() {
   return (
@@ -144,11 +145,16 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StoreHydrator />
-      <PwaUpdatePrompt />
-      <WriteErrorBanner />
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      {/* Mounted here, not in AppShell: the /workout route bypasses AppShell, so
+          useToast() would return its no-op fallback there. Same reason
+          WriteErrorBanner lives at this level. */}
+      <ToastProvider>
+        <StoreHydrator />
+        <PwaUpdatePrompt />
+        <WriteErrorBanner />
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

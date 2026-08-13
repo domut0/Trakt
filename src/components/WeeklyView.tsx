@@ -54,8 +54,8 @@ function fmtCardioDetails(
 
 /**
  * The History tab's default (Weekly) view: a continuous, newest-first scroll
- * of one card per day that has ANYTHING on it — a workout, some numbers, or a
- * cheat-day flag — broken up by a summary header for each Monday-start week.
+ * of one card per day that has ANYTHING on it (a workout, some numbers, or a
+ * cheat-day flag), broken up by a summary header for each Monday-start week.
  *
  * Days with nothing logged are skipped rather than rendered blank, so a
  * fortnight off collapses to a gap between two week headers instead of
@@ -124,8 +124,19 @@ export function WeeklyView() {
 
   if (weeks.length === 0) {
     return (
-      <div className="mx-5 rounded-xl bg-muted px-4 py-8 text-center text-[14px] text-muted-foreground">
-        Nothing logged yet.
+      <div className="mx-5 rounded-2xl bg-surface px-5 py-8 text-center space-y-3">
+        {/* h2, not h3: this replaces the whole week list, so there is no section
+            heading above it to be a sub-level of. */}
+        <h2 className="text-[16px] font-semibold tracking-tight">No history logged</h2>
+        <p className="text-[13px] text-muted-foreground">
+          Track your bodyweight, steps, or macros to start building your log.
+        </p>
+        <button
+          onClick={() => openEditor(dayKey(new Date()))}
+          className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-accent px-5 py-2.5 text-[14px] font-semibold text-accent-foreground"
+        >
+          Log today's numbers
+        </button>
       </div>
     );
   }
@@ -175,8 +186,8 @@ export function WeeklyView() {
 }
 
 /**
- * The divider between weeks. Deliberately quiet — small, uppercase and muted,
- * matching the app's other section headings — so it reads as a label over the
+ * The divider between weeks. Deliberately quiet: small, uppercase and muted,
+ * matching the app's other section headings, so it reads as a label over the
  * day cards rather than competing with them.
  */
 function WeekHeader({
@@ -211,10 +222,10 @@ function WeekHeader({
   return (
     <div className="px-5 pb-2">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-[13px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <h2 className="tnum min-w-0 truncate text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
           Week of {format(parseDayKey(weekStart), "MMM d")}
         </h2>
-        <span className="shrink-0 text-[12px] text-muted-foreground">
+        <span className="tnum shrink-0 text-[12px] text-muted-foreground">
           {sessionCount === 0
             ? "No sessions"
             : `${sessionCount} session${sessionCount === 1 ? "" : "s"}`}
@@ -237,8 +248,8 @@ function WeekHeader({
  * One day. Tapping anywhere except a workout row opens the day editor, so any
  * past day can be corrected in place.
  *
- * There is deliberately no swipe-to-delete here. The card is composite — a
- * workout plus macros plus steps plus bodyweight — and one accidental gesture
+ * There is deliberately no swipe-to-delete here. The card is composite: a
+ * workout plus macros plus steps plus bodyweight, and one accidental gesture
  * should not be able to take all of that with it. Deleting a workout lives on
  * the session screen; clearing numbers lives in the editor.
  */
@@ -263,10 +274,22 @@ function DayCard({
         tabIndex={0}
         aria-label={`Edit ${format(parseDayKey(date), "EEEE, MMMM d")}`}
         onClick={() => onOpenEditor(date)}
+        // role="button" promises keyboard activation that a <div> does not
+        // provide, so the card was focusable and then did nothing on Enter or
+        // Space. It cannot simply BE a <button>: it contains the workout links,
+        // and a button may not nest interactive content.
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          // Only the card itself. A key press that reached here by bubbling from
+          // a workout link is that link's to handle.
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
+          onOpenEditor(date);
+        }}
         className="cursor-pointer rounded-2xl bg-surface px-5 py-4"
       >
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[16px] font-semibold tracking-tight">{dayLabel(date)}</span>
+          <span className="tnum text-[16px] font-semibold tracking-tight">{dayLabel(date)}</span>
           {log?.isCheatDay && (
             <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-medium text-destructive">
               <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
@@ -276,22 +299,34 @@ function DayCard({
         </div>
 
         {sessions.length > 0 && (
-          <ul className="mt-2 space-y-1">
+          <ul className="mt-1">
             {sessions.map((session) => (
               <li key={session.id}>
+                {/* min-h-[44px] rather than an inset overlay: two workouts on one
+                    day put these rows 4px apart, so overlapping hit areas would
+                    have let the upper row swallow taps meant for the lower. */}
                 <Link
                   to="/session/$id"
                   params={{ id: session.id }}
                   // The card behind this opens the editor; a workout row must
                   // not do both.
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-baseline gap-2"
+                  className="flex min-h-[44px] items-center gap-2"
                 >
-                  <span className="text-[15px] font-medium tracking-tight">{session.title}</span>
+                  <span className="truncate text-[15px] font-medium tracking-tight">
+                    {session.title}
+                  </span>
                   {session.subtitle && (
-                    <span className="text-[12px] text-muted-foreground">{session.subtitle}</span>
+                    <span className="tnum shrink-0 text-[12px] text-muted-foreground">
+                      {session.subtitle}
+                    </span>
                   )}
-                  <span className="ml-auto shrink-0 text-[12px] text-muted-foreground">›</span>
+                  <span
+                    aria-hidden="true"
+                    className="ml-auto shrink-0 text-[12px] text-muted-foreground"
+                  >
+                    ›
+                  </span>
                 </Link>
               </li>
             ))}

@@ -30,11 +30,22 @@ function HistoryPage() {
     <AppShell>
       <header className="flex items-center justify-between px-5 pb-4 pt-14">
         <h1 className="text-[30px] font-semibold tracking-tight">History</h1>
-        <div data-swipe-ignore className="flex gap-1 rounded-full bg-muted p-1">
+        <div
+          data-swipe-ignore
+          role="group"
+          aria-label="History view"
+          className="flex shrink-0 gap-1 rounded-full bg-muted p-1"
+        >
+          {/* The pills stay compact so they sit on the same line as the title,
+              so the 44px target comes from an inset pseudo-element overlay
+              rather than padding. Same trick as the switch in settings.tsx. The
+              two overlays only ever extend vertically, and the buttons sit side
+              by side, so neither can swallow the other's taps. */}
           <button
             onClick={() => setView("weekly")}
+            aria-pressed={view === "weekly"}
             className={
-              "rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors " +
+              "relative rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] " +
               (view === "weekly" ? "bg-foreground text-background" : "text-muted-foreground")
             }
           >
@@ -42,8 +53,9 @@ function HistoryPage() {
           </button>
           <button
             onClick={() => setView("calendar")}
+            aria-pressed={view === "calendar"}
             className={
-              "rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors " +
+              "relative rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] " +
               (view === "calendar" ? "bg-foreground text-background" : "text-muted-foreground")
             }
           >

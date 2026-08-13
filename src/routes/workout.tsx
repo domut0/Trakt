@@ -9,7 +9,7 @@ import { useStore } from "../lib/store";
 export const Route = createFileRoute("/workout")({
   head: () => ({
     meta: [
-      { title: "Workout — Anything But The Notes App" },
+      { title: "Workout" },
       { name: "description", content: "Active workout logging." },
       { property: "og:title", content: "Workout in progress" },
       { property: "og:description", content: "Active workout logging." },
@@ -94,19 +94,25 @@ function WorkoutPage() {
     <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
       {/* Top bar */}
       <div className="grid grid-cols-3 items-center px-5 pt-14">
+        {/* The negative vertical margin is what lets a 20px line of text carry a
+            44px touch target without making the top bar taller: 44 - 2*12 = 20,
+            so the row occupies exactly the height it did before. Same pattern as
+            the Back button on the exercise screen. */}
         <button
           onClick={() => router.navigate({ to: "/" })}
-          className="justify-self-start text-[15px] font-medium text-accent"
+          className="-my-3 flex min-h-[44px] items-center justify-self-start text-[15px] font-medium text-accent"
         >
           Home
         </button>
-        <div className="justify-self-center text-center">
-          <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Split</div>
-          <div className="text-[15px] font-semibold tracking-tight">{slot.name}</div>
+        <div className="min-w-0 justify-self-center text-center">
+          <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Split
+          </div>
+          <h1 className="truncate text-[15px] font-semibold tracking-tight">{slot.name}</h1>
         </div>
         <button
           onClick={handleEnd}
-          className="justify-self-end text-[15px] font-medium text-muted-foreground"
+          className="-my-3 flex min-h-[44px] items-center justify-self-end text-[15px] font-medium text-muted-foreground"
         >
           End
         </button>
@@ -114,7 +120,7 @@ function WorkoutPage() {
 
       {/* Stopwatch */}
       <div className="mt-6 flex flex-col items-center">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Time between sets
         </div>
         <div className="tnum mt-1 text-[44px] font-semibold leading-none tracking-tight">
@@ -124,12 +130,15 @@ function WorkoutPage() {
 
       {/* Current exercise */}
       <div className="mt-6 flex flex-col items-center px-5 text-center">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Current exercise
         </div>
-        <div className="mt-1 text-[26px] font-semibold tracking-tight">
-          {currentExercise?.name ?? <span className="text-muted-foreground/60">—</span>}
-        </div>
+        {/* break-words, not truncate: this is the hero of the screen and a long
+            exercise name is better on two lines than clipped. text-balance keeps
+            the second line from being a one-word orphan at 320px. */}
+        <h2 className="mt-1 text-balance break-words text-[26px] font-semibold tracking-tight">
+          {currentExercise?.name ?? <span className="text-muted-foreground">-</span>}
+        </h2>
         {currentSetupNote && (
           <div className="mt-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-muted-foreground">
             {currentSetupNote}
@@ -148,14 +157,17 @@ function WorkoutPage() {
               setSheetOpen(true);
             }
           }}
+          // Icon-only: the "Log set" / "Next set" caption below is a sibling, not
+          // this button's content, so without a label it announces as "button".
+          aria-label={inBlock ? "Log the next set in this block" : "Log a set"}
           className="flex h-[88px] w-[88px] items-center justify-center rounded-full bg-accent text-accent-foreground"
         >
-          <Plus size={30} />
+          <Plus size={30} aria-hidden="true" />
         </button>
         {inBlock && currentBlock ? (
           <div className="mt-2 text-center">
             <div className="text-[13px] font-medium text-accent">Next set</div>
-            <div className="text-[12px] text-muted-foreground">
+            <div className="tnum text-[12px] text-muted-foreground">
               {currentBlock.loggedInBlock + 1} of {currentBlock.targetSets} · {currentBlock.weight}{" "}
               × {currentBlock.reps}
               {currentBlock.rpe != null ? ` @ ${currentBlock.rpe}` : ""}
@@ -172,7 +184,7 @@ function WorkoutPage() {
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
         <div>
-          <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+          <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             This session
           </div>
           <div className="mt-1 flex items-baseline gap-4">
@@ -190,9 +202,9 @@ function WorkoutPage() {
         </div>
         <button
           onClick={() => setShowView(true)}
-          className="rounded-full bg-surface px-4 py-2 text-[13px] font-medium hairline-t hairline-b"
+          className="flex min-h-[44px] shrink-0 items-center rounded-full bg-surface px-4 py-2 text-[13px] font-medium hairline-t hairline-b"
         >
-          View Workout
+          View workout
         </button>
       </div>
 
@@ -207,14 +219,16 @@ function WorkoutPage() {
             className="mx-auto flex h-full max-w-md flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 pt-14 pb-3">
+            <div className="flex items-center justify-between gap-3 px-5 pt-14 pb-3">
               <button
                 onClick={() => setShowView(false)}
-                className="text-[15px] font-medium text-accent"
+                className="-my-3 flex min-h-[44px] shrink-0 items-center text-[15px] font-medium text-accent"
               >
                 Done
               </button>
-              <div className="text-[15px] font-semibold tracking-tight">{slot.name}</div>
+              <div className="min-w-0 truncate text-[15px] font-semibold tracking-tight">
+                {slot.name}
+              </div>
               <DeleteWorkoutButton sessionId={session.id} onDeleted={() => setShowView(false)} />
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -227,6 +241,8 @@ function WorkoutPage() {
       {loggedToast !== null && (
         <div
           key={loggedToast}
+          role="status"
+          aria-live="polite"
           className="anim-toast pointer-events-none fixed bottom-36 left-1/2 z-[60] flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-[13px] font-semibold text-background shadow-lg"
         >
           <span className="flex h-4 w-4 items-center justify-center rounded-full bg-accent">

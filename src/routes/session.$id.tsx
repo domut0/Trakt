@@ -22,7 +22,9 @@ function SessionPage() {
   if (!session) {
     return (
       <AppShell>
-        <div className="px-6 py-20 text-center text-muted-foreground">Session not found.</div>
+        <div className="px-5 py-20 text-center text-[15px] text-muted-foreground">
+          Session not found.
+        </div>
       </AppShell>
     );
   }
@@ -34,7 +36,9 @@ function SessionPage() {
   if (!isCardio && !slot) {
     return (
       <AppShell>
-        <div className="px-6 py-20 text-center text-muted-foreground">Session not found.</div>
+        <div className="px-5 py-20 text-center text-[15px] text-muted-foreground">
+          Session not found.
+        </div>
       </AppShell>
     );
   }
@@ -45,9 +49,12 @@ function SessionPage() {
   return (
     <AppShell>
       <div className="flex items-center justify-between px-5 pt-14 pb-2">
+        {/* The negative vertical margin is what lets a 20px line of text carry a
+            44px touch target without pushing the header down: 44 - 2*12 = 20, so
+            the row occupies exactly the height it did before. */}
         <button
           onClick={() => router.navigate({ to: "/" })}
-          className="text-[15px] font-medium text-accent"
+          className="-my-3 flex min-h-[44px] items-center text-[15px] font-medium text-accent"
         >
           Back
         </button>
@@ -57,17 +64,19 @@ function SessionPage() {
         />
       </div>
       <header className="px-5 pb-2">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+        <div className="tnum text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           {d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
         </div>
-        <h1 className="mt-1 text-[30px] font-semibold tracking-tight">{title}</h1>
+        <h1 className="mt-1 text-balance break-words text-[30px] font-semibold tracking-tight">
+          {title}
+        </h1>
       </header>
       {isCardio ? (
         <div className="mt-4 px-5 space-y-4">
           {(session.durationMinutes != null || session.distance != null) && (
             <div className="flex gap-3">
               {session.durationMinutes != null && (
-                <div className="flex-1 rounded-2xl bg-surface p-4">
+                <div className="min-w-0 flex-1 rounded-2xl bg-surface p-4">
                   <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                     Duration
                   </div>
@@ -78,7 +87,7 @@ function SessionPage() {
                 </div>
               )}
               {session.distance != null && (
-                <div className="flex-1 rounded-2xl bg-surface p-4">
+                <div className="min-w-0 flex-1 rounded-2xl bg-surface p-4">
                   <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                     Distance
                   </div>

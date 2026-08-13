@@ -39,7 +39,7 @@ function getEnabledTabs(chartsEnabled: boolean): TabItem[] {
  * because each tab page mounts a fresh AppShell instance, so this can't live
  * in component state. Never touched during SSR (only DOM event handlers
  * write to it), so it's always null on the server and on a fresh client
- * load -- no hydration mismatch.
+ * load - no hydration mismatch.
  */
 type NavDirection = "forward" | "back" | null;
 let lastNavDirection: NavDirection = null;
@@ -75,6 +75,9 @@ function Icon({ name }: { name: "home" | "chart" | "calendar" | "settings" }) {
     strokeWidth: 1.6,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
+    // Decorative: every tab renders its own visible text label right below the
+    // icon, so exposing the glyph too would just double the announcement.
+    "aria-hidden": true,
   };
   if (name === "home")
     return (
@@ -112,12 +115,12 @@ function Icon({ name }: { name: "home" | "chart" | "calendar" | "settings" }) {
 /**
  * The nav bar's Workout action button, filled (not stroked) so it reads as
  * the accent colour rather than picking up the outline treatment every
- * routed tab icon uses -- it's an action, not a destination. Sized to match
+ * routed tab icon uses - it's an action, not a destination. Sized to match
  * `Icon` above (22x22, viewBox 0 0 24 24).
  */
 function FlameIcon() {
   return (
-    <svg width={22} height={22} viewBox="0 0 24 24" fill="currentColor">
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" />
     </svg>
   );
@@ -136,16 +139,19 @@ export function ActiveSessionBanner() {
   return (
     <button
       onClick={() => router.navigate({ to: "/workout" })}
-      className="fixed left-0 right-0 top-0 z-40 flex items-center justify-between bg-accent px-4 py-2.5 text-accent-foreground"
+      // min-h-[44px] is not only the touch-target floor: AppShell already
+      // reserves exactly pt-11 (44px) for this banner, and at py-2.5 the bar
+      // measured ~38px, so the reserved gap never matched the real bar.
+      className="fixed left-0 right-0 top-0 z-40 flex min-h-[44px] items-center justify-between gap-3 bg-accent px-4 py-2.5 text-accent-foreground"
     >
-      <span className="flex items-center gap-2 text-[13px] font-medium">
-        <span className="relative flex h-2 w-2">
+      <span className="flex min-w-0 items-center gap-2 text-[13px] font-medium">
+        <span className="relative flex h-2 w-2 shrink-0">
           <span className="absolute inset-0 animate-ping rounded-full bg-accent-foreground/60" />
           <span className="relative h-2 w-2 rounded-full bg-accent-foreground" />
         </span>
-        Workout in progress · {slot?.name}
+        <span className="truncate">Workout in progress · {slot?.name}</span>
       </span>
-      <span className="text-[13px] font-medium opacity-90">Return →</span>
+      <span className="shrink-0 text-[13px] font-medium opacity-90">Return →</span>
     </button>
   );
 }
@@ -159,11 +165,22 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   const items = getEnabledTabs(chartsEnabled);
   const currentIndex = items.findIndex((it) => it.to === location.pathname);
 
-  // Split the ROUTED tabs (never the Workout button) into two halves so the
-  // action button lands in the middle of the row regardless of whether
-  // Charts is showing -- 3 routed tabs (4 total incl. Workout) or 4 routed
-  // tabs (5 total). Deriving the split from the array length, rather than a
-  // fixed index, is what keeps it centred as that count changes.
+  // Split the ROUTED tabs (never the Workout button) into two halves that sit
+  // either side of it.
+  //
+  // The centring does NOT depend on this split being even, which is what was
+  // wrong before: an odd routed-tab count (Charts off) left the button off by
+  // half a slot. It is exact because the two <ul>s are `flex-1` - that is
+  // `flex: 1 1 0%`, so both have a zero flex basis and an equal grow factor -
+  // around a `shrink-0` centre. Whatever width the centre takes, the remaining
+  // free space is split into two equal halves, so the centre lands on the axis
+  // for 3 routed tabs (2 left, 1 right) exactly as it does for 4.
+  //
+  // The tabs themselves are then distributed WITHIN their half, so with Charts
+  // off the lone right-hand tab is centred in the right half rather than being
+  // evenly spaced against the left pair. That is a deliberate trade: the action
+  // button is the thing a thumb hunts for, and it must not move when a setting
+  // in another screen is toggled.
   const splitAt = Math.ceil(items.length / 2);
   const leftItems = items.slice(0, splitAt);
   const rightItems = items.slice(splitAt);
@@ -181,7 +198,11 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
               lastNavDirection = i > currentIndex ? "forward" : "back";
             }
           }}
-          className="flex flex-col items-center gap-0.5 py-1"
+          // Full width of its flex-1 <li>, with an explicit height floor so the
+          // 22px icon plus 11px label can never fall under 44px if either is
+          // restyled later.
+          className="flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 py-1"
+          aria-current={active ? "page" : undefined}
           style={{ color: active ? "var(--color-accent)" : "var(--color-muted-foreground)" }}
         >
           <Icon name={it.icon} />
@@ -193,17 +214,27 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
 
   return (
     <nav
+      aria-label="Primary"
       className="relative z-30 shrink-0 hairline-t bg-background"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
     >
-      <ul className="mx-auto flex max-w-md items-stretch justify-around px-2 pt-2">
-        {leftItems.map((it, i) => renderTab(it, i))}
-        <li className="flex-1">
+      <div className="mx-auto flex max-w-md items-stretch justify-between px-2 pt-2">
+        <ul className="flex flex-1 items-stretch justify-around">
+          {leftItems.map((it, i) => renderTab(it, i))}
+        </ul>
+        <div className="flex shrink-0 items-center justify-center px-1">
           <button
             onClick={() =>
               activeSessionId ? router.navigate({ to: "/workout" }) : onOpenChooser()
             }
-            className="flex w-full flex-col items-center gap-0.5 py-1"
+            aria-label={activeSessionId ? "Return to active workout" : "Start workout"}
+            // Losing the old `w-full` when this moved out of a flex-1 <li> left
+            // the button as wide as its label, and "Return" is only ~36px - under
+            // the 44px minimum, in the exact state where the user most needs to
+            // hit it. The floor also keeps the button from changing width when
+            // the label swaps between "Workout" and "Return", which would
+            // otherwise shift the whole nav mid-session.
+            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 py-1"
             style={{ color: "var(--color-accent)" }}
           >
             <FlameIcon />
@@ -211,9 +242,11 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
               {activeSessionId ? "Return" : "Workout"}
             </span>
           </button>
-        </li>
-        {rightItems.map((it, i) => renderTab(it, splitAt + i))}
-      </ul>
+        </div>
+        <ul className="flex flex-1 items-stretch justify-around">
+          {rightItems.map((it, i) => renderTab(it, splitAt + i))}
+        </ul>
+      </div>
       {activeSessionId && (
         <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-accent/40" />
       )}
@@ -231,13 +264,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Workout chooser + strength start flow, owned here so the nav's Workout
   // button works from every tab. StartWorkoutSheet is mounted from AppShell
   // (not a route) specifically so it survives index.tsx's own mount of it
-  // being removed elsewhere -- this is now the flow's only entry point that
+  // being removed elsewhere - this is now the flow's only entry point that
   // doesn't require an active session already existing.
   const [chooserOpen, setChooserOpen] = useState(false);
   const [startSheetOpen, setStartSheetOpen] = useState(false);
 
   // Ordered enabled-tab paths, for both swipe navigation and figuring out
-  // whether the current page is a tab at all (swipes only act on tabs --
+  // whether the current page is a tab at all (swipes only act on tabs,
   // e.g. never on /session/$id, which has its own row swipe gestures).
   const tabPaths = useMemo(() => getEnabledTabs(chartsEnabled).map((t) => t.to), [chartsEnabled]);
   const tabIndex = tabPaths.findIndex((p) => p === location.pathname);

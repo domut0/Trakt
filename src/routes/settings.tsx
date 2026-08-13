@@ -1,7 +1,17 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { BACKUP_VERSION, parseBackup, useStore, type BackupData } from "../lib/store";
+import { OneRmCalculatorSheet } from "../components/OneRmCalculatorSheet";
+import { PlateCalculatorSheet } from "../components/PlateCalculatorSheet";
+import { TargetsEditor } from "../components/TargetsEditor";
+import { dailyLogsToCsv, setsToCsv } from "../lib/csv";
+import {
+  BACKUP_VERSION,
+  parseBackup,
+  useStore,
+  type BackupData,
+  type TargetProfile,
+} from "../lib/store";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -20,8 +30,21 @@ function SettingsPage() {
   const setUnit = useStore((s) => s.setUnit);
   const chartsEnabled = useStore((s) => s.chartsEnabled);
   const setChartsEnabled = useStore((s) => s.setChartsEnabled);
+  const targetsEnabled = useStore((s) => s.targetsEnabled);
+  const setTargetsEnabled = useStore((s) => s.setTargetsEnabled);
+  const habitsEnabled = useStore((s) => s.habitsEnabled);
+  const setHabitsEnabled = useStore((s) => s.setHabitsEnabled);
+  const toolsEnabled = useStore((s) => s.toolsEnabled);
+  const setToolsEnabled = useStore((s) => s.setToolsEnabled);
   const importData = useStore((s) => s.importData);
   const clearAllData = useStore((s) => s.clearAllData);
+  // Read only so the import confirmation can compare the file against what is
+  // already here. An import replaces each of these tables whole, so anything in
+  // them that the file does not carry is deleted, not merged.
+  const dailyLogs = useStore((s) => s.dailyLogs);
+  const habits = useStore((s) => s.habits);
+  const habitEntries = useStore((s) => s.habitEntries);
+  const targetProfiles = useStore((s) => s.targetProfiles);
   const router = useRouter();
 
   // Import flow: a selected file is parsed and fully validated (parseBackup)
@@ -31,6 +54,8 @@ function SettingsPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [plateSheetOpen, setPlateSheetOpen] = useState(false);
+  const [oneRmSheetOpen, setOneRmSheetOpen] = useState(false);
 
   const confirmClear = async () => {
     await clearAllData();
@@ -39,21 +64,74 @@ function SettingsPage() {
   };
 
   const exportJson = () => {
-    const { exercises, slots, sessions, sets, dailyLogs, unit } = useStore.getState();
-    const blob = new Blob(
-      [
-        JSON.stringify(
-          { version: BACKUP_VERSION, exercises, slots, sessions, sets, dailyLogs, unit },
-          null,
-          2,
-        ),
-      ],
-      { type: "application/json" },
-    );
+    const {
+      exercises,
+      slots,
+      sessions,
+      sets,
+      dailyLogs,
+      habits,
+      habitEntries,
+      targetProfiles,
+      weekdayTargets,
+      targetsEnabled,
+      habitsEnabled,
+      toolsEnabled,
+      unit,
+    } = useStore.getState();
+    // Annotated as BackupData on purpose. This object literal used to be built
+    // inline inside JSON.stringify, where an excess/missing key is invisible to
+    // the type checker: when BackupData grew to v4 the export quietly kept
+    // writing v3 files, so restoring a backup wiped the user's habits and
+    // targets. The annotation makes the next widening of BackupData a build
+    // error here instead of silent data loss for whoever restores the file.
+    const backup: BackupData = {
+      version: BACKUP_VERSION,
+      exercises,
+      slots,
+      sessions,
+      sets,
+      dailyLogs,
+      habits,
+      habitEntries,
+      targetProfiles,
+      weekdayTargets,
+      targetsEnabled,
+      habitsEnabled,
+      toolsEnabled,
+      unit,
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `workout-log-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportSetsCsv = () => {
+    const { sets, sessions, exercises, slots, unit } = useStore.getState();
+    const csv = setsToCsv(sets, sessions, exercises, slots, unit);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `abtn-sets-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportDailyLogsCsv = () => {
+    const { dailyLogs, unit } = useStore.getState();
+    const csv = dailyLogsToCsv(dailyLogs, unit);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `abtn-daily-log-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -96,6 +174,20 @@ function SettingsPage() {
     setPendingImport(null);
   };
 
+  // Derived for the confirmation below, and deliberately two separate things.
+  // A per-table count of what is in the FILE is not enough on its own: after
+  // parseBackup, a file that predates a feature is indistinguishable from a file
+  // written by someone who never used it, because both arrive as an empty array
+  // (habits) or as the seeded single profile (targets). A count of "0 habits"
+  // therefore reads as "nothing changes" at exactly the moment it means "all of
+  // your habits are about to be deleted". So the losses are computed by
+  // comparing against live state instead, which also means a user who has never
+  // used habits is told nothing about them.
+  const fileCounts = pendingImport ? summarizeBackup(pendingImport) : "";
+  const losses = pendingImport
+    ? describeLosses(pendingImport, { dailyLogs, habits, habitEntries, targetProfiles })
+    : [];
+
   return (
     <AppShell>
       <header className="px-5 pb-4 pt-14">
@@ -125,11 +217,94 @@ function SettingsPage() {
             <div className="text-[15px]">Charts tab</div>
             <div className="text-[12px] text-muted-foreground">Show the Charts tab in the nav.</div>
           </div>
-          <Toggle checked={chartsEnabled} onChange={() => setChartsEnabled(!chartsEnabled)} />
+          <Toggle
+            checked={chartsEnabled}
+            onChange={() => setChartsEnabled(!chartsEnabled)}
+            label="Charts tab"
+          />
         </div>
       </Section>
 
-      <Section title="Data" delay={80}>
+      <Section title="Features" delay={80}>
+        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
+          <div>
+            <div className="text-[15px]">Daily targets</div>
+            <div className="text-[12px] text-muted-foreground">
+              Show goal progress on the daily log.
+            </div>
+          </div>
+          <Toggle
+            checked={targetsEnabled}
+            onChange={() => setTargetsEnabled(!targetsEnabled)}
+            label="Daily targets"
+          />
+        </div>
+        {/* Inline editor, not a sheet: the profiles only mean anything while
+            targets are on, so they live under the switch that turns them on. */}
+        {targetsEnabled && (
+          <div className="px-5 py-4 hairline-t">
+            <TargetsEditor />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
+          <div>
+            <div className="text-[15px]">Habits</div>
+            <div className="text-[12px] text-muted-foreground">
+              Adds a daily checklist to the Today tab, for supplements and the like.
+            </div>
+          </div>
+          <Toggle
+            checked={habitsEnabled}
+            onChange={() => setHabitsEnabled(!habitsEnabled)}
+            label="Habits"
+          />
+        </div>
+
+        <div className="flex items-center justify-between px-5 py-3.5 hairline-t">
+          <div>
+            <div className="text-[15px]">Calculators</div>
+            <div className="text-[12px] text-muted-foreground">
+              Add plate loading and 1RM tools here.
+            </div>
+          </div>
+          <Toggle
+            checked={toolsEnabled}
+            onChange={() => setToolsEnabled(!toolsEnabled)}
+            label="Calculators"
+          />
+        </div>
+        {toolsEnabled && (
+          <>
+            <button
+              onClick={() => setPlateSheetOpen(true)}
+              className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+            >
+              <div>
+                <div className="text-[15px]">Plate calculator</div>
+                <div className="text-[12px] text-muted-foreground">
+                  Work out what to load per side.
+                </div>
+              </div>
+              <span className="text-accent">→</span>
+            </button>
+            <button
+              onClick={() => setOneRmSheetOpen(true)}
+              className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+            >
+              <div>
+                <div className="text-[15px]">1RM estimator</div>
+                <div className="text-[12px] text-muted-foreground">
+                  Estimate a max from a weight and reps.
+                </div>
+              </div>
+              <span className="text-accent">→</span>
+            </button>
+          </>
+        )}
+      </Section>
+
+      <Section title="Data" delay={120}>
         <button
           onClick={exportJson}
           className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
@@ -137,6 +312,30 @@ function SettingsPage() {
           <div>
             <div className="text-[15px]">Export backup</div>
             <div className="text-[12px] text-muted-foreground">Download all data as JSON.</div>
+          </div>
+          <span className="text-accent">→</span>
+        </button>
+        <button
+          onClick={exportSetsCsv}
+          className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+        >
+          <div>
+            <div className="text-[15px]">Export sets (CSV)</div>
+            <div className="text-[12px] text-muted-foreground">
+              Download set history for spreadsheets.
+            </div>
+          </div>
+          <span className="text-accent">→</span>
+        </button>
+        <button
+          onClick={exportDailyLogsCsv}
+          className="flex w-full items-center justify-between px-5 py-3.5 text-left hairline-t"
+        >
+          <div>
+            <div className="text-[15px]">Export daily log (CSV)</div>
+            <div className="text-[12px] text-muted-foreground">
+              Download nutrition and bodyweight history.
+            </div>
           </div>
           <span className="text-accent">→</span>
         </button>
@@ -161,11 +360,19 @@ function SettingsPage() {
         {pendingImport && (
           <div className="px-5 py-3.5 hairline-t">
             <div className="text-[13px] text-muted-foreground">
-              This file has {pendingImport.exercises.length} exercises,{" "}
-              {pendingImport.sessions.length} sessions, {pendingImport.sets.length} sets and{" "}
-              {pendingImport.dailyLogs.length} logged days. Importing will replace all data
-              currently on this device. This cannot be undone.
+              Backup format v{pendingImport.version}
+              {pendingImport.version < BACKUP_VERSION
+                ? ", written by an older version of the app"
+                : ""}
+              . This file has {fileCounts}. Importing will replace all data currently on this
+              device, along with your unit and feature switches. This cannot be undone.
             </div>
+            {losses.length > 0 && (
+              <div className="mt-3 text-[13px] text-destructive">
+                Importing this file deletes {joinList(losses)}. The file contains none of it. Export
+                a backup first if you want to keep it.
+              </div>
+            )}
             <div className="mt-3 flex gap-2">
               <button
                 onClick={cancelImport}
@@ -173,9 +380,20 @@ function SettingsPage() {
               >
                 Cancel
               </button>
+              {/* Reads as destructive only when it actually destroys something the
+                  user still has, so the red is a signal rather than the permanent
+                  colour of the import button. Geometry is untouched on purpose:
+                  the hit area stays exactly the visible pill, since widening the
+                  tap target of a confirm this final only makes it easier to hit
+                  by mistake. */}
               <button
                 onClick={confirmImport}
-                className="flex-1 rounded-full bg-foreground py-2.5 text-[14px] font-medium text-background"
+                className={
+                  "flex-1 rounded-full py-2.5 text-[14px] font-medium " +
+                  (losses.length > 0
+                    ? "bg-destructive text-white"
+                    : "bg-foreground text-background")
+                }
               >
                 Replace all data
               </button>
@@ -190,7 +408,7 @@ function SettingsPage() {
         )}
       </Section>
 
-      <Section title="Reset" delay={120}>
+      <Section title="Reset" delay={160}>
         {!showClearConfirm ? (
           <button
             onClick={() => setShowClearConfirm(true)}
@@ -231,8 +449,104 @@ function SettingsPage() {
       <p className="px-5 pt-6 text-[12px] text-muted-foreground">
         v0.1 · local only · no accounts, no sync.
       </p>
+
+      {/* Gated on toolsEnabled as well as their own open state, so switching
+          Calculators off while a sheet is up cannot leave it stranded. */}
+      {toolsEnabled && (
+        <>
+          <PlateCalculatorSheet open={plateSheetOpen} onClose={() => setPlateSheetOpen(false)} />
+          <OneRmCalculatorSheet open={oneRmSheetOpen} onClose={() => setOneRmSheetOpen(false)} />
+        </>
+      )}
     </AppShell>
   );
+}
+
+/** `${n} thing` / `${n} things`, the same idiom CalendarView and WeeklyView use.
+ * Worth a helper here because a confirmation that says "1 habits" reads like the
+ * file is malformed rather than like a count. */
+function countOf(n: number, singular: string): string {
+  return `${n} ${n === 1 ? singular : `${singular}s`}`;
+}
+
+/** "a", "a and b", "a, b and c". */
+function joinList(items: string[]): string {
+  if (items.length < 2) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/** Every table `replaceAllData` clears, in the order the backup file itself
+ * lists them. All of them are cleared whole, so any table missing from this list
+ * is data the user is never warned about losing. */
+function summarizeBackup(b: BackupData): string {
+  return joinList([
+    countOf(b.exercises.length, "exercise"),
+    countOf(b.slots.length, "split"),
+    countOf(b.sessions.length, "session"),
+    countOf(b.sets.length, "set"),
+    countOf(b.dailyLogs.length, "logged day"),
+    countOf(b.habits.length, "habit"),
+    countOf(b.habitEntries.length, "habit check-off"),
+    countOf(b.targetProfiles.length, "target profile"),
+  ]);
+}
+
+/** True when the target setup is something the user built, as opposed to the
+ * single empty "Every day" profile that `defaultTargets` seeds on first run and
+ * that `parseBackup` substitutes for any file older than v4.
+ *
+ * Content, not version number: a v4 file exported before its author ever opened
+ * the targets editor carries that same empty default, and importing it destroys
+ * the reader's profiles just as thoroughly as a v1 file does. More than one
+ * profile also covers a non-uniform weekday assignment, since seven days can
+ * only differ if there is more than one profile to point at. */
+function hasTargetData(profiles: TargetProfile[]): boolean {
+  if (profiles.length > 1) return true;
+  return profiles.some(
+    (p) =>
+      p.calories !== undefined ||
+      p.protein !== undefined ||
+      p.carbs !== undefined ||
+      p.fat !== undefined ||
+      p.steps !== undefined,
+  );
+}
+
+/**
+ * What this device has that the backup does not, phrased as the thing the user
+ * loses. Each clause fires independently, because the format grew one feature at
+ * a time and a file can be short of any subset: a v1 file has no daily logs, a
+ * v1-v3 file has no habits and no real targets, and a hand-trimmed v4 file can
+ * be missing habit history while still carrying the habits themselves.
+ *
+ * Deliberately does NOT check exercises, splits, sessions or sets. Those four
+ * exist in every format version and are validated hard by `parseBackup`, so a
+ * file with none of them is a genuinely empty backup rather than an old one, and
+ * the counts in the summary already say so plainly.
+ */
+function describeLosses(
+  b: BackupData,
+  current: {
+    dailyLogs: unknown[];
+    habits: unknown[];
+    habitEntries: unknown[];
+    targetProfiles: TargetProfile[];
+  },
+): string[] {
+  const losses: string[] = [];
+  if (b.dailyLogs.length === 0 && current.dailyLogs.length > 0) {
+    losses.push(countOf(current.dailyLogs.length, "logged day"));
+  }
+  if (b.habits.length === 0 && current.habits.length > 0) {
+    losses.push(countOf(current.habits.length, "habit"));
+  }
+  if (b.habitEntries.length === 0 && current.habitEntries.length > 0) {
+    losses.push(countOf(current.habitEntries.length, "recorded habit check-off"));
+  }
+  if (!hasTargetData(b.targetProfiles) && hasTargetData(current.targetProfiles)) {
+    losses.push(countOf(current.targetProfiles.length, "daily target profile"));
+  }
+  return losses;
 }
 
 function Section({
@@ -254,11 +568,29 @@ function Section({
   );
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  /** Names the switch for screen readers. The visible row title is a plain div,
+   * not a <label>, so without this the control announces as unlabelled. */
+  label: string;
+}) {
   return (
     <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
       onClick={onChange}
-      className="relative h-7 w-12 rounded-full transition-colors"
+      // The pill stays 28px tall to keep rows compact, so the 44px tap target is
+      // added as an absolutely positioned overlay rather than as padding, which
+      // would make every settings row taller. shrink-0 keeps long descriptions
+      // from squeezing the switch out of shape at 390px.
+      className="relative h-7 w-12 shrink-0 rounded-full transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-['']"
       style={{ backgroundColor: checked ? "var(--color-accent)" : "var(--color-border)" }}
     >
       <span
