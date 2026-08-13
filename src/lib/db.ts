@@ -244,7 +244,16 @@ export async function seedDb(data: {
   // part of the same atomic unit if this is ever extended.
   await db.transaction(
     "rw",
-    [db.exercises, db.slots, db.sessions, db.sets, db.dailyLogs, db.habits, db.habitEntries, db.meta],
+    [
+      db.exercises,
+      db.slots,
+      db.sessions,
+      db.sets,
+      db.dailyLogs,
+      db.habits,
+      db.habitEntries,
+      db.meta,
+    ],
     async () => {
       await db.exercises.bulkPut(data.exercises);
       await db.slots.bulkPut(data.slots);
@@ -268,7 +277,16 @@ export async function seedDb(data: {
 export async function replaceAllData(data: BackupData): Promise<void> {
   await db.transaction(
     "rw",
-    [db.exercises, db.slots, db.sessions, db.sets, db.dailyLogs, db.habits, db.habitEntries, db.meta],
+    [
+      db.exercises,
+      db.slots,
+      db.sessions,
+      db.sets,
+      db.dailyLogs,
+      db.habits,
+      db.habitEntries,
+      db.meta,
+    ],
     async () => {
       await db.exercises.clear();
       await db.slots.clear();

@@ -24,6 +24,24 @@ describe("escapeCsvField", () => {
   it("handles fields containing commas, quotes, and newlines combined", () => {
     expect(escapeCsvField('note, "pins 12"\nnext line')).toBe('"note, ""pins 12""\nnext line"');
   });
+
+  it("quotes a bare carriage return with no newline after it", () => {
+    // Old-Mac line endings and stray \r from pasted text both land here. \r is
+    // a quote trigger in its own right under RFC 4180, not only as part of CRLF.
+    expect(escapeCsvField("seat 4\rpins 12")).toBe('"seat 4\rpins 12"');
+  });
+
+  it("doubles every quote in a field, not just the first", () => {
+    expect(escapeCsvField('""')).toBe('""""""');
+    expect(escapeCsvField('a"b"c')).toBe('"a""b""c"');
+  });
+
+  it("leaves a field containing a semicolon or tab unquoted", () => {
+    // Only the four RFC 4180 triggers force quoting. Over-quoting is not
+    // wrong output, but it is noise in every cell of a real export.
+    expect(escapeCsvField("seat 4; pins 12")).toBe("seat 4; pins 12");
+    expect(escapeCsvField("seat 4\tpins 12")).toBe("seat 4\tpins 12");
+  });
 });
 
 describe("toCsv", () => {
@@ -107,8 +125,52 @@ describe("setsToCsv", () => {
     expect(lines[0]).toBe(
       "Date,Time,Split Slot,Exercise,Exercise Type,Weight,Unit,Reps,RPE,Setup Note",
     );
-    expect(lines[1]).toBe('2026-08-12,14:30,Heavy Bench,Bench Press,main,225,lbs,5,8,"seat 4, pins 12"');
+    expect(lines[1]).toBe(
+      '2026-08-12,14:30,Heavy Bench,Bench Press,main,225,lbs,5,8,"seat 4, pins 12"',
+    );
     expect(lines[2]).toBe('2026-08-12,14:35,Heavy Bench,"Chest Fly, Cable",accessory,50,lbs,10,,');
+  });
+
+  it("escapes a setup note carrying a comma, a quote, a CR and an LF all at once", () => {
+    const note = 'seat 4, "high" pins\r\nbelt on\rno straps';
+    const messySets: WorkoutSet[] = [{ ...sets[0], id: "set_messy", setupNote: note }];
+
+    const csv = setsToCsv(messySets, sessions, exercises, slots, "lbs");
+    // The escaped note spans lines, so the row cannot be found by splitting on
+    // CRLF. Assert the whole payload instead: header, one CRLF, then the row.
+    const expectedCell = '"seat 4, ""high"" pins\r\nbelt on\rno straps"';
+    expect(csv).toBe(
+      "Date,Time,Split Slot,Exercise,Exercise Type,Weight,Unit,Reps,RPE,Setup Note\r\n" +
+        `2026-08-12,14:30,Heavy Bench,Bench Press,main,225,lbs,5,8,${expectedCell}`,
+    );
+    // Inner quotes doubled, outer quotes added exactly once.
+    expect(csv.endsWith('no straps"')).toBe(true);
+    expect(csv).not.toContain('"""high"""');
+  });
+
+  it("separates records with CRLF, not bare LF", () => {
+    const csv = setsToCsv(sets, sessions, exercises, slots, "lbs");
+    expect(csv.split("\r\n")).toHaveLength(3);
+    // No LF anywhere that is not preceded by a CR.
+    expect(csv.replace(/\r\n/g, "")).not.toContain("\n");
+  });
+
+  it("orders rows chronologically by loggedAt regardless of input order", () => {
+    const csv = setsToCsv([sets[1], sets[0]], sessions, exercises, slots, "lbs");
+    const lines = csv.split("\r\n");
+    expect(lines[1]).toContain("14:30");
+    expect(lines[2]).toContain("14:35");
+  });
+
+  it("leaves Split Slot empty for a session with no slot and never invents one", () => {
+    // A cardio session carries no splitSlotId at all. Cardio produces no sets,
+    // so this is a defensive assertion rather than a reachable state - but it
+    // pins down that a slot-less session resolves to an empty cell instead of
+    // picking up whichever slot happens to be first in the list.
+    const slotless: WorkoutSession[] = [{ id: "sess_1", startedAt: timestamp }];
+    const lines = setsToCsv(sets, slotless, exercises, slots, "lbs").split("\r\n");
+    expect(lines[1].split(",")[2]).toBe("");
+    expect(lines[2].split(",")[2]).toBe("");
   });
 });
 
@@ -138,11 +200,55 @@ describe("dailyLogsToCsv", () => {
     expect(lines[0]).toBe(
       "Date,Calories,Protein (g),Carbs (g),Fat (g),Steps,Bodyweight,Unit,Cheat Day",
     );
-    // Row 1: absent carbs, fat, steps are empty cells
-    expect(lines[1]).toBe("2026-08-10,2400,180,,,185.5,lbs,false");
+    // Nine columns, so nine cells on every row. Asserted structurally as well
+    // as literally: hand-counting commas in the literals below is exactly how
+    // a fixture ends up short one empty cell and still looks right.
+    const cellCount = lines[0].split(",").length;
+    expect(cellCount).toBe(9);
+    for (const line of lines) {
+      expect(line.split(",")).toHaveLength(cellCount);
+    }
+
+    // Row 1: absent carbs, fat AND steps are three empty cells
+    expect(lines[1]).toBe("2026-08-10,2400,180,,,,185.5,lbs,false");
     // Row 2: steps is 0 (logged zero), not empty cell, while calories/protein/carbs/fat/bodyweight are empty
     expect(lines[2]).toBe("2026-08-11,,,,,0,,lbs,");
     // Row 3: cheat day is true, numeric fields absent
-    expect(lines[3]).toBe("2026-08-12,,,,,,,,lbs,true");
+    expect(lines[3]).toBe("2026-08-12,,,,,,,lbs,true");
+  });
+
+  it("sorts rows by date ascending regardless of input order", () => {
+    const logs: DailyLog[] = [
+      { date: "2026-08-12", steps: 3 },
+      { date: "2026-08-10", steps: 1 },
+      { date: "2026-08-11", steps: 2 },
+    ];
+
+    const lines = dailyLogsToCsv(logs, "lbs").split("\r\n");
+    expect(lines.slice(1).map((l) => l.split(",")[0])).toEqual([
+      "2026-08-10",
+      "2026-08-11",
+      "2026-08-12",
+    ]);
+  });
+
+  it("writes a logged 0 as 0 for every numeric field, never as an empty cell", () => {
+    // The converse of the rule above, and the easy one to break while fixing
+    // it: a day of 0 steps or 0 calories is a real record, not an absent one.
+    const logs: DailyLog[] = [
+      {
+        date: "2026-08-10",
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        steps: 0,
+        bodyweight: 0,
+        isCheatDay: false,
+      },
+    ];
+
+    const lines = dailyLogsToCsv(logs, "kg").split("\r\n");
+    expect(lines[1]).toBe("2026-08-10,0,0,0,0,0,0,kg,false");
   });
 });

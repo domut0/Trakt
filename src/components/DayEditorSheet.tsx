@@ -85,6 +85,9 @@ export function DayEditorSheet({
     if (!open) {
       setDragY(0);
       setIsDragging(false);
+      // Reset the keyboard lift too, or reopening the sheet paints one frame
+      // with the padding left over from the last time a keyboard was up.
+      setKeyboardOffset(0);
       return;
     }
     const existing = useStore.getState().dailyLogFor(date);
@@ -117,7 +120,15 @@ export function DayEditorSheet({
   const existing = dailyLogs.find((l) => l.date === date);
 
   const save = () => {
-    const previousLog = dailyLogs.find((l) => l.date === date);
+    // The Undo snapshot. Two things about it are load-bearing:
+    //
+    // 1. It is read from the store HERE, before the upsert, not from the
+    //    `dailyLogs` render value, so it cannot be a render behind.
+    // 2. It is destructured into plain numbers immediately, so the Undo closure
+    //    below holds VALUES rather than a record it would re-read at click
+    //    time. A stale read there would write a wrong number into the log,
+    //    which is worse than offering no Undo at all.
+    const previousLog = useStore.getState().dailyLogFor(date);
     const prevCalories = previousLog?.calories;
     const prevProtein = previousLog?.protein;
     const prevCarbs = previousLog?.carbs;
@@ -141,9 +152,20 @@ export function DayEditorSheet({
     onClose();
 
     showToast({
-      message: "Day saved",
+      message: previousLog ? "Day updated" : "Day saved",
       actionLabel: "Undo",
       onAction: () => {
+        // EVERY field of DailyLog other than `date` is listed, explicitly, and
+        // every one is present as a key even when its value is undefined. That
+        // is what makes undoing a CREATE work: `upsertDailyLog` merges by
+        // spread, so a key holding undefined genuinely clears the field, the
+        // merged record then satisfies `isDailyLogEmpty`, and the row is
+        // DELETED rather than left as a zeroed shell that would still count as
+        // a logged day everywhere days are counted.
+        //
+        // Omitting a key here instead of passing undefined would silently
+        // preserve whatever the save wrote. If a field is ever added to
+        // DailyLog it must be added here too.
         upsertDailyLog(date, {
           calories: prevCalories,
           protein: prevProtein,
@@ -159,10 +181,31 @@ export function DayEditorSheet({
 
   const setField = (key: NumKey) => (v: string) => setDraft((d) => ({ ...d, [key]: v }));
 
+  /**
+   * Where the bodyweight steppers start from when the field is blank.
+   *
+   * The most recently logged bodyweight, because that is the only number that
+   * is ever nearly right: stepping is for nudging today's reading off
+   * yesterday's, not for travelling to it from a constant. The literal fallback
+   * is unit-aware only because a fixed 150 would mean "150 kg" for anyone on
+   * kg, which is not a plausible starting point for anybody.
+   */
+  const seedBodyweight = (): number => {
+    // Day keys are zero-padded yyyy-MM-dd, so lexicographic order IS
+    // chronological order.
+    let latest: DailyLog | undefined;
+    for (const log of dailyLogs) {
+      if (log.bodyweight === undefined) continue;
+      if (!latest || log.date > latest.date) latest = log;
+    }
+    if (latest?.bodyweight !== undefined) return latest.bodyweight;
+    return unit === "kg" ? 70 : 150;
+  };
+
   const stepBodyweight = (dir: -1 | 1) => {
     const raw = draft.bodyweight.trim();
-    const current = raw ? parseFloat(raw) : 150;
-    const base = Number.isNaN(current) ? 150 : current;
+    const parsed = raw ? parseFloat(raw) : NaN;
+    const base = Number.isNaN(parsed) ? seedBodyweight() : parsed;
     const next = Math.max(0, Math.round((base + dir * 0.5) * 10) / 10);
     setField("bodyweight")(String(next));
   };
@@ -203,8 +246,16 @@ export function DayEditorSheet({
     }
   };
 
+  // `data-swipe-ignore`: this sheet is opened from the Today card, WeeklyView
+  // and CalendarView, all of which render inside AppShell's <main>. React
+  // portals bubble along the React tree, not the DOM tree, so touches in here
+  // still reach <main>'s swipe-between-tabs handler, and a drag with any
+  // horizontal component would navigate away mid-edit. AppShell's
+  // shouldIgnoreSwipe resolves this attribute with a DOM `closest`, which
+  // works from the portal's real position under document.body.
   return createPortal(
     <div
+      data-swipe-ignore
       className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end justify-center bg-black/30 anim-backdrop"
       onClick={onClose}
       style={{ opacity: dragY > 0 ? Math.max(0, 1 - dragY / 300) : 1 }}
@@ -218,12 +269,14 @@ export function DayEditorSheet({
           transition: isDragging ? "none" : "transform 0.2s cubic-bezier(0.32, 0.72, 0, 1)",
         }}
       >
+        {/* min-h-[44px], not the visual height of the 4px grabber: this is the
+            drag-to-dismiss target, and py-3 alone gave it a 28px hit area. */}
         <div
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerCancel}
-          className="w-full cursor-grab touch-none py-3 active:cursor-grabbing"
+          className="flex min-h-[44px] w-full cursor-grab touch-none items-center active:cursor-grabbing"
           aria-label="Drag down to close sheet"
         >
           <div className="mx-auto h-1 w-10 rounded-full bg-border" />
@@ -365,6 +418,35 @@ export function DayEditorSheet({
   );
 }
 
+/**
+ * Select a field's whole value as it is entered, so typing REPLACES the number
+ * instead of appending to it. This is the single biggest friction win in the
+ * editor: without it, correcting a 4-digit calorie entry means four backspaces
+ * before the first useful keystroke.
+ *
+ * The synchronous `select()` is what works on desktop. iOS Safari runs its own
+ * tap-to-place-caret AFTER the focus event and collapses that selection, so the
+ * range is reapplied on the next frame. The activeElement check makes the
+ * deferred half a no-op if the user has already moved on, and is also why this
+ * needs no cleanup on unmount: a frame that lands after the sheet closes finds
+ * a detached element and does nothing.
+ *
+ * These inputs carry no `type`, so they are text inputs and support
+ * setSelectionRange; the try/catch is only insurance against that changing,
+ * since `type="number"` would throw here.
+ */
+function selectAllOnEntry(el: HTMLInputElement) {
+  el.select();
+  requestAnimationFrame(() => {
+    if (document.activeElement !== el) return;
+    try {
+      el.setSelectionRange(0, el.value.length);
+    } catch {
+      // Selection unsupported for this input type; the sync select() stands.
+    }
+  });
+}
+
 function NumField({
   label,
   value,
@@ -417,8 +499,13 @@ function NumField({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onFocus={(e) => {
-              e.target.select();
-              e.target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              selectAllOnEntry(e.currentTarget);
+              // `block: "nearest"` with no `behavior`, deliberately. A JS
+              // smooth scroll is not covered by styles.css's global
+              // prefers-reduced-motion clamp (that only flattens CSS
+              // durations), and on iOS it also races the keyboard resize that
+              // the visualViewport lift above already handles.
+              e.currentTarget.scrollIntoView({ block: "nearest" });
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {

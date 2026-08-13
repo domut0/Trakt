@@ -32,10 +32,14 @@ export const RELIABLE_REP_LIMIT = 12;
  * Rounds a number to 1 decimal place to prevent floating-point noise in
  * displays. Non-finite results (a weight so large the formula overflows to
  * Infinity) collapse to 0 so nothing can render "Infinity" or "NaN".
+ *
+ * The finiteness check is on the ROUNDED value, not the argument: scaling by 10
+ * is itself enough to overflow a merely huge input, so checking only the
+ * argument would let Infinity straight through to the screen.
  */
 function round1Decimal(n: number): number {
-  if (!Number.isFinite(n)) return 0;
-  return Math.round(n * 10) / 10;
+  const rounded = Math.round(n * 10) / 10;
+  return Number.isFinite(rounded) ? rounded : 0;
 }
 
 /**
@@ -44,19 +48,18 @@ function round1Decimal(n: number): number {
  *
  * The input is trimmed to 4 decimals first so binary noise (236.24999999999997
  * for what is mathematically 236.25) cannot fall on the wrong side of a
- * half-increment boundary.
+ * half-increment boundary. As in round1Decimal, the finiteness check is on the
+ * result, since the intermediate scaling can overflow a finite argument.
  */
 function roundToNearest2Point5(n: number): number {
-  if (!Number.isFinite(n)) return 0;
   const clean = Math.round(n * 10000) / 10000;
-  return Math.round(clean / 2.5) * 2.5;
+  const rounded = Math.round(clean / 2.5) * 2.5;
+  return Number.isFinite(rounded) ? rounded : 0;
 }
 
 /** True for a usable weight/reps pair; anything else estimates to 0. */
 function validInput(weight: number, reps: number): boolean {
-  return (
-    Number.isFinite(weight) && weight > 0 && Number.isFinite(reps) && reps > 0
-  );
+  return Number.isFinite(weight) && weight > 0 && Number.isFinite(reps) && reps > 0;
 }
 
 /**
@@ -91,6 +94,11 @@ export function brzycki(weight: number, reps: number): number {
 
 /**
  * Returns estimated 1RM using Epley, Brzycki, and their arithmetic mean.
+ *
+ * When both formulas agree the mean is that value verbatim, with no rounding
+ * pass. Rounding it would let a single at 102.55 display an average of 102.6
+ * beside two component estimates of 102.55, and the headline number differing
+ * from both numbers it averages reads as a bug.
  */
 export function estimate1RM(weight: number, reps: number): OneRmEstimate {
   const e = epley(weight, reps);
@@ -98,7 +106,7 @@ export function estimate1RM(weight: number, reps: number): OneRmEstimate {
   return {
     epley: e,
     brzycki: b,
-    average: round1Decimal((e + b) / 2),
+    average: e === b ? e : round1Decimal((e + b) / 2),
   };
 }
 

@@ -13,13 +13,7 @@ import { useStore } from "../lib/store";
  * Bottom-sheet plate calculator overlay. Computes the greedy plate stack
  * needed per side of the barbell to load a target weight.
  */
-export function PlateCalculatorSheet({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const unit = useStore((s) => s.unit);
 
   const defaultBar = unit === "kg" ? DEFAULT_BAR_KG : DEFAULT_BAR_LBS;
@@ -27,6 +21,7 @@ export function PlateCalculatorSheet({
 
   const [targetStr, setTargetStr] = useState("135");
   const [barWeight, setBarWeight] = useState(defaultBar);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   useEffect(() => {
     if (open) {
@@ -36,12 +31,42 @@ export function PlateCalculatorSheet({
     }
   }, [open, unit]);
 
+  // Adjust sheet bottom padding when the soft keyboard appears so the sleeve
+  // and the Done button stay above it. Same pattern as LogSetSheet.
+  useEffect(() => {
+    if (!open) {
+      setKeyboardOffset(0);
+      return;
+    }
+    if (typeof window === "undefined" || !window.visualViewport) return;
+
+    const vv = window.visualViewport;
+    const handleViewportChange = () => {
+      setKeyboardOffset(Math.max(0, window.innerHeight - vv.height));
+    };
+
+    vv.addEventListener("resize", handleViewportChange);
+    vv.addEventListener("scroll", handleViewportChange);
+    handleViewportChange();
+
+    return () => {
+      vv.removeEventListener("resize", handleViewportChange);
+      vv.removeEventListener("scroll", handleViewportChange);
+    };
+  }, [open]);
+
   if (!open || typeof document === "undefined") return null;
 
-  const targetWeight = parseFloat(targetStr) || 0;
+  // An empty or half-typed field ("", "-", "abc") parses to NaN, and NaN renders
+  // literally as "NaN". 0 falls below every bar weight, so the sheet shows the
+  // bare bar instead.
+  const parsedTarget = parseFloat(targetStr);
+  const targetWeight = Number.isFinite(parsedTarget) ? parsedTarget : 0;
   const stack = computePlateStack(targetWeight, barWeight, undefined, unit);
 
-  // Expand perSide pairs into individual plate weights for visual sleeve rendering.
+  // Expand perSide pairs into individual plate weights for visual sleeve
+  // rendering. Bounded because computePlateStack caps total plates per side, so
+  // an absurd target cannot make this loop render millions of elements.
   const expandedPlates: number[] = [];
   for (const item of stack.perSide) {
     for (let i = 0; i < item.count; i++) {
@@ -59,7 +84,9 @@ export function PlateCalculatorSheet({
       <div
         className="w-full max-w-md rounded-t-3xl bg-surface p-5 anim-sheet"
         onClick={(e) => e.stopPropagation()}
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 20px)" }}
+        style={{
+          paddingBottom: `max(env(safe-area-inset-bottom), ${20 + keyboardOffset}px)`,
+        }}
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
 
@@ -134,7 +161,7 @@ export function PlateCalculatorSheet({
             </span>
             {stack.remainder > 0 && (
               <span className="rounded-full bg-border px-2.5 py-0.5 text-[12px] font-medium text-muted-foreground">
-                Closest: {stack.achieved} {unit}
+                {stack.remainder} {unit} short
               </span>
             )}
           </div>
@@ -173,7 +200,9 @@ export function PlateCalculatorSheet({
           </div>
 
           <div className="mt-3 flex items-center justify-between text-[13px] text-muted-foreground hairline-t pt-2.5">
-            <span>Bar: {barWeight} {unit}</span>
+            <span>
+              Bar: {barWeight} {unit}
+            </span>
             <span className="tnum font-semibold text-foreground">
               Total: {stack.achieved} {unit}
             </span>

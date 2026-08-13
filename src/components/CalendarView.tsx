@@ -13,7 +13,13 @@ import { dayKey } from "../lib/daily-log";
 import { DayEditorSheet } from "./DayEditorSheet";
 import { isCardioSession, useStore, type WorkoutSession } from "../lib/store";
 
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+/**
+ * Monday-start, matching `weekStartKey` in daily-log.ts and therefore the
+ * "Week of ..." headers the Weekly view renders in this same tab. The grid used
+ * to start on Sunday, so flipping between Weekly and Calendar moved which days
+ * counted as one week.
+ */
+const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 function fmtTime(ts: number) {
   return new Date(ts).toLocaleTimeString(undefined, { hour: "numeric" });
@@ -48,7 +54,7 @@ export function CalendarView() {
   const unit = useStore((s) => s.unit);
 
   const [viewedMonth, setViewedMonth] = useState(() => startOfMonth(new Date()));
-  // null until the user taps a day — lets the default track newly-hydrated
+  // null until the user taps a day, which lets the default track newly-hydrated
   // data instead of freezing at whatever was loaded on first render.
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -85,7 +91,10 @@ export function CalendarView() {
 
   const monthLabel = format(viewedMonth, "MMMM yyyy");
   const cells = useMemo(() => {
-    const firstWeekday = getDay(viewedMonth);
+    // `getDay` is 0=Sunday..6=Saturday; the grid's first column is Monday, so
+    // shift by 6 to get the number of leading blanks. Sunday needs 6 blanks, not
+    // 0, which is precisely the off-by-one that a bare `getDay` produced.
+    const firstWeekday = (getDay(viewedMonth) + 6) % 7;
     const daysInMonth = getDaysInMonth(viewedMonth);
     const out: Array<{ date: Date; key: string } | null> = [];
     for (let i = 0; i < firstWeekday; i++) out.push(null);
@@ -101,7 +110,7 @@ export function CalendarView() {
       <div className="mx-5 mb-3 flex items-center justify-between">
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(subMonths(m, 1)))}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-[18px] text-foreground"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-[18px] text-foreground"
           aria-label="Previous month"
         >
           ‹
@@ -109,14 +118,20 @@ export function CalendarView() {
         <span className="text-[16px] font-semibold tracking-tight">{monthLabel}</span>
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(addMonths(m, 1)))}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-[18px] text-foreground"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-[18px] text-foreground"
           aria-label="Next month"
         >
           ›
         </button>
       </div>
 
-      <div className="mx-5 grid grid-cols-7 text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      {/* Hidden from assistive tech: as single letters these are ambiguous
+          ("T" twice, "S" twice) and they are redundant anyway, because each day
+          cell below names its own weekday in full. */}
+      <div
+        aria-hidden="true"
+        className="mx-5 grid grid-cols-7 text-center text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+      >
         {WEEKDAYS.map((w, i) => (
           <div key={i} className="py-1">
             {w}
@@ -143,10 +158,24 @@ export function CalendarView() {
           const hasAnyDot = workouts.length > 0 || showNutrition || showSteps || showBodyweight;
           const isSelected = cell.key === selectedKey;
           const todayCell = isToday(cell.date);
+          // The dots are the only thing distinguishing one cell from another,
+          // and a colour is not an accessible name. Spell out what the day
+          // holds, otherwise the whole grid reads as a run of bare numbers.
+          const logged: string[] = [];
+          if (workouts.length > 0) {
+            logged.push(`${workouts.length} workout${workouts.length === 1 ? "" : "s"}`);
+          }
+          if (showNutrition) logged.push(log.isCheatDay ? "macros, cheat day" : "macros");
+          if (showSteps) logged.push("steps");
+          if (showBodyweight) logged.push("bodyweight");
           return (
             <button
               key={cell.key}
               onClick={() => setPickedKey(cell.key)}
+              aria-pressed={isSelected}
+              aria-label={`${format(cell.date, "EEEE, MMMM d")}${
+                logged.length > 0 ? `: ${logged.join(", ")}` : ": nothing logged"
+              }`}
               className={
                 "relative flex min-h-[64px] flex-col items-center gap-1 bg-surface pb-1 pt-2 " +
                 (isSelected ? "ring-1 ring-inset ring-accent" : "")

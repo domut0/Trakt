@@ -466,9 +466,12 @@ function SlimProgressBar({ progress }: { progress: TargetProgress }) {
       <div className="flex justify-between text-[12px]">
         <span className="font-medium text-muted-foreground">{label}</span>
         <span className="tnum font-semibold">
-          {progress.logged.toLocaleString()}{unitSuffix}
+          {progress.logged.toLocaleString()}
+          {unitSuffix}
           <span className="text-muted-foreground font-normal">
-            {" "} / {progress.target.toLocaleString()}{unitSuffix}
+            {" "}
+            / {progress.target.toLocaleString()}
+            {unitSuffix}
           </span>
           {isOver && <span className="ml-1.5 text-[10px] font-bold text-destructive">OVER</span>}
         </span>
@@ -548,7 +551,9 @@ function CalorieTargetRing({
         )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pt-0.5 text-center">
-        <span className={`tnum text-[14px] font-bold leading-none ${isOver ? "text-destructive" : ""}`}>
+        <span
+          className={`tnum text-[14px] font-bold leading-none ${isOver ? "text-destructive" : ""}`}
+        >
           {logged.toLocaleString()}
         </span>
         <span className="mt-0.5 text-[10px] font-medium leading-none text-muted-foreground">

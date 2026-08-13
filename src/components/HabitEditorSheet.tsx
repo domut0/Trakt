@@ -120,13 +120,7 @@ function ChevronIcon({ open }: { open: boolean }) {
  * Designed for low-friction batch data entry: submitting an item clears the field
  * while retaining input focus so multiple supplements can be added sequentially.
  */
-export function HabitEditorSheet({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export function HabitEditorSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const habits = useStore((s) => s.habits);
   const addHabit = useStore((s) => s.addHabit);
   const renameHabit = useStore((s) => s.renameHabit);
@@ -143,12 +137,15 @@ export function HabitEditorSheet({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (open) {
-      setNewHabitName("");
-      setEditingId(null);
-      setConfirmDeleteId(null);
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
+    if (!open) return;
+    setNewHabitName("");
+    setEditingId(null);
+    setConfirmDeleteId(null);
+    // Deferred a tick because the portal content is only in the document after
+    // this commit. Cleared on unmount so closing the sheet mid-delay cannot
+    // leave a pending focus call behind.
+    const focusTimer = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(focusTimer);
   }, [open]);
 
   const activeHabits = useMemo(
@@ -209,10 +206,11 @@ export function HabitEditorSheet({
         <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-border" />
 
         <div className="flex shrink-0 items-center justify-between pb-3">
-          <h2 className="text-[17px] font-semibold tracking-tight">Manage Supplements</h2>
+          <h2 className="text-[17px] font-semibold tracking-tight">Manage supplements</h2>
           <button
+            type="button"
             onClick={onClose}
-            className="text-[13px] font-medium text-muted-foreground hover:text-foreground"
+            className="-mr-2 flex min-h-[44px] items-center px-2 text-[13px] font-medium text-muted-foreground hover:text-foreground"
           >
             Done
           </button>
@@ -260,21 +258,23 @@ export function HabitEditorSheet({
                 {confirmDeleteId === habit.id ? (
                   <div className="flex flex-col gap-2 p-1">
                     <p className="text-[12px] font-medium text-destructive">
-                      Delete habit and all its history?
+                      Delete supplement and all its history?
                     </p>
                     <div className="flex items-center gap-2">
                       <button
+                        type="button"
                         onClick={() => {
                           deleteHabit(habit.id);
                           setConfirmDeleteId(null);
                         }}
-                        className="min-h-[36px] flex-1 rounded-lg bg-destructive px-3 text-[13px] font-semibold text-white"
+                        className="min-h-[44px] flex-1 rounded-lg bg-destructive px-3 text-[13px] font-semibold text-white"
                       >
                         Delete history
                       </button>
                       <button
+                        type="button"
                         onClick={() => setConfirmDeleteId(null)}
-                        className="min-h-[36px] flex-1 rounded-lg bg-muted px-3 text-[13px] font-medium text-muted-foreground"
+                        className="min-h-[44px] flex-1 rounded-lg bg-muted px-3 text-[13px] font-medium text-muted-foreground"
                       >
                         Cancel
                       </button>
@@ -298,24 +298,29 @@ export function HabitEditorSheet({
                         />
                       ) : (
                         <button
+                          type="button"
                           onClick={() => {
                             setEditingId(habit.id);
                             setEditingName(habit.name);
                           }}
-                          className="w-full text-left text-[15px] font-medium text-foreground hover:text-accent"
+                          aria-label={`Rename ${habit.name}`}
+                          className="flex min-h-[44px] w-full items-center text-left text-[15px] font-medium text-foreground hover:text-accent"
                           title="Tap to rename"
                         >
-                          {habit.name}
+                          <span className="truncate">{habit.name}</span>
                         </button>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
+                    {/* gap-0.5, not gap-1: four 44px controls plus the name have
+                        to fit a 375px viewport without the name collapsing. */}
+                    <div className="flex shrink-0 items-center gap-0.5">
                       <button
+                        type="button"
                         onClick={() => moveUp(idx)}
                         disabled={idx === 0}
                         aria-label={`Move ${habit.name} up`}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground disabled:opacity-30"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground disabled:opacity-30"
                       >
                         <ArrowUpIcon />
                       </button>
@@ -323,14 +328,14 @@ export function HabitEditorSheet({
                         onClick={() => moveDown(idx)}
                         disabled={idx === activeHabits.length - 1}
                         aria-label={`Move ${habit.name} down`}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground disabled:opacity-30"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground disabled:opacity-30"
                       >
                         <ArrowDownIcon />
                       </button>
                       <button
                         onClick={() => setHabitArchived(habit.id, true)}
                         aria-label={`Archive ${habit.name}`}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground"
                         title="Archive (keeps history)"
                       >
                         <ArchiveIcon />
@@ -338,7 +343,7 @@ export function HabitEditorSheet({
                       <button
                         onClick={() => setConfirmDeleteId(habit.id)}
                         aria-label={`Delete ${habit.name}`}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-destructive"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-destructive"
                         title="Delete"
                       >
                         <TrashIcon />
@@ -356,7 +361,7 @@ export function HabitEditorSheet({
                 onClick={() => setShowArchived(!showArchived)}
                 className="flex min-h-[44px] w-full items-center justify-between rounded-xl px-2 text-[13px] font-medium text-muted-foreground hover:text-foreground"
               >
-                <span>Archived habits ({archivedHabits.length})</span>
+                <span>Archived supplements ({archivedHabits.length})</span>
                 <ChevronIcon open={showArchived} />
               </button>
 
@@ -370,21 +375,23 @@ export function HabitEditorSheet({
                       {confirmDeleteId === habit.id ? (
                         <div className="flex flex-col gap-2 p-1">
                           <p className="text-[12px] font-medium text-destructive">
-                            Delete habit and all its history?
+                            Delete supplement and all its history?
                           </p>
                           <div className="flex items-center gap-2">
                             <button
+                              type="button"
                               onClick={() => {
                                 deleteHabit(habit.id);
                                 setConfirmDeleteId(null);
                               }}
-                              className="min-h-[36px] flex-1 rounded-lg bg-destructive px-3 text-[13px] font-semibold text-white"
+                              className="min-h-[44px] flex-1 rounded-lg bg-destructive px-3 text-[13px] font-semibold text-white"
                             >
                               Delete history
                             </button>
                             <button
+                              type="button"
                               onClick={() => setConfirmDeleteId(null)}
-                              className="min-h-[36px] flex-1 rounded-lg bg-muted px-3 text-[13px] font-medium text-muted-foreground"
+                              className="min-h-[44px] flex-1 rounded-lg bg-muted px-3 text-[13px] font-medium text-muted-foreground"
                             >
                               Cancel
                             </button>
@@ -399,7 +406,7 @@ export function HabitEditorSheet({
                             <button
                               onClick={() => setHabitArchived(habit.id, false)}
                               aria-label={`Unarchive ${habit.name}`}
-                              className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground"
+                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground"
                               title="Unarchive"
                             >
                               <UnarchiveIcon />
@@ -407,7 +414,7 @@ export function HabitEditorSheet({
                             <button
                               onClick={() => setConfirmDeleteId(habit.id)}
                               aria-label={`Delete ${habit.name}`}
-                              className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-destructive"
+                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-destructive"
                               title="Delete"
                             >
                               <TrashIcon />

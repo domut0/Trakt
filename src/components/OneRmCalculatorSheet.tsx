@@ -1,23 +1,18 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { estimate1RM, percentageTable } from "../lib/onerm";
+import { estimate1RM, percentageTable, RELIABLE_REP_LIMIT } from "../lib/onerm";
 import { useStore } from "../lib/store";
 
 /**
  * Bottom-sheet 1RM (one-rep max) calculator overlay. Provides weight/reps inputs,
  * Epley and Brzycki 1RM estimates with their average, and a percentage breakdown table.
  */
-export function OneRmCalculatorSheet({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const unit = useStore((s) => s.unit);
 
   const [weightStr, setWeightStr] = useState("225");
   const [repsStr, setRepsStr] = useState("5");
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   useEffect(() => {
     if (open) {
@@ -26,10 +21,39 @@ export function OneRmCalculatorSheet({
     }
   }, [open, unit]);
 
+  // Adjust sheet bottom padding when the soft keyboard appears so the estimate
+  // and the Done button stay above it. Same pattern as LogSetSheet.
+  useEffect(() => {
+    if (!open) {
+      setKeyboardOffset(0);
+      return;
+    }
+    if (typeof window === "undefined" || !window.visualViewport) return;
+
+    const vv = window.visualViewport;
+    const handleViewportChange = () => {
+      setKeyboardOffset(Math.max(0, window.innerHeight - vv.height));
+    };
+
+    vv.addEventListener("resize", handleViewportChange);
+    vv.addEventListener("scroll", handleViewportChange);
+    handleViewportChange();
+
+    return () => {
+      vv.removeEventListener("resize", handleViewportChange);
+      vv.removeEventListener("scroll", handleViewportChange);
+    };
+  }, [open]);
+
   if (!open || typeof document === "undefined") return null;
 
-  const numWeight = parseFloat(weightStr) || 0;
-  const numReps = parseInt(repsStr, 10) || 0;
+  // An empty or half-typed field parses to NaN, and NaN renders literally as
+  // "NaN". Both inputs collapse to 0, which the pure module treats as unusable
+  // and reports as a 0 estimate.
+  const parsedWeight = parseFloat(weightStr);
+  const parsedReps = parseInt(repsStr, 10);
+  const numWeight = Number.isFinite(parsedWeight) ? parsedWeight : 0;
+  const numReps = Number.isFinite(parsedReps) ? parsedReps : 0;
 
   const estimate = estimate1RM(numWeight, numReps);
   const rows = percentageTable(estimate.average);
@@ -42,7 +66,9 @@ export function OneRmCalculatorSheet({
       <div
         className="w-full max-w-md rounded-t-3xl bg-surface p-5 anim-sheet"
         onClick={(e) => e.stopPropagation()}
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 20px)" }}
+        style={{
+          paddingBottom: `max(env(safe-area-inset-bottom), ${20 + keyboardOffset}px)`,
+        }}
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
 
@@ -83,12 +109,10 @@ export function OneRmCalculatorSheet({
           </div>
 
           <div className="rounded-xl bg-muted p-3">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Reps
-            </div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Reps</div>
             <div className="mt-1 flex items-baseline gap-1">
               <input
-                inputMode="decimal"
+                inputMode="numeric"
                 enterKeyHint="done"
                 aria-label="Reps"
                 value={repsStr}
@@ -118,13 +142,23 @@ export function OneRmCalculatorSheet({
 
             <div className="text-right text-[12px] text-muted-foreground">
               <div>
-                Epley: <span className="tnum font-semibold text-foreground">{estimate.epley}</span> {unit}
+                Epley: <span className="tnum font-semibold text-foreground">{estimate.epley}</span>{" "}
+                {unit}
               </div>
               <div>
-                Brzycki: <span className="tnum font-semibold text-foreground">{estimate.brzycki}</span> {unit}
+                Brzycki:{" "}
+                <span className="tnum font-semibold text-foreground">{estimate.brzycki}</span>{" "}
+                {unit}
               </div>
             </div>
           </div>
+
+          {numReps > RELIABLE_REP_LIMIT && (
+            <p className="mt-2.5 text-[12px] leading-snug text-muted-foreground">
+              Past {RELIABLE_REP_LIMIT} reps both formulas drift high. Treat this as a rough
+              ceiling, not a number to load.
+            </p>
+          )}
         </div>
 
         {/* Percentage Breakdown Table */}

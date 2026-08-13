@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useStore, type ExerciseType } from "../lib/store";
-import { useToast } from "./Toast";
 
 /** Handles all three exercise types even though the picker above filters
  * cardio out entirely -- kept exhaustive so a future caller (or a stray
@@ -23,6 +22,10 @@ export function LogSetSheet({
 }) {
   const activeSessionId = useStore((s) => s.activeSessionId)!;
   const currentExerciseId = useStore((s) => s.currentExerciseId);
+  // Subscribed, not read via getState() at render time: an unsubscribed read
+  // leaves the weight suffix showing the old unit until something else happens
+  // to re-render this sheet.
+  const unit = useStore((s) => s.unit);
   const exercises = useStore((s) => s.exercises);
   const sets = useStore((s) => s.sets);
   const addExercise = useStore((s) => s.addExercise);
@@ -30,7 +33,6 @@ export function LogSetSheet({
   const prefillFor = useStore((s) => s.prefillFor);
   const lastSetupNoteFor = useStore((s) => s.lastSetupNoteFor);
   const logSet = useStore((s) => s.logSet);
-  const showToast = useToast();
 
   const [pickingExercise, setPickingExercise] = useState(false);
   const [exerciseQuery, setExerciseQuery] = useState("");
@@ -52,6 +54,9 @@ export function LogSetSheet({
     if (!open) {
       setDragY(0);
       setIsDragging(false);
+      // Reset the keyboard lift too, or reopening the sheet paints one frame
+      // with the padding left over from the last time a keyboard was up.
+      setKeyboardOffset(0);
       return;
     }
     const eid = currentExerciseId;
@@ -134,11 +139,22 @@ export function LogSetSheet({
       setupNote: note.trim() || suggestedNote,
       targetSets,
     });
+    // No toast raised here, on purpose, and no Undo. Two separate reasons:
+    //
+    // 1. `onLogged` is the confirmation. The /workout route already flashes a
+    //    "Set logged" toast in response to it, at the same z-index this one
+    //    would use, so raising a second one stacks two overlapping
+    //    confirmations of the same action with different lifetimes.
+    // 2. An Undo could not be made correct from here anyway. `logSet` returns
+    //    void, and it does more than append a row: it sets currentExerciseId,
+    //    opens a currentBlock when targetSets > 1, derives the next set's
+    //    timeBetweenSetsSeconds from this one, and persists the active-workout
+    //    meta. A `deleteSet` alone would leave a block whose only set is gone,
+    //    and `logNextInBlock` then takes its exerciseId from whatever set is
+    //    now most recent, which is how an Undo turns into a set logged against
+    //    the wrong exercise. A broken Undo is worse than no Undo.
     onLogged?.();
     onClose();
-    showToast({
-      message: targetSets > 1 ? `${targetSets} sets logged` : "Set logged",
-    });
   };
 
   const stepReps = (dir: -1 | 1) => {
@@ -193,8 +209,15 @@ export function LogSetSheet({
     }
   };
 
+  // `data-swipe-ignore` is belt-and-braces: /workout bypasses AppShell today,
+  // so nothing here reaches the swipe-between-tabs handler. React portals
+  // bubble along the React tree though, so the moment this sheet is rendered
+  // from a route that IS wrapped in AppShell, a drag with any horizontal
+  // component would navigate away mid-set. The attribute costs nothing and is
+  // resolved by a DOM `closest` in AppShell's shouldIgnoreSwipe.
   return createPortal(
     <div
+      data-swipe-ignore
       className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end justify-center bg-black/30 anim-backdrop"
       onClick={onClose}
       style={{ opacity: dragY > 0 ? Math.max(0, 1 - dragY / 300) : 1 }}
@@ -208,12 +231,14 @@ export function LogSetSheet({
           transition: isDragging ? "none" : "transform 0.2s cubic-bezier(0.32, 0.72, 0, 1)",
         }}
       >
+        {/* min-h-[44px], not the visual height of the 4px grabber: this is the
+            drag-to-dismiss target, and py-3 alone gave it a 28px hit area. */}
         <div
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerCancel}
-          className="w-full cursor-grab touch-none py-3 active:cursor-grabbing"
+          className="flex min-h-[44px] w-full cursor-grab touch-none items-center active:cursor-grabbing"
           aria-label="Drag down to close sheet"
         >
           <div className="mx-auto h-1 w-10 rounded-full bg-border" />
@@ -223,6 +248,7 @@ export function LogSetSheet({
           <div className="px-5 pb-4">
             <input
               autoFocus
+              aria-label="Search or add exercise"
               value={exerciseQuery}
               onChange={(e) => setExerciseQuery(e.target.value)}
               placeholder="Search or add exercise"
@@ -299,6 +325,10 @@ export function LogSetSheet({
                 Setup
               </span>
               <input
+                // The visible "Setup" text is a sibling span, not a <label>,
+                // and the placeholder is whatever note was used last time, so
+                // neither one names this field to a screen reader.
+                aria-label="Setup note"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 enterKeyHint="next"
@@ -316,7 +346,7 @@ export function LogSetSheet({
             <div className="mt-5 grid grid-cols-2 gap-3">
               <NumField
                 label="Weight"
-                suffix={useStore.getState().unit}
+                suffix={unit}
                 value={weight}
                 onChange={setWeight}
                 placeholder={suggestion.weight != null ? String(suggestion.weight) : "0"}
@@ -359,10 +389,16 @@ export function LogSetSheet({
                 <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
                   Sets
                 </div>
+                {/* tabIndex={-1} + preventDefault on mousedown, matching the
+                    steppers in NumField: without them these take focus off
+                    whichever numeric field the user is filling, collapsing the
+                    soft keyboard on every tap. */}
                 <div className="mt-1 flex items-center justify-between">
                   <button
                     type="button"
+                    tabIndex={-1}
                     aria-label="Decrease sets"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setTargetSets(Math.max(1, targetSets - 1))}
                     className="flex h-11 w-11 items-center justify-center rounded-full bg-surface text-[18px] font-semibold text-foreground hairline-t hairline-b active:scale-95"
                   >
@@ -371,7 +407,9 @@ export function LogSetSheet({
                   <span className="tnum text-[22px] font-semibold">{targetSets}</span>
                   <button
                     type="button"
+                    tabIndex={-1}
                     aria-label="Increase sets"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setTargetSets(targetSets + 1)}
                     className="flex h-11 w-11 items-center justify-center rounded-full bg-surface text-[18px] font-semibold text-foreground hairline-t hairline-b active:scale-95"
                   >
@@ -402,6 +440,34 @@ export function LogSetSheet({
     </div>,
     document.body,
   );
+}
+
+/**
+ * Select a field's whole value as it is entered, so typing REPLACES the number
+ * instead of appending to it. This is the single biggest friction win when
+ * logging: without it, changing 225 to 235 means clearing three digits first.
+ *
+ * The synchronous `select()` is what works on desktop. iOS Safari runs its own
+ * tap-to-place-caret AFTER the focus event and collapses that selection, so the
+ * range is reapplied on the next frame. The activeElement check makes the
+ * deferred half a no-op if the user has already moved on, and is also why this
+ * needs no cleanup on unmount: a frame that lands after the sheet closes finds
+ * a detached element and does nothing.
+ *
+ * These inputs carry no `type`, so they are text inputs and support
+ * setSelectionRange; the try/catch is only insurance against that changing,
+ * since `type="number"` would throw here.
+ */
+function selectAllOnEntry(el: HTMLInputElement) {
+  el.select();
+  requestAnimationFrame(() => {
+    if (document.activeElement !== el) return;
+    try {
+      el.setSelectionRange(0, el.value.length);
+    } catch {
+      // Selection unsupported for this input type; the sync select() stands.
+    }
+  });
 }
 
 export function NumField({
@@ -456,8 +522,13 @@ export function NumField({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onFocus={(e) => {
-              e.target.select();
-              e.target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              selectAllOnEntry(e.currentTarget);
+              // `block: "nearest"` with no `behavior`, deliberately. A JS
+              // smooth scroll is not covered by styles.css's global
+              // prefers-reduced-motion clamp (that only flattens CSS
+              // durations), and on iOS it also races the keyboard resize that
+              // the visualViewport lift above already handles.
+              e.currentTarget.scrollIntoView({ block: "nearest" });
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {

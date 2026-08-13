@@ -45,10 +45,17 @@ export interface PlateStackResult {
  * remainder comparisons and displayed totals stay exact. Four decimals is far
  * finer than any plate increment (1.25 kg / 2.5 lb) yet coarse enough to
  * absorb the binary error that accumulates from repeated subtraction.
+ *
+ * NaN and Infinity degrade to 0. A magnitude so large that scaling by 10000
+ * overflows is returned untouched instead: a double that big has no fractional
+ * part left to clean, and collapsing it to 0 would make an unreachable target
+ * report a remainder of 0, which reads as "loaded exactly".
  */
 function cleanFloat(n: number): number {
   if (!Number.isFinite(n)) return 0;
-  return Math.round(n * 10000) / 10000;
+  const scaled = n * 10000;
+  if (!Number.isFinite(scaled)) return n;
+  return Math.round(scaled) / 10000;
 }
 
 /**

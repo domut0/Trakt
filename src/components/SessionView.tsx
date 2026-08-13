@@ -271,7 +271,8 @@ export function SessionView({
               Repeat last workout
             </div>
             <div className="text-[14px] font-semibold tracking-tight">
-              {repeatExercises.length} exercise{repeatExercises.length === 1 ? "" : "s"} from previous session
+              {repeatExercises.length} exercise{repeatExercises.length === 1 ? "" : "s"} from
+              previous session
             </div>
           </div>
           <span className="text-[13px] font-medium text-accent">

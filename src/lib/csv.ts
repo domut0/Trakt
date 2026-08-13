@@ -55,7 +55,14 @@ export function toCsv<T>(rows: readonly T[], columns: readonly ColumnSpec<T>[]):
 /**
  * Serialises logged sets into CSV rows.
  * One row per logged set, sorted chronologically by loggedAt ascending.
- * Cardio sessions have no sets and do not appear here.
+ *
+ * There is deliberately no cardio filter. `logCardio` writes a session and no
+ * sets at all, so a cardio bout contributes nothing to this file by
+ * construction rather than by exclusion. Adding a guard here would instead
+ * risk dropping real strength data whenever `kind` grew a third value, and an
+ * export is the one place where silently losing a row is unrecoverable. The
+ * consequence, worth stating: cardio is absent from BOTH CSV exports, so the
+ * JSON backup is currently the only complete record of it.
  */
 export function setsToCsv(
   sets: readonly WorkoutSet[],
@@ -83,7 +90,11 @@ export function setsToCsv(
       header: "Split Slot",
       accessor: (set) => {
         const sess = sessionMap.get(set.sessionId);
-        if (!sess || !sess.splitSlotId) return "";
+        // `== null`, not falsy: a slot id is a string and the only absent value
+        // is undefined, which is what every cardio session carries. Matching
+        // the `!= null` convention used by store.ts's slot guards keeps the two
+        // readings of "has no slot" identical.
+        if (sess == null || sess.splitSlotId == null) return "";
         return slotMap.get(sess.splitSlotId)?.name ?? "";
       },
     },

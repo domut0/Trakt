@@ -64,7 +64,7 @@ export function HabitsCard({ date }: { date: string }) {
   const totalCount = activeHabits.length;
 
   return (
-    <div className="rounded-2xl bg-surface px-5 py-4">
+    <div className="rounded-2xl border border-border/40 bg-surface px-5 py-4">
       {/* Header with compact progress indicator and editor button */}
       <div className="flex items-center justify-between pb-2">
         <div className="flex items-center gap-2">
@@ -75,10 +75,14 @@ export function HabitsCard({ date }: { date: string }) {
             </span>
           )}
         </div>
+        {/* The visible circle stays 32px so the header does not turn into a
+            toolbar, while an inset pseudo-element carries the hit area past 44px.
+            Same trick as the toggle in settings.tsx. */}
         <button
+          type="button"
           onClick={() => setEditorOpen(true)}
           aria-label="Edit supplements"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="relative flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:bg-muted hover:text-foreground"
         >
           <SettingsIcon />
         </button>
@@ -87,6 +91,7 @@ export function HabitsCard({ date }: { date: string }) {
       {/* Checklist items or prompt to add the first supplement */}
       {totalCount === 0 ? (
         <button
+          type="button"
           onClick={() => setEditorOpen(true)}
           className="flex min-h-[44px] w-full items-center justify-center rounded-xl bg-muted/50 px-4 py-3 text-[14px] font-medium text-accent hover:bg-muted"
         >
@@ -107,9 +112,7 @@ export function HabitsCard({ date }: { date: string }) {
               >
                 <span
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors ${
-                    isDone
-                      ? "bg-accent text-accent-foreground"
-                      : "border border-border bg-muted/30"
+                    isDone ? "bg-accent text-accent-foreground" : "border border-border bg-muted/30"
                   }`}
                 >
                   {isDone && <CheckIcon />}

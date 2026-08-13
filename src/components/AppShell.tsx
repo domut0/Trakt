@@ -159,10 +159,22 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   const items = getEnabledTabs(chartsEnabled);
   const currentIndex = items.findIndex((it) => it.to === location.pathname);
 
-  // Split routed tabs into left and right halves around the Workout button.
-  // Symmetric left and right flex-1 containers ensure the center button is
-  // ALWAYS strictly horizontally centered, whether Charts is enabled (2 tabs
-  // on each side) or disabled (2 tabs on left, 1 tab on right).
+  // Split the ROUTED tabs (never the Workout button) into two halves that sit
+  // either side of it.
+  //
+  // The centring does NOT depend on this split being even, which is what was
+  // wrong before: an odd routed-tab count (Charts off) left the button off by
+  // half a slot. It is exact because the two <ul>s are `flex-1` - that is
+  // `flex: 1 1 0%`, so both have a zero flex basis and an equal grow factor -
+  // around a `shrink-0` centre. Whatever width the centre takes, the remaining
+  // free space is split into two equal halves, so the centre lands on the axis
+  // for 3 routed tabs (2 left, 1 right) exactly as it does for 4.
+  //
+  // The tabs themselves are then distributed WITHIN their half, so with Charts
+  // off the lone right-hand tab is centred in the right half rather than being
+  // evenly spaced against the left pair. That is a deliberate trade: the action
+  // button is the thing a thumb hunts for, and it must not move when a setting
+  // in another screen is toggled.
   const splitAt = Math.ceil(items.length / 2);
   const leftItems = items.slice(0, splitAt);
   const rightItems = items.slice(splitAt);
@@ -180,7 +192,11 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
               lastNavDirection = i > currentIndex ? "forward" : "back";
             }
           }}
-          className="flex flex-col items-center gap-0.5 py-1"
+          // Full width of its flex-1 <li>, with an explicit height floor so the
+          // 22px icon plus 11px label can never fall under 44px if either is
+          // restyled later.
+          className="flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 py-1"
+          aria-current={active ? "page" : undefined}
           style={{ color: active ? "var(--color-accent)" : "var(--color-muted-foreground)" }}
         >
           <Icon name={it.icon} />
@@ -205,7 +221,13 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
               activeSessionId ? router.navigate({ to: "/workout" }) : onOpenChooser()
             }
             aria-label={activeSessionId ? "Return to active workout" : "Start workout"}
-            className="flex flex-col items-center gap-0.5 py-1"
+            // Losing the old `w-full` when this moved out of a flex-1 <li> left
+            // the button as wide as its label, and "Return" is only ~36px - under
+            // the 44px minimum, in the exact state where the user most needs to
+            // hit it. The floor also keeps the button from changing width when
+            // the label swaps between "Workout" and "Return", which would
+            // otherwise shift the whole nav mid-session.
+            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 py-1"
             style={{ color: "var(--color-accent)" }}
           >
             <FlameIcon />

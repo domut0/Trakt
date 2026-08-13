@@ -88,6 +88,12 @@ export function groupSetsBySession(
 /**
  * Finds the heaviest set logged for an exercise, breaking ties by higher reps.
  * Returns undefined when the set list is empty.
+ *
+ * Takes sets, not sessions, so it cannot apply the cardio guard itself. Feed it
+ * the output of `setsForExercise`, which can only return strength sets - that is
+ * the whole reason `setsForExercise` takes `sessions` as a required argument
+ * rather than an optional one. Passing a raw `state.sets` slice here would put a
+ * treadmill entry into a personal best.
  */
 export function bestSetFor(sets: WorkoutSet[]): WorkoutSet | undefined {
   if (sets.length === 0) return undefined;
@@ -100,6 +106,9 @@ export function bestSetFor(sets: WorkoutSet[]): WorkoutSet | undefined {
 
 /**
  * Returns total volume (sum of weight * reps across all sets).
+ *
+ * Same contract as `bestSetFor`: strength-only is the caller's job, discharged
+ * by passing the output of `setsForExercise`.
  */
 export function volumeFor(sets: WorkoutSet[]): number {
   return sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
@@ -109,8 +118,26 @@ export function volumeFor(sets: WorkoutSet[]): number {
  * Finds the exercise IDs logged during the previous strength session of the same split slot,
  * maintaining the original logged order.
  *
- * Excludes cardio sessions and ensures sessions with undefined splitSlotId never match each other,
- * preventing unslotted sessions from leaking exercise lists into each other.
+ * The same two guards as `findLastSessionForSlot` in store.ts, applied to BOTH
+ * sides of every comparison: cardio is excluded outright, and a session with no
+ * `splitSlotId` never matches anything. Without the second guard two cardio
+ * bouts, which both carry `splitSlotId === undefined`, would compare equal to
+ * each other and to any other slot-less session, and a treadmill run would
+ * start feeding this list.
+ *
+ * "Previous" means strictly earlier, by `startedAt`. Both halves of that matter:
+ *
+ * - Strictly earlier, because this is called for a session being VIEWED, not
+ *   only for the live one. `/session/$id` renders the same SessionView as
+ *   `/workout`, so without a `startedAt` comparison, opening last Monday's
+ *   session offered the exercise list from the FOLLOWING Monday.
+ * - By `startedAt`, not `endedAt`, matching every surface that buckets or
+ *   orders sessions by date (see `countSessionsTrained` in daily-log.ts). A
+ *   session that began earlier is the earlier session even if it ran long.
+ *
+ * `endedAt != null` is a separate, deliberate filter: an abandoned session is
+ * not something to pull a plan from. This is exactly the completeness/ordering
+ * split that `countSessionsTrained` documents.
  */
 export function previousSessionExerciseOrder(
   sessions: WorkoutSession[],
@@ -129,9 +156,10 @@ export function previousSessionExerciseOrder(
         s.splitSlotId != null &&
         s.splitSlotId === currentSession.splitSlotId &&
         s.id !== currentSession.id &&
-        (s.endedAt != null || s.startedAt < currentSession.startedAt),
+        s.endedAt != null &&
+        s.startedAt < currentSession.startedAt,
     )
-    .sort((a, b) => (b.endedAt ?? b.startedAt) - (a.endedAt ?? a.startedAt));
+    .sort((a, b) => b.startedAt - a.startedAt);
 
   if (matchingSessions.length === 0) {
     return [];

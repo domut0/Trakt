@@ -40,6 +40,10 @@ export function useToast(): ShowToast {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [activeToast, setActiveToast] = useState<ActiveToast | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A monotonic counter, not Date.now(): two toasts raised in the same
+  // millisecond would share an id, and the auto-dismiss below identifies its
+  // own toast by id.
+  const nextIdRef = useRef(0);
 
   const dismiss = useCallback(() => {
     if (timerRef.current) {
@@ -52,15 +56,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const showToast: ShowToast = useCallback(
     ({ message, actionLabel, onAction, durationMs = 4000 }) => {
       // Replaces any currently active toast immediately so rapid successive
-      // actions never stack notifications or push content offscreen.
+      // actions never stack notifications or push content offscreen. Clearing
+      // the old timer here is what stops it from dismissing the REPLACEMENT.
       if (timerRef.current) {
         clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
 
-      const id = Date.now();
+      nextIdRef.current += 1;
+      const id = nextIdRef.current;
       setActiveToast({ id, message, actionLabel, onAction, durationMs });
 
       timerRef.current = setTimeout(() => {
+        timerRef.current = null;
         setActiveToast((current) => (current?.id === id ? null : current));
       }, durationMs);
     },
@@ -71,6 +79,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
     };
   }, []);
@@ -78,7 +87,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={showToast}>
       {children}
-      {activeToast && <ToastElement toast={activeToast} onDismiss={dismiss} />}
+      {/* Keyed by id so a replacement toast gets a FRESH element: without it
+          React reuses the node and the outgoing toast's drag state (mid-drag
+          offset, dangling isDragging) carries over onto the new message. */}
+      {activeToast && <ToastElement key={activeToast.id} toast={activeToast} onDismiss={dismiss} />}
     </ToastContext.Provider>
   );
 }
@@ -86,7 +98,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 function ToastElement({ toast, onDismiss }: { toast: ActiveToast; onDismiss: () => void }) {
   const [offsetY, setOffsetY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [entered, setEntered] = useState(false);
   const startYRef = useRef(0);
+
+  // Slide up on mount. Driven by a CSS transition rather than a keyframe
+  // animation so the same `transform` can be handed over to the drag below,
+  // and so styles.css's global prefers-reduced-motion clamp (which flattens
+  // transition-duration) already covers it.
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   // SSR guard matching sheet components in the app: never attempt createPortal
   // during the server pass when document is undefined.
@@ -128,10 +150,16 @@ function ToastElement({ toast, onDismiss }: { toast: ActiveToast; onDismiss: () 
     onDismiss();
   };
 
+  // Note the absence of a `-translate-x-1/2` class below. Tailwind v4 compiles
+  // translate utilities to the standalone `translate` property, which composes
+  // WITH `transform` rather than being overridden by it, so pairing the two
+  // shifted this a full 100% of its own width left of centre, half of it off
+  // screen. The -50% in the inline transform is the only horizontal centring.
   return createPortal(
     <div
       role="status"
       aria-live="polite"
+      aria-atomic="true"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -141,14 +169,14 @@ function ToastElement({ toast, onDismiss }: { toast: ActiveToast; onDismiss: () 
           onDismiss();
         }
       }}
-      className="fixed left-1/2 -translate-x-1/2 z-[60] flex w-[calc(100%-2rem)] max-w-sm items-center justify-between gap-3 rounded-2xl bg-surface px-4 py-3 text-foreground shadow-lg hairline-t hairline-b touch-none cursor-pointer"
+      className="fixed left-1/2 z-[60] flex min-h-[44px] w-[calc(100%-2rem)] max-w-sm items-center justify-between gap-3 rounded-2xl bg-surface px-4 py-3 text-foreground shadow-lg hairline-t hairline-b touch-none cursor-pointer"
       style={{
         bottom: "max(calc(env(safe-area-inset-bottom) + 68px), 76px)",
-        transform: `translate(-50%, ${offsetY}px)`,
+        transform: `translate(-50%, ${offsetY + (entered ? 0 : 18)}px)`,
         transition: isDragging
           ? "none"
           : "transform 0.2s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease",
-        opacity: offsetY > 0 ? Math.max(0, 1 - offsetY / 120) : 1,
+        opacity: entered ? (offsetY > 0 ? Math.max(0, 1 - offsetY / 120) : 1) : 0,
       }}
     >
       <span className="text-[14px] font-medium leading-snug">{toast.message}</span>

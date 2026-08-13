@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import {
   computeWindowChange,
@@ -7,6 +7,7 @@ import {
   niceTicks,
   rollingAverage,
   splitIntoSegments,
+  tickDecimals,
 } from "../lib/chart-math";
 import type { DailyLogNumericField } from "../lib/daily-log";
 import { useStore } from "../lib/store";
@@ -45,6 +46,18 @@ const RANGES = [
 
 type ViewMode = "daily" | "avg7";
 
+/**
+ * Rounds a metric value for display: counts read as whole numbers, everything
+ * else to one decimal. Shared by the stats row, the scrub pill and the
+ * single-point label so the same number never renders two ways.
+ */
+function formatMetricValue(metricKey: DailyLogNumericField, v: number): string {
+  if (metricKey === "calories" || metricKey === "steps") {
+    return Math.round(v).toLocaleString();
+  }
+  return (Math.round(v * 10) / 10).toLocaleString();
+}
+
 function ChartsPage() {
   const dailyLogs = useStore((s) => s.dailyLogs);
   const unit = useStore((s) => s.unit);
@@ -57,9 +70,11 @@ function ChartsPage() {
   const metricUnit = typeof metric.unit === "function" ? metric.unit(unit) : metric.unit;
 
   // Map all logs for the current metric sorted chronologically by timestamp.
+  // Non-finite values are dropped rather than plotted: a single NaN from a bad
+  // CSV import makes the whole SVG path string invalid, which blanks the line.
   const allMetricLogs = useMemo(() => {
     return dailyLogs
-      .filter((log) => log[metricKey] !== undefined)
+      .filter((log) => Number.isFinite(log[metricKey]))
       .map((log) => {
         const parts = log.date.split("-");
         const ts = new Date(
@@ -73,6 +88,7 @@ function ChartsPage() {
           isCheatDay: log.isCheatDay,
         };
       })
+      .filter((p) => Number.isFinite(p.ts))
       .sort((a, b) => a.ts - b.ts);
   }, [dailyLogs, metricKey]);
 
@@ -112,22 +128,30 @@ function ChartsPage() {
     return linearRegression(currentPoints);
   }, [currentPoints]);
 
+  // slope is per MILLISECOND (ts is in ms), so one week is 7 * 86400000.
+  //
+  // Withheld for very short samples: extrapolating two readings a day apart to
+  // a weekly rate multiplies their difference by seven, which reads as a
+  // confident trend that the data does not support.
   const slopePerWeek = useMemo(() => {
     if (!regression) return null;
+    if (currentPoints.length < 3) return null;
+    const spanMs = currentPoints[currentPoints.length - 1].ts - currentPoints[0].ts;
+    if (spanMs < 5 * 86400000) return null;
     return regression.slope * (7 * 86400000);
-  }, [regression]);
+  }, [regression, currentPoints]);
 
   const windowChange = useMemo(() => {
     return computeWindowChange(currentPoints, priorPoints);
   }, [currentPoints, priorPoints]);
 
-  // Formatting helpers for stats row and trend readout.
-  const formatMetricVal = (v: number) => {
-    if (metricKey === "calories" || metricKey === "steps") {
-      return Math.round(v).toLocaleString();
-    }
-    return (Math.round(v * 10) / 10).toLocaleString();
-  };
+  // Formatting helper for stats row and trend readout.
+  // Memoised on metricKey rather than left as a plain arrow so the useMemo hooks
+  // below can depend on the function itself. They previously listed `metricKey`
+  // as a stand-in for it, which was correct but invisible to the exhaustive-deps
+  // lint, and a proxy dependency stops being correct the moment the formatter
+  // closes over anything else.
+  const formatMetricVal = useCallback((v: number) => formatMetricValue(metricKey, v), [metricKey]);
 
   const latestValStr =
     currentPoints.length > 0 ? formatMetricVal(currentPoints[currentPoints.length - 1].val) : "-";
@@ -147,14 +171,14 @@ function ChartsPage() {
     const sign = windowChange > 0 ? "+" : windowChange < 0 ? "-" : "";
     const arrow = windowChange > 0 ? "↑ " : windowChange < 0 ? "↓ " : "";
     return `${arrow}${sign}${formatMetricVal(Math.abs(windowChange))}`;
-  }, [windowChange, metricKey]);
+  }, [windowChange, formatMetricVal]);
 
   const rateReadoutText = useMemo(() => {
     if (slopePerWeek === null) return null;
     const sign = slopePerWeek >= 0 ? "+" : "-";
     const val = formatMetricVal(Math.abs(slopePerWeek));
     return `${sign}${val} ${metricUnit} / week`;
-  }, [slopePerWeek, metricUnit, metricKey]);
+  }, [slopePerWeek, metricUnit, formatMetricVal]);
 
   return (
     <AppShell>
@@ -193,7 +217,9 @@ function ChartsPage() {
             key={r.label}
             onClick={() => setRangeDays(r.days)}
             className={
-              "min-h-[44px] whitespace-nowrap rounded-full px-3.5 py-2 text-[11px] font-medium transition-colors duration-200 flex items-center justify-center " +
+              // min-w matters as much as min-h here: the "7" chip is a single
+              // character and would otherwise be a 34px-wide tap target.
+              "min-h-[44px] min-w-[44px] whitespace-nowrap rounded-full px-3.5 py-2 text-[11px] font-medium transition-colors duration-200 flex items-center justify-center " +
               (rangeDays === r.days ? "bg-muted text-foreground" : "text-muted-foreground")
             }
           >
@@ -267,7 +293,9 @@ function ChartsPage() {
             </div>
           </div>
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Average</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Average
+            </div>
             <div className="tnum mt-0.5 text-[20px] font-semibold">{avgValStr}</div>
           </div>
           <div>
@@ -332,21 +360,29 @@ function Chart({
   const rawMinY = Math.min(...allYVals);
   const rawMaxY = Math.max(...allYVals);
   const yTicks = niceTicks(rawMinY, rawMaxY, 5);
+  const yDecimals = tickDecimals(yTicks);
 
   const yMin = yTicks[0];
   const yMax = yTicks[yTicks.length - 1];
-  const ySpan = Math.max(1, yMax - yMin);
+  // NOT Math.max(1, ...): niceTicks already guarantees yMax > yMin, and a floor
+  // of 1 silently rescales every bodyweight chart whose ticks span less than a
+  // pound (180.2 to 180.8 spans 0.6), squashing the whole series and its
+  // gridlines into the bottom of the plot area.
+  const ySpan = yMax > yMin ? yMax - yMin : 1;
 
   const y = (v: number) => pad.t + (1 - (v - yMin) / ySpan) * (H - pad.t - pad.b);
 
   const xs = displayedPoints.map((p) => p.ts);
   const xMin = Math.min(...xs);
   const xMax = Math.max(...xs);
-  const xSpan = Math.max(1, xMax - xMin);
+  const xSpan = xMax - xMin;
+  const plotW = W - pad.l - pad.r;
 
+  // Every point sharing one timestamp gets centred rather than stacked on the
+  // left edge. The old Math.max(1, xSpan) guard made this branch unreachable.
   const x = (t: number) => {
-    if (xSpan === 0) return pad.l + (W - pad.l - pad.r) / 2;
-    return pad.l + ((t - xMin) / xSpan) * (W - pad.l - pad.r);
+    if (xSpan <= 0) return pad.l + plotW / 2;
+    return pad.l + ((t - xMin) / xSpan) * plotW;
   };
 
   // Adaptive X ticks depending on day span to prevent text collision.
@@ -437,7 +473,13 @@ function Chart({
   const handlePointerDown = (e: React.PointerEvent<SVGRectElement>) => {
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
-    } catch (_) {}
+    } catch {
+      // Deliberately swallowed. Capture is an optimisation for keeping the
+      // scrub alive when the finger leaves the SVG, and it throws if the
+      // pointer has already been released (a fast tap, or a touch cancelled by
+      // the system). Scrubbing still works without it, so a failure here must
+      // not break the gesture.
+    }
     const idx = getNearestIndex(e);
     setScrubIndex(idx);
     pointerDownRef.current = { x: e.clientX, y: e.clientY, index: idx, isDrag: false };
@@ -456,12 +498,10 @@ function Chart({
   };
 
   const handlePointerUp = (e: React.PointerEvent<SVGRectElement>) => {
-    try {
-      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      }
-    } catch (_) {}
-
+    // Snapshot the gesture BEFORE releasing capture: releasePointerCapture
+    // dispatches lostpointercapture synchronously, and that handler clears this
+    // very ref, which would otherwise swallow every tap.
+    const down = pointerDownRef.current;
     const rect = e.currentTarget.getBoundingClientRect();
     const isOutside =
       e.clientX < rect.left ||
@@ -469,32 +509,40 @@ function Chart({
       e.clientY < rect.top ||
       e.clientY > rect.bottom;
 
+    pointerDownRef.current = null;
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // Also deliberately swallowed, and the guard above is not enough on its
+      // own: the pointer can be invalidated between the hasPointerCapture check
+      // and the release. Crucially, scrubIndex is cleared AFTER this block, so a
+      // throw here can never leave the crosshair stuck on screen.
+    }
+
+    setScrubIndex(null);
+
     if (isOutside) {
       setSelectedIndex(null);
-      setScrubIndex(null);
-      pointerDownRef.current = null;
       return;
     }
 
-    if (pointerDownRef.current) {
-      const { index: downIdx, isDrag } = pointerDownRef.current;
-      const currentIdx = scrubIndex !== null ? scrubIndex : downIdx;
-
-      if (!isDrag) {
-        if (selectedIndex === currentIdx) {
-          setSelectedIndex(null);
-        } else {
-          setSelectedIndex(currentIdx);
-        }
+    if (down) {
+      const currentIdx = scrubIndex !== null ? scrubIndex : down.index;
+      // A tap on the already-selected point dismisses it; a drag always leaves
+      // the point it ended on selected.
+      if (!down.isDrag && selectedIndex === currentIdx) {
+        setSelectedIndex(null);
       } else {
         setSelectedIndex(currentIdx);
       }
     }
-
-    setScrubIndex(null);
-    pointerDownRef.current = null;
   };
 
+  // Covers both pointercancel (which fires often on mobile: the browser takes
+  // the gesture over as a vertical page scroll) and any other capture loss, so
+  // the crosshair can never be left stuck under a finger that is gone.
   const handlePointerCancel = () => {
     setScrubIndex(null);
     pointerDownRef.current = null;
@@ -505,21 +553,20 @@ function Chart({
   let pillY = 0;
   let pillValStr = "";
   let pillDateStr = "";
-  const halfPillW = 60;
+  // Wide enough for the longest real label ("10,000 steps - Wed, Sep 10") at
+  // fontSize 9 without the text spilling out of the rounded rect.
+  const halfPillW = 66;
 
   if (activePoint) {
     const px = x(activePoint.ts);
     const py = y(activePoint.val);
 
     pillX = Math.max(pad.l + halfPillW, Math.min(W - pad.r - halfPillW, px));
-    pillY = Math.max(pad.t + 12, py - 18);
+    // Sits above the point, or below it when the point is too near the top for
+    // the pill to clear the highlighted dot.
+    pillY = py - 18 >= pad.t + 12 ? py - 18 : Math.min(H - pad.b - 12, py + 20);
 
-    const formatVal = (v: number) =>
-      metricKey === "calories" || metricKey === "steps"
-        ? Math.round(v).toLocaleString()
-        : (Math.round(v * 10) / 10).toLocaleString();
-
-    pillValStr = `${formatVal(activePoint.val)} ${unit}`;
+    pillValStr = `${formatMetricValue(metricKey, activePoint.val)} ${unit}`;
     const d = new Date(activePoint.ts);
     pillDateStr = d.toLocaleDateString("en-US", {
       weekday: "short",
@@ -528,23 +575,51 @@ function Chart({
     });
   }
 
+  // Every Y label is formatted from the SHARED tick precision. Formatting each
+  // tick on its own produced axes reading "180.2 | 180.2 | 180.3 | 180.3", and
+  // abbreviating per tick mixed "8,000" with "10k" on one axis.
+  const peakY = Math.max(Math.abs(yMin), Math.abs(yMax));
+  const useThousands = peakY >= 10000;
+  const yStep = yTicks.length > 1 ? Math.abs(yTicks[1] - yTicks[0]) : 1;
+  const kDecimals = Math.min(2, Math.max(0, -Math.floor(Math.log10(yStep / 1000) + 1e-9)));
+
+  // Cheat days recolour the DAILY series only. In 7-day-average mode a plotted
+  // value is a mean ending on that day, not that day's intake, so marking it red
+  // would attribute the cheat day to the wrong number. The faint raw dots behind
+  // the smoothed line keep carrying the signal.
+  const isCheatDot = (p: { isCheatDay?: boolean }) =>
+    isCalories && viewMode === "daily" && p.isCheatDay === true;
+
   const formatYLabel = (v: number) => {
-    if (Math.abs(v) >= 10000) {
-      return `${(v / 1000).toFixed(0)}k`;
-    }
-    if (v % 1 === 0) {
-      return v.toLocaleString();
-    }
-    return v.toFixed(1);
+    if (v === 0) return "0";
+    if (useThousands) return `${(v / 1000).toFixed(kDecimals)}k`;
+    return v.toLocaleString(undefined, {
+      minimumFractionDigits: yDecimals,
+      maximumFractionDigits: yDecimals,
+    });
   };
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-[180px] w-full select-none">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="h-[180px] w-full select-none"
+      // Scrubbing is a horizontal drag, which is exactly the gesture AppShell
+      // reads as swipe-to-next-tab. Without this the first scrub navigates away.
+      data-swipe-ignore
+      role="img"
+      aria-label={`${metricLabel} over time`}
+    >
       <defs>
         <linearGradient id="chart-area" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.18" />
           <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0" />
         </linearGradient>
+        {/* Least-squares fitted values can fall outside the data range, so the
+            trend line is clipped to the plot box instead of drawing over the X
+            axis labels. */}
+        <clipPath id="chart-plot-clip">
+          <rect x={pad.l} y={pad.t} width={plotW} height={H - pad.t - pad.b} />
+        </clipPath>
       </defs>
 
       {/* Horizontal Y gridlines and right-aligned numeric Y labels in left gutter */}
@@ -597,6 +672,7 @@ function Chart({
           strokeWidth={1.25}
           strokeDasharray="4 4"
           opacity={0.6}
+          clipPath="url(#chart-plot-clip)"
         />
       )}
 
@@ -669,7 +745,7 @@ function Chart({
           cx={x(p.ts)}
           cy={y(p.val)}
           r={isSinglePoint ? 4 : 2}
-          fill={isCalories && p.isCheatDay ? "var(--color-destructive)" : "var(--color-accent)"}
+          fill={isCheatDot(p) ? "var(--color-destructive)" : "var(--color-accent)"}
         />
       ))}
 
@@ -684,11 +760,7 @@ function Chart({
           fill="var(--color-foreground)"
           className="tnum"
         >
-          {`${
-            metricKey === "calories" || metricKey === "steps"
-              ? Math.round(displayedPoints[0].val).toLocaleString()
-              : (Math.round(displayedPoints[0].val * 10) / 10).toLocaleString()
-          } ${unit}`}
+          {`${formatMetricValue(metricKey, displayedPoints[0].val)} ${unit}`}
         </text>
       )}
 
@@ -709,11 +781,7 @@ function Chart({
             cx={x(activePoint.ts)}
             cy={y(activePoint.val)}
             r={5}
-            fill={
-              isCalories && activePoint.isCheatDay
-                ? "var(--color-destructive)"
-                : "var(--color-accent)"
-            }
+            fill={isCheatDot(activePoint) ? "var(--color-destructive)" : "var(--color-accent)"}
             stroke="var(--color-surface)"
             strokeWidth={2}
           />
@@ -751,11 +819,16 @@ function Chart({
         width={W}
         height={H}
         fill="transparent"
-        style={{ touchAction: "none" }}
+        // pan-y, not none: the chart is 180px of a scrolling page, and
+        // touch-action: none would trap every vertical swipe that happens to
+        // start on it. Horizontal movement still reaches us for scrubbing;
+        // vertical movement scrolls the page and cancels the scrub.
+        style={{ touchAction: "pan-y" }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
+        onLostPointerCapture={handlePointerCancel}
       />
     </svg>
   );

@@ -54,8 +54,8 @@ function fmtCardioDetails(
 
 /**
  * The History tab's default (Weekly) view: a continuous, newest-first scroll
- * of one card per day that has ANYTHING on it — a workout, some numbers, or a
- * cheat-day flag — broken up by a summary header for each Monday-start week.
+ * of one card per day that has ANYTHING on it (a workout, some numbers, or a
+ * cheat-day flag), broken up by a summary header for each Monday-start week.
  *
  * Days with nothing logged are skipped rather than rendered blank, so a
  * fortnight off collapses to a gap between two week headers instead of
@@ -184,8 +184,8 @@ export function WeeklyView() {
 }
 
 /**
- * The divider between weeks. Deliberately quiet — small, uppercase and muted,
- * matching the app's other section headings — so it reads as a label over the
+ * The divider between weeks. Deliberately quiet: small, uppercase and muted,
+ * matching the app's other section headings, so it reads as a label over the
  * day cards rather than competing with them.
  */
 function WeekHeader({
@@ -246,8 +246,8 @@ function WeekHeader({
  * One day. Tapping anywhere except a workout row opens the day editor, so any
  * past day can be corrected in place.
  *
- * There is deliberately no swipe-to-delete here. The card is composite — a
- * workout plus macros plus steps plus bodyweight — and one accidental gesture
+ * There is deliberately no swipe-to-delete here. The card is composite: a
+ * workout plus macros plus steps plus bodyweight, and one accidental gesture
  * should not be able to take all of that with it. Deleting a workout lives on
  * the session screen; clearing numbers lives in the editor.
  */
@@ -272,6 +272,18 @@ function DayCard({
         tabIndex={0}
         aria-label={`Edit ${format(parseDayKey(date), "EEEE, MMMM d")}`}
         onClick={() => onOpenEditor(date)}
+        // role="button" promises keyboard activation that a <div> does not
+        // provide, so the card was focusable and then did nothing on Enter or
+        // Space. It cannot simply BE a <button>: it contains the workout links,
+        // and a button may not nest interactive content.
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          // Only the card itself. A key press that reached here by bubbling from
+          // a workout link is that link's to handle.
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
+          onOpenEditor(date);
+        }}
         className="cursor-pointer rounded-2xl bg-surface px-5 py-4"
       >
         <div className="flex items-baseline justify-between gap-3">

@@ -1,10 +1,6 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useCanGoBack, useRouter } from "@tanstack/react-router";
 import { AppShell } from "../components/AppShell";
-import {
-  bestSetFor,
-  groupSetsBySession,
-  setsForExercise,
-} from "../lib/exercise-history";
+import { bestSetFor, groupSetsBySession, setsForExercise } from "../lib/exercise-history";
 import { useStore } from "../lib/store";
 
 export const Route = createFileRoute("/exercise/$id")({
@@ -20,17 +16,26 @@ export const Route = createFileRoute("/exercise/$id")({
 function ExercisePage() {
   const { id } = Route.useParams();
   const router = useRouter();
+  const canGoBack = useCanGoBack();
   const exercise = useStore((s) => s.exercises.find((x) => x.id === id));
   const allSets = useStore((s) => s.sets);
   const sessions = useStore((s) => s.sessions);
   const unit = useStore((s) => s.unit);
 
+  // This page is only ever reached from SessionView, which renders inside both
+  // /workout and /session/$id. A hardcoded navigate to "/" therefore threw the
+  // user out of an in-progress workout screen instead of returning them to it.
+  // The history entry only exists when they actually navigated here, so a
+  // deep-link or refresh still needs the Today fallback.
+  const goBack = () => {
+    if (canGoBack) router.history.back();
+    else router.navigate({ to: "/" });
+  };
+
   if (!exercise) {
     return (
       <AppShell>
-        <div className="px-6 py-20 text-center text-muted-foreground">
-          Exercise not found.
-        </div>
+        <div className="px-6 py-20 text-center text-muted-foreground">Exercise not found.</div>
       </AppShell>
     );
   }
@@ -40,18 +45,17 @@ function ExercisePage() {
   const grouped = groupSetsBySession(exSets, sessions);
 
   const typeLabel =
-    exercise.type === "main"
-      ? "Main Lift"
-      : exercise.type === "cardio"
-        ? "Cardio"
-        : "Accessory";
+    exercise.type === "main" ? "Main Lift" : exercise.type === "cardio" ? "Cardio" : "Accessory";
 
   return (
     <AppShell>
       <div className="flex items-center justify-between px-5 pt-14 pb-2">
+        {/* The negative vertical margin is what lets a 22px line of text carry a
+            44px touch target without pushing the title down: 44 - 2*11 = 22, so
+            the row occupies exactly the height it did before. */}
         <button
-          onClick={() => router.navigate({ to: "/" })}
-          className="text-[15px] font-medium text-accent"
+          onClick={goBack}
+          className="-my-[11px] flex min-h-[44px] items-center text-[15px] font-medium text-accent"
         >
           Back
         </button>
@@ -61,9 +65,7 @@ function ExercisePage() {
         <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
           {typeLabel}
         </div>
-        <h1 className="mt-1 text-[30px] font-semibold tracking-tight">
-          {exercise.name}
-        </h1>
+        <h1 className="mt-1 text-[30px] font-semibold tracking-tight">{exercise.name}</h1>
         {exercise.setupNote && (
           <div className="mt-2 rounded-lg bg-muted px-3 py-2 text-[13px] text-muted-foreground">
             {exercise.setupNote}
@@ -83,9 +85,13 @@ function ExercisePage() {
                 <>
                   {best.weight}{" "}
                   <span className="text-[13px] font-normal text-muted-foreground">{unit}</span>
-                  {" × "}{best.reps}
+                  {" × "}
+                  {best.reps}
                   {best.rpe != null && (
-                    <span className="text-[13px] font-normal text-muted-foreground"> @ {best.rpe}</span>
+                    <span className="text-[13px] font-normal text-muted-foreground">
+                      {" "}
+                      @ {best.rpe}
+                    </span>
                   )}
                 </>
               ) : (
@@ -114,8 +120,14 @@ function ExercisePage() {
         {grouped.length === 0 ? (
           <div className="rounded-2xl bg-surface p-6 text-center">
             <h3 className="text-[16px] font-semibold tracking-tight">No history logged</h3>
+            {/* A cardio exercise can never fill this screen: `logCardio` writes a
+                session with duration and distance and no sets at all, so telling
+                someone to log sets for it would be advice that cannot be
+                followed. */}
             <p className="mt-1 text-[13px] text-muted-foreground">
-              Log sets for {exercise.name} during a workout to track your progress here.
+              {exercise.type === "cardio"
+                ? `${exercise.name} is logged as a bout with duration and distance rather than sets. Those appear on the History tab.`
+                : `Log sets for ${exercise.name} during a workout to track your progress here.`}
             </p>
           </div>
         ) : (
@@ -143,12 +155,12 @@ function ExercisePage() {
                           {idx + 1}
                         </span>
                         <span className="tnum font-medium">
-                          {s.weight} <span className="text-[12px] text-muted-foreground">{unit}</span> × {s.reps}
+                          {s.weight}{" "}
+                          <span className="text-[12px] text-muted-foreground">{unit}</span> ×{" "}
+                          {s.reps}
                         </span>
                         {s.rpe != null && (
-                          <span className="tnum text-[13px] text-muted-foreground">
-                            @ {s.rpe}
-                          </span>
+                          <span className="tnum text-[13px] text-muted-foreground">@ {s.rpe}</span>
                         )}
                         {s.isDropsetOrPartial && (
                           <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
