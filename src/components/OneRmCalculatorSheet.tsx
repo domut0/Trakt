@@ -84,9 +84,7 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
 
         <div className="flex items-center justify-between">
           <div>
-            <div className="t-caption text-muted-foreground">
-              Calculator
-            </div>
+            <div className="t-caption text-muted-foreground">Calculator</div>
             <h2 className="t-heading font-semibold tracking-tight">1RM Estimator</h2>
           </div>
           <button
@@ -102,9 +100,7 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
         {/* Inputs */}
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-muted p-3">
-            <div className="t-caption text-muted-foreground">
-              Weight ({unit})
-            </div>
+            <div className="t-caption text-muted-foreground">Weight ({unit})</div>
             <div className="mt-1 flex items-baseline gap-1">
               <input
                 inputMode="decimal"
@@ -138,28 +134,19 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
 
         {/* Estimates Card */}
         <div className="mt-4 rounded-2xl bg-muted/40 p-4">
-          <div className="t-caption text-muted-foreground">
-            Estimated 1RM
-          </div>
+          <div className="t-caption text-muted-foreground">Estimated 1RM</div>
           <div className="mt-1 flex items-baseline justify-between">
             <div>
-              <span className="t-hero text-accent">
-                {estimate.average}
-              </span>
-              <span className="ml-1.5 t-body font-medium text-muted-foreground">
-                {unit} avg
-              </span>
+              <span className="t-hero text-accent">{estimate.average}</span>
+              <span className="ml-1.5 t-body font-medium text-muted-foreground">{unit} avg</span>
             </div>
 
             <div className="text-right t-label text-muted-foreground">
               <div>
-                Epley: <span className="t-stat text-foreground">{estimate.epley}</span>{" "}
-                {unit}
+                Epley: <span className="t-stat text-foreground">{estimate.epley}</span> {unit}
               </div>
               <div>
-                Brzycki:{" "}
-                <span className="t-stat text-foreground">{estimate.brzycki}</span>{" "}
-                {unit}
+                Brzycki: <span className="t-stat text-foreground">{estimate.brzycki}</span> {unit}
               </div>
             </div>
           </div>
@@ -174,9 +161,7 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
 
         {/* Percentage Breakdown Table */}
         <div className="mt-4">
-          <div className="mb-2 t-caption text-muted-foreground">
-            Percentage Breakdown
-          </div>
+          <div className="mb-2 t-caption text-muted-foreground">Percentage Breakdown</div>
 
           <div className="max-h-[220px] overflow-y-auto rounded-xl bg-muted/40">
             <table className="w-full text-left t-body">

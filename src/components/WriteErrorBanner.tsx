@@ -17,13 +17,16 @@ export function WriteErrorBanner() {
       className="fixed inset-x-0 top-0 z-50 flex items-center justify-between gap-3 bg-destructive px-4 py-2.5 text-white"
       style={{ paddingTop: "max(env(safe-area-inset-top), 10px)" }}
     >
-      <span className="text-[13px] font-medium">
+      <span className="t-label font-medium">
         Couldn't save to this device. Export a backup from Settings.
       </span>
       <button
         onClick={dismissWriteError}
         aria-label="Dismiss"
-        className="shrink-0 rounded-full p-1 opacity-90"
+        // 44px hit area from an inset overlay rather than padding: this banner
+        // is position-fixed over the app's own header, so growing it would
+        // cover content rather than move it.
+        className="relative shrink-0 rounded-full p-1 opacity-90 after:absolute after:-inset-2.5 after:content-['']"
       >
         <X size={16} />
       </button>

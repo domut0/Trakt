@@ -128,9 +128,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
                 className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""}`}
               >
                 <span className="truncate t-body text-muted-foreground">{r.name}</span>
-                <span className="shrink-0 t-caption text-muted-foreground">
-                  Suggested
-                </span>
+                <span className="shrink-0 t-caption text-muted-foreground">Suggested</span>
               </button>
             ),
           )}
@@ -142,9 +140,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
               }`}
             >
               <span className="truncate t-body">Add "{trimmedQuery}"</span>
-              <span className="shrink-0 t-caption">
-                New
-              </span>
+              <span className="shrink-0 t-caption">New</span>
             </button>
           )}
         </div>
@@ -168,23 +164,14 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
           className="group-row w-full text-left"
         >
           <div className="min-w-0 flex-1">
-            <div className="t-caption text-muted-foreground">
-              Activity
-            </div>
-            <div className="truncate t-heading">
-              {chosen?.name}
-            </div>
+            <div className="t-caption text-muted-foreground">Activity</div>
+            <div className="truncate t-heading">{chosen?.name}</div>
           </div>
-          <span className="shrink-0 t-label font-medium text-accent">
-            Change
-          </span>
+          <span className="shrink-0 t-label font-medium text-accent">Change</span>
         </button>
 
         <div className="group-row group-row-sep">
-          <label
-            htmlFor="cardio-setup-note"
-            className="shrink-0 t-caption text-muted-foreground"
-          >
+          <label htmlFor="cardio-setup-note" className="shrink-0 t-caption text-muted-foreground">
             Setup
           </label>
           <input

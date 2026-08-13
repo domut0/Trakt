@@ -64,9 +64,7 @@ function SessionPage() {
         <div className="t-caption text-muted-foreground">
           {d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
         </div>
-        <h1 className="mt-1 text-balance break-words t-title">
-          {title}
-        </h1>
+        <h1 className="mt-1 text-balance break-words t-title">{title}</h1>
       </header>
       {isCardio ? (
         <div className="section-gap px-5">
@@ -81,7 +79,9 @@ function SessionPage() {
               </div>
             )}
             {session.distance != null && (
-              <div className={`group-row ${session.durationMinutes != null ? "group-row-sep" : ""}`}>
+              <div
+                className={`group-row ${session.durationMinutes != null ? "group-row-sep" : ""}`}
+              >
                 <span className="t-body text-muted-foreground">Distance</span>
                 <span className="t-stat">
                   {session.distance}{" "}
@@ -94,9 +94,7 @@ function SessionPage() {
             {session.setupNote && (
               <div
                 className={`group-row flex-col items-start ${
-                  session.durationMinutes != null || session.distance != null
-                    ? "group-row-sep"
-                    : ""
+                  session.durationMinutes != null || session.distance != null ? "group-row-sep" : ""
                 }`}
               >
                 <span className="t-caption text-muted-foreground">Notes</span>

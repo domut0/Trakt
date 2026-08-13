@@ -118,9 +118,7 @@ export function HabitsCard({ date }: { date: string }) {
                   <span
                     aria-hidden="true"
                     className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors ${
-                      isDone
-                        ? "bg-accent text-accent-foreground"
-                        : "border border-border bg-muted"
+                      isDone ? "bg-accent text-accent-foreground" : "border border-border bg-muted"
                     }`}
                   >
                     {isDone && <CheckIcon />}

@@ -150,17 +150,13 @@ function Home() {
       */}
       {habitsEnabled && (
         <section className="px-5 section-gap anim-fade-up">
-          <h2 className="group-header px-0 t-caption">
-            Habits
-          </h2>
+          <h2 className="group-header px-0 t-caption">Habits</h2>
           <HabitsCard date={todayKey} />
         </section>
       )}
 
       <section className="px-5 section-gap anim-fade-up">
-        <h2 className="group-header px-0 t-caption">
-          Daily log
-        </h2>
+        <h2 className="group-header px-0 t-caption">Daily log</h2>
         <div className="group-list p-5">
           {hasTodayLog ? (
             <button
@@ -198,7 +194,9 @@ function Home() {
                   className="flex min-h-[44px] w-full items-center justify-between border-t border-border pt-3 text-left transition-colors active:opacity-70"
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
-                    <span className="t-label font-semibold text-accent shrink-0">Copy yesterday</span>
+                    <span className="t-label font-semibold text-accent shrink-0">
+                      Copy yesterday
+                    </span>
                     <span className="t-label truncate text-muted-foreground">
                       ({formatYesterdaySummary(yesterdayLog)})
                     </span>
@@ -212,17 +210,13 @@ function Home() {
       </section>
 
       <section className="px-5 section-gap pb-8 anim-fade-up">
-        <h2 className="group-header px-0 t-caption">
-          Workouts
-        </h2>
+        <h2 className="group-header px-0 t-caption">Workouts</h2>
         {todaysSessions.length > 0 ? (
           <div className="group-list">
             {todaysSessions.map(({ session, title, subtitle }, idx) => (
               <button
                 key={session.id}
-                onClick={() =>
-                  router.navigate({ to: "/session/$id", params: { id: session.id } })
-                }
+                onClick={() => router.navigate({ to: "/session/$id", params: { id: session.id } })}
                 className={`group-row w-full text-left focus:outline-none ${
                   idx > 0 ? "group-row-sep" : ""
                 }`}
@@ -233,13 +227,9 @@ function Home() {
                       compresses "· 12 sets" and "3 PM" first and a long split
                       name still pushes the row wide. */}
                   <div className="flex min-w-0 items-baseline gap-2">
-                    <span className="truncate t-body font-semibold tracking-tight">
-                      {title}
-                    </span>
+                    <span className="truncate t-body font-semibold tracking-tight">{title}</span>
                     {subtitle && (
-                      <span className="shrink-0 t-label text-muted-foreground">
-                        · {subtitle}
-                      </span>
+                      <span className="shrink-0 t-label text-muted-foreground">· {subtitle}</span>
                     )}
                   </div>
                 </div>
@@ -578,9 +568,7 @@ function CalorieTargetRing({
         )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pt-0.5 text-center">
-        <span
-          className={`t-body font-bold leading-none ${isOver ? "text-destructive" : ""}`}
-        >
+        <span className={`t-body font-bold leading-none ${isOver ? "text-destructive" : ""}`}>
           {logged.toLocaleString()}
         </span>
         <span className="mt-0.5 t-caption leading-none text-muted-foreground font-normal">
@@ -688,4 +676,3 @@ function MacroRing({
     </div>
   );
 }
-

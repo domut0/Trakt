@@ -103,9 +103,7 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
 
         <div className="flex items-center justify-between">
           <div>
-            <div className="t-caption text-muted-foreground">
-              Calculator
-            </div>
+            <div className="t-caption text-muted-foreground">Calculator</div>
             <h2 className="t-heading font-semibold tracking-tight">Plate loading</h2>
           </div>
           <button
@@ -121,9 +119,7 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
         {/* Input & Bar Selection */}
         <div className="mt-4 space-y-3">
           <div className="rounded-xl bg-muted p-3">
-            <div className="t-caption text-muted-foreground">
-              Target weight ({unit})
-            </div>
+            <div className="t-caption text-muted-foreground">Target weight ({unit})</div>
             <div className="mt-1 flex items-baseline gap-1">
               <input
                 inputMode="decimal"
@@ -139,9 +135,7 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
           </div>
 
           <div>
-            <div className="mb-1.5 t-caption text-muted-foreground">
-              Bar weight
-            </div>
+            <div className="mb-1.5 t-caption text-muted-foreground">Bar weight</div>
             <div className="grid grid-cols-3 gap-2">
               {barOptions.map((w) => {
                 const isSelected = barWeight === w;
@@ -168,9 +162,7 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
         {/* Visual Sleeve & Per Side Loading */}
         <div className="mt-5 rounded-2xl bg-muted/40 p-4">
           <div className="flex items-center justify-between">
-            <span className="t-caption text-muted-foreground">
-              Plates per side
-            </span>
+            <span className="t-caption text-muted-foreground">Plates per side</span>
             {stack.remainder > 0 && (
               <span className="rounded-full bg-border px-2.5 py-0.5 t-label font-medium text-muted-foreground">
                 {stack.remainder} {unit} short

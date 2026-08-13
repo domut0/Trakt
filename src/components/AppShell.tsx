@@ -238,9 +238,7 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
             style={{ color: "var(--color-accent)" }}
           >
             <FlameIcon />
-            <span className="t-label font-semibold">
-              {activeSessionId ? "Return" : "Workout"}
-            </span>
+            <span className="t-label font-semibold">{activeSessionId ? "Return" : "Workout"}</span>
           </button>
         </div>
         <ul className="flex flex-1 items-stretch justify-around">

@@ -291,9 +291,7 @@ export function DayEditorSheet({
         </div>
 
         <div className="px-5 pb-5">
-          <div className="t-caption text-muted-foreground">
-            {existing ? "Edit day" : "Log day"}
-          </div>
+          <div className="t-caption text-muted-foreground">{existing ? "Edit day" : "Log day"}</div>
           <div className="mt-0.5 t-heading font-semibold tracking-tight">{headerLabel(date)}</div>
 
           {/* Grouped list of labelled numeric rows and cheat day switch */}
@@ -589,5 +587,3 @@ function selectAllOnEntry(el: HTMLInputElement) {
     }
   });
 }
-
-

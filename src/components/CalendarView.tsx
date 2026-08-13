@@ -137,9 +137,7 @@ export function CalendarView() {
         className="mx-5 grid grid-cols-7 text-center t-caption text-muted-foreground py-1"
       >
         {WEEKDAYS.map((w, i) => (
-          <div key={i}>
-            {w}
-          </div>
+          <div key={i}>{w}</div>
         ))}
       </div>
 
@@ -306,9 +304,7 @@ export function CalendarView() {
                     {selectedLog.fat !== undefined && (
                       <div>
                         <span className="text-muted-foreground">F:</span>{" "}
-                        <span className="tnum font-medium text-foreground">
-                          {selectedLog.fat}g
-                        </span>
+                        <span className="tnum font-medium text-foreground">{selectedLog.fat}g</span>
                       </div>
                     )}
                     {selectedLog.steps !== undefined && (

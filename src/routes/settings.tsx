@@ -284,11 +284,11 @@ function SettingsPage() {
             >
               <div>
                 <div className="t-body">Plate calculator</div>
-                <div className="t-label text-muted-foreground">
-                  Work out what to load per side.
-                </div>
+                <div className="t-label text-muted-foreground">Work out what to load per side.</div>
               </div>
-              <span className="text-accent" aria-hidden="true">→</span>
+              <span className="text-accent" aria-hidden="true">
+                →
+              </span>
             </button>
             <button
               type="button"
@@ -301,23 +301,23 @@ function SettingsPage() {
                   Estimate a max from a weight and reps.
                 </div>
               </div>
-              <span className="text-accent" aria-hidden="true">→</span>
+              <span className="text-accent" aria-hidden="true">
+                →
+              </span>
             </button>
           </>
         )}
       </Section>
 
       <Section title="Data" delay={120}>
-        <button
-          type="button"
-          onClick={exportJson}
-          className="group-row w-full text-left"
-        >
+        <button type="button" onClick={exportJson} className="group-row w-full text-left">
           <div>
             <div className="t-body">Export backup</div>
             <div className="t-label text-muted-foreground">Download all data as JSON.</div>
           </div>
-          <span className="text-accent" aria-hidden="true">→</span>
+          <span className="text-accent" aria-hidden="true">
+            →
+          </span>
         </button>
         <button
           type="button"
@@ -330,7 +330,9 @@ function SettingsPage() {
               Download set history for spreadsheets.
             </div>
           </div>
-          <span className="text-accent" aria-hidden="true">→</span>
+          <span className="text-accent" aria-hidden="true">
+            →
+          </span>
         </button>
         <button
           type="button"
@@ -343,7 +345,9 @@ function SettingsPage() {
               Download nutrition and bodyweight history.
             </div>
           </div>
-          <span className="text-accent" aria-hidden="true">→</span>
+          <span className="text-accent" aria-hidden="true">
+            →
+          </span>
         </button>
         <label className="group-row group-row-sep w-full cursor-pointer text-left">
           <div>
@@ -356,7 +360,9 @@ function SettingsPage() {
             className="hidden"
             onChange={handleFileChange}
           />
-          <span className="text-accent" aria-hidden="true">→</span>
+          <span className="text-accent" aria-hidden="true">
+            →
+          </span>
         </label>
 
         {importError && (
@@ -429,7 +435,9 @@ function SettingsPage() {
                 Wipe all workouts and start fresh.
               </div>
             </div>
-            <span className="text-destructive" aria-hidden="true">→</span>
+            <span className="text-destructive" aria-hidden="true">
+              →
+            </span>
           </button>
         ) : (
           <div className="space-y-3 p-4">

@@ -249,9 +249,7 @@ function ChartsPage() {
       >
         {/* Inline segmented control on chart card to toggle raw vs smoothed series */}
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="t-caption text-muted-foreground truncate">
-            {metric.label}
-          </h2>
+          <h2 className="t-caption text-muted-foreground truncate">{metric.label}</h2>
           <div
             role="group"
             aria-label="Series"

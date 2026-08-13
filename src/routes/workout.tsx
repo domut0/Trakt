@@ -177,9 +177,7 @@ function WorkoutPage() {
               <span className="t-label text-muted-foreground">sets</span>
             </div>
             <div>
-              <span className="t-stat">
-                {new Set(sessSets.map((s) => s.exerciseId)).size}
-              </span>{" "}
+              <span className="t-stat">{new Set(sessSets.map((s) => s.exerciseId)).size}</span>{" "}
               <span className="t-label text-muted-foreground">exercises</span>
             </div>
           </div>
@@ -210,9 +208,7 @@ function WorkoutPage() {
               >
                 Done
               </button>
-              <div className="min-w-0 truncate t-body font-semibold">
-                {slot.name}
-              </div>
+              <div className="min-w-0 truncate t-body font-semibold">{slot.name}</div>
               <DeleteWorkoutButton sessionId={session.id} onDeleted={() => setShowView(false)} />
             </div>
             <div className="flex-1 overflow-y-auto">

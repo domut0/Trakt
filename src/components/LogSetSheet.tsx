@@ -292,12 +292,8 @@ export function LogSetSheet({
           <div className="px-5 pb-5">
             <div className="flex items-baseline justify-between">
               <button onClick={() => setPickingExercise(true)} className="text-left">
-                <div className="t-caption text-muted-foreground">
-                  Exercise
-                </div>
-                <div className="mt-0.5 t-heading font-semibold tracking-tight">
-                  {chosen?.name}
-                </div>
+                <div className="t-caption text-muted-foreground">Exercise</div>
+                <div className="mt-0.5 t-heading font-semibold tracking-tight">{chosen?.name}</div>
               </button>
               <button
                 onClick={() => setPickingExercise(true)}
@@ -311,7 +307,10 @@ export function LogSetSheet({
             <div className="mt-4 group-list bg-muted/40">
               {/* Setup note */}
               <div className="group-row">
-                <label htmlFor="set-field-note" className="t-body font-medium text-foreground shrink-0">
+                <label
+                  htmlFor="set-field-note"
+                  className="t-body font-medium text-foreground shrink-0"
+                >
                   Setup
                 </label>
                 <input
@@ -482,7 +481,9 @@ export function LogSetSheet({
                   >
                     −
                   </button>
-                  <span className="t-stat font-semibold text-foreground w-12 text-center">{targetSets}</span>
+                  <span className="t-stat font-semibold text-foreground w-12 text-center">
+                    {targetSets}
+                  </span>
                   <button
                     type="button"
                     tabIndex={-1}

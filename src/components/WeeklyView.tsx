@@ -127,7 +127,9 @@ export function WeeklyView() {
       <div className="group-list mx-5 p-8 text-center space-y-3">
         {/* h2, not h3: this replaces the whole week list, so there is no section
             heading above it to be a sub-level of. */}
-        <h2 className="t-heading font-semibold tracking-tight text-foreground">No history logged</h2>
+        <h2 className="t-heading font-semibold tracking-tight text-foreground">
+          No history logged
+        </h2>
         <p className="t-label text-muted-foreground">
           Track your bodyweight, steps, or macros to start building your log.
         </p>
@@ -295,7 +297,9 @@ function DayCard({
         className="cursor-pointer px-5 py-4"
       >
         <div className="flex items-baseline justify-between gap-3">
-          <span className="t-body font-semibold tracking-tight text-foreground">{dayLabel(date)}</span>
+          <span className="t-body font-semibold tracking-tight text-foreground">
+            {dayLabel(date)}
+          </span>
           {log?.isCheatDay && (
             <span className="flex shrink-0 items-center gap-1.5 t-caption text-destructive">
               <span className="h-1.5 w-1.5 rounded-full bg-destructive" />

@@ -76,9 +76,7 @@ function SetRow({
           </span>
           <span className="text-muted-foreground">×</span>
           <span className="t-stat">{s.reps}</span>
-          {s.rpe != null && (
-            <span className="t-label text-muted-foreground">@ {s.rpe}</span>
-          )}
+          {s.rpe != null && <span className="t-label text-muted-foreground">@ {s.rpe}</span>}
           {s.isDropsetOrPartial && (
             <span className="rounded-full bg-muted px-1.5 py-0.5 t-caption text-muted-foreground">
               drop
@@ -198,9 +196,7 @@ export function SessionView({
     const saved = session?.note;
     const savedBody = saved ? (
       <>
-        <div className="t-caption text-muted-foreground">
-          Session note
-        </div>
+        <div className="t-caption text-muted-foreground">Session note</div>
         <div className="mt-1 whitespace-pre-wrap t-body text-foreground">{saved}</div>
       </>
     ) : null;
@@ -215,10 +211,7 @@ export function SessionView({
         // Swipe-ignored: placing the caret or dragging out a selection inside
         // the field must not read as a swipe between tabs.
         <div data-swipe-ignore className="mx-5 section-gap group-list p-4">
-          <label
-            htmlFor={noteFieldId}
-            className="block t-caption text-muted-foreground"
-          >
+          <label htmlFor={noteFieldId} className="block t-caption text-muted-foreground">
             Session note
           </label>
           <textarea
@@ -273,9 +266,7 @@ export function SessionView({
             className="group-row w-full text-left"
           >
             <div className="min-w-0">
-              <div className="t-caption text-muted-foreground">
-                Repeat last workout
-              </div>
+              <div className="t-caption text-muted-foreground">Repeat last workout</div>
               <div className="t-body font-semibold">
                 {repeatExercises.length} exercise{repeatExercises.length === 1 ? "" : "s"} from
                 previous session
@@ -429,9 +420,7 @@ function EditSetSheet({
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
-        <h2 className="t-caption text-muted-foreground">
-          Edit set
-        </h2>
+        <h2 className="t-caption text-muted-foreground">Edit set</h2>
         <div className="mt-3 grid grid-cols-3 gap-3">
           {(
             [
@@ -445,10 +434,7 @@ function EditSetSheet({
             const fieldId = `edit-set-${s.id}-${label.toLowerCase()}`;
             return (
               <div key={label} className="min-w-0 rounded-xl bg-muted p-3">
-                <label
-                  htmlFor={fieldId}
-                  className="block t-caption text-muted-foreground"
-                >
+                <label htmlFor={fieldId} className="block t-caption text-muted-foreground">
                   {label}
                 </label>
                 <input

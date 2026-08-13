@@ -61,12 +61,8 @@ function ExercisePage() {
       </div>
 
       <header className="px-5 pb-4">
-        <div className="t-caption text-muted-foreground">
-          {typeLabel}
-        </div>
-        <h1 className="mt-1 text-balance break-words t-title">
-          {exercise.name}
-        </h1>
+        <div className="t-caption text-muted-foreground">{typeLabel}</div>
+        <h1 className="mt-1 text-balance break-words t-title">{exercise.name}</h1>
         {exercise.setupNote && (
           <div className="mt-2 rounded-lg bg-muted px-3 py-2 t-label text-muted-foreground">
             {exercise.setupNote}
@@ -82,8 +78,7 @@ function ExercisePage() {
             <span className="t-stat">
               {best ? (
                 <>
-                  {best.weight}{" "}
-                  <span className="t-label text-muted-foreground">{unit}</span>
+                  {best.weight} <span className="t-label text-muted-foreground">{unit}</span>
                   {" × "}
                   {best.reps}
                   {best.rpe != null && (
@@ -104,9 +99,7 @@ function ExercisePage() {
 
       {/* Chronological per-session history */}
       <section className="section-gap px-5 pb-10">
-        <h2 className="group-header px-0 t-caption">
-          History
-        </h2>
+        <h2 className="group-header px-0 t-caption">History</h2>
 
         {grouped.length === 0 ? (
           <div className="group-list p-6 text-center">
@@ -136,10 +129,7 @@ function ExercisePage() {
                 </div>
                 <div className="group-list">
                   {sets.map((s, idx) => (
-                    <div
-                      key={s.id}
-                      className={`group-row ${idx > 0 ? "group-row-sep" : ""}`}
-                    >
+                    <div key={s.id} className={`group-row ${idx > 0 ? "group-row-sep" : ""}`}>
                       <div className="flex min-w-0 flex-wrap items-baseline gap-3">
                         <span className="t-label w-5 shrink-0 text-muted-foreground">
                           {idx + 1}
