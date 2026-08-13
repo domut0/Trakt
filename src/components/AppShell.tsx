@@ -144,14 +144,14 @@ export function ActiveSessionBanner() {
       // measured ~38px, so the reserved gap never matched the real bar.
       className="fixed left-0 right-0 top-0 z-40 flex min-h-[44px] items-center justify-between gap-3 bg-accent px-4 py-2.5 text-accent-foreground"
     >
-      <span className="flex min-w-0 items-center gap-2 text-[13px] font-medium">
+      <span className="flex min-w-0 items-center gap-2 t-label font-medium">
         <span className="relative flex h-2 w-2 shrink-0">
           <span className="absolute inset-0 animate-ping rounded-full bg-accent-foreground/60" />
           <span className="relative h-2 w-2 rounded-full bg-accent-foreground" />
         </span>
         <span className="truncate">Workout in progress · {slot?.name}</span>
       </span>
-      <span className="shrink-0 text-[13px] font-medium opacity-90">Return →</span>
+      <span className="shrink-0 t-label font-medium opacity-90">Return →</span>
     </button>
   );
 }
@@ -206,7 +206,7 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
           style={{ color: active ? "var(--color-accent)" : "var(--color-muted-foreground)" }}
         >
           <Icon name={it.icon} />
-          <span className="text-[11px] font-medium tracking-tight">{it.label}</span>
+          <span className="t-label font-medium">{it.label}</span>
         </Link>
       </li>
     );
@@ -215,7 +215,7 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   return (
     <nav
       aria-label="Primary"
-      className="relative z-30 shrink-0 hairline-t bg-background"
+      className="relative z-30 shrink-0 hairline-t bg-surface"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
     >
       <div className="mx-auto flex max-w-md items-stretch justify-between px-2 pt-2">
@@ -238,7 +238,7 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
             style={{ color: "var(--color-accent)" }}
           >
             <FlameIcon />
-            <span className="text-[11px] font-semibold tracking-tight">
+            <span className="t-label font-semibold">
               {activeSessionId ? "Return" : "Workout"}
             </span>
           </button>
