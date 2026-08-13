@@ -110,19 +110,19 @@ export function CalendarView() {
       <div className="mx-5 mb-3 flex items-center justify-between">
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(subMonths(m, 1)))}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-[18px] text-foreground"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted t-heading text-foreground"
           aria-label="Previous month"
         >
           <span aria-hidden="true">‹</span>
         </button>
         {/* Announced on change: stepping the month replaces the whole grid below
             but moves no focus, so without this the change is silent. */}
-        <span aria-live="polite" className="tnum text-[16px] font-semibold tracking-tight">
+        <span aria-live="polite" className="t-body font-semibold tracking-tight text-foreground">
           {monthLabel}
         </span>
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(addMonths(m, 1)))}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-[18px] text-foreground"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted t-heading text-foreground"
           aria-label="Next month"
         >
           <span aria-hidden="true">›</span>
@@ -134,10 +134,10 @@ export function CalendarView() {
           cell below names its own weekday in full. */}
       <div
         aria-hidden="true"
-        className="mx-5 grid grid-cols-7 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+        className="mx-5 grid grid-cols-7 text-center t-caption text-muted-foreground py-1"
       >
         {WEEKDAYS.map((w, i) => (
-          <div key={i} className="py-1">
+          <div key={i}>
             {w}
           </div>
         ))}
@@ -145,7 +145,7 @@ export function CalendarView() {
 
       <div
         key={monthLabel}
-        className="mx-5 grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-border bg-border anim-fade-up"
+        className="mx-5 grid grid-cols-7 gap-px overflow-hidden rounded-2xl bg-border anim-fade-up"
       >
         {cells.map((cell, i) => {
           if (!cell) return <div key={`blank-${i}`} className="min-h-[64px] bg-surface" />;
@@ -181,14 +181,14 @@ export function CalendarView() {
                 logged.length > 0 ? `: ${logged.join(", ")}` : ": nothing logged"
               }`}
               className={
-                "relative flex min-h-[64px] flex-col items-center gap-1 bg-surface pb-1 pt-2 " +
+                "relative flex min-h-[64px] flex-col items-center gap-1 bg-surface pb-1 pt-2 transition-colors " +
                 (isSelected ? "ring-1 ring-inset ring-accent" : "")
               }
             >
               <span
                 aria-hidden="true"
                 className={
-                  "tnum flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-medium " +
+                  "t-body tnum flex h-7 w-7 items-center justify-center rounded-full font-medium " +
                   (todayCell ? "bg-accent text-accent-foreground" : "text-foreground")
                 }
               >
@@ -222,9 +222,9 @@ export function CalendarView() {
         })}
       </div>
 
-      <section className="mt-6 pb-6" key={selectedKey}>
-        <div className="px-5 pb-2 flex items-center justify-between">
-          <h2 className="tnum text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <section className="section-gap pb-6" key={selectedKey}>
+        <div className="group-header">
+          <h2 className="t-caption text-muted-foreground">
             {format(selectedDate, "EEEE, MMMM d")}
           </h2>
         </div>
@@ -244,14 +244,16 @@ export function CalendarView() {
 
           if (!hasSessions && !hasLog) {
             return (
-              <div className="mx-5 rounded-2xl bg-surface px-5 py-8 text-center space-y-3 anim-fade-up">
-                <h3 className="text-[16px] font-semibold tracking-tight">No entry for this date</h3>
-                <p className="text-[13px] text-muted-foreground">
+              <div className="group-list mx-5 p-6 text-center space-y-3 anim-fade-up">
+                <h3 className="t-body font-semibold tracking-tight text-foreground">
+                  No entry for this date
+                </h3>
+                <p className="t-label text-muted-foreground">
                   Record your daily numbers or complete a workout to fill this day.
                 </p>
                 <button
                   onClick={() => setEditorOpen(true)}
-                  className="w-full min-h-[44px] rounded-2xl bg-muted py-3.5 text-center text-[14px] font-semibold text-accent"
+                  className="w-full min-h-[44px] rounded-full bg-muted py-2.5 t-body font-semibold text-foreground transition-colors active:opacity-80"
                 >
                   Log daily numbers
                 </button>
@@ -260,55 +262,67 @@ export function CalendarView() {
           }
 
           return (
-            <div className="space-y-4">
+            <div className="group-list mx-5 anim-fade-up">
               {hasLog ? (
                 <button
                   onClick={() => setEditorOpen(true)}
-                  className="mx-5 flex flex-col gap-2 rounded-2xl bg-surface px-5 py-4 text-left anim-fade-up w-[calc(100%-40px)]"
+                  className="group-row w-full flex-col !items-start gap-2 py-4 text-left cursor-pointer transition-colors active:bg-muted/50"
                 >
-                  <div className="flex items-center justify-between gap-3 w-full">
-                    <span className="text-[16px] font-semibold tracking-tight">Daily summary</span>
+                  <div className="flex w-full items-center justify-between gap-3">
+                    <span className="t-body font-semibold tracking-tight text-foreground">
+                      Daily summary
+                    </span>
                     {selectedLog.isCheatDay && (
-                      <span className="shrink-0 rounded-md bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-destructive">
+                      <span className="shrink-0 rounded-md bg-destructive/10 px-2 py-0.5 t-caption text-destructive">
                         Cheat day
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-[13px]">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 t-label">
                     {selectedLog.calories !== undefined && (
                       <div>
                         <span className="text-muted-foreground">Cal:</span>{" "}
-                        <span className="font-medium tnum">{selectedLog.calories}</span>
+                        <span className="tnum font-medium text-foreground">
+                          {selectedLog.calories}
+                        </span>
                       </div>
                     )}
                     {selectedLog.protein !== undefined && (
                       <div>
                         <span className="text-muted-foreground">P:</span>{" "}
-                        <span className="font-medium tnum">{selectedLog.protein}g</span>
+                        <span className="tnum font-medium text-foreground">
+                          {selectedLog.protein}g
+                        </span>
                       </div>
                     )}
                     {selectedLog.carbs !== undefined && (
                       <div>
                         <span className="text-muted-foreground">C:</span>{" "}
-                        <span className="font-medium tnum">{selectedLog.carbs}g</span>
+                        <span className="tnum font-medium text-foreground">
+                          {selectedLog.carbs}g
+                        </span>
                       </div>
                     )}
                     {selectedLog.fat !== undefined && (
                       <div>
                         <span className="text-muted-foreground">F:</span>{" "}
-                        <span className="font-medium tnum">{selectedLog.fat}g</span>
+                        <span className="tnum font-medium text-foreground">
+                          {selectedLog.fat}g
+                        </span>
                       </div>
                     )}
                     {selectedLog.steps !== undefined && (
                       <div>
                         <span className="text-muted-foreground">Steps:</span>{" "}
-                        <span className="font-medium tnum">{selectedLog.steps}</span>
+                        <span className="tnum font-medium text-foreground">
+                          {selectedLog.steps.toLocaleString()}
+                        </span>
                       </div>
                     )}
                     {selectedLog.bodyweight !== undefined && (
                       <div>
                         <span className="text-muted-foreground">BW:</span>{" "}
-                        <span className="font-medium tnum">
+                        <span className="tnum font-medium text-foreground">
                           {selectedLog.bodyweight} {unit}
                         </span>
                       </div>
@@ -316,67 +330,61 @@ export function CalendarView() {
                   </div>
                 </button>
               ) : (
-                <div className="px-5">
-                  <button
-                    onClick={() => setEditorOpen(true)}
-                    className="w-full min-h-[44px] rounded-2xl bg-surface py-4 text-center text-[14px] font-semibold text-accent anim-fade-up"
-                  >
-                    Log daily numbers
-                  </button>
-                </div>
+                <button
+                  onClick={() => setEditorOpen(true)}
+                  className="group-row w-full justify-center py-3.5 t-body font-semibold text-accent"
+                >
+                  Log daily numbers
+                </button>
               )}
 
-              {hasSessions && (
-                <ul className="space-y-3 px-5">
-                  {selectedSessions.map((session, i) => {
-                    const isCardio = isCardioSession(session);
-                    const slot = !isCardio
-                      ? slots.find((sl) => sl.id === session.splitSlotId)
-                      : undefined;
-                    const cardioEx = isCardio
-                      ? exercises.find((e) => e.id === session.cardioExerciseId)
-                      : undefined;
-                    const title = isCardio
-                      ? (cardioEx?.name ?? "Cardio")
-                      : (slot?.name ?? "Untitled");
-                    const cardioDetails = isCardio
-                      ? fmtCardioDetails(session.durationMinutes, session.distance, unit)
-                      : null;
-                    const subtitle = isCardio
-                      ? cardioDetails
-                        ? `· ${cardioDetails}`
-                        : undefined
-                      : `· ${sets.filter((x) => x.sessionId === session.id).length} sets`;
+              {hasSessions &&
+                selectedSessions.map((session, i) => {
+                  const isCardio = isCardioSession(session);
+                  const slot = !isCardio
+                    ? slots.find((sl) => sl.id === session.splitSlotId)
+                    : undefined;
+                  const cardioEx = isCardio
+                    ? exercises.find((e) => e.id === session.cardioExerciseId)
+                    : undefined;
+                  const title = isCardio
+                    ? (cardioEx?.name ?? "Cardio")
+                    : (slot?.name ?? "Untitled");
+                  const cardioDetails = isCardio
+                    ? fmtCardioDetails(session.durationMinutes, session.distance, unit)
+                    : null;
+                  const subtitle = isCardio
+                    ? cardioDetails
+                      ? `· ${cardioDetails}`
+                      : undefined
+                    : `· ${sets.filter((x) => x.sessionId === session.id).length} sets`;
 
-                    return (
-                      <li key={session.id}>
-                        <Link
-                          to="/session/$id"
-                          params={{ id: session.id }}
-                          className="flex items-center justify-between rounded-2xl bg-surface px-5 py-4 anim-fade-up"
-                          style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
-                        >
-                          <div className="min-w-0 flex-1 pr-3">
-                            <div className="flex min-w-0 items-baseline gap-2">
-                              <span className="truncate text-[16px] font-semibold tracking-tight">
-                                {title}
-                              </span>
-                              {subtitle && (
-                                <span className="tnum shrink-0 text-[12px] text-muted-foreground">
-                                  {subtitle}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <span className="tnum shrink-0 text-[12px] text-muted-foreground">
-                            {fmtTime(session.startedAt)}
+                  return (
+                    <Link
+                      key={session.id}
+                      to="/session/$id"
+                      params={{ id: session.id }}
+                      className="group-row group-row-sep w-full items-center justify-between py-4"
+                      style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
+                    >
+                      <div className="min-w-0 flex-1 pr-3">
+                        <div className="flex min-w-0 items-baseline gap-2">
+                          <span className="truncate t-body font-semibold tracking-tight text-foreground">
+                            {title}
                           </span>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+                          {subtitle && (
+                            <span className="t-label shrink-0 text-muted-foreground">
+                              {subtitle}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="t-label shrink-0 text-muted-foreground">
+                        {fmtTime(session.startedAt)}
+                      </span>
+                    </Link>
+                  );
+                })}
             </div>
           );
         })()}

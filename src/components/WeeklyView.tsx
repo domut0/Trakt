@@ -124,16 +124,16 @@ export function WeeklyView() {
 
   if (weeks.length === 0) {
     return (
-      <div className="mx-5 rounded-2xl bg-surface px-5 py-8 text-center space-y-3">
+      <div className="group-list mx-5 p-8 text-center space-y-3">
         {/* h2, not h3: this replaces the whole week list, so there is no section
             heading above it to be a sub-level of. */}
-        <h2 className="text-[16px] font-semibold tracking-tight">No history logged</h2>
-        <p className="text-[13px] text-muted-foreground">
+        <h2 className="t-heading font-semibold tracking-tight text-foreground">No history logged</h2>
+        <p className="t-label text-muted-foreground">
           Track your bodyweight, steps, or macros to start building your log.
         </p>
         <button
           onClick={() => openEditor(dayKey(new Date()))}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-accent px-5 py-2.5 text-[14px] font-semibold text-accent-foreground"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-accent px-5 py-2.5 t-body font-semibold text-accent-foreground"
         >
           Log today's numbers
         </button>
@@ -157,8 +157,8 @@ export function WeeklyView() {
               sessionCount={countSessionsTrained(endedSessions, week.weekStart)}
               unit={unit}
             />
-            <ul className="space-y-3 px-5">
-              {week.days.map((date) => (
+            <ul className="group-list mx-5">
+              {week.days.map((date, index) => (
                 <DayCard
                   key={date}
                   data={{
@@ -169,6 +169,7 @@ export function WeeklyView() {
                   unit={unit}
                   onOpenEditor={openEditor}
                   delayMs={Math.min(cardIndex++, 6) * 35}
+                  isFirst={index === 0}
                 />
               ))}
             </ul>
@@ -220,19 +221,19 @@ function WeekHeader({
   }
 
   return (
-    <div className="px-5 pb-2">
+    <div className="group-header">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="tnum min-w-0 truncate text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <h2 className="t-caption min-w-0 truncate text-muted-foreground">
           Week of {format(parseDayKey(weekStart), "MMM d")}
         </h2>
-        <span className="tnum shrink-0 text-[12px] text-muted-foreground">
+        <span className="t-caption shrink-0 text-muted-foreground">
           {sessionCount === 0
             ? "No sessions"
             : `${sessionCount} session${sessionCount === 1 ? "" : "s"}`}
         </span>
       </div>
       {stats.length > 0 && (
-        <div className="mt-0.5 flex flex-wrap gap-x-4 text-[12px] text-muted-foreground">
+        <div className="mt-0.5 flex flex-wrap gap-x-4 t-label text-muted-foreground">
           {stats.map((s) => (
             <span key={s} className="tnum">
               {s}
@@ -258,17 +259,22 @@ function DayCard({
   unit,
   onOpenEditor,
   delayMs,
+  isFirst,
 }: {
   data: DayCardData;
   unit: "lbs" | "kg";
   onOpenEditor: (date: string) => void;
   delayMs: number;
+  isFirst: boolean;
 }) {
   const { date, sessions, log } = data;
   const stats = log ? dayStats(log, unit) : [];
 
   return (
-    <li className="anim-fade-up" style={{ animationDelay: `${delayMs}ms` }}>
+    <li
+      className={`anim-fade-up ${!isFirst ? "group-row-sep" : ""}`}
+      style={{ animationDelay: `${delayMs}ms` }}
+    >
       <div
         role="button"
         tabIndex={0}
@@ -286,12 +292,12 @@ function DayCard({
           e.preventDefault();
           onOpenEditor(date);
         }}
-        className="cursor-pointer rounded-2xl bg-surface px-5 py-4"
+        className="cursor-pointer px-5 py-4"
       >
         <div className="flex items-baseline justify-between gap-3">
-          <span className="tnum text-[16px] font-semibold tracking-tight">{dayLabel(date)}</span>
+          <span className="t-body font-semibold tracking-tight text-foreground">{dayLabel(date)}</span>
           {log?.isCheatDay && (
-            <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-medium text-destructive">
+            <span className="flex shrink-0 items-center gap-1.5 t-caption text-destructive">
               <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
               Cheat day
             </span>
@@ -313,17 +319,17 @@ function DayCard({
                   onClick={(e) => e.stopPropagation()}
                   className="flex min-h-[44px] items-center gap-2"
                 >
-                  <span className="truncate text-[15px] font-medium tracking-tight">
+                  <span className="truncate t-body font-medium tracking-tight text-foreground">
                     {session.title}
                   </span>
                   {session.subtitle && (
-                    <span className="tnum shrink-0 text-[12px] text-muted-foreground">
+                    <span className="t-label shrink-0 text-muted-foreground">
                       {session.subtitle}
                     </span>
                   )}
                   <span
                     aria-hidden="true"
-                    className="ml-auto shrink-0 text-[12px] text-muted-foreground"
+                    className="ml-auto shrink-0 t-label text-muted-foreground"
                   >
                     ›
                   </span>
@@ -336,9 +342,9 @@ function DayCard({
         {stats.length > 0 && (
           <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
             {stats.map((s) => (
-              <span key={s.label} className="text-[14px]">
-                <span className="tnum font-semibold">{s.value}</span>{" "}
-                <span className="text-[12px] text-muted-foreground">{s.label}</span>
+              <span key={s.label} className="t-body">
+                <span className="tnum font-semibold text-foreground">{s.value}</span>{" "}
+                <span className="t-label text-muted-foreground">{s.label}</span>
               </span>
             ))}
           </div>
