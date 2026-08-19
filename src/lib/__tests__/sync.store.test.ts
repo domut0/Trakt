@@ -173,22 +173,33 @@ describe("syncNow: the push", () => {
     expect(useSyncStore.getState().pending).toBe(false);
   });
 
-  it("stops forcing once a base exists, and sends its revision", async () => {
+  it("stops forcing once a base exists, and pulls before pushing", async () => {
     await saveSyncBase(buildBase(useStore.getState(), 4));
-    const sent = stubFetch({ ok: true, revision: 5 });
+    const sent = stubFetch({ ok: true, revision: 4 });
 
     await useSyncStore.getState().syncNow();
 
-    expect(sent[0].body.force).toBe(false);
-    expect(sent[0].body.expectedRevision).toBe(4);
+    expect(sent.map((s) => s.body.action)).toEqual(["pull", "push"]);
+    expect(sent[1].body.force).toBe(false);
+    expect(sent[1].body.expectedRevision).toBe(4);
   });
 
   it("leaves the base untouched when the push fails", async () => {
     // Advancing it on a failed push would make every record that did not land
     // look like a sheet edit on the next merge.
-    const original = buildBase(useStore.getState(), 4);
-    await saveSyncBase(original);
-    stubFetch({ ok: false, error: "network" });
+    await saveSyncBase(buildBase(useStore.getState(), 4));
+    setSyncFetch((_url, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify(
+            body.action === "pull"
+              ? { ok: true, revision: 4, tabs: {} }
+              : { ok: false, error: "network" },
+          ),
+        ),
+      );
+    });
 
     await useSyncStore.getState().syncNow();
 
@@ -332,5 +343,209 @@ describe("disconnect", () => {
     expect(useSyncStore.getState().status).toBe("off");
     expect(await db.meta.get("syncConfig")).toBeUndefined();
     expect(await loadSyncBase()).toBeUndefined();
+  });
+});
+
+describe("syncNow: pulling sheet edits back", () => {
+  /** A sheet reply carrying one editable set row. */
+  function sheetWith(weight: unknown, revision = 4) {
+    return {
+      ok: true,
+      revision,
+      tabs: {
+        sets: [
+          ["ID", "Weight", "Reps", "RPE", "Setup Note"],
+          ["set_1", weight, 5, "", ""],
+        ],
+      },
+    };
+  }
+
+  beforeEach(async () => {
+    useStore.setState({
+      hydrated: true,
+      unit: "lbs",
+      exercises: [{ id: "e_bench", name: "Bench Press", type: "main" }],
+      slots: [],
+      sessions: [{ id: "sess_1", startedAt: 1_000, endedAt: 2_000 }],
+      sets: [
+        {
+          id: "set_1",
+          sessionId: "sess_1",
+          exerciseId: "e_bench",
+          weight: 225,
+          reps: 5,
+          loggedAt: 1_500,
+        },
+      ],
+      dailyLogs: [],
+      habits: [],
+      habitEntries: [],
+    });
+    useSyncStore.setState({ config: CONFIG, collisions: [] });
+    await saveSyncBase(buildBase(useStore.getState(), 4));
+  });
+
+  it("does not pull on the first sync, when there is no base", async () => {
+    await db.meta.delete("syncBase");
+    const sent = stubFetch({ ok: true, revision: 1 });
+
+    await useSyncStore.getState().syncNow();
+
+    // Nothing to merge against, so a pull could not be interpreted anyway.
+    expect(sent.map((s) => s.body.action)).toEqual(["push"]);
+  });
+
+  it("pulls before pushing, so a sheet edit is not overwritten by the push", async () => {
+    // The ordering IS the correctness property here. Pushing first would write
+    // the app's old value over the cell the user just typed in.
+    const sent: Sent[] = [];
+    setSyncFetch((_url, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      sent.push({ body });
+      return Promise.resolve(
+        new Response(
+          JSON.stringify(body.action === "pull" ? sheetWith(235) : { ok: true, revision: 5 }),
+        ),
+      );
+    });
+
+    await useSyncStore.getState().syncNow();
+
+    expect(sent.map((s) => s.body.action)).toEqual(["pull", "push"]);
+    // The edit reached the app...
+    expect(useStore.getState().sets[0].weight).toBe(235);
+    // ...and the push carried it back, so the next pull does not see it again.
+    const tabs = sent[1].body.tabs as Record<string, unknown[][]>;
+    expect(tabs.sets[1]).toContain(235);
+  });
+
+  it("writes the sheet's edit through to IndexedDB, not just to memory", async () => {
+    setSyncFetch((_url, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify(body.action === "pull" ? sheetWith(235) : { ok: true, revision: 5 }),
+        ),
+      );
+    });
+
+    await useSyncStore.getState().syncNow();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect((await db.sets.get("set_1"))?.weight).toBe(235);
+  });
+
+  it("keeps the app's value and records a collision when both sides moved", async () => {
+    useStore.setState({ sets: [{ ...useStore.getState().sets[0], weight: 245 }] });
+    setSyncFetch((_url, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify(body.action === "pull" ? sheetWith(235) : { ok: true, revision: 5 }),
+        ),
+      );
+    });
+
+    await useSyncStore.getState().syncNow();
+
+    expect(useStore.getState().sets[0].weight).toBe(245);
+    expect(useSyncStore.getState().collisions).toHaveLength(1);
+    expect(useSyncStore.getState().collisions[0]).toMatchObject({
+      field: "weight",
+      sheetValue: 235,
+      appValue: 245,
+    });
+  });
+
+  it("pushes against the revision the pull reported, not the stored one", async () => {
+    // A base left behind by a failed push would otherwise read as stale forever.
+    const sent: Sent[] = [];
+    setSyncFetch((_url, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      sent.push({ body });
+      return Promise.resolve(
+        new Response(
+          JSON.stringify(body.action === "pull" ? sheetWith(225, 9) : { ok: true, revision: 10 }),
+        ),
+      );
+    });
+
+    await useSyncStore.getState().syncNow();
+
+    expect(sent[1].body.expectedRevision).toBe(9);
+  });
+
+  it("re-runs the cycle once when the sheet moved between pull and push", async () => {
+    const actions: string[] = [];
+    let pushes = 0;
+    setSyncFetch((_url, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      actions.push(String(body.action));
+      if (body.action === "pull")
+        return Promise.resolve(new Response(JSON.stringify(sheetWith(225))));
+      pushes += 1;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify(
+            pushes === 1 ? { ok: false, error: "stale", revision: 6 } : { ok: true, revision: 7 },
+          ),
+        ),
+      );
+    });
+
+    await useSyncStore.getState().syncNow();
+
+    // Someone typed in the sheet during the push window, so the whole cycle
+    // runs again rather than that edit being lost.
+    expect(actions).toEqual(["pull", "push", "pull", "push"]);
+    expect(useSyncStore.getState().status).toBe("idle");
+  });
+
+  it("gives up after one retry rather than looping forever", async () => {
+    let pushes = 0;
+    setSyncFetch((_url, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      if (body.action === "pull")
+        return Promise.resolve(new Response(JSON.stringify(sheetWith(225))));
+      pushes += 1;
+      return Promise.resolve(new Response(JSON.stringify({ ok: false, error: "stale" })));
+    });
+
+    await useSyncStore.getState().syncNow();
+
+    expect(pushes).toBe(2);
+    expect(useSyncStore.getState().status).toBe("error");
+  });
+
+  it("does not push at all when the pull fails", async () => {
+    const sent = stubFetch({ ok: false, error: "network" });
+
+    await useSyncStore.getState().syncNow();
+
+    expect(sent.map((s) => s.body.action)).toEqual(["pull"]);
+    expect(useSyncStore.getState().status).toBe("error");
+  });
+
+  it("keeps unread collisions across a later clean sync", async () => {
+    useSyncStore.setState({
+      collisions: [
+        { tab: "daily", key: "2026-08-12", field: "calories", sheetValue: 2100, appValue: 2400 },
+      ],
+    });
+    setSyncFetch((_url, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify(body.action === "pull" ? sheetWith(225) : { ok: true, revision: 5 }),
+        ),
+      );
+    });
+
+    await useSyncStore.getState().syncNow();
+
+    expect(useSyncStore.getState().collisions).toHaveLength(1);
+    useSyncStore.getState().dismissCollisions();
+    expect(useSyncStore.getState().collisions).toHaveLength(0);
   });
 });

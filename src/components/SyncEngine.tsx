@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useStore } from "@/lib/store";
 import { useSyncStore } from "@/lib/sync-store";
 import { syncSourceChanged } from "@/lib/sync";
+import { useToast } from "./Toast";
 
 /**
  * Schedules sheet syncs. Renders nothing.
@@ -26,10 +27,29 @@ const BACKOFF_MS = [30_000, 120_000, 600_000, 1_800_000];
 
 export function SyncEngine() {
   const hydrateSync = useSyncStore((s) => s.hydrate);
+  const collisionCount = useSyncStore((s) => s.collisions.length);
+  const showToast = useToast();
+  const announcedCollisions = useRef(0);
 
   useEffect(() => {
     void hydrateSync();
   }, [hydrateSync]);
+
+  useEffect(() => {
+    // A collision means something the user typed into the sheet was discarded,
+    // so it cannot be left to be discovered in Settings. One toast per batch,
+    // never one per collision: editing a week of nutrition on a laptop while
+    // the phone was offline can produce dozens at once.
+    if (collisionCount > announcedCollisions.current) {
+      const added = collisionCount - announcedCollisions.current;
+      showToast({
+        message:
+          added === 1 ? "1 sheet edit was not applied." : `${added} sheet edits were not applied.`,
+        durationMs: 6000,
+      });
+    }
+    announcedCollisions.current = collisionCount;
+  }, [collisionCount, showToast]);
 
   useEffect(() => {
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -80,7 +100,11 @@ export function SyncEngine() {
         if (useSyncStore.getState().pending) void run();
         return;
       }
-      if (useSyncStore.getState().pending) void run();
+      // Coming back runs unconditionally, not only when something is pending.
+      // This is the path by which edits made in the sheet reach the app, and
+      // those leave no local trace to be pending about.
+      failures = 0;
+      void run();
     };
 
     const onOnline = () => {

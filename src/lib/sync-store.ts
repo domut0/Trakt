@@ -9,8 +9,14 @@ import {
   type SyncConfigMeta,
 } from "./db";
 import { useStore } from "./store";
-import { buildBase, buildSheetTabs } from "./sync";
-import { isLikelyExecUrl, pushToSheet, type SyncConnection } from "./sync-client";
+import {
+  buildBase,
+  buildSheetTabs,
+  mergeFromSheet,
+  type Collision,
+  type MergeResult,
+} from "./sync";
+import { isLikelyExecUrl, pullFromSheet, pushToSheet, type SyncConnection } from "./sync-client";
 
 /**
  * Sheet sync state, deliberately in its own store.
@@ -47,6 +53,8 @@ export interface SyncState {
   hydrated: boolean;
   /** Single-flight guard: a second cycle must never overlap the first. */
   running: boolean;
+  /** Sheet edits that lost to an app edit. Kept until the user dismisses them. */
+  collisions: Collision[];
 
   hydrate: () => Promise<void>;
   connect: (url: string, secret: string) => Promise<{ ok: boolean; error?: string }>;
@@ -54,6 +62,25 @@ export interface SyncState {
   setEnabled: (enabled: boolean) => Promise<void>;
   markPending: () => void;
   syncNow: () => Promise<void>;
+  dismissCollisions: () => void;
+}
+
+/**
+ * Feeds merged sheet edits through the store's own actions.
+ *
+ * Deliberately not a bespoke bulk write: `upsertDailyLog` already deletes a row
+ * whose fields have all been cleared (via `isDailyLogEmpty`), which is exactly
+ * what blanking a day in the sheet should do, and every action already handles
+ * its own IndexedDB write-through. Reimplementing that here would mean two
+ * write paths that have to agree forever.
+ */
+function applyMerge(result: MergeResult): void {
+  const store = useStore.getState();
+  for (const { id, patch } of result.setPatches) store.updateSet(id, patch);
+  for (const { id, patch } of result.sessionPatches) {
+    store.updateSession(id, { note: patch.note });
+  }
+  for (const { date, patch } of result.dailyPatches) store.upsertDailyLog(date, patch);
 }
 
 function connectionFrom(config: SyncConfigMeta): SyncConnection {
@@ -108,6 +135,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   pending: false,
   hydrated: false,
   running: false,
+  collisions: [],
 
   hydrate: async () => {
     if (get().hydrated) return;
@@ -172,6 +200,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
       lastError: undefined,
       lastSyncedAt: undefined,
       pending: false,
+      collisions: [],
     });
   },
 
@@ -196,11 +225,10 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     const { config, running } = get();
     if (!config?.enabled || running) return;
 
-    const app = useStore.getState();
     // The store's default state is empty arrays until IndexedDB has loaded.
     // Pushing that would publish an empty sheet, and once a base exists it would
     // read as the user having deleted their entire history.
-    if (!app.hydrated) return;
+    if (!useStore.getState().hydrated) return;
 
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       set({ status: "offline", pending: true });
@@ -209,34 +237,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
 
     set({ running: true, status: "syncing" });
     try {
-      const base = await loadSyncBase();
-      const response = await pushToSheet(connectionFrom(config), {
-        tabs: buildSheetTabs(app),
-        expectedRevision: base?.revision ?? 0,
-        // Without a base there is nothing to be stale against: this is the first
-        // publish, and the app is the only thing that has ever written here.
-        force: base === undefined,
-        unit: app.unit,
-      });
-
-      if (!response.ok) {
-        const { status, message } = describeFailure(response.error);
-        set({ status, lastError: message, pending: true });
-        return;
-      }
-
-      // Captured from the state that was actually pushed, not from a re-read:
-      // anything logged during the request belongs to the NEXT push, and
-      // recording it here would make that edit invisible to the merge forever.
-      await saveSyncBase(buildBase(app, response.revision));
-
-      if (response.spreadsheetUrl && response.spreadsheetUrl !== config.spreadsheetUrl) {
-        const next = { ...config, spreadsheetUrl: response.spreadsheetUrl };
-        await saveSyncConfig(next);
-        set({ config: next });
-      }
-
-      set({ status: "idle", lastSyncedAt: Date.now(), lastError: undefined, pending: false });
+      await runCycle(config, set, get, 0);
     } catch {
       // Nothing here may throw into React. A sync failure is not a data-loss
       // event and must never interrupt logging.
@@ -245,4 +246,95 @@ export const useSyncStore = create<SyncState>((set, get) => ({
       set({ running: false });
     }
   },
+
+  dismissCollisions: () => set({ collisions: [] }),
 }));
+
+/** How many times a stale push is retried before giving up for this cycle. */
+const MAX_STALE_RETRIES = 1;
+
+type SetState = (partial: Partial<SyncState>) => void;
+type GetState = () => SyncState;
+
+/**
+ * One pull, merge, push.
+ *
+ * The pull comes first so that anything typed in the sheet is folded into the
+ * app BEFORE the push rewrites the tabs. Reversing the two would overwrite the
+ * user's edits with the values they had just replaced.
+ */
+async function runCycle(
+  config: SyncConfigMeta,
+  set: SetState,
+  get: GetState,
+  attempt: number,
+): Promise<void> {
+  const connection = connectionFrom(config);
+  let base = await loadSyncBase();
+  let collisions: Collision[] = [];
+
+  if (base) {
+    const pulled = await pullFromSheet(connection);
+    if (!pulled.ok) {
+      const { status, message } = describeFailure(pulled.error);
+      set({ status, lastError: message, pending: true });
+      return;
+    }
+
+    const merged = mergeFromSheet(base, useStore.getState(), pulled.tabs);
+    applyMerge(merged);
+    collisions = merged.report.collisions;
+
+    // Push against what the sheet actually is now, not what it was when this
+    // base was written, so a push that failed earlier does not read as stale
+    // forever.
+    base = { ...base, revision: pulled.revision };
+  }
+
+  // Read AFTER applying the merge: the push must carry the sheet's edits back,
+  // or the next pull would see them as edits all over again.
+  const app = useStore.getState();
+
+  const response = await pushToSheet(connection, {
+    tabs: buildSheetTabs(app),
+    expectedRevision: base?.revision ?? 0,
+    // Without a base there is nothing to be stale against: this is the first
+    // publish, and the app is the only thing that has ever written here.
+    force: base === undefined,
+    unit: app.unit,
+  });
+
+  if (!response.ok) {
+    // Someone typed in the sheet between the pull and the push. The window is
+    // about a second, but it is exactly when the user is looking at the sheet,
+    // so re-running the cycle folds their edit in rather than losing it.
+    if (response.error === "stale" && attempt < MAX_STALE_RETRIES) {
+      await runCycle(config, set, get, attempt + 1);
+      return;
+    }
+    const { status, message } = describeFailure(response.error);
+    set({ status, lastError: message, pending: true });
+    return;
+  }
+
+  // Captured from the state that was actually pushed, not from a re-read:
+  // anything logged during the request belongs to the NEXT push, and recording
+  // it here would make that edit invisible to the merge forever.
+  await saveSyncBase(buildBase(app, response.revision));
+
+  if (response.spreadsheetUrl && response.spreadsheetUrl !== config.spreadsheetUrl) {
+    const next = { ...config, spreadsheetUrl: response.spreadsheetUrl };
+    await saveSyncConfig(next);
+    set({ config: next });
+  }
+
+  set({
+    status: "idle",
+    lastSyncedAt: Date.now(),
+    lastError: undefined,
+    pending: false,
+    // Appended, not replaced: a collision the user has not read yet must not be
+    // dropped by the next successful sync.
+    collisions: [...get().collisions, ...collisions].slice(-20),
+  });
+}

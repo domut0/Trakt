@@ -16,6 +16,12 @@ function scriptWithSecret(secret: string): string {
   return scriptSource.replace("__SECRET__", secret);
 }
 
+/** A discarded cell, shown back to the user. Blank must read as blank, not as nothing. */
+function formatValue(value: unknown): string {
+  if (value === undefined || value === null || value === "") return "(blank)";
+  return String(value);
+}
+
 function statusLine(state: {
   status: string;
   lastSyncedAt?: number;
@@ -42,6 +48,8 @@ export function SyncSettings() {
   const disconnect = useSyncStore((s) => s.disconnect);
   const setEnabled = useSyncStore((s) => s.setEnabled);
   const syncNow = useSyncStore((s) => s.syncNow);
+  const collisions = useSyncStore((s) => s.collisions);
+  const dismissCollisions = useSyncStore((s) => s.dismissCollisions);
 
   const [showSetup, setShowSetup] = useState(false);
   const [secret, setSecret] = useState("");
@@ -208,6 +216,32 @@ export function SyncSettings() {
             →
           </span>
         </a>
+      )}
+
+      {collisions.length > 0 && (
+        <div className="group-row-sep space-y-3 p-4">
+          <div className="t-label text-muted-foreground">
+            These sheet edits were not applied, because the same value had also changed on this
+            device. The app's value was kept.
+          </div>
+          <ul className="space-y-1">
+            {collisions.slice(-5).map((c, i) => (
+              <li key={`${c.tab}-${c.key}-${c.field}-${i}`} className="t-label">
+                <span className="text-muted-foreground">
+                  {c.tab} · {c.field}:{" "}
+                </span>
+                sheet had {formatValue(c.sheetValue)}, app kept {formatValue(c.appValue)}
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={dismissCollisions}
+            className="min-h-11 w-full rounded-full bg-muted py-2.5 t-body font-medium text-muted-foreground"
+          >
+            Dismiss
+          </button>
+        </div>
       )}
 
       {!showDisconnect ? (
