@@ -3,7 +3,9 @@ import { useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { OneRmCalculatorSheet } from "../components/OneRmCalculatorSheet";
 import { PlateCalculatorSheet } from "../components/PlateCalculatorSheet";
+import { SyncSettings } from "../components/SyncSettings";
 import { TargetsEditor } from "../components/TargetsEditor";
+import { Toggle } from "../components/Toggle";
 import { dailyLogsToCsv, setsToCsv } from "../lib/csv";
 import {
   BACKUP_VERSION,
@@ -422,7 +424,11 @@ function SettingsPage() {
         )}
       </Section>
 
-      <Section title="Reset" delay={160}>
+      <Section title="Google sheet" delay={160}>
+        <SyncSettings />
+      </Section>
+
+      <Section title="Reset" delay={200}>
         {!showClearConfirm ? (
           <button
             type="button"
@@ -466,7 +472,7 @@ function SettingsPage() {
       </Section>
 
       <p className="px-5 pt-6 t-label text-muted-foreground">
-        v0.1 · local only · no accounts, no sync.
+        v0.1 · local first · no accounts, sync optional.
       </p>
 
       {/* Gated on toolsEnabled as well as their own open state, so switching
@@ -582,38 +588,5 @@ function Section({
       <h2 className="group-header t-caption">{title}</h2>
       <div className="group-list mx-5">{children}</div>
     </section>
-  );
-}
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  /** Names the switch for screen readers. The visible row title is a plain div,
-   * not a <label>, so without this the control announces as unlabelled. */
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={onChange}
-      // The pill stays 28px tall to keep rows compact, so the 44px tap target is
-      // added as an absolutely positioned overlay rather than as padding, which
-      // would make every settings row taller. shrink-0 keeps long descriptions
-      // from squeezing the switch out of shape at 390px.
-      className="relative h-7 w-12 shrink-0 rounded-full transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-['']"
-      style={{ backgroundColor: checked ? "var(--color-accent)" : "var(--color-border)" }}
-    >
-      <span
-        className="absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all"
-        style={{ left: checked ? 22 : 2 }}
-      />
-    </button>
   );
 }

@@ -127,6 +127,35 @@ export interface SyncBase {
   dailyLogs: Record<string, EditableDaily>;
 }
 
+/** The store fields that reach the sheet. Anything absent here cannot dirty a sync. */
+const SYNC_SOURCE_KEYS = [
+  "exercises",
+  "slots",
+  "sessions",
+  "sets",
+  "dailyLogs",
+  "habits",
+  "habitEntries",
+  "unit",
+] as const;
+
+/**
+ * Whether a store update changed anything the sheet would show.
+ *
+ * Reference equality is exact here, not an approximation: every mutating action
+ * replaces its array immutably, so an unchanged array is the same array. This is
+ * the app's only dirty signal, because there is no chokepoint on the write path
+ * -- 31 independent `safeWrite` call sites, no funnel. Anything that ever writes
+ * to IndexedDB without going through the store will be invisible to sync.
+ *
+ * Ephemeral fields are excluded by omission: `activeSessionId`, `currentBlock`,
+ * `hydrated` and `writeFailed` all change during a workout without changing
+ * anything the sheet carries.
+ */
+export function syncSourceChanged(a: SyncSource, b: SyncSource): boolean {
+  return SYNC_SOURCE_KEYS.some((key) => a[key] !== b[key]);
+}
+
 /** The slice of store state the sync reads. `useStore.getState()` satisfies it. */
 export interface SyncSource {
   exercises: readonly Exercise[];

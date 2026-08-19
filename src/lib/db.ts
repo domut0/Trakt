@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
+import type { SyncBase } from "./sync";
 import type {
   BackupData,
   DailyLog,
@@ -21,7 +22,7 @@ import type {
  * and calling any of these during server render will throw.
  */
 
-export type MetaKey = "settings" | "activeSession";
+export type MetaKey = "settings" | "activeSession" | "syncConfig" | "syncBase";
 
 export interface SettingsMeta {
   key: "settings";
@@ -62,7 +63,41 @@ export interface ActiveSessionMeta {
   };
 }
 
-type MetaRecord = SettingsMeta | ActiveSessionMeta;
+/**
+ * Google Sheets sync connection details.
+ *
+ * Deliberately its own meta row rather than a field on SettingsMeta, and
+ * deliberately absent from BackupData. The url and secret together are a bearer
+ * capability over the sheet, so putting them in an exportable JSON file would
+ * mean sharing a backup hands over write access. Keeping them device-local also
+ * makes the safe thing the default when a backup is restored onto a second
+ * phone, which sync cannot support (see `deviceId`).
+ */
+export interface SyncConfigMeta {
+  key: "syncConfig";
+  /** The Apps Script web app /exec URL. */
+  url: string;
+  secret: string;
+  /** Identifies this install to the script, which refuses a push from another. */
+  deviceId: string;
+  enabled: boolean;
+  /** Filled in from the script's reply, so Settings can link to the sheet. */
+  spreadsheetUrl?: string;
+}
+
+/**
+ * The merge ancestor: exactly what was last successfully pushed.
+ *
+ * Held in its own row so `replaceAllData` can drop it without touching the
+ * connection details, which is the asymmetry that matters -- restoring a backup
+ * must forget what the sheet looked like, but must not disconnect the sheet.
+ */
+export interface SyncBaseMeta {
+  key: "syncBase";
+  base: SyncBase;
+}
+
+type MetaRecord = SettingsMeta | ActiveSessionMeta | SyncConfigMeta | SyncBaseMeta;
 
 class WorkoutDb extends Dexie {
   exercises!: EntityTable<Exercise, "id">;
@@ -317,8 +352,51 @@ export async function replaceAllData(data: BackupData): Promise<void> {
       };
       await db.meta.put(settings);
       await db.meta.put(EMPTY_ACTIVE_SESSION);
+      // The sync base describes a dataset that no longer exists, so it MUST go
+      // with it. Left behind, the next sync diffs the incoming data against the
+      // old base, reads every vanished record as "the user deleted this", and
+      // wipes their sheet. That path is reachable from the Reset button, which
+      // is documented as a clean slate for testing.
+      //
+      // syncConfig is a separate row and deliberately survives: restoring a
+      // backup should not silently disconnect the sheet. Two rows is what makes
+      // that asymmetry expressible.
+      await db.meta.delete("syncBase");
     },
   );
+}
+
+// --- Sync meta ------------------------------------------------------------
+//
+// None of these go through `safeWrite`. That helper flips the global
+// `writeFailed` flag, which raises "Couldn't save to this device" in
+// WriteErrorBanner -- far too alarming for a sync bookkeeping write that the
+// user's logging does not depend on. Callers handle their own failures.
+
+export async function loadSyncConfig(): Promise<SyncConfigMeta | undefined> {
+  return (await db.meta.get("syncConfig")) as SyncConfigMeta | undefined;
+}
+
+export async function saveSyncConfig(config: SyncConfigMeta): Promise<void> {
+  await db.meta.put(config);
+}
+
+export async function deleteSyncConfig(): Promise<void> {
+  await db.meta.delete("syncConfig");
+}
+
+export async function loadSyncBase(): Promise<SyncBase | undefined> {
+  const record = (await db.meta.get("syncBase")) as SyncBaseMeta | undefined;
+  return record?.base;
+}
+
+export async function saveSyncBase(base: SyncBase): Promise<void> {
+  const record: SyncBaseMeta = { key: "syncBase", base };
+  await db.meta.put(record);
+}
+
+export async function clearSyncBase(): Promise<void> {
+  await db.meta.delete("syncBase");
 }
 
 export async function putSettingsMeta(settings: SettingsMeta): Promise<void> {

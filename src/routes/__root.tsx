@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { useStore } from "../lib/store";
 import { PwaUpdatePrompt } from "../components/PwaUpdatePrompt";
 import { WriteErrorBanner } from "../components/WriteErrorBanner";
+import { SyncEngine } from "../components/SyncEngine";
 import { ToastProvider } from "../components/Toast";
 
 function NotFoundComponent() {
@@ -150,6 +151,7 @@ function RootComponent() {
           WriteErrorBanner lives at this level. */}
       <ToastProvider>
         <StoreHydrator />
+        <SyncEngine />
         <PwaUpdatePrompt />
         <WriteErrorBanner />
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
