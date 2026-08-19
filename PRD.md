@@ -36,10 +36,25 @@ Powerlifters, "powerbuilders" (modern bodybuilders who also chase strength on a 
 - **Weight + reps are the only mandatory fields.** Everything else is optional or hidden.
 - **No screen should ask the user to plan before they lift.** The app follows the workout; it never blocks on a plan the user hasn't made yet.
 - **One tap, not several, for anything that's already known** (repeated sets, repeated exercises, repeated weights).
-- **No feature that requires a backend.** Zero accounts, zero sync, zero server-triggered notifications. If a feature needs a server, it's out of scope for this app's architecture, full stop.
+- **The app requires no backend to function.** Zero accounts, zero server-triggered notifications, and nothing on the logging path may depend on a network. If a _core_ feature needs a server, it's out of scope for this app's architecture. Narrowed once, deliberately: see §5.1.
 - **Mobile-only design.** No responsive/desktop layout considerations — this is a phone-in-hand-at-the-gym tool.
 
-## 6. Core Concepts (glossary)
+### 5.1 Amendment: Google Sheets sync
+
+The original principle read "No feature that requires a backend... If a feature needs a server, it's out of scope for this app's architecture, full stop." That was written to protect a specific property — the app must never stop working, or start being slow, because a network did — and it was worth protecting. It is recorded here rather than quietly deleted, because what changed is real.
+
+**What prompted it.** The point of logging is to make decisions about training and diet, and the app deliberately does none of that analysis itself. Getting the data somewhere an LLM can read it turned out to be the missing half of the feedback loop the PRD identifies as failure cause #2. A JSON export is a snapshot nobody remembers to take; a spreadsheet that is simply always current is not.
+
+**What was added.** Optional one-way-plus sync to a Google Sheet the user owns, via an Apps Script web app they deploy themselves.
+
+**Why it does not break the principle it narrows:**
+
+- **There is still no backend.** No accounts, no server the project operates, no hosting bill, no secrets in the repo, no deploy config. The script runs in the user's own Google account, under their authorization, against their own file.
+- **Nothing on the logging path touches it.** IndexedDB remains the source of truth. Writes are local and synchronous as before; sync is debounced work that happens afterwards and is allowed to fail. A failed sync is a line in Settings, never a blocked or slowed set.
+- **It is off until switched on.** With sync off, the app is byte-for-byte the app described by the rest of this document.
+- **It is not multi-device sync.** §8's non-goal stands. The design is single-device by construction and refuses a second one rather than degrading (see §10).
+
+**What it costs, stated plainly.** "Your data never leaves the device" stops being unconditionally true for a user who enables it. That is a real change to the product's privacy story, not a technicality, which is why it is opt-in and why the setup screen says what the deployment URL grants.
 
 | Term                  | Definition                                                                                                                                                                                                                                                              |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -158,7 +173,7 @@ Two related but distinct matching rules, both scoped **per Split Slot**, never g
 
 Considered and deliberately deferred — not oversights:
 
-- Accounts, login, cloud sync, multi-device support
+- Accounts, login, cloud sync, multi-device support. Sheet sync (§5.1) is **not** an exception: it is single-device by construction, and a second device is refused rather than silently corrupting the sheet.
 - Push notifications of any kind (streak reminders, etc.)
 - Rest timer with countdown/targets/alarms (only the passive "time between sets" stopwatch exists)
 - Warm-up set logging
@@ -182,9 +197,20 @@ No user/account entity — a fresh install has no identity beyond its local data
 
 - **Stack:** React + Vite + TypeScript, Dexie (IndexedDB) for storage, Zustand for state, Tailwind for styling — the same core stack as LiftLens PWA, minus everything CV/video-specific (no onnxruntime-web, no WebCodecs, no Web Workers, no COOP/COEP cross-origin isolation requirement).
 - **Hosting:** Vercel.
-- **No backend.** No auth, no server, no database beyond on-device IndexedDB.
+- **No backend.** No auth, no server this project operates, no database beyond on-device IndexedDB.
 - **PWA:** installable via "Add to Home Screen," offline-capable via service worker.
 - **Phase 2 path:** Capacitor wraps the same codebase for App Store distribution, if/when pursued.
+
+### 10.1 Sheet sync (optional, off by default)
+
+See §5.1 for why this exists. Mechanics:
+
+- **Transport.** One POST to a Google Apps Script web app the user deploys into their own spreadsheet. Chosen over the Sheets REST API because OAuth would need a Google Cloud project, a consent screen, and somewhere safe to refresh a token — which is the backend this app does not have. The script executes as the user, so the app never holds a Google credential. The request is sent as `text/plain` to stay a CORS simple request; Apps Script does not answer preflight `OPTIONS`.
+- **Direction.** Asymmetric. `daily` (all fields, and new dates may be added), `sets` (weight, reps, RPE, setup note) and `sessions` (note) are editable in the sheet. Everything else is app-owned and rewritten wholesale.
+- **Conflict model.** Three-way merge against the last-pushed snapshot, held in the Dexie `meta` table. No entity gained an `updatedAt`, a revision, or a tombstone; the ancestor is what those would otherwise have to reconstruct. Per field, not per record. The app wins a genuine conflict, and the discarded value is shown to the user.
+- **Deliberate refusals.** A row missing from the sheet is never a deletion, and rows cannot be created from the sheet except in `daily`, whose key is the calendar date. Sorting and filtering a spreadsheet are ordinary actions; a training log is not re-derivable.
+- **Single device.** Each install tracks what it last pushed, so a second one reads the first's work as sheet edits and overwrites it. The script records a device id and refuses a foreign push. Fixing this properly needs per-record versioning, which is a different design.
+- **Failure posture.** Sync never blocks, slows, or fails a write. Status lives in Settings; a failed sync is not surfaced through the IndexedDB write-failure banner, which means something much worse.
 
 ## 11. Visual Design Direction
 
