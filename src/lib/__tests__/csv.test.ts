@@ -1,6 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { dailyLogsToCsv, escapeCsvField, setsToCsv, toCsv, type ColumnSpec } from "../csv";
-import type { DailyLog, Exercise, SplitSlot, WorkoutSession, WorkoutSet } from "../store";
+import {
+  cardioColumns,
+  cardioSessionsInOrder,
+  dailyLogsToCsv,
+  escapeCsvField,
+  habitEntriesInOrder,
+  habitEntryColumns,
+  sessionColumns,
+  setsToCsv,
+  strengthSessionsInOrder,
+  toCsv,
+  toRows,
+  type ColumnSpec,
+} from "../csv";
+import type {
+  DailyLog,
+  Exercise,
+  Habit,
+  HabitEntry,
+  SplitSlot,
+  WorkoutSession,
+  WorkoutSet,
+} from "../store";
 
 describe("escapeCsvField", () => {
   it("leaves plain text unquoted", () => {
@@ -250,5 +271,170 @@ describe("dailyLogsToCsv", () => {
 
     const lines = dailyLogsToCsv(logs, "kg").split("\r\n");
     expect(lines[1]).toBe("2026-08-10,0,0,0,0,0,0,kg,false");
+  });
+});
+
+describe("toRows", () => {
+  interface Row {
+    name: string;
+    score?: number;
+    flag?: boolean;
+  }
+
+  const columns: ColumnSpec<Row>[] = [
+    { header: "Name", accessor: "name" },
+    { header: "Score", accessor: "score" },
+    { header: "Flag", accessor: (r) => r.flag },
+  ];
+
+  it("returns the header row followed by one array per record", () => {
+    const rows = toRows([{ name: "a", score: 1, flag: true }], columns);
+    expect(rows).toEqual([
+      ["Name", "Score", "Flag"],
+      ["a", 1, true],
+    ]);
+  });
+
+  it("returns the header row alone for an empty input", () => {
+    expect(toRows([], columns)).toEqual([["Name", "Score", "Flag"]]);
+  });
+
+  it("preserves cell TYPES rather than stringifying them", () => {
+    // This is the whole reason toRows exists separately from toCsv: a number
+    // that arrives in Sheets as the string "225" is not arithmetic-usable, and
+    // every formula the user writes over the column silently breaks.
+    const [, row] = toRows([{ name: "a", score: 225, flag: false }], columns);
+    expect(typeof row[0]).toBe("string");
+    expect(typeof row[1]).toBe("number");
+    expect(typeof row[2]).toBe("boolean");
+  });
+
+  it("keeps absent values absent instead of coercing them to empty strings", () => {
+    // toCsv flattens undefined to "" because CSV has no other option. toRows
+    // must NOT, or the merge cannot tell a cleared cell from an untouched one.
+    const [, row] = toRows([{ name: "a" }], columns);
+    expect(row[1]).toBeUndefined();
+    expect(row[2]).toBeUndefined();
+  });
+
+  it("feeds toCsv, so the two never disagree about column order", () => {
+    const rows: Row[] = [{ name: "a", score: 1, flag: true }];
+    const fromCsv = toCsv(rows, columns).split("\r\n")[0];
+    expect(fromCsv).toBe(toRows(rows, columns)[0].join(","));
+  });
+});
+
+describe("sheet-only column specs", () => {
+  const t = new Date(2026, 7, 12, 14, 30, 0).getTime();
+
+  const exercises: Exercise[] = [
+    { id: "e_bench", name: "Bench Press", type: "main" },
+    { id: "e_row", name: "Rowing Machine", type: "cardio" },
+  ];
+  const slots: SplitSlot[] = [{ id: "s_hb", name: "Heavy Bench", rotationOrder: 0 }];
+
+  const strength: WorkoutSession = {
+    id: "sess_1",
+    splitSlotId: "s_hb",
+    startedAt: t,
+    endedAt: t + 3600_000,
+    note: "felt flat",
+  };
+  const cardio: WorkoutSession = {
+    id: "sess_2",
+    kind: "cardio",
+    cardioExerciseId: "e_row",
+    startedAt: t + 7200_000,
+    durationMinutes: 22,
+    distance: 4.5,
+  };
+  const sets: WorkoutSet[] = [
+    { id: "set_1", sessionId: "sess_1", exerciseId: "e_bench", weight: 225, reps: 5, loggedAt: t },
+    { id: "set_2", sessionId: "sess_1", exerciseId: "e_bench", weight: 225, reps: 4, loggedAt: t },
+  ];
+
+  it("splits strength and cardio sessions into their own tables", () => {
+    const all = [cardio, strength];
+    expect(strengthSessionsInOrder(all).map((s) => s.id)).toEqual(["sess_1"]);
+    expect(cardioSessionsInOrder(all).map((s) => s.id)).toEqual(["sess_2"]);
+  });
+
+  it("counts sets per session and computes duration from endedAt", () => {
+    const [header, row] = toRows([strength], sessionColumns(slots, sets));
+    expect(header).toEqual([
+      "Date",
+      "Split Slot",
+      "Started",
+      "Ended",
+      "Duration (min)",
+      "Sets",
+      "Note",
+    ]);
+    expect(row).toEqual(["2026-08-12", "Heavy Bench", "14:30", "15:30", 60, 2, "felt flat"]);
+  });
+
+  it("leaves duration and ended empty for an in-progress session", () => {
+    // Computing against Date.now() would make the sheet's contents depend on
+    // when it was synced rather than on what happened.
+    const live: WorkoutSession = { id: "sess_3", splitSlotId: "s_hb", startedAt: t };
+    const [, row] = toRows([live], sessionColumns(slots, []));
+    expect(row[3]).toBe("");
+    expect(row[4]).toBeUndefined();
+    expect(row[5]).toBe(0);
+  });
+
+  it("resolves the cardio exercise and labels the distance unit", () => {
+    const [header, row] = toRows([cardio], cardioColumns(exercises, "lbs"));
+    expect(header).toEqual([
+      "Date",
+      "Time",
+      "Exercise",
+      "Duration (min)",
+      "Distance",
+      "Distance Unit",
+      "Setup Note",
+      "Note",
+    ]);
+    expect(row).toEqual([
+      "2026-08-12",
+      "16:30",
+      "Rowing Machine",
+      22,
+      4.5,
+      "mi",
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it("labels cardio distance as km under kg", () => {
+    const [, row] = toRows([cardio], cardioColumns(exercises, "kg"));
+    expect(row[5]).toBe("km");
+  });
+
+  it("resolves habit names and orders entries by date then name", () => {
+    const habits: Habit[] = [
+      { id: "h_1", name: "Creatine", order: 0 },
+      { id: "h_2", name: "Ashwagandha", order: 1, archived: true },
+    ];
+    const entries: HabitEntry[] = [
+      { id: "2026-08-12|h_1", date: "2026-08-12", habitId: "h_1" },
+      { id: "2026-08-12|h_2", date: "2026-08-12", habitId: "h_2" },
+      { id: "2026-08-11|h_1", date: "2026-08-11", habitId: "h_1" },
+    ];
+
+    const ordered = habitEntriesInOrder(entries, habits);
+    expect(ordered.map((e) => e.id)).toEqual([
+      "2026-08-11|h_1",
+      "2026-08-12|h_2",
+      "2026-08-12|h_1",
+    ]);
+
+    const [header, ...rows] = toRows(ordered, habitEntryColumns(habits));
+    expect(header).toEqual(["Date", "Habit", "Archived"]);
+    // An archived habit keeps its entries so history stays honest; the flag is
+    // how a reader tells "stopped tracking" from "stopped doing it".
+    expect(rows[1]).toEqual(["2026-08-12", "Ashwagandha", true]);
+    expect(rows[2]).toEqual(["2026-08-12", "Creatine", false]);
   });
 });
