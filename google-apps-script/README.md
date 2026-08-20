@@ -55,6 +55,14 @@ Press **Deploy**, authorize if asked, and copy the **Web app URL**. It ends in
 Paste the URL into the app's **Google sheet** section and press **Connect**. The
 first sync publishes everything the app has.
 
+## Pointing a Claude Project at the sheet
+
+Reading the sheet is most of the point. See
+[`claude-project-instructions.md`](claude-project-instructions.md) in this directory for a
+document to paste into a Claude Project's custom instructions: it teaches the schema, the
+conventions that keep its numbers matching the app's, and the handful of traps (a blank cell is
+not a zero, warm-up sets are never logged) that otherwise produce confident wrong answers.
+
 ## Updating the script later
 
 If you ever paste a newer `sync.gs`, you must deploy a **new version** of the
