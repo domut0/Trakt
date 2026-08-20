@@ -16,7 +16,8 @@ creates the tabs it needs on the first sync.
 In the sheet: **Extensions** then **Apps Script**. Delete whatever is in the
 editor.
 
-In the app: **Settings** then **Sheet sync** then **Copy script**. That copies
+In the app: **Settings**, then the **Google sheet** section, then **Set up sheet sync**,
+then **Copy script**. That copies
 `sync.gs` with your secret already filled in, so there is nothing to edit. Paste
 it into the editor and save.
 
@@ -51,8 +52,8 @@ Press **Deploy**, authorize if asked, and copy the **Web app URL**. It ends in
 
 ## 5. Connect the app
 
-Paste the URL into **Settings** then **Sheet sync** in the app, and press
-**Connect**. The first sync publishes everything the app has.
+Paste the URL into the app's **Google sheet** section and press **Connect**. The
+first sync publishes everything the app has.
 
 ## Updating the script later
 
@@ -77,8 +78,23 @@ does not hand over your sheet. Treat the URL like a password.
 out what you changed in the sheet. A second device has its own idea of that, so
 it would read the first device's work as sheet edits and overwrite it. The script
 records a device id and refuses a push from a different one, so this fails with a
-message instead of scrambling your data. If you move to a new phone, disconnect
-in Settings on the old one first.
+message instead of scrambling your data.
+
+**Moving to a new phone** is that refusal on purpose, and the way through it is
+**Take over this sheet** in Settings on the new device. Note that disconnecting on
+the OLD device is not enough by itself: that clears the connection there, but the
+sheet still records the old device id, so the new phone stays refused.
+
+Take over replaces the sheet's contents with whatever the new device holds, so do
+it in this order:
+
+1. **Export backup** on the old phone.
+2. **Import backup** on the new one.
+3. **Take over this sheet**.
+
+Skip the first two and you take over with an empty log, and the sheet is emptied to
+match. The confirmation names how many sets and days it is about to push, which is
+there so that "0 sets" stops you.
 
 **Your own tabs are safe.** The script only touches `sets`, `sessions`, `daily`,
 `cardio`, `habits` and `_sync`. Any other tab you add, with formulas or pivot

@@ -52,9 +52,11 @@ The original principle read "No feature that requires a backend... If a feature 
 - **There is still no backend.** No accounts, no server the project operates, no hosting bill, no secrets in the repo, no deploy config. The script runs in the user's own Google account, under their authorization, against their own file.
 - **Nothing on the logging path touches it.** IndexedDB remains the source of truth. Writes are local and synchronous as before; sync is debounced work that happens afterwards and is allowed to fail. A failed sync is a line in Settings, never a blocked or slowed set.
 - **It is off until switched on.** With sync off, the app is byte-for-byte the app described by the rest of this document.
-- **It is not multi-device sync.** §8's non-goal stands. The design is single-device by construction and refuses a second one rather than degrading (see §10).
+- **It is not multi-device sync.** §8's non-goal stands. The design is single-device by construction and refuses a second one rather than degrading (see §10). Moving between devices is an explicit, confirmed handover, never an automatic reconciliation.
 
 **What it costs, stated plainly.** "Your data never leaves the device" stops being unconditionally true for a user who enables it. That is a real change to the product's privacy story, not a technicality, which is why it is opt-in and why the setup screen says what the deployment URL grants.
+
+## 6. Core Concepts (glossary)
 
 | Term                  | Definition                                                                                                                                                                                                                                                              |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -173,7 +175,7 @@ Two related but distinct matching rules, both scoped **per Split Slot**, never g
 
 Considered and deliberately deferred — not oversights:
 
-- Accounts, login, cloud sync, multi-device support. Sheet sync (§5.1) is **not** an exception: it is single-device by construction, and a second device is refused rather than silently corrupting the sheet.
+- Accounts, login, cloud sync, multi-device support. Sheet sync (§5.1) is **not** an exception: it is single-device by construction, and a second device is refused rather than silently corrupting the sheet. Handing a sheet to a new device is a deliberate action the user confirms, with the row counts it is about to overwrite shown first.
 - Push notifications of any kind (streak reminders, etc.)
 - Rest timer with countdown/targets/alarms (only the passive "time between sets" stopwatch exists)
 - Warm-up set logging

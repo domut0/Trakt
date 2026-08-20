@@ -91,7 +91,9 @@ The one exception is sheet sync, which is off unless you enable it. Turning it o
 your log to a Google Sheet you own, through a script running in your own Google account.
 The deployment URL it uses is effectively a password for that sheet, so it is stored only
 on the device and deliberately left out of JSON backups. Sync is single-device by design:
-a second install is refused rather than allowed to overwrite the first one's history.
+a second install is refused rather than allowed to overwrite the first one's history. Moving
+to a new device is a deliberate handover ("Take over this sheet"), not something that happens
+by accident.
 
 ## License
 
