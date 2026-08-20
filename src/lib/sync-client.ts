@@ -22,6 +22,8 @@ export interface PushInput {
   /** Set on the first sync, when there is no base to be stale against. */
   force: boolean;
   unit: "lbs" | "kg";
+  /** Claims a sheet another install owns, replacing its contents. */
+  takeover?: boolean;
 }
 
 export type SyncOk = {
@@ -130,6 +132,7 @@ export function pushToSheet(connection: SyncConnection, input: PushInput): Promi
       expectedRevision: input.expectedRevision,
       force: input.force,
       unit: input.unit,
+      takeover: input.takeover ?? false,
     },
     PUSH_TIMEOUT_MS,
   );

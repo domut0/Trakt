@@ -22,7 +22,7 @@ import type {
  * and calling any of these during server render will throw.
  */
 
-export type MetaKey = "settings" | "activeSession" | "syncConfig" | "syncBase";
+export type MetaKey = "settings" | "activeSession" | "syncConfig" | "syncBase" | "deviceId";
 
 export interface SettingsMeta {
   key: "settings";
@@ -64,6 +64,22 @@ export interface ActiveSessionMeta {
 }
 
 /**
+ * Identifies this install to the sync script.
+ *
+ * Its own row rather than a field on SyncConfigMeta, because it identifies the
+ * BROWSER, not the connection. Held on the config row it died with every
+ * disconnect, and reconnecting minted a new id that the sheet then refused --
+ * so pasting a wrong URL once and retrying locked you out of your own sheet.
+ *
+ * Consequently it also survives `replaceAllData`: restoring a backup does not
+ * make you a different browser.
+ */
+export interface DeviceIdMeta {
+  key: "deviceId";
+  deviceId: string;
+}
+
+/**
  * Google Sheets sync connection details.
  *
  * Deliberately its own meta row rather than a field on SettingsMeta, and
@@ -97,7 +113,7 @@ export interface SyncBaseMeta {
   base: SyncBase;
 }
 
-type MetaRecord = SettingsMeta | ActiveSessionMeta | SyncConfigMeta | SyncBaseMeta;
+type MetaRecord = SettingsMeta | ActiveSessionMeta | SyncConfigMeta | SyncBaseMeta | DeviceIdMeta;
 
 class WorkoutDb extends Dexie {
   exercises!: EntityTable<Exercise, "id">;
@@ -372,6 +388,16 @@ export async function replaceAllData(data: BackupData): Promise<void> {
 // `writeFailed` flag, which raises "Couldn't save to this device" in
 // WriteErrorBanner -- far too alarming for a sync bookkeeping write that the
 // user's logging does not depend on. Callers handle their own failures.
+
+export async function loadDeviceId(): Promise<string | undefined> {
+  const record = (await db.meta.get("deviceId")) as DeviceIdMeta | undefined;
+  return record?.deviceId;
+}
+
+export async function saveDeviceId(deviceId: string): Promise<void> {
+  const record: DeviceIdMeta = { key: "deviceId", deviceId };
+  await db.meta.put(record);
+}
 
 export async function loadSyncConfig(): Promise<SyncConfigMeta | undefined> {
   return (await db.meta.get("syncConfig")) as SyncConfigMeta | undefined;

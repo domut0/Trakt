@@ -6,7 +6,13 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  // Every build output directory .gitignore knows about. `.vercel` in
+  // particular: a local `VERCEL=1` build writes a whole bundled server under
+  // `.vercel/output`, and linting that does not fail, it just runs for many
+  // minutes and looks like a hang.
+  {
+    ignores: ["dist", ".output", ".vinxi", ".vercel", ".nitro", ".tanstack", ".wrangler"],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

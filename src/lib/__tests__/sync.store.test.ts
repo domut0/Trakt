@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { db, loadSyncBase, saveSyncBase, saveSyncConfig, type SyncConfigMeta } from "../db";
+import {
+  db,
+  loadDeviceId,
+  loadSyncBase,
+  saveSyncBase,
+  saveSyncConfig,
+  type SyncConfigMeta,
+} from "../db";
 import { useStore } from "../store";
 import { useSyncStore } from "../sync-store";
 import { buildBase, type SyncBase } from "../sync";
@@ -49,6 +56,8 @@ async function resetAll() {
     pending: false,
     hydrated: false,
     running: false,
+    collisions: [],
+    blockedReason: undefined,
   });
 }
 
@@ -547,5 +556,148 @@ describe("syncNow: pulling sheet edits back", () => {
     expect(useSyncStore.getState().collisions).toHaveLength(1);
     useSyncStore.getState().dismissCollisions();
     expect(useSyncStore.getState().collisions).toHaveLength(0);
+  });
+});
+
+describe("device id", () => {
+  const EXEC = "https://script.google.com/macros/s/AKfycbTEST/exec";
+
+  beforeEach(() => {
+    useStore.setState({
+      hydrated: true,
+      exercises: [{ id: "e_bench", name: "Bench Press", type: "main" }],
+      sets: [],
+      sessions: [],
+      dailyLogs: [],
+      habits: [],
+      habitEntries: [],
+      slots: [],
+    });
+  });
+
+  it("survives a disconnect and reconnect", async () => {
+    // The bug this exists for: the id used to live on the config row, so
+    // disconnecting deleted it and reconnecting minted a new one that the sheet
+    // then refused. Mistyping the URL once was enough to lock you out.
+    stubFetch({ ok: true, revision: 1 });
+
+    await useSyncStore.getState().connect(EXEC, "secret-one");
+    const first = useSyncStore.getState().config?.deviceId;
+    expect(first).toBeTruthy();
+
+    await useSyncStore.getState().disconnect();
+    await useSyncStore.getState().connect(EXEC, "secret-two");
+
+    expect(useSyncStore.getState().config?.deviceId).toBe(first);
+  });
+
+  it("is not deleted by disconnect", async () => {
+    stubFetch({ ok: true, revision: 1 });
+    await useSyncStore.getState().connect(EXEC, "secret");
+    const id = await loadDeviceId();
+
+    await useSyncStore.getState().disconnect();
+
+    expect(await loadDeviceId()).toBe(id);
+  });
+
+  it("survives clearing all data, because a reset is not a new browser", async () => {
+    stubFetch({ ok: true, revision: 1 });
+    await useSyncStore.getState().connect(EXEC, "secret");
+    const id = await loadDeviceId();
+
+    await useStore.getState().clearAllData();
+
+    expect(await loadDeviceId()).toBe(id);
+  });
+
+  it("is generated once, not on every connect", async () => {
+    stubFetch({ ok: true, revision: 1 });
+    await useSyncStore.getState().connect(EXEC, "secret");
+    const id = await loadDeviceId();
+    await useSyncStore.getState().connect(EXEC, "secret");
+    expect(await loadDeviceId()).toBe(id);
+  });
+});
+
+describe("taking over a sheet", () => {
+  beforeEach(() => {
+    useStore.setState({
+      hydrated: true,
+      unit: "lbs",
+      exercises: [{ id: "e_bench", name: "Bench Press", type: "main" }],
+      slots: [],
+      sessions: [{ id: "sess_1", startedAt: 1_000, endedAt: 2_000 }],
+      sets: [
+        {
+          id: "set_1",
+          sessionId: "sess_1",
+          exerciseId: "e_bench",
+          weight: 225,
+          reps: 5,
+          loggedAt: 1_500,
+        },
+      ],
+      dailyLogs: [],
+      habits: [],
+      habitEntries: [],
+    });
+    useSyncStore.setState({ config: CONFIG });
+  });
+
+  it("records why it is blocked, as a code rather than as prose", async () => {
+    // The UI branches on this. Matching on the message text would silently stop
+    // working the first time someone reworded it.
+    stubFetch({ ok: false, error: "other-device", deviceId: "dev_other" });
+
+    await useSyncStore.getState().syncNow();
+
+    expect(useSyncStore.getState().status).toBe("blocked");
+    expect(useSyncStore.getState().blockedReason).toBe("other-device");
+  });
+
+  it("clears the blocked reason once a sync succeeds", async () => {
+    stubFetch({ ok: false, error: "other-device" });
+    await useSyncStore.getState().syncNow();
+    expect(useSyncStore.getState().blockedReason).toBe("other-device");
+
+    stubFetch({ ok: true, revision: 2 });
+    await useSyncStore.getState().syncNow();
+
+    expect(useSyncStore.getState().blockedReason).toBeUndefined();
+    expect(useSyncStore.getState().status).toBe("idle");
+  });
+
+  it("sends takeover and force, so the script hands the sheet over", async () => {
+    const sent = stubFetch({ ok: true, revision: 9 });
+
+    await useSyncStore.getState().takeOverSheet();
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].body.action).toBe("push");
+    expect(sent[0].body.takeover).toBe(true);
+    expect(sent[0].body.force).toBe(true);
+  });
+
+  it("drops the old base first, since a takeover republishes wholesale", async () => {
+    // The ancestor recorded against the previous owner's sheet describes a
+    // history this device never had.
+    await saveSyncBase(buildBase(useStore.getState(), 3));
+    const sent = stubFetch({ ok: true, revision: 9 });
+
+    await useSyncStore.getState().takeOverSheet();
+
+    // No pull: with the base gone there is nothing to merge against.
+    expect(sent.map((s) => s.body.action)).toEqual(["push"]);
+    expect((await loadSyncBase())?.revision).toBe(9);
+  });
+
+  it("does nothing when no sheet is connected", async () => {
+    useSyncStore.setState({ config: undefined });
+    const sent = stubFetch({ ok: true, revision: 1 });
+
+    await useSyncStore.getState().takeOverSheet();
+
+    expect(sent).toHaveLength(0);
   });
 });

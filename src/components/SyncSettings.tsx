@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import scriptSource from "../../google-apps-script/sync.gs?raw";
+import { useStore } from "@/lib/store";
 import { generateSecret, useSyncStore } from "@/lib/sync-store";
 import { Toggle } from "./Toggle";
 
@@ -50,6 +51,10 @@ export function SyncSettings() {
   const syncNow = useSyncStore((s) => s.syncNow);
   const collisions = useSyncStore((s) => s.collisions);
   const dismissCollisions = useSyncStore((s) => s.dismissCollisions);
+  const blockedReason = useSyncStore((s) => s.blockedReason);
+  const takeOverSheet = useSyncStore((s) => s.takeOverSheet);
+  const setCount = useStore((s) => s.sets.length);
+  const dayCount = useStore((s) => s.dailyLogs.length);
 
   const [showSetup, setShowSetup] = useState(false);
   const [secret, setSecret] = useState("");
@@ -59,6 +64,7 @@ export function SyncSettings() {
   const [showScript, setShowScript] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [showDisconnect, setShowDisconnect] = useState(false);
+  const [showTakeover, setShowTakeover] = useState(false);
 
   const openSetup = () => {
     // Generated here rather than at render: crypto is fine on the server, but
@@ -216,6 +222,55 @@ export function SyncSettings() {
             →
           </span>
         </a>
+      )}
+
+      {blockedReason === "other-device" && (
+        <div className="group-row-sep space-y-3 p-4">
+          <div className="t-label text-muted-foreground">
+            This sheet belongs to another install. Each one tracks what it last pushed, so two
+            writing to one sheet would overwrite each other.
+          </div>
+          {!showTakeover ? (
+            <button
+              type="button"
+              onClick={() => setShowTakeover(true)}
+              className="min-h-11 w-full rounded-full bg-muted py-2.5 t-body font-medium"
+            >
+              Take over this sheet
+            </button>
+          ) : (
+            <>
+              {/* The counts are the point. A fresh install taking over replaces
+                  the sheet with nothing, and "0 sets" is what makes that
+                  obvious before the tap rather than after. */}
+              <div className="t-label text-destructive">
+                This replaces the sheet's contents with this device's data:{" "}
+                {setCount.toLocaleString()} {setCount === 1 ? "set" : "sets"} and{" "}
+                {dayCount.toLocaleString()} {dayCount === 1 ? "day" : "days"} logged. The other
+                install stops syncing to it.
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTakeover(false)}
+                  className="min-h-11 flex-1 rounded-full bg-muted py-2.5 t-body font-medium text-muted-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void takeOverSheet();
+                    setShowTakeover(false);
+                  }}
+                  className="min-h-11 flex-1 rounded-full bg-destructive py-2.5 t-body font-medium text-white"
+                >
+                  Take over
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {collisions.length > 0 && (

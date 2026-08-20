@@ -2,8 +2,10 @@ import { create } from "zustand";
 import {
   clearSyncBase,
   deleteSyncConfig,
+  loadDeviceId,
   loadSyncBase,
   loadSyncConfig,
+  saveDeviceId,
   saveSyncBase,
   saveSyncConfig,
   type SyncConfigMeta,
@@ -16,7 +18,13 @@ import {
   type Collision,
   type MergeResult,
 } from "./sync";
-import { isLikelyExecUrl, pullFromSheet, pushToSheet, type SyncConnection } from "./sync-client";
+import {
+  isLikelyExecUrl,
+  pullFromSheet,
+  pushToSheet,
+  type SyncConnection,
+  type SyncErrorCode,
+} from "./sync-client";
 
 /**
  * Sheet sync state, deliberately in its own store.
@@ -55,6 +63,12 @@ export interface SyncState {
   running: boolean;
   /** Sheet edits that lost to an app edit. Kept until the user dismisses them. */
   collisions: Collision[];
+  /**
+   * Why sync is blocked, as a code rather than the prose in `lastError`.
+   * The UI branches on this; matching on a message string would silently stop
+   * working the moment the wording changed.
+   */
+  blockedReason?: SyncErrorCode;
 
   hydrate: () => Promise<void>;
   connect: (url: string, secret: string) => Promise<{ ok: boolean; error?: string }>;
@@ -62,6 +76,8 @@ export interface SyncState {
   setEnabled: (enabled: boolean) => Promise<void>;
   markPending: () => void;
   syncNow: () => Promise<void>;
+  /** Claims a sheet currently owned by another install. Replaces its contents. */
+  takeOverSheet: () => Promise<void>;
   dismissCollisions: () => void;
 }
 
@@ -96,6 +112,24 @@ export function generateSecret(): string {
 
 function generateDeviceId(): string {
   return `dev_${generateSecret().slice(0, 12)}`;
+}
+
+/**
+ * This install's id, generated once and kept.
+ *
+ * Read from its own meta row rather than from the sync config, so disconnecting
+ * and reconnecting does not mint a new one -- which the sheet would then refuse,
+ * locking the user out over nothing more than a mistyped URL.
+ *
+ * Lazily created here rather than during `hydrate` so that someone who never
+ * turns sync on never gets the write.
+ */
+async function ensureDeviceId(): Promise<string> {
+  const existing = await loadDeviceId();
+  if (existing) return existing;
+  const created = generateDeviceId();
+  await saveDeviceId(created);
+  return created;
 }
 
 /** Maps a script or transport failure onto what the user can do about it. */
@@ -164,15 +198,15 @@ export const useSyncStore = create<SyncState>((set, get) => ({
       return { ok: false, error: "Paste the secret from the script." };
     }
 
-    const config: SyncConfigMeta = {
-      key: "syncConfig",
-      url: trimmed,
-      secret: secret.trim(),
-      deviceId: get().config?.deviceId ?? generateDeviceId(),
-      enabled: true,
-    };
-
+    let config: SyncConfigMeta;
     try {
+      config = {
+        key: "syncConfig",
+        url: trimmed,
+        secret: secret.trim(),
+        deviceId: await ensureDeviceId(),
+        enabled: true,
+      };
       await saveSyncConfig(config);
       // A fresh connection knows nothing about what is in the sheet, so the
       // first sync must be a publish rather than a merge.
@@ -181,7 +215,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
       return { ok: false, error: "Couldn't save the connection to this device." };
     }
 
-    set({ config, status: "idle", lastError: undefined });
+    set({ config, status: "idle", lastError: undefined, blockedReason: undefined });
     await get().syncNow();
     return { ok: true };
   },
@@ -201,6 +235,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
       lastSyncedAt: undefined,
       pending: false,
       collisions: [],
+      blockedReason: undefined,
     });
   },
 
@@ -247,6 +282,25 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     }
   },
 
+  takeOverSheet: async () => {
+    const { config, running } = get();
+    if (!config || running) return;
+    if (!useStore.getState().hydrated) return;
+
+    set({ running: true, status: "syncing" });
+    try {
+      // A takeover republishes wholesale, so whatever ancestor was recorded
+      // against the previous owner's sheet is meaningless. Dropping it also
+      // makes the cycle below force, which is what claiming the sheet means.
+      await clearSyncBase();
+      await runCycle(config, set, get, 0, { takeover: true });
+    } catch {
+      set({ status: "error", lastError: "Sync failed.", pending: true });
+    } finally {
+      set({ running: false });
+    }
+  },
+
   dismissCollisions: () => set({ collisions: [] }),
 }));
 
@@ -268,6 +322,7 @@ async function runCycle(
   set: SetState,
   get: GetState,
   attempt: number,
+  options: { takeover?: boolean } = {},
 ): Promise<void> {
   const connection = connectionFrom(config);
   let base = await loadSyncBase();
@@ -277,7 +332,12 @@ async function runCycle(
     const pulled = await pullFromSheet(connection);
     if (!pulled.ok) {
       const { status, message } = describeFailure(pulled.error);
-      set({ status, lastError: message, pending: true });
+      set({
+        status,
+        lastError: message,
+        pending: true,
+        blockedReason: status === "blocked" ? (pulled.error as SyncErrorCode) : undefined,
+      });
       return;
     }
 
@@ -302,6 +362,7 @@ async function runCycle(
     // publish, and the app is the only thing that has ever written here.
     force: base === undefined,
     unit: app.unit,
+    takeover: options.takeover,
   });
 
   if (!response.ok) {
@@ -309,11 +370,16 @@ async function runCycle(
     // about a second, but it is exactly when the user is looking at the sheet,
     // so re-running the cycle folds their edit in rather than losing it.
     if (response.error === "stale" && attempt < MAX_STALE_RETRIES) {
-      await runCycle(config, set, get, attempt + 1);
+      await runCycle(config, set, get, attempt + 1, options);
       return;
     }
     const { status, message } = describeFailure(response.error);
-    set({ status, lastError: message, pending: true });
+    set({
+      status,
+      lastError: message,
+      pending: true,
+      blockedReason: status === "blocked" ? (response.error as SyncErrorCode) : undefined,
+    });
     return;
   }
 
@@ -332,6 +398,7 @@ async function runCycle(
     status: "idle",
     lastSyncedAt: Date.now(),
     lastError: undefined,
+    blockedReason: undefined,
     pending: false,
     // Appended, not replaced: a collision the user has not read yet must not be
     // dropped by the next successful sync.

@@ -13,7 +13,7 @@
 const SECRET = "__SECRET__";
 
 /** Bumped when this file changes in a way the app needs to know about. */
-const SCRIPT_VERSION = 1;
+const SCRIPT_VERSION = 2;
 
 /** Tabs the app writes. Anything else in the spreadsheet is left alone. */
 const APP_TABS = ["sets", "sessions", "daily", "cardio", "habits"];
@@ -78,7 +78,11 @@ function push_(body) {
     // second device reads the first one's push as a pile of sheet edits and
     // its own next push deletes the first one's history. Refusing is the only
     // honest option short of per-record versioning.
-    if (meta.deviceId && body.deviceId && meta.deviceId !== body.deviceId) {
+    //
+    // `takeover` is the deliberate override, sent only when the user has
+    // confirmed in the app that this device should own the sheet from now on.
+    // The write below then claims it.
+    if (!body.takeover && meta.deviceId && body.deviceId && meta.deviceId !== body.deviceId) {
       return { ok: false, error: "other-device", deviceId: meta.deviceId };
     }
 
