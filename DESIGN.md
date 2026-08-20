@@ -58,14 +58,43 @@ parts. `CalendarView` had six containers on a single screen.
 
 ## Colour
 
+**Red is for things that break, not for numbers that are large.**
+
+The palette could previously express neutral and failure and nothing else, so hitting a
+protein goal looked exactly like blowing a calorie ceiling. Colour now does three separate
+jobs, and a token does exactly one of them.
+
 - Accent (`--color-accent`) marks things that are **actionable or currently selected**.
   Never decorative. If everything is accented, nothing is.
+- State (`--color-success`, `--color-warning`) is the state of a **value against a goal**,
+  and nothing else. Success `#4ade80` is a goal met; warning `#fbbf24` is over a ceiling.
+  As text both pass AA: success 10.78:1 on background and 9.40:1 on surface, warning
+  11.26:1 and 9.81:1. Success is deliberately not `--nutrition` `#4fa97a`, which is the
+  daily-log dot's identity colour and keeps meaning only "nutrition entry".
+- Destructive (`--color-destructive`) is for **destruction and errors only**: delete,
+  clear data, a failed write, a sync collision. **Never a data value.** A cheat day is not
+  an error. Being over your step goal is not an error. Those are `--warning` and
+  `--success`. Red on a number the user simply logged is the app telling them off for
+  using it.
 - Muted (`--color-muted-foreground`) for secondary text. It measures 6.56:1 on surface
   and 7.53:1 on background, so it passes AA. **Do not use opacity variants** like
   `/60` or `/50`: those compute to 3.74:1 and fail.
 - The metric colours (`--color-carbs`, `--fat`, `--protein`, `--steps`, `--bodyweight`,
   `--cardio`, `--nutrition`) are data encodings. Use them only to identify that metric,
   never as decoration.
+
+**State must never be carried by hue alone.** Whatever the colour says, a fill, a label or
+an icon has to say as well, so "met" is still readable by someone who cannot tell the two
+hues apart. This is measured, not boilerplate: simulated for protanopia, `--success` and
+`--warning` fall from 37.9 apart to roughly 10 (CIEDE2000; the exact figure moves with the
+simulation model), close enough to read as the same olive. A bare green number and a bare amber number are the same number to those users. A
+filled ring, a "goal met" label or a check beside the value all solve it.
+
+The identity declared at the top of this file (lines 5-8) is **unchanged**, and this
+amendment is bounded on purpose. Green and amber are **not a second brand accent**: blue
+is still the only colour that means "press this", and nothing here adds a font, a
+gradient, a glow or a texture. State colours only ever report on a value. If one of them
+ever becomes navigation, a button or a mood, this rule has been broken.
 
 ## Touch and motion
 

@@ -13,6 +13,8 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-destructive: var(--destructive);
   --color-nutrition: var(--nutrition);
   --color-steps: var(--steps);
@@ -38,6 +40,33 @@
   /* MFP blue accent */
   --accent: #4b82f5;
   --accent-foreground: #ffffff;
+  /* STATE. These describe how a value sits against a goal. The metric colours
+     below describe which series a value belongs to. Different jobs, so they are
+     drawn from different tiers on purpose: state sits up at --accent brightness
+     so it reads as a verdict, while the data series stay muted so they read as
+     identity. Never signal state with hue alone; a fill, label or icon has to
+     carry it too. Simulated for protanopia these two fall from 37.9 apart to
+     roughly 10 (CIEDE2000; the exact figure moves with the simulation model)
+     and both land on much the same olive. */
+  /* A goal met. Deliberately NOT --nutrition #4fa97a, which is the daily-log
+     dot's identity colour and has to keep meaning only "nutrition entry": this
+     is 21 points brighter in value, 14 more saturated and 7 degrees warmer in
+     hue, 15.1 apart in CIEDE2000, a wider gap than the carbs/nutrition pair
+     below that the palette already treats as distinct (10.3). Not a general
+     "good news" wash, and never decoration.
+     As text: 10.78:1 on --background, 9.40:1 on --surface. Passes AA. */
+  --success: #4ade80;
+  /* Over a ceiling: past a calorie target, past a macro cap. This is what most
+     of the app's misused red becomes. It is a reading rather than a fault, so
+     it must never escalate to --destructive; nothing has broken just because a
+     number is high. Its nearest neighbour is --protein #e0a44f at 10.7, the one
+     colour it must not be confused with, so keep it off the macro ring.
+     As text: 11.26:1 on --background, 9.81:1 on --surface. Passes AA. */
+  --warning: #fbbf24;
+  /* Destruction and errors ONLY: delete, clear data, a failed write, a sync
+     collision. NOT "this number is large". A cheat day is --warning and a step
+     count over goal is --success; neither of them is an error, and colouring
+     them red is how the app ended up scolding people for using it. */
   --destructive: #f0554e;
   --nutrition: #4fa97a;
   --steps: #c2a25a;
