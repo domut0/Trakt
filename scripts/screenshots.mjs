@@ -89,15 +89,7 @@ function weekdayIndex(date) {
 
 /** Epoch ms for a given clock time on `date`, in UTC. */
 function atTime(date, hour, minute) {
-  return Date.UTC(
-    date.getUTCFullYear(),
-    date.getUTCMonth(),
-    date.getUTCDate(),
-    hour,
-    minute,
-    0,
-    0,
-  );
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hour, minute, 0, 0);
 }
 
 const round1 = (n) => Math.round(n * 10) / 10;
@@ -187,7 +179,15 @@ const HABITS = [
 ];
 
 const TARGET_PROFILES = [
-  { id: "tp_train", name: "Training", calories: 2700, protein: 200, carbs: 300, fat: 80, steps: 10000 },
+  {
+    id: "tp_train",
+    name: "Training",
+    calories: 2700,
+    protein: 200,
+    carbs: 300,
+    fat: 80,
+    steps: 10000,
+  },
   { id: "tp_rest", name: "Rest", calories: 2200, protein: 190, carbs: 180, fat: 75, steps: 8000 },
 ];
 /** Monday first. Wed/Sat/Sun are rest days. */
@@ -489,11 +489,9 @@ const FONT_UA =
 
 /** curl rather than fetch: it already trusts this environment's proxy and CA. */
 function curlBuffer(url, extraArgs = []) {
-  const res = spawnSync(
-    "curl",
-    ["-sSL", "--max-time", "25", "-A", FONT_UA, ...extraArgs, url],
-    { maxBuffer: 32 * 1024 * 1024 },
-  );
+  const res = spawnSync("curl", ["-sSL", "--max-time", "25", "-A", FONT_UA, ...extraArgs, url], {
+    maxBuffer: 32 * 1024 * 1024,
+  });
   if (res.status !== 0 || !res.stdout || res.stdout.length === 0) return null;
   return res.stdout;
 }
@@ -595,7 +593,11 @@ async function waitForHydration(page) {
 async function assertNoErrorOverlay(page, name) {
   const overlay = await page.locator("vite-error-overlay").count();
   if (overlay > 0) {
-    const text = await page.locator("vite-error-overlay").first().innerText().catch(() => "");
+    const text = await page
+      .locator("vite-error-overlay")
+      .first()
+      .innerText()
+      .catch(() => "");
     throw new Error(`Vite error overlay is covering the page at "${name}":\n${text.slice(0, 800)}`);
   }
 }
@@ -628,9 +630,12 @@ async function shot(page, name) {
 
 /** The app is a fixed-height shell; the scroller is <main>, not the document. */
 async function scrollMain(page, top) {
-  await page.locator("main").first().evaluate((el, y) => {
-    el.scrollTop = y;
-  }, top);
+  await page
+    .locator("main")
+    .first()
+    .evaluate((el, y) => {
+      el.scrollTop = y;
+    }, top);
   await page.waitForTimeout(250);
 }
 
@@ -675,7 +680,10 @@ async function importBackup(page, backup, label) {
       await confirm.waitFor({ state: "visible", timeout: 5_000 });
       selected = true;
     } catch {
-      const err = await page.locator(".text-destructive").allInnerTexts().catch(() => []);
+      const err = await page
+        .locator(".text-destructive")
+        .allInnerTexts()
+        .catch(() => []);
       const parseError = err.find((t) => t && /backup|file|json|malformed/i.test(t));
       if (parseError) {
         throw new Error(`The app rejected the generated backup JSON: ${parseError}`);
@@ -786,22 +794,37 @@ async function captureCharts(page) {
   }
 
   // Range chips, on Calories.
-  await page.getByRole("group", { name: "Metric" }).getByRole("button", { name: "Calories" }).click();
+  await page
+    .getByRole("group", { name: "Metric" })
+    .getByRole("button", { name: "Calories" })
+    .click();
   await settle(page, 300);
   for (const [label, name] of [
     ["Last 7 days", "36-charts-calories-7d"],
     ["Last 90 days", "37-charts-calories-90d"],
     ["All time", "38-charts-calories-all"],
   ]) {
-    await page.getByRole("group", { name: "Date range" }).getByRole("button", { name: label }).click();
+    await page
+      .getByRole("group", { name: "Date range" })
+      .getByRole("button", { name: label })
+      .click();
     await settle(page, 400);
     await shot(page, name);
   }
 
   // The smoothed series, on the metric where it actually matters.
-  await page.getByRole("group", { name: "Metric" }).getByRole("button", { name: "Bodyweight" }).click();
-  await page.getByRole("group", { name: "Date range" }).getByRole("button", { name: "Last 90 days" }).click();
-  await page.getByRole("group", { name: "Series" }).getByRole("button", { name: "7-day avg" }).click();
+  await page
+    .getByRole("group", { name: "Metric" })
+    .getByRole("button", { name: "Bodyweight" })
+    .click();
+  await page
+    .getByRole("group", { name: "Date range" })
+    .getByRole("button", { name: "Last 90 days" })
+    .click();
+  await page
+    .getByRole("group", { name: "Series" })
+    .getByRole("button", { name: "7-day avg" })
+    .click();
   await settle(page, 500);
   // Everything Charts has (chips, plot, trend line, the four stat tiles) fits
   // one viewport, so there is deliberately no below-the-fold capture here.
@@ -826,11 +849,10 @@ async function captureSettings(page) {
   await scrollToTop(page, page.getByText("Target profiles", { exact: true }));
   await shot(page, "43-settings-target-profile-cards");
 
+  // Scrolling Export backup to the top also lands the page on its last screen,
+  // so this doubles as the settings-bottom capture.
   await scrollToTop(page, page.getByText("Export backup", { exact: true }));
-  await shot(page, "44-settings-data-and-backup");
-
-  await scrollMain(page, 99_999);
-  await shot(page, "45-settings-bottom");
+  await shot(page, "44-settings-data-backup-and-reset");
 }
 
 async function captureWorkoutFlow(page) {
@@ -865,7 +887,10 @@ async function captureWorkoutFlow(page) {
   await settle(page, 300);
   await shot(page, "55-log-set-exercise-search");
 
-  await page.getByRole("button", { name: /^Bench Press/ }).first().click();
+  await page
+    .getByRole("button", { name: /^Bench Press/ })
+    .first()
+    .click();
   await settle(page, 500);
   await shot(page, "56-log-set-sheet");
 
