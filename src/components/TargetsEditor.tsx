@@ -1,5 +1,15 @@
-import { useState } from "react";
-import { isUniformWeek, WEEKDAY_LABELS } from "../lib/targets";
+import { useState, type KeyboardEvent } from "react";
+import {
+  DEFAULT_GOAL_MODE,
+  directionFor,
+  GOAL_MODES,
+  isUniformWeek,
+  TARGET_FIELDS,
+  WEEKDAY_LABELS,
+  type GoalMode,
+  type TargetDirection,
+  type TargetField,
+} from "../lib/targets";
 import { useStore, type TargetProfile } from "../lib/store";
 
 /**
@@ -259,6 +269,8 @@ function ProfileCard({
         </button>
       </div>
 
+      <GoalModeControl profile={profile} onUpdate={onUpdate} />
+
       <div className="grid grid-cols-2 gap-3">
         <TargetFieldInput
           id={`target-${profile.id}-calories`}
@@ -298,6 +310,160 @@ function ProfileCard({
           onChange={(val) => onUpdate({ fat: val })}
         />
       </div>
+    </div>
+  );
+}
+
+/** How each mode names itself. Present participles because the user is picking
+ * a description of what they are doing, not an action to perform now. */
+const GOAL_MODE_LABELS: Record<GoalMode, string> = {
+  cut: "Cutting",
+  maintain: "Maintaining",
+  gain: "Gaining",
+};
+
+/** Field names as they read mid-sentence, with the number the verb has to
+ * agree with. "protein" and "fat" are mass nouns and take "is"; the rest are
+ * plural. Without this the generated line says "fat sit near target". */
+const FIELD_NOUNS: Record<TargetField, { text: string; plural: boolean }> = {
+  calories: { text: "calories", plural: true },
+  protein: { text: "protein", plural: false },
+  carbs: { text: "carbs", plural: true },
+  fat: { text: "fat", plural: false },
+  steps: { text: "steps", plural: true },
+};
+
+/** One clause per direction, in both numbers. Plain language on purpose: the
+ * user should never have to learn the words floor, ceiling and band. */
+const DIRECTION_CLAUSES: Record<TargetDirection, { one: string; many: string }> = {
+  ceiling: { one: "is a budget to stay under", many: "are budgets to stay under" },
+  floor: { one: "is a goal to beat", many: "are goals to beat" },
+  band: { one: "sits near target", many: "sit near target" },
+};
+
+/** Clause order. Budgets first because on a cut that is the constraint the
+ * user came here for; the rest follows in the same order in every mode, so
+ * switching modes rewrites the line rather than reshuffling it. */
+const CLAUSE_ORDER: readonly TargetDirection[] = ["ceiling", "floor", "band"];
+
+function joinNouns(words: readonly string[]): string {
+  if (words.length <= 2) return words.join(" and ");
+  return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
+/**
+ * The plain-language consequence of a mode, one sentence per direction the
+ * mode actually uses.
+ *
+ * DERIVED from `directionFor` rather than written out three times, so the
+ * sentence cannot drift from the table that drives the rings and bars. If a
+ * mode's directions change in targets.ts, this line changes with it and the
+ * screen never explains a rule the app is not applying.
+ */
+function goalModeSummary(mode: GoalMode): string {
+  const byDirection = new Map<TargetDirection, TargetField[]>();
+  for (const field of TARGET_FIELDS) {
+    const direction = directionFor(field, mode);
+    const fields = byDirection.get(direction) ?? [];
+    fields.push(field);
+    byDirection.set(direction, fields);
+  }
+
+  return CLAUSE_ORDER.flatMap((direction) => {
+    const fields = byDirection.get(direction);
+    if (!fields || fields.length === 0) return [];
+    const clause = DIRECTION_CLAUSES[direction];
+    // A list of two or more always takes the plural verb; a lone subject keeps
+    // its own number.
+    const plural = fields.length > 1 || FIELD_NOUNS[fields[0]].plural;
+    const nouns = joinNouns(fields.map((f) => FIELD_NOUNS[f].text));
+    const sentence = `${nouns} ${plural ? clause.many : clause.one}.`;
+    return [sentence.charAt(0).toUpperCase() + sentence.slice(1)];
+  }).join(" ");
+}
+
+/**
+ * The one dial that gives every field its direction.
+ *
+ * Deliberately ONE control rather than five per-field pickers. The user already
+ * knows whether they are cutting, holding or gaining; nobody knows off-hand
+ * whether fat should be a ceiling or a band on a bulk, and asking them five
+ * times is exactly the configuration friction this app exists to avoid.
+ * `directionFor` in targets.ts owns that expansion, and the summary line under
+ * the control is generated from it so the user can see what they just chose.
+ *
+ * Reads through `DEFAULT_GOAL_MODE` and never writes on mount: a profile saved
+ * before this control existed shows "Maintaining" and stays untouched in
+ * storage until the user actually taps something.
+ *
+ * Follows the weekday strip above: a row of equal chips, current choice in
+ * accent. It is single-select, so the semantics are a radio group with roving
+ * tabindex and arrow keys, not the strip's plain buttons.
+ */
+function GoalModeControl({
+  profile,
+  onUpdate,
+}: {
+  profile: TargetProfile;
+  onUpdate: (patch: Partial<Omit<TargetProfile, "id">>) => void;
+}) {
+  const mode = profile.goalMode ?? DEFAULT_GOAL_MODE;
+  const summaryId = `goal-mode-summary-${profile.id}`;
+  const profileName = profile.name.trim() || "this profile";
+
+  /** Arrow keys move the selection, per the radio group pattern: focus and
+   * checked state stay together, so there is no "focused but unselected" chip
+   * a keyboard user has to press space on. */
+  const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>, idx: number) => {
+    const step =
+      e.key === "ArrowRight" || e.key === "ArrowDown"
+        ? 1
+        : e.key === "ArrowLeft" || e.key === "ArrowUp"
+          ? -1
+          : 0;
+    if (step === 0) return;
+    e.preventDefault();
+    const nextIdx = (idx + step + GOAL_MODES.length) % GOAL_MODES.length;
+    onUpdate({ goalMode: GOAL_MODES[nextIdx] });
+    const next = e.currentTarget.parentElement?.children[nextIdx];
+    if (next instanceof HTMLElement) next.focus();
+  };
+
+  return (
+    <div>
+      <div className="t-caption text-muted-foreground">Goal</div>
+      <div
+        role="radiogroup"
+        aria-label={`Goal for ${profileName}`}
+        aria-describedby={summaryId}
+        className="mt-2 grid grid-cols-3 gap-2"
+      >
+        {GOAL_MODES.map((option, idx) => {
+          const selected = option === mode;
+          return (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              // Roving tabindex: one stop for the whole group, landing on the
+              // current choice, so Tab does not have to walk three chips.
+              tabIndex={selected ? 0 : -1}
+              onClick={() => onUpdate({ goalMode: option })}
+              onKeyDown={(e) => handleKeyDown(e, idx)}
+              className={
+                "flex min-h-[44px] items-center justify-center rounded-xl px-2 text-center t-label font-medium transition-colors duration-150 " +
+                (selected ? "bg-accent text-accent-foreground" : "bg-surface text-muted-foreground")
+              }
+            >
+              {GOAL_MODE_LABELS[option]}
+            </button>
+          );
+        })}
+      </div>
+      <p id={summaryId} className="mt-2 t-label text-muted-foreground">
+        {goalModeSummary(mode)}
+      </p>
     </div>
   );
 }
