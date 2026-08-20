@@ -1,4 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { ArrowUp, Check } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { DayEditorSheet } from "../components/DayEditorSheet";
@@ -459,8 +460,12 @@ function DayLogSummary({
               <span className="t-label text-muted-foreground">{s.label}</span>
             </span>
           ))}
+          {/* A label the user applies to themselves, not a fault the app found.
+              It was red, which made a deliberate choice look like an error and
+              collided with the goal states above it; state colour belongs to a
+              value measured against a goal, and this is neither. */}
           {log.isCheatDay && (
-            <span className="t-label font-medium text-destructive">Cheat day</span>
+            <span className="t-label font-medium text-muted-foreground">Cheat day</span>
           )}
         </div>
       )}
@@ -490,31 +495,103 @@ function goalStateColor(status: TargetStatus, fieldColor: string): string {
   }
 }
 
+/** Signed distance from target, rounded for display. Logged values are whole
+ * numbers in practice, but a hand-typed 62.5g of fat must not print as +0.5000001g. */
+function overBy(progress: TargetProgress): number {
+  return Math.round(progress.delta);
+}
+
+interface GoalNote {
+  text: string;
+  /** The non-colour half of the signal. See `GoalStateNote`. */
+  mark: "check" | "over";
+  tone: string;
+}
+
 /**
- * The short annotation after a value, and the colour it carries.
+ * The words and the mark a reached or broken goal earns.
  *
  * A beaten floor reads as a gain (`+26g`), a broken ceiling reads as a quantity
- * (`26g over`), and everything else says nothing at all. The distinction is the
- * whole point of this change: the same +26 is a good day on protein and a bad
+ * (`26g over`), and a day still in flight says nothing at all. The distinction is
+ * the whole point of this change: the same +26 is a good day on protein and a bad
  * one on fat, and only the goal's direction knows which.
  *
- * This text is also what keeps the state readable without colour. Success and
- * warning are far apart to most eyes but collapse to nearly the same olive under
- * protanopia, so the words carry the meaning and the hue only reinforces it.
+ * Every state returns TEXT, never a bare colour, because success and warning are
+ * far apart to most eyes but collapse to nearly the same olive under protanopia
+ * (37.9 to about 10 in CIEDE2000). The words carry the meaning; the hue only
+ * agrees with them.
  */
-function goalDelta(
-  progress: TargetProgress,
-  unitSuffix: string,
-): { text: string; tone: string } | null {
-  const over = Math.round(progress.delta);
-  if (over <= 0) return null;
-  if (progress.status === "met" && progress.direction === "floor") {
-    return { text: `+${over.toLocaleString()}${unitSuffix}`, tone: "var(--color-success)" };
+function goalStateNote(progress: TargetProgress, unitSuffix: string): GoalNote | null {
+  const over = overBy(progress);
+  switch (progress.status) {
+    case "exceeded":
+      return {
+        text: over > 0 ? `${over.toLocaleString()}${unitSuffix} over` : "Over",
+        mark: "over",
+        tone: "var(--color-warning)",
+      };
+    case "met":
+      // A floor beaten has a surplus worth naming. A band landed on does not:
+      // 3g of carbs inside the tolerance is noise, and printing "+3g" next to a
+      // met goal invites reading it as a miss.
+      return {
+        text:
+          progress.direction === "floor" && over > 0
+            ? `+${over.toLocaleString()}${unitSuffix}`
+            : "Goal met",
+        mark: "check",
+        tone: "var(--color-success)",
+      };
+    case "progress":
+      return null;
   }
-  if (progress.status === "exceeded") {
-    return { text: `${over.toLocaleString()}${unitSuffix} over`, tone: "var(--color-warning)" };
+}
+
+/**
+ * The note as rendered: a glyph and then the words.
+ *
+ * The glyph is not decoration. It is the carrier that survives a display, a
+ * simulation or an eye that cannot separate the two state hues, and it is the
+ * only thing distinguishing a goal met exactly (no surplus to print) from a
+ * small overage.
+ */
+function GoalStateNote({ note, className = "" }: { note: GoalNote; className?: string }) {
+  const Icon = note.mark === "check" ? Check : ArrowUp;
+  return (
+    <span
+      className={`flex items-center gap-1 whitespace-nowrap font-semibold ${className}`}
+      style={{ color: note.tone }}
+    >
+      <Icon size={12} strokeWidth={3} aria-hidden="true" />
+      {note.text}
+    </span>
+  );
+}
+
+/**
+ * What a screen reader hears in place of the bar or the ring.
+ *
+ * These sit inside the day-log card, which is one big button, so the reader
+ * announces the button's name and never walks into the widgets. A `progressbar`
+ * role would take its value with it into a name computation that ignores values;
+ * an `img` with a written-out label is what actually reaches the user, and it is
+ * the same sentence a sighted user reads off the row.
+ */
+function goalAriaLabel(label: string, progress: TargetProgress, unitSuffix: string): string {
+  const value =
+    `${label}: ${progress.logged.toLocaleString()}${unitSuffix} ` +
+    `of ${progress.target.toLocaleString()}${unitSuffix}`;
+  const over = overBy(progress);
+  switch (progress.status) {
+    case "met":
+      return over > 0
+        ? `${value}, goal met, ${over.toLocaleString()}${unitSuffix} over`
+        : `${value}, goal met`;
+    case "exceeded":
+      return `${value}, ${over.toLocaleString()}${unitSuffix} over`;
+    case "progress":
+      return value;
   }
-  return null;
 }
 
 function SlimProgressBar({ progress }: { progress: TargetProgress }) {
@@ -536,51 +613,43 @@ function SlimProgressBar({ progress }: { progress: TargetProgress }) {
   const label = fieldLabels[progress.field] ?? progress.field;
   const fieldColor = fieldColors[progress.field] ?? "var(--color-accent)";
   const fill = goalStateColor(progress.status, fieldColor);
-  const delta = goalDelta(progress, unitSuffix);
+  const note = goalStateNote(progress, unitSuffix);
 
-  // Past the target the bar fills completely and the TARGET slides back to where
-  // it actually falls, marked by a notch. Clamping the width was throwing away
-  // the only interesting thing about a big day: 8,100 and 14,000 steps against an
-  // 8,000 goal both rendered as the same full bar.
-  const over = progress.fraction > 1;
-  const fillPct = over ? 100 : progress.fraction * 100;
-  const notchPct = over ? (1 / progress.fraction) * 100 : null;
+  // A goal that is done fills the bar. Only a day still in flight renders short,
+  // so "full" is a state the eye can read at a glance and does not have to
+  // measure. A band met at 97% is met, and stopping the fill three pixels shy of
+  // the end would say the opposite of the green it is painted in.
+  const fillPct = progress.status === "progress" ? Math.max(0, progress.fraction) * 100 : 100;
 
-  const statusWord =
-    progress.status === "met"
-      ? "goal met"
-      : progress.status === "exceeded"
-        ? "over"
-        : "in progress";
+  // Past the goal the bar is full and the TARGET slides back to where it
+  // actually falls, marked by a notch: the further left the notch, the bigger
+  // the day. Clamping the width was throwing away the only interesting thing
+  // about a big day, so 9,400 and 14,000 steps against an 8,000 goal drew the
+  // same full bar. They now notch at 85% and at 57%.
+  const notchPct = progress.delta > 0 ? 100 / progress.fraction : null;
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex justify-between t-label">
+    <div
+      className="flex flex-col gap-1"
+      role="img"
+      aria-label={goalAriaLabel(label, progress, unitSuffix)}
+    >
+      <div className="flex items-center justify-between gap-2 t-label">
         <span className="font-medium text-muted-foreground">{label}</span>
-        <span className="t-label font-semibold">
-          {progress.logged.toLocaleString()}
-          {unitSuffix}
-          <span className="text-muted-foreground font-normal">
-            {" "}
-            / {progress.target.toLocaleString()}
+        <span className="flex items-center gap-1.5 font-semibold">
+          <span>
+            {progress.logged.toLocaleString()}
             {unitSuffix}
-          </span>
-          {delta && (
-            <span className="ml-1.5 font-semibold" style={{ color: delta.tone }}>
-              {delta.text}
+            <span className="text-muted-foreground font-normal">
+              {" "}
+              / {progress.target.toLocaleString()}
+              {unitSuffix}
             </span>
-          )}
+          </span>
+          {note && <GoalStateNote note={note} />}
         </span>
       </div>
-      <div
-        className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted"
-        role="progressbar"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={progress.target}
-        aria-valuenow={progress.logged}
-        aria-valuetext={`${progress.logged.toLocaleString()}${unitSuffix} of ${progress.target.toLocaleString()}${unitSuffix}, ${statusWord}`}
-      >
+      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
         <div
           className="h-full rounded-full transition-all"
           style={{ width: `${fillPct}%`, backgroundColor: fill }}
@@ -588,11 +657,7 @@ function SlimProgressBar({ progress }: { progress: TargetProgress }) {
         {/* Where the target sat, once the bar has run past it. Cut in the card's
             own fill so it reads as a gap in the bar rather than another colour. */}
         {notchPct !== null && (
-          <div
-            className="absolute inset-y-0 w-0.5 bg-surface"
-            style={{ left: `${notchPct}%` }}
-            aria-hidden="true"
-          />
+          <div className="absolute inset-y-0 w-0.5 bg-surface" style={{ left: `${notchPct}%` }} />
         )}
       </div>
     </div>
@@ -606,71 +671,67 @@ function CalorieTargetRing({ progress }: { progress: TargetProgress }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  // Once a goal is reached the ring closes, and how far past it you went is told
-  // in words underneath rather than by a second arc. At 72px a two-arc ring was
-  // reading as one ring in two arbitrary colours, and the magnitude it was
-  // trying to encode is a number, which the centre is already there to show.
-  const closed = status === "met" || status === "exceeded";
-  const arcFraction = closed ? 1 : Math.min(fraction, 1);
+  // Once a goal is reached the ring CLOSES, and how far past it you went is told
+  // in words underneath rather than by a second arc. At 72px a two-arc ring read
+  // as one ring in two arbitrary colours; a closed ring is unambiguous, and it
+  // is also the state carrier that survives when the two hues cannot be told
+  // apart. The magnitude it was trying to draw is a number, and there is a
+  // number right there.
+  const arcFraction = status === "progress" ? Math.min(Math.max(fraction, 0), 1) : 1;
   const arcDash = `${arcFraction * circumference} ${circumference * (1 - arcFraction)}`;
   const arcColor = goalStateColor(status, "var(--color-accent)");
-
-  const over = Math.round(progress.delta);
-  const note =
-    status === "exceeded" && over > 0
-      ? `${over.toLocaleString()} over`
-      : status === "met" && progress.direction === "floor" && over > 0
-        ? `+${over.toLocaleString()}`
-        : null;
-
-  const statusWord = status === "met" ? "goal met" : status === "exceeded" ? "over" : "in progress";
+  const note = goalStateNote(progress, "");
 
   return (
     <div
-      className="relative flex shrink-0 items-center justify-center"
-      style={{ width: size, height: size }}
-      role="progressbar"
-      aria-label="Calories"
-      aria-valuemin={0}
-      aria-valuemax={target}
-      aria-valuenow={logged}
-      aria-valuetext={`${logged.toLocaleString()} of ${target.toLocaleString()} calories, ${statusWord}`}
+      className="flex shrink-0 flex-col items-center gap-1"
+      role="img"
+      aria-label={goalAriaLabel("Calories", progress, "")}
     >
-      <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="var(--color-muted-foreground)"
-          opacity="0.2"
-          strokeWidth={strokeWidth}
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={arcColor}
-          strokeWidth={strokeWidth}
-          strokeDasharray={arcDash}
-          strokeDashoffset={0}
-          strokeLinecap="round"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center pt-0.5 text-center">
-        {/* Only a reached or broken goal recolours the number. In flight it stays
-            plain, so the colour keeps meaning "something happened here". */}
-        <span
-          className="t-body font-bold leading-none"
-          style={status === "progress" ? undefined : { color: arcColor }}
-        >
-          {logged.toLocaleString()}
-        </span>
-        <span className="mt-0.5 t-caption leading-none text-muted-foreground font-normal">
-          {note ?? `/ ${target.toLocaleString()}`}
-        </span>
+      <div
+        className="relative flex items-center justify-center"
+        style={{ width: size, height: size }}
+      >
+        <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="var(--color-muted-foreground)"
+            opacity="0.2"
+            strokeWidth={strokeWidth}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={arcColor}
+            strokeWidth={strokeWidth}
+            strokeDasharray={arcDash}
+            strokeDashoffset={0}
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pt-0.5 text-center">
+          {/* Only a reached or broken goal recolours the number. In flight it stays
+              plain, so the colour keeps meaning "something happened here". */}
+          <span
+            className="t-body font-bold leading-none"
+            style={status === "progress" ? undefined : { color: arcColor }}
+          >
+            {logged.toLocaleString()}
+          </span>
+          {/* The target stays put in every state. It is the thing the number is
+              being compared against, so a ring that hides it once you go over
+              leaves the reading with nothing to sit against. */}
+          <span className="mt-0.5 t-caption leading-none text-muted-foreground font-normal">
+            / {target.toLocaleString()}
+          </span>
+        </div>
       </div>
+      {note && <GoalStateNote note={note} className="t-label" />}
     </div>
   );
 }
