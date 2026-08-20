@@ -13,7 +13,7 @@ import {
   type SettingsMeta,
 } from "./db";
 import { isDailyLogEmpty } from "./daily-log";
-import { targetProfileFor } from "./targets";
+import { targetProfileFor, type GoalMode } from "./targets";
 import { seedExercises } from "./exercise-library";
 
 export type ExerciseType = "main" | "accessory" | "cardio";
@@ -130,6 +130,16 @@ export interface TargetProfile {
   carbs?: number;
   fat?: number;
   steps?: number;
+  /**
+   * Whether the user is cutting, maintaining or gaining, which is what decides
+   * per field whether going OVER is a win or a miss (see `directionFor`).
+   *
+   * Optional, and absent means `maintain`, resolved on read — never stamped
+   * onto stored data. Every profile saved before this field existed therefore
+   * behaves sensibly with no migration, and because it is a non-indexed field
+   * it needs no Dexie version bump either (see the note in db.ts).
+   */
+  goalMode?: GoalMode;
 }
 
 /**
