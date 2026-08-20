@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -87,6 +88,7 @@
     "globals": "^15.15.0",
     "jsdom": "^29.1.1",
     "nitro": "3.0.260603-beta",
+    "playwright": "^1.62.1",
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",

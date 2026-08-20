@@ -144,3 +144,6 @@ dist
 
 # Local tooling / editor state
 .claude/
+
+# Design-review screenshots (regenerate with `npm run screenshots`)
+screenshots/
