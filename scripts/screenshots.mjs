@@ -943,8 +943,16 @@ async function captureSessionDetail(page) {
 
 async function main() {
   if (existsSync(OUT_DIR)) {
-    for (const f of readdirSync(OUT_DIR)) {
-      if (f.endsWith(".png")) rmSync(join(OUT_DIR, f));
+    // A full run wipes the directory so deleted screens cannot linger as stale
+    // PNGs. A FILTERED run must not: SCREENSHOT_ONLY is documented as a filter,
+    // and clearing everything made it a filter that deletes the 35 screens it
+    // was told to skip. Since screenshots/ is gitignored, that silently
+    // destroyed the before half of a before/after comparison, which is most of
+    // what this harness exists for.
+    if (!ONLY) {
+      for (const f of readdirSync(OUT_DIR)) {
+        if (f.endsWith(".png")) rmSync(join(OUT_DIR, f));
+      }
     }
   } else {
     mkdirSync(OUT_DIR, { recursive: true });
