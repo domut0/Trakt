@@ -333,10 +333,17 @@ const FIELD_NOUNS: Record<TargetField, { text: string; plural: boolean }> = {
   steps: { text: "steps", plural: true },
 };
 
-/** One clause per direction, in both numbers. Plain language on purpose: the
- * user should never have to learn the words floor, ceiling and band. */
+/**
+ * One clause per direction, in both numbers. Plain language on purpose: the
+ * user should never have to learn the words floor, ceiling and band.
+ *
+ * "budget" carries "stay under" on its own, so spelling that out cost a third
+ * wrapped line on the cut, which is the mode with the most to say. "goal to
+ * beat" keeps its second half because a bare "goal" is the ambiguity this whole
+ * module exists to remove.
+ */
 const DIRECTION_CLAUSES: Record<TargetDirection, { one: string; many: string }> = {
-  ceiling: { one: "is a budget to stay under", many: "are budgets to stay under" },
+  ceiling: { one: "is a budget", many: "are budgets" },
   floor: { one: "is a goal to beat", many: "are goals to beat" },
   band: { one: "sits near target", many: "sit near target" },
 };

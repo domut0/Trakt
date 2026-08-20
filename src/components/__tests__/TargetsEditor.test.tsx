@@ -105,8 +105,7 @@ describe("goal mode summary line", () => {
 
     expect(new Set([maintaining, cutting, gaining]).size).toBe(3);
     expect(cutting).toBe(
-      "Calories and fat are budgets to stay under. Protein and steps are goals to beat. " +
-        "Carbs sit near target.",
+      "Calories and fat are budgets. Protein and steps are goals to beat. Carbs sit near target.",
     );
     expect(maintaining).toBe(
       "Protein and steps are goals to beat. Calories, carbs and fat sit near target.",
