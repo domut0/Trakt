@@ -280,7 +280,11 @@ function DayCard({
       <div
         role="button"
         tabIndex={0}
-        aria-label={`Edit ${format(parseDayKey(date), "EEEE, MMMM d")}`}
+        // The card's own label is its accessible name, so anything inside it,
+        // the cheat-day mark included, is announced only if it is named here.
+        aria-label={`Edit ${format(parseDayKey(date), "EEEE, MMMM d")}${
+          log?.isCheatDay ? ", cheat day" : ""
+        }`}
         onClick={() => onOpenEditor(date)}
         // role="button" promises keyboard activation that a <div> does not
         // provide, so the card was focusable and then did nothing on Enter or
@@ -300,9 +304,15 @@ function DayCard({
           <span className="t-body font-semibold tracking-tight text-foreground">
             {dayLabel(date)}
           </span>
+          {/* A neutral note the user wrote on their own day, so it is muted and
+              marked with the same hollow dot the calendar grid uses. Outline
+              against filled means the mark is not carried by hue alone. */}
           {log?.isCheatDay && (
-            <span className="flex shrink-0 items-center gap-1.5 t-caption text-destructive">
-              <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+            <span className="flex shrink-0 items-center gap-1.5 t-caption text-muted-foreground">
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 rounded-full border border-muted-foreground"
+              />
               Cheat day
             </span>
           )}

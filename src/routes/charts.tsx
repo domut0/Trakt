@@ -602,12 +602,17 @@ function Chart({
   const yStep = yTicks.length > 1 ? Math.abs(yTicks[1] - yTicks[0]) : 1;
   const kDecimals = Math.min(2, Math.max(0, -Math.floor(Math.log10(yStep / 1000) + 1e-9)));
 
-  // Cheat days recolour the DAILY series only. In 7-day-average mode a plotted
-  // value is a mean ending on that day, not that day's intake, so marking it red
-  // would attribute the cheat day to the wrong number. The faint raw dots behind
-  // the smoothed line keep carrying the signal.
+  // Cheat days are marked on the DAILY series only. In 7-day-average mode a
+  // plotted value is a mean ending on that day, not that day's intake, so
+  // marking it would attribute the cheat day to the wrong number. The faint raw
+  // dots behind the smoothed line keep carrying the signal.
+  //
+  // The mark is a ring around the dot, not a different fill: a cheat day is a
+  // label the user chose for their own day, so it annotates the point rather
+  // than repainting it, and the ring reads without depending on hue.
   const isCheatDot = (p: { isCheatDay?: boolean }) =>
     isCalories && viewMode === "daily" && p.isCheatDay === true;
+  const hasCheatDots = displayedPoints.some(isCheatDot);
 
   const formatYLabel = (v: number) => {
     if (v === 0) return "0";
@@ -626,7 +631,11 @@ function Chart({
       // reads as swipe-to-next-tab. Without this the first scrub navigates away.
       data-swipe-ignore
       role="img"
-      aria-label={`${metricLabel} over time`}
+      aria-label={
+        hasCheatDots
+          ? `${metricLabel} over time. Cheat days are ringed.`
+          : `${metricLabel} over time`
+      }
     >
       <defs>
         <linearGradient id="chart-area" x1="0" y1="0" x2="0" y2="1">
@@ -698,20 +707,23 @@ function Chart({
 
       {/* Raw daily dots drawn faintly behind smoothed line when in 7-day average mode */}
       {viewMode === "avg7" &&
-        rawPoints.map((rp, i) => (
-          <circle
-            key={`raw-dot-${i}`}
-            cx={x(rp.ts)}
-            cy={y(rp.val)}
-            r={1.5}
-            fill={
-              isCalories && rp.isCheatDay
-                ? "var(--color-destructive)"
-                : "var(--color-muted-foreground)"
-            }
-            opacity={0.35}
-          />
-        ))}
+        rawPoints.map((rp, i) => {
+          // Same annotation as the daily series: a cheat day opens the dot out
+          // into a ring instead of painting it another colour.
+          const cheat = isCalories && rp.isCheatDay === true;
+          return (
+            <circle
+              key={`raw-dot-${i}`}
+              cx={x(rp.ts)}
+              cy={y(rp.val)}
+              r={cheat ? 2.5 : 1.5}
+              fill={cheat ? "none" : "var(--color-muted-foreground)"}
+              stroke={cheat ? "var(--color-muted-foreground)" : "none"}
+              strokeWidth={1}
+              opacity={0.35}
+            />
+          );
+        })}
 
       {/* Solid line segments and gradient area fills */}
       {segments.map((seg, sIdx) => {
@@ -758,16 +770,31 @@ function Chart({
         );
       })}
 
-      {/* Data dots on displayed series with cheat day recolouring */}
+      {/* Data dots on displayed series */}
       {displayedPoints.map((p, i) => (
         <circle
           key={`dot-${i}`}
           cx={x(p.ts)}
           cy={y(p.val)}
           r={isSinglePoint ? 4 : 2}
-          fill={isCheatDot(p) ? "var(--color-destructive)" : "var(--color-accent)"}
+          fill="var(--color-accent)"
         />
       ))}
+
+      {/* Cheat day rings, drawn around the dot they annotate */}
+      {displayedPoints.map((p, i) =>
+        isCheatDot(p) ? (
+          <circle
+            key={`cheat-dot-${i}`}
+            cx={x(p.ts)}
+            cy={y(p.val)}
+            r={isSinglePoint ? 7 : 4.5}
+            fill="none"
+            stroke="var(--color-muted-foreground)"
+            strokeWidth={1}
+          />
+        ) : null,
+      )}
 
       {/* Label for single point state */}
       {isSinglePoint && (
@@ -801,10 +828,20 @@ function Chart({
             cx={x(activePoint.ts)}
             cy={y(activePoint.val)}
             r={5}
-            fill={isCheatDot(activePoint) ? "var(--color-destructive)" : "var(--color-accent)"}
+            fill="var(--color-accent)"
             stroke="var(--color-surface)"
             strokeWidth={2}
           />
+          {isCheatDot(activePoint) && (
+            <circle
+              cx={x(activePoint.ts)}
+              cy={y(activePoint.val)}
+              r={8}
+              fill="none"
+              stroke="var(--color-muted-foreground)"
+              strokeWidth={1}
+            />
+          )}
           <g>
             <rect
               x={pillX - halfPillW}

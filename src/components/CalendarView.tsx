@@ -157,7 +157,13 @@ export function CalendarView() {
               log.fat !== undefined);
           const showSteps = log?.steps !== undefined;
           const showBodyweight = log?.bodyweight !== undefined;
-          const hasAnyDot = workouts.length > 0 || showNutrition || showSteps || showBodyweight;
+          // A cheat day is a label the user put on their own day, so it counts
+          // as a logged day in its own right. It used to be invisible unless
+          // macros happened to be logged too, which made a day someone
+          // deliberately marked look exactly like a day they never opened.
+          const isCheatDay = log?.isCheatDay === true;
+          const hasAnyDot =
+            workouts.length > 0 || showNutrition || showSteps || showBodyweight || isCheatDay;
           const isSelected = cell.key === selectedKey;
           const todayCell = isToday(cell.date);
           // The dots are the only thing distinguishing one cell from another,
@@ -167,9 +173,10 @@ export function CalendarView() {
           if (workouts.length > 0) {
             logged.push(`${workouts.length} workout${workouts.length === 1 ? "" : "s"}`);
           }
-          if (showNutrition) logged.push(log.isCheatDay ? "macros, cheat day" : "macros");
+          if (showNutrition) logged.push("macros");
           if (showSteps) logged.push("steps");
           if (showBodyweight) logged.push("bodyweight");
+          if (isCheatDay) logged.push("cheat day");
           return (
             <button
               key={cell.key}
@@ -203,13 +210,13 @@ export function CalendarView() {
                       }
                     />
                   ))}
-                  {showNutrition && (
-                    <span
-                      className={
-                        "h-1.5 w-1.5 rounded-full " +
-                        (log.isCheatDay ? "bg-destructive" : "bg-nutrition")
-                      }
-                    />
+                  {showNutrition && <span className="h-1.5 w-1.5 rounded-full bg-nutrition" />}
+                  {/* Annotates the day, never replaces a dot: the food dot keeps
+                      its nutrition colour and the cheat day adds a hollow mark
+                      beside it. Outline against filled, so the mark is not
+                      carried by hue. */}
+                  {isCheatDay && (
+                    <span className="h-1.5 w-1.5 rounded-full border border-muted-foreground" />
                   )}
                   {showSteps && <span className="h-1.5 w-1.5 rounded-full bg-steps" />}
                   {showBodyweight && <span className="h-1.5 w-1.5 rounded-full bg-bodyweight" />}
@@ -271,7 +278,11 @@ export function CalendarView() {
                       Daily summary
                     </span>
                     {selectedLog.isCheatDay && (
-                      <span className="shrink-0 rounded-md bg-destructive/10 px-2 py-0.5 t-caption text-destructive">
+                      <span className="flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 t-caption text-muted-foreground">
+                        <span
+                          aria-hidden="true"
+                          className="h-1.5 w-1.5 rounded-full border border-muted-foreground"
+                        />
                         Cheat day
                       </span>
                     )}
