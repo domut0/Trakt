@@ -159,7 +159,7 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
           )}
         </div>
 
-        {/* Percentage Breakdown Table */}
+        {/* Percentages table */}
         <div className="mt-4">
           <div className="mb-2 t-caption text-muted-foreground">Percentages</div>
 

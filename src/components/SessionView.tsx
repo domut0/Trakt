@@ -324,10 +324,8 @@ export function SessionView({
     return (
       <div className="pb-6">
         <div className="mx-5 my-6 group-list px-5 py-8 text-center">
-          <h2 className="t-heading">No sets logged yet</h2>
-          <p className="mt-1 t-label text-muted-foreground">
-            Select an exercise from below or open the set picker to log your first set.
-          </p>
+          <h2 className="t-heading">No sets yet</h2>
+          <p className="mt-1 t-label text-muted-foreground">The workout starts when you log one.</p>
         </div>
         {renderRepeatChecklist()}
         {renderSessionNote()}

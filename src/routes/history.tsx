@@ -8,9 +8,12 @@ export const Route = createFileRoute("/history")({
   head: () => ({
     meta: [
       { title: "History" },
-      { name: "description", content: "Your logged workouts, by week or by day." },
+      { name: "description", content: "Your workouts and daily numbers, by week or by day." },
       { property: "og:title", content: "History" },
-      { property: "og:description", content: "Your logged workouts, by week or by day." },
+      {
+        property: "og:description",
+        content: "Your workouts and daily numbers, by week or by day.",
+      },
     ],
   }),
   component: HistoryPage,

@@ -159,7 +159,7 @@ function Home() {
       )}
 
       <section className="px-5 section-gap anim-fade-up">
-        <h2 className="group-header px-0 t-caption">Daily log</h2>
+        <h2 className="group-header px-0 t-caption">Daily numbers</h2>
         {/*
           The one elevated surface on the screen, and it is elevated with FILL,
           which is what DESIGN.md asks for: no border, no shadow. `--muted`
@@ -192,7 +192,7 @@ function Home() {
                 onClick={() => setEditingDate(todayKey)}
                 className="flex min-h-[44px] w-full items-center text-left t-label text-muted-foreground focus:outline-none"
               >
-                Nothing logged today. Tap to add calories, macros, steps or bodyweight.
+                Nothing logged today.
               </button>
 
               {canCopyYesterday && (
@@ -257,7 +257,7 @@ function Home() {
           </div>
         ) : (
           <div className="group-list px-5 py-4">
-            <p className="t-label text-muted-foreground">No workouts logged today</p>
+            <p className="t-label text-muted-foreground">You haven't trained yet.</p>
           </div>
         )}
       </section>
@@ -330,9 +330,9 @@ function ConsistencyStrip({
         <div className="grid grid-cols-7 gap-1">
           {days.map((d) => {
             let statusText = "Nothing tracked";
-            if (d.hasWorkout && d.hasLog) statusText = "Workout trained and daily log recorded";
-            else if (d.hasWorkout) statusText = "Workout trained";
-            else if (d.hasLog) statusText = "Daily log recorded";
+            if (d.hasWorkout && d.hasLog) statusText = "Workout and daily numbers logged";
+            else if (d.hasWorkout) statusText = "Workout logged";
+            else if (d.hasLog) statusText = "Daily numbers logged";
 
             return (
               <button

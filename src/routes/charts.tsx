@@ -16,9 +16,9 @@ export const Route = createFileRoute("/charts")({
   head: () => ({
     meta: [
       { title: "Charts" },
-      { name: "description", content: "Daily metrics over time." },
+      { name: "description", content: "Your daily numbers over time." },
       { property: "og:title", content: "Charts" },
-      { property: "og:description", content: "Daily metrics over time." },
+      { property: "og:description", content: "Your daily numbers over time." },
     ],
   }),
   component: ChartsPage,
@@ -184,7 +184,6 @@ function ChartsPage() {
     <AppShell>
       <header className="px-5 pb-4 pt-14">
         <h1 className="t-title">Charts</h1>
-        <p className="mt-1 t-label text-muted-foreground">Daily metrics over time.</p>
       </header>
 
       {/* Metric and date range selection cluster tightened into a single calm block */}
@@ -361,14 +360,13 @@ function Chart({
     null,
   );
 
-  // 0 points empty state with actionable guidance to log on Today tab.
+  // 0 points empty state. Names the metric and points at the range chips,
+  // because "no data" here usually means the window is too narrow rather than
+  // that nothing was ever logged.
   if (displayedPoints.length === 0) {
     return (
       <div className="flex h-[180px] flex-col items-center justify-center p-4 text-center">
-        <h3 className="t-heading">No data recorded</h3>
-        <p className="mt-1 t-label text-muted-foreground">
-          Log your {metricLabel.toLowerCase()} on the Today tab to track progress over time.
-        </p>
+        <h3 className="t-heading">No {metricLabel.toLowerCase()} in this range</h3>
       </div>
     );
   }

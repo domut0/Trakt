@@ -128,11 +128,8 @@ export function WeeklyView() {
         {/* h2, not h3: this replaces the whole week list, so there is no section
             heading above it to be a sub-level of. */}
         <h2 className="t-heading font-semibold tracking-tight text-foreground">
-          No history logged
+          Nothing to look back on yet
         </h2>
-        <p className="t-label text-muted-foreground">
-          Track your bodyweight, steps, or macros to start building your log.
-        </p>
         <button
           onClick={() => openEditor(dayKey(new Date()))}
           className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-accent px-5 py-2.5 t-body font-semibold text-accent-foreground"
@@ -230,8 +227,8 @@ function WeekHeader({
         </h2>
         <span className="t-caption shrink-0 text-muted-foreground">
           {sessionCount === 0
-            ? "No sessions"
-            : `${sessionCount} session${sessionCount === 1 ? "" : "s"}`}
+            ? "No workouts"
+            : `${sessionCount} workout${sessionCount === 1 ? "" : "s"}`}
         </span>
       </div>
       {stats.length > 0 && (

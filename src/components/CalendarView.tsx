@@ -250,12 +250,7 @@ export function CalendarView() {
           if (!hasSessions && !hasLog) {
             return (
               <div className="group-list mx-5 p-6 text-center space-y-3 anim-fade-up">
-                <h3 className="t-body font-semibold tracking-tight text-foreground">
-                  No entry for this date
-                </h3>
-                <p className="t-label text-muted-foreground">
-                  Record your daily numbers or complete a workout to fill this day.
-                </p>
+                <h3 className="t-body font-semibold tracking-tight text-foreground">Empty day</h3>
                 <button
                   onClick={() => setEditorOpen(true)}
                   className="w-full min-h-[44px] rounded-full bg-muted py-2.5 t-body font-semibold text-foreground transition-colors active:opacity-80"
@@ -275,7 +270,7 @@ export function CalendarView() {
                 >
                   <div className="flex w-full items-center justify-between gap-3">
                     <span className="t-body font-semibold tracking-tight text-foreground">
-                      Daily summary
+                      Daily numbers
                     </span>
                     {selectedLog.isCheatDay && (
                       <span className="flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 t-caption text-muted-foreground">

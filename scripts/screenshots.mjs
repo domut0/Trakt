@@ -755,8 +755,8 @@ async function captureToday(page) {
   await shot(page, "11-today-populated-scrolled");
 
   await scrollMain(page, 0);
-  // The daily-log card is a button wrapping the ring + macro columns.
-  await page.locator("section", { hasText: "Daily log" }).getByRole("button").first().click();
+  // The daily-numbers card is a button wrapping the ring + macro columns.
+  await page.locator("section", { hasText: "Daily numbers" }).getByRole("button").first().click();
   await settle(page, 600);
   await shot(page, "12-today-day-editor-sheet");
   await page.keyboard.press("Escape");

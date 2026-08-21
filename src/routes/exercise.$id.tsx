@@ -103,12 +103,16 @@ function ExercisePage() {
 
         {grouped.length === 0 ? (
           <div className="group-list p-6 text-center">
-            <h3 className="t-heading">No history logged</h3>
-            <p className="mt-1 t-label text-muted-foreground">
-              {exercise.type === "cardio"
-                ? `${exercise.name} is logged as a bout with duration and distance rather than sets. Those appear on the History tab.`
-                : `Log sets for ${exercise.name} during a workout to track your progress here.`}
-            </p>
+            {exercise.type === "cardio" ? (
+              <>
+                <h3 className="t-heading">Not tracked here</h3>
+                <p className="mt-1 t-label text-muted-foreground">
+                  Cardio is logged as duration and distance, so it shows up on the History tab.
+                </p>
+              </>
+            ) : (
+              <h3 className="t-heading">Never logged</h3>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
