@@ -1101,6 +1101,47 @@ export const useStore = create<State>((set, get) => ({
 
   dailyLogFor: (date) => get().dailyLogs.find((l) => l.date === date),
 
+  /**
+   * Changes the LABEL every weight is shown with. It converts nothing, and that
+   * is a known hazard rather than an oversight.
+   *
+   * No unit is recorded on a `WorkoutSet`, so a 100 logged in kg and a 225
+   * logged in lbs sit in one history as bare numbers. 225 lb IS 102 kg, a
+   * rounding error of a gain, but anything comparing the two reads a 125-unit
+   * jump. That reaches progress charts, `bestSetFor`, and pr.ts, which would
+   * announce an all-time weight record for changing a setting. The same applies
+   * to `DailyLog.bodyweight` and to cardio `distance`, which is miles or km on
+   * the same switch and so converts by a different factor again.
+   *
+   * Both available fixes were weighed and neither is safe to land piecemeal:
+   *
+   * - CONVERTING stored weights on switch is the only one that repairs an
+   *   existing mixed history, and it is the more dangerous of the two. It
+   *   rewrites every number the user typed. `safeWrite` swallows a failed write
+   *   by design (the in-memory state has already won), so a conversion that
+   *   fails partway leaves rows in two units with nothing marking which moved.
+   *   It is also lossy and therefore not reversible: 100 kg reads back as
+   *   220.5 lb and returns as 100.017 kg, so a user who toggles the setting to
+   *   look at something walks their whole history a little each time.
+   * - STAMPING `unit` onto each set at log time is additive, never rewrites a
+   *   stored number, is exactly reversible, and needs no Dexie bump, since a
+   *   non-indexed field round-trips through the current schema (see db.ts).
+   *   It is the better design and it is what should eventually happen. But it
+   *   only fixes anything once every READER converts, and the readers are in
+   *   pr.ts, exercise-history.ts, chart-math.ts, csv.ts and six screens.
+   *   Stamped but unread, the field would make the data look authoritative
+   *   while leaving it exactly as wrong, which is the worse failure: the next
+   *   person to build on it would have every reason to trust it.
+   *
+   * Neither recovers what unit an EXISTING set was logged in. That was never
+   * written down and is not derivable. The only guess available is "whatever
+   * the global unit is now", and leaving that guess implicit is more honest
+   * than back-filling it into storage, where it would read as a recorded fact.
+   *
+   * So this stays as it is, deliberately, until the reader-side conversion can
+   * land with it in one piece. unit-switch.test.ts pins the behaviour so the
+   * change cannot be made by halves.
+   */
   setUnit: (u) => {
     set({ unit: u });
     persistSettingsFrom(get());
