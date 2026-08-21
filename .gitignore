@@ -147,3 +147,4 @@ dist
 
 # Design-review screenshots (regenerate with `npm run screenshots`)
 screenshots/
+screenshots-before/
