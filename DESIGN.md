@@ -139,6 +139,51 @@ ever becomes navigation, a button or a mood, this rule has been broken.
 ## Copy
 
 - Sentence case. "View workout", not "View Workout".
-- **No em dashes anywhere.** Use a hyphen or restructure.
+- **No em dashes anywhere.** Use a hyphen or restructure. Prefer restructuring: the
+  substitution usually reads worse than the sentence you would have written instead.
 - The habit feature is called **Habits**, generically, on every surface. It is not a
   supplement tracker; supplements are one thing a user might track with it.
+
+### One name per thing
+
+A feature with several names reads as several features, and nothing signals "nobody
+read this end to end" faster. Settled:
+
+- **Daily numbers.** Not "daily log", "daily summary" or "today's numbers", all of
+  which shipped simultaneously for one feature.
+- **Workout**, never "session", on any user-facing surface. The internal type is still
+  `WorkoutSession`; that is fine, it is not a label.
+
+### Empty states must not share a shape
+
+This is the rule that matters most and the easiest to break by accident. Every empty
+state in the app was once built from one frame:
+
+> [imperative] + [object] + ["to" + purpose]
+>
+> "Log your calories on the Today tab **to track progress over time**."
+
+Each was fine alone. Six of them in one app is the signature of text generated to a
+pattern, and it is what makes an interface feel machine-written even when every
+sentence is defensible.
+
+**Vary them deliberately.** The current set runs from two words to fourteen, opens
+eight different ways, and five carry no call to action at all. Before adding one, read
+it against the others as a set. Specifically:
+
+- **A purpose clause is almost always deletable.** A screen with nothing on it is
+  usually self-explanatory, and "to track your progress here" tells the user something
+  they already know.
+- **Say what is true, not what is generic.** The Charts empty state used to claim
+  nothing had ever been logged, which was wrong whenever data existed outside the
+  selected range. Naming the metric and the range fixed a bug, not just a sentence.
+- **Check where the component actually renders** before writing a call to action.
+  Pointing at "the big button" is wrong on the screen that has no big button.
+- If every empty state becomes a terse fragment, the rhyme is back in a new key.
+
+### Do not manufacture praise
+
+The app notices records because a training log is about them. It does not congratulate
+anyone for showing up, and a workout with no records still gets a plain, real summary.
+Hollow encouragement from software that does not know the user is the fastest way to
+sound fake, and it is the opposite of the restraint the rest of this document buys.
