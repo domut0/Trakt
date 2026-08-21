@@ -27,13 +27,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "A frictionless workout logger for lifters. Weight and reps - nothing else in the way.",
+          "A frictionless workout logger for lifters. Weight and reps. Nothing else in the way.",
       },
       { property: "og:title", content: "Anything But The Notes App" },
       {
         property: "og:description",
         content:
-          "A frictionless workout logger for lifters. Weight and reps - nothing else in the way.",
+          "A frictionless workout logger for lifters. Weight and reps. Nothing else in the way.",
       },
     ],
   }),

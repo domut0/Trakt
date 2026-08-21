@@ -6,7 +6,7 @@ import { useStore } from "../lib/store";
 export const Route = createFileRoute("/exercise/$id")({
   head: () => ({
     meta: [
-      { title: "Exercise History" },
+      { title: "Exercise history" },
       { name: "description", content: "Exercise history and personal records." },
     ],
   }),

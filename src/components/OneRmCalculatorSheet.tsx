@@ -85,7 +85,7 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
         <div className="flex items-center justify-between">
           <div>
             <div className="t-caption text-muted-foreground">Calculator</div>
-            <h2 className="t-heading font-semibold tracking-tight">1RM Estimator</h2>
+            <h2 className="t-heading font-semibold tracking-tight">1RM estimator</h2>
           </div>
           <button
             type="button"
@@ -161,14 +161,14 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
 
         {/* Percentage Breakdown Table */}
         <div className="mt-4">
-          <div className="mb-2 t-caption text-muted-foreground">Percentage Breakdown</div>
+          <div className="mb-2 t-caption text-muted-foreground">Percentages</div>
 
           <div className="max-h-[220px] overflow-y-auto rounded-xl bg-muted/40">
             <table className="w-full text-left t-body">
               <thead>
                 <tr className="border-b border-border t-caption text-muted-foreground">
-                  <th className="px-3 py-2 font-medium">Pct</th>
-                  <th className="px-3 py-2 font-medium">Rep Target</th>
+                  <th className="px-3 py-2 font-medium">%</th>
+                  <th className="px-3 py-2 font-medium">Reps</th>
                   <th className="px-3 py-2 text-right font-medium">Weight ({unit})</th>
                 </tr>
               </thead>
