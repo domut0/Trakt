@@ -144,14 +144,22 @@ function buildRecords(
     return found.findIndex((other) => other.exerciseId === record.exerciseId) === index;
   });
 
-  // `headlineRecord` returns the entry itself, so identity recovers the
-  // SessionRecord (with its exercise and set) rather than the narrower type.
-  const head = headlineRecord(bestPerExercise);
-  const headIndex = head ? bestPerExercise.findIndex((record) => record === head) : -1;
-  const ordered =
-    headIndex > 0
-      ? [bestPerExercise[headIndex], ...bestPerExercise.filter((_, i) => i !== headIndex)]
-      : bestPerExercise;
+  // Ranked all the way down, not just at the top. `headlineRecord` is applied
+  // repeatedly to what is left rather than the ranking being re-declared here,
+  // so pr.ts stays the single source of truth for what "most significant"
+  // means, and a change to KIND_ORDER there cannot leave this file behind.
+  // It returns the entry itself, so identity recovers the SessionRecord (with
+  // its exercise and set) rather than the narrower type, and it keeps the
+  // earlier entry on a tie, which is what preserves the session's own order
+  // between two records of equal rank. At most one entry per exercise reaches
+  // this loop, so the quadratic shape is over a handful of items.
+  const remaining = [...bestPerExercise];
+  const ordered: typeof bestPerExercise = [];
+  while (remaining.length > 0) {
+    const head = headlineRecord(remaining);
+    const index = head ? remaining.findIndex((record) => record === head) : -1;
+    ordered.push(...remaining.splice(index === -1 ? 0 : index, 1));
+  }
 
   const nameById = new Map(exercises.map((e) => [e.id, e.name]));
   const setById = new Map(sessionSets.map((s) => [s.id, s]));
