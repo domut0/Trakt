@@ -141,9 +141,9 @@ describe("logCardio", () => {
   });
 
   it("survives a reload with its fields intact", async () => {
-    // Hydrate first so the DB is genuinely populated. hydrate() re-seeds
-    // whenever the exercises table is empty, which would otherwise blow away
-    // the session written below.
+    // Hydrate first so the DB is genuinely populated. hydrate() re-seeds the
+    // exercise library whenever the exercises table is empty, which would
+    // otherwise blow away the session written below.
     useStore.setState({ ...DEFAULT_STATE, hydrated: false });
     await useStore.getState().hydrate();
 

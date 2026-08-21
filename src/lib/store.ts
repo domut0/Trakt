@@ -338,8 +338,8 @@ interface State {
   importData: (data: BackupData) => Promise<void>;
   /** Wipe all logged data (slots, sessions, sets), reset settings to defaults,
    * and restore the exercise preset library — a clean slate for testing. The
-   * preset library is re-seeded so the picker stays usable AND so the DB is not
-   * "empty" (which would make hydrate re-insert the demo history on next load). */
+   * preset library is re-seeded so the picker stays usable, which also leaves
+   * the result identical to what a genuine first run produces. */
   clearAllData: () => Promise<void>;
   predictedNextSlotName: () => string | undefined;
   suggestedNextExerciseFor: (
@@ -359,231 +359,6 @@ interface State {
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-
-// Seed data — a couple of realistic sessions so the UI has something to render.
-// Used ONLY by hydrate() to populate a brand-new (empty) IndexedDB on first run.
-// The store's own default state is empty arrays (see useStore below); these
-// constants are no longer read directly as the default state.
-const now = Date.now();
-const day = 86400000;
-
-const seedSlots: SplitSlot[] = [
-  { id: "s_hb", name: "Heavy Bench", rotationOrder: 0, lastLoggedAt: now - 3 * day },
-  { id: "s_sq", name: "Squat", rotationOrder: 1, lastLoggedAt: now - 2 * day },
-  { id: "s_vb", name: "Volume Bench", rotationOrder: 2, lastLoggedAt: now - day },
-  { id: "s_arms", name: "Arms", rotationOrder: 3, lastLoggedAt: now - 5 * day },
-];
-
-const seedSessions: WorkoutSession[] = [
-  {
-    id: "sess_1",
-    splitSlotId: "s_hb",
-    startedAt: now - 3 * day,
-    endedAt: now - 3 * day + 3600_000,
-  },
-  {
-    id: "sess_2",
-    splitSlotId: "s_sq",
-    startedAt: now - 2 * day,
-    endedAt: now - 2 * day + 3900_000,
-  },
-  { id: "sess_3", splitSlotId: "s_vb", startedAt: now - day, endedAt: now - day + 3400_000 },
-];
-
-const b1 = uid(),
-  b2 = uid(),
-  b3 = uid(),
-  b4 = uid(),
-  b5 = uid();
-const seedSets: WorkoutSet[] = [
-  // Heavy Bench 3 days ago
-  {
-    id: uid(),
-    sessionId: "sess_1",
-    exerciseId: "e_bench",
-    weight: 225,
-    reps: 3,
-    rpe: 7,
-    blockGroupId: b1,
-    loggedAt: now - 3 * day + 600_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_1",
-    exerciseId: "e_bench",
-    weight: 190,
-    reps: 5,
-    rpe: 6,
-    blockGroupId: b2,
-    timeBetweenSetsSeconds: 240,
-    loggedAt: now - 3 * day + 900_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_1",
-    exerciseId: "e_bench",
-    weight: 190,
-    reps: 5,
-    rpe: 7,
-    blockGroupId: b2,
-    timeBetweenSetsSeconds: 220,
-    loggedAt: now - 3 * day + 1130_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_1",
-    exerciseId: "e_bench",
-    weight: 190,
-    reps: 5,
-    rpe: 8,
-    blockGroupId: b2,
-    timeBetweenSetsSeconds: 235,
-    loggedAt: now - 3 * day + 1370_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_1",
-    exerciseId: "e_bench",
-    weight: 190,
-    reps: 4,
-    rpe: 9,
-    blockGroupId: b2,
-    timeBetweenSetsSeconds: 250,
-    loggedAt: now - 3 * day + 1625_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_1",
-    exerciseId: "e_flap",
-    weight: 57.5,
-    reps: 6,
-    rpe: 10,
-    blockGroupId: b3,
-    timeBetweenSetsSeconds: 300,
-    loggedAt: now - 3 * day + 2000_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_1",
-    exerciseId: "e_flap",
-    weight: 57.5,
-    reps: 6,
-    rpe: 10,
-    blockGroupId: b3,
-    timeBetweenSetsSeconds: 280,
-    loggedAt: now - 3 * day + 2290_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_1",
-    exerciseId: "e_push",
-    weight: 60,
-    reps: 12,
-    rpe: 9,
-    blockGroupId: b4,
-    timeBetweenSetsSeconds: 200,
-    loggedAt: now - 3 * day + 2600_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_1",
-    exerciseId: "e_push",
-    weight: 60,
-    reps: 10,
-    rpe: 10,
-    blockGroupId: b4,
-    timeBetweenSetsSeconds: 210,
-    loggedAt: now - 3 * day + 2820_000,
-  },
-  // Squat 2 days ago
-  {
-    id: uid(),
-    sessionId: "sess_2",
-    exerciseId: "e_squat",
-    weight: 275,
-    reps: 3,
-    rpe: 8,
-    blockGroupId: uid(),
-    loggedAt: now - 2 * day + 600_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_2",
-    exerciseId: "e_squat",
-    weight: 245,
-    reps: 5,
-    rpe: 7,
-    blockGroupId: b5,
-    timeBetweenSetsSeconds: 260,
-    loggedAt: now - 2 * day + 900_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_2",
-    exerciseId: "e_squat",
-    weight: 245,
-    reps: 5,
-    rpe: 8,
-    blockGroupId: b5,
-    timeBetweenSetsSeconds: 245,
-    loggedAt: now - 2 * day + 1160_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_2",
-    exerciseId: "e_squat",
-    weight: 245,
-    reps: 5,
-    rpe: 9,
-    blockGroupId: b5,
-    timeBetweenSetsSeconds: 255,
-    loggedAt: now - 2 * day + 1415_000,
-  },
-  // Volume Bench yesterday
-  {
-    id: uid(),
-    sessionId: "sess_3",
-    exerciseId: "e_bench",
-    weight: 175,
-    reps: 6,
-    rpe: 7,
-    blockGroupId: uid(),
-    loggedAt: now - day + 600_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_3",
-    exerciseId: "e_bench",
-    weight: 175,
-    reps: 6,
-    rpe: 8,
-    blockGroupId: uid(),
-    timeBetweenSetsSeconds: 200,
-    loggedAt: now - day + 800_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_3",
-    exerciseId: "e_row",
-    weight: 90,
-    reps: 10,
-    rpe: 8,
-    blockGroupId: uid(),
-    timeBetweenSetsSeconds: 190,
-    loggedAt: now - day + 1100_000,
-  },
-  {
-    id: uid(),
-    sessionId: "sess_3",
-    exerciseId: "e_row",
-    weight: 90,
-    reps: 10,
-    rpe: 9,
-    blockGroupId: uid(),
-    timeBetweenSetsSeconds: 200,
-    loggedAt: now - day + 1300_000,
-  },
-];
 
 // ---------------------------------------------------------------------------
 // Pure logic, extracted so it can be unit-tested with plain arrays — no store,
@@ -1003,20 +778,25 @@ export const useStore = create<State>((set, get) => ({
           toolsEnabled: false,
           ...targets,
         };
+        // A first run seeds the exercise NAME library and nothing else. The
+        // library is reference data the picker needs to be usable on day one;
+        // slots, sessions and sets are the user's own record of what they did,
+        // and inventing any of those would show someone a training history they
+        // never had. An empty log is the honest state of a new install.
         await seedDb({
           exercises: seedExercises,
-          slots: seedSlots,
-          sessions: seedSessions,
-          sets: seedSets,
+          slots: [],
+          sessions: [],
+          sets: [],
           settings,
         });
         set({
           exercises: seedExercises,
-          slots: seedSlots,
-          sessions: seedSessions,
-          sets: seedSets,
-          dailyLogs: [], // a first run seeds no daily logs
-          habits: [], // nor any habits: the checklist starts empty and opt-in
+          slots: [],
+          sessions: [],
+          sets: [],
+          dailyLogs: [],
+          habits: [], // the checklist starts empty and opt-in
           habitEntries: [],
           unit: settings.unit,
           chartsEnabled: true,
@@ -1505,9 +1285,9 @@ export const useStore = create<State>((set, get) => ({
 
   clearAllData: async () => {
     // Reuse the atomic replace: wipe every table, then write back only the
-    // exercise preset library with empty history and default settings. Keeping
-    // the presets means the DB is not "empty", so hydrate() won't re-seed the
-    // demo history on the next load — the clean slate persists.
+    // exercise preset library with empty history and default settings. That is
+    // exactly the state a first run lands in, so "clear data" and a fresh
+    // install are the same thing rather than two subtly different starts.
     const targets = defaultTargets();
     await replaceAllData({
       version: BACKUP_VERSION,

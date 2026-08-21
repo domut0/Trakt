@@ -252,7 +252,18 @@ describe("importData (full backup restore)", () => {
     // Seed a populated DB, then read it back out in exactly the shape
     // exportJson() in settings.tsx produces.
     await useStore.getState().hydrate();
+    // Logged here rather than relied on from the seed: a first run has no
+    // history at all any more, so a round-trip that only exported what hydrate
+    // wrote would be asserting that three empty arrays survive a JSON trip.
+    const benchId = useStore.getState().exercises[0].id;
+    useStore.getState().startWorkout("Heavy Bench");
+    useStore.getState().logSet({ exerciseId: benchId, weight: 225, reps: 3, targetSets: 2 });
+    useStore.getState().logNextInBlock({ reps: 2 });
+    useStore.getState().endWorkout();
     const seeded = useStore.getState();
+    expect(seeded.slots).toHaveLength(1);
+    expect(seeded.sessions).toHaveLength(1);
+    expect(seeded.sets).toHaveLength(2);
     // Give the seeded state a couple of daily logs so the round-trip covers them.
     useStore.getState().upsertDailyLog("2026-02-10", { calories: 2100, protein: 180 });
     useStore.getState().upsertDailyLog("2026-02-11", { steps: 0, isCheatDay: true });

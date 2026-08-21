@@ -41,20 +41,47 @@ beforeEach(async () => {
 });
 
 describe("Dexie persistence (hydrate + write-through)", () => {
-  it("seeds an empty DB on first hydrate", async () => {
+  it("seeds an empty DB on first hydrate with the exercise library and nothing else", async () => {
     await useStore.getState().hydrate();
     const state = useStore.getState();
 
     expect(state.hydrated).toBe(true);
     // Full seed library (see PROGRESS.md — 117 exercises after Issue #5).
     expect(state.exercises.length).toBeGreaterThan(100);
-    expect(state.slots.length).toBe(4);
-    expect(state.sessions.length).toBe(3);
-    expect(state.sets.length).toBeGreaterThan(0);
     expect(state.unit).toBe("lbs");
 
     // The seed actually landed in IndexedDB, not just in memory.
     expect(await db.exercises.count()).toBe(state.exercises.length);
+  });
+
+  it("invents no training history on a first run", async () => {
+    // The point of the assertion, and why it checks the DB as well as the
+    // store: a first run once seeded four split slots and three dated sessions
+    // of sets, so a brand-new install opened onto workouts its owner had never
+    // done. Exercise NAMES are reference data and stay; slots, sessions and
+    // sets are the user's own record and must start empty.
+    await useStore.getState().hydrate();
+    const state = useStore.getState();
+
+    expect(state.slots).toEqual([]);
+    expect(state.sessions).toEqual([]);
+    expect(state.sets).toEqual([]);
+    expect(state.dailyLogs).toEqual([]);
+    expect(state.habits).toEqual([]);
+    expect(state.habitEntries).toEqual([]);
+    expect(state.activeSessionId).toBeUndefined();
+
+    expect(await db.slots.count()).toBe(0);
+    expect(await db.sessions.count()).toBe(0);
+    expect(await db.sets.count()).toBe(0);
+    expect(await db.dailyLogs.count()).toBe(0);
+
+    // And it stays empty across a reload rather than being re-seeded because
+    // the history tables look "new" on the second launch.
+    useStore.setState({ ...DEFAULT_STATE, hydrated: false });
+    await useStore.getState().hydrate();
+    expect(useStore.getState().sessions).toEqual([]);
+    expect(useStore.getState().sets).toEqual([]);
   });
 
   it("does not re-seed or duplicate data on a second hydrate against an already-populated DB", async () => {
