@@ -113,10 +113,11 @@ function Icon({ name }: { name: "home" | "chart" | "calendar" | "settings" }) {
 }
 
 /**
- * The nav bar's Workout action button, filled (not stroked) so it reads as
- * the accent colour rather than picking up the outline treatment every
- * routed tab icon uses - it's an action, not a destination. Sized to match
- * `Icon` above (22x22, viewBox 0 0 24 24).
+ * The nav bar's Workout action button, filled (not stroked) rather than
+ * picking up the outline treatment every routed tab icon uses - it's an
+ * action, not a destination. Fill and weight carry that difference now;
+ * colour does not, because colour is spoken for (see BottomNav). Sized to
+ * match `Icon` above (22x22, viewBox 0 0 24 24).
  */
 function FlameIcon() {
   return (
@@ -234,10 +235,27 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
             // hit it. The floor also keeps the button from changing width when
             // the label swaps between "Workout" and "Return", which would
             // otherwise shift the whole nav mid-session.
-            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 py-1"
-            style={{ color: "var(--color-accent)" }}
+            // Foreground, not accent. Accent in this bar now means exactly one
+            // thing - the tab you are on - so the action button states its
+            // rank with fill and weight instead: a solid glyph and a semibold
+            // label against four muted outlined tabs. When it was accent too,
+            // two items lit up at once and neither one told you where you were.
+            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 py-1 text-foreground"
           >
-            <FlameIcon />
+            <span className="relative flex items-center justify-center">
+              <FlameIcon />
+              {/* Live-session marker: a badge on the glyph, in the same
+                  dot-and-pulse language as the banner at the top of the
+                  screen. Deliberately not a colour swap - the session is not
+                  a selection, so it must not borrow selection's colour.
+                  Reduced motion is handled globally in styles.css. */}
+              {activeSessionId && (
+                <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-2 w-2">
+                  <span className="absolute inset-0 animate-ping rounded-full bg-foreground/60" />
+                  <span className="relative h-2 w-2 rounded-full bg-foreground ring-2 ring-surface" />
+                </span>
+              )}
+            </span>
             <span className="t-label font-semibold">{activeSessionId ? "Return" : "Workout"}</span>
           </button>
         </div>

@@ -2,25 +2,6 @@ import { useMemo, useState } from "react";
 import { useStore } from "../lib/store";
 import { HabitEditorSheet } from "./HabitEditorSheet";
 
-function SettingsIcon() {
-  return (
-    <svg
-      width={18}
-      height={18}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
-}
-
 function CheckIcon() {
   return (
     <svg
@@ -65,41 +46,30 @@ export function HabitsCard({ date }: { date: string }) {
   const doneCount = activeHabits.filter((h) => completedIds.has(h.id)).length;
   const totalCount = activeHabits.length;
 
+  // One container, not two. The habits are a plain `group-list`: the outer
+  // `rounded-2xl bg-surface` card this used to sit in was a second container
+  // of the same fill around the same rows, so it was invisible and cost a
+  // wrapper plus 16px of padding for nothing. No card title either: the only
+  // caller (Today) already renders a "Habits" group header directly above.
+  //
+  // The count and the editor share the group's last row instead of a header
+  // band above a separator. A count is not a control, so it no longer wears a
+  // pill; the row that carries it IS a control, is 44px tall by construction,
+  // and says so in accent.
   return (
-    <div className="rounded-2xl bg-surface p-4">
-      {/* Header with compact progress indicator and editor button.
-          No card title here: the only caller (Today) already renders a
-          "Habits" section heading directly above this card, so a second one
-          inside it printed the same word twice, one line apart. */}
-      <div className="flex items-center justify-between gap-3 pb-3">
-        <div className="flex min-w-0 items-center gap-2">
-          {totalCount > 0 && (
-            <span className="tnum rounded-full bg-muted px-2.5 py-0.5 t-label font-medium text-muted-foreground">
-              {doneCount} of {totalCount}
-            </span>
-          )}
-        </div>
-        {/* The visible circle stays 32px so the header does not turn into a
-            toolbar, while an inset pseudo-element carries the hit area past 44px. */}
-        <button
-          type="button"
-          onClick={() => setEditorOpen(true)}
-          aria-label="Edit habits"
-          className="relative flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:bg-muted hover:text-foreground"
-        >
-          <SettingsIcon />
-        </button>
-      </div>
-
-      {/* Checklist items or prompt to add the first habit */}
+    <div>
       {totalCount === 0 ? (
-        <button
-          type="button"
-          onClick={() => setEditorOpen(true)}
-          className="flex min-h-[44px] w-full items-center justify-center rounded-xl bg-muted px-4 py-3 t-body font-medium text-accent hover:bg-muted"
-        >
-          + Add your first habit
-        </button>
+        <ul className="group-list">
+          <li>
+            <button
+              type="button"
+              onClick={() => setEditorOpen(true)}
+              className="group-row w-full t-body font-medium text-accent"
+            >
+              Add your first habit
+            </button>
+          </li>
+        </ul>
       ) : (
         <ul className="group-list">
           {activeHabits.map((habit, idx) => {
@@ -134,6 +104,19 @@ export function HabitsCard({ date }: { date: string }) {
               </li>
             );
           })}
+          <li>
+            <button
+              type="button"
+              onClick={() => setEditorOpen(true)}
+              aria-label="Edit habits"
+              className="group-row group-row-sep w-full text-left"
+            >
+              <span className="tnum t-label text-muted-foreground">
+                {doneCount} of {totalCount} done
+              </span>
+              <span className="t-body font-medium text-accent">Edit habits</span>
+            </button>
+          </li>
         </ul>
       )}
 
