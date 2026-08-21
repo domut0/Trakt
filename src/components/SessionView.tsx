@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { previousSessionExerciseOrder } from "../lib/exercise-history";
 import { useStore, type WorkoutSet } from "../lib/store";
 
 /** Row with swipe-left to delete / swipe-right to edit (touch). */
@@ -106,13 +105,10 @@ export function SessionView({
   );
   const sessions = useStore((s) => s.sessions);
   const exercises = useStore((s) => s.exercises);
-  const currentExerciseId = useStore((s) => s.currentExerciseId);
-  const setCurrentExercise = useStore((s) => s.setCurrentExercise);
   const deleteSet = useStore((s) => s.deleteSet);
   const updateSet = useStore((s) => s.updateSet);
   const updateSession = useStore((s) => s.updateSession);
   const [editing, setEditing] = useState<WorkoutSet | null>(null);
-  const [showRepeatList, setShowRepeatList] = useState(true);
 
   const session = sessions.find((s) => s.id === sessionId);
 
@@ -147,19 +143,6 @@ export function SessionView({
       return { exercise: ex, sets: groupSets, setupNote: noteSet?.setupNote ?? ex.setupNote };
     });
   }, [sets, exercises]);
-
-  const repeatExerciseIds = useMemo(
-    () => previousSessionExerciseOrder(sessions, allSets, sessionId),
-    [sessions, allSets, sessionId],
-  );
-
-  const repeatExercises = useMemo(
-    () =>
-      repeatExerciseIds
-        .map((id) => exercises.find((e) => e.id === id))
-        .filter((e): e is NonNullable<typeof e> => e !== undefined),
-    [repeatExerciseIds, exercises],
-  );
 
   // The field only mounts in response to a tap on the note row, so focusing it
   // here can never pull the caret out of the set-logging flow. Deliberately not
@@ -255,71 +238,6 @@ export function SessionView({
     );
   };
 
-  const renderRepeatChecklist = () => {
-    if (repeatExercises.length === 0) return null;
-    return (
-      <div className="mx-5 section-gap">
-        <div className="group-list">
-          <button
-            onClick={() => setShowRepeatList((v) => !v)}
-            aria-expanded={showRepeatList}
-            className="group-row w-full text-left"
-          >
-            <div className="min-w-0">
-              <div className="t-caption text-muted-foreground">Repeat last workout</div>
-              <div className="t-body font-semibold">
-                {repeatExercises.length} exercise{repeatExercises.length === 1 ? "" : "s"} from
-                previous session
-              </div>
-            </div>
-            <span className="shrink-0 t-label font-medium text-accent">
-              {showRepeatList ? "Hide" : "Show"}
-            </span>
-          </button>
-          {showRepeatList && (
-            <div>
-              {repeatExercises.map((ex) => {
-                const isSelected = currentExerciseId === ex.id;
-                const isLogged = sets.some((s) => s.exerciseId === ex.id);
-                return (
-                  <button
-                    key={ex.id}
-                    onClick={() => setCurrentExercise(ex.id)}
-                    aria-pressed={isSelected}
-                    className={
-                      "group-row group-row-sep w-full text-left transition-colors " +
-                      (isSelected ? "text-accent font-semibold" : "text-foreground")
-                    }
-                  >
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span
-                        aria-hidden="true"
-                        className={
-                          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border t-caption " +
-                          (isLogged
-                            ? "border-accent bg-accent text-accent-foreground"
-                            : isSelected
-                              ? "border-accent text-accent"
-                              : "border-muted-foreground text-transparent")
-                        }
-                      >
-                        ✓
-                      </span>
-                      <span className="truncate t-body">{ex.name}</span>
-                    </div>
-                    <span className="shrink-0 t-caption text-muted-foreground">
-                      {ex.type === "main" ? "Main" : ex.type === "cardio" ? "Cardio" : "Accessory"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   if (grouped.length === 0) {
     return (
       <div className="pb-6">
@@ -327,7 +245,6 @@ export function SessionView({
           <h2 className="t-heading">No sets yet</h2>
           <p className="mt-1 t-label text-muted-foreground">The workout starts when you log one.</p>
         </div>
-        {renderRepeatChecklist()}
         {renderSessionNote()}
       </div>
     );
@@ -335,7 +252,6 @@ export function SessionView({
 
   return (
     <div className="pb-6">
-      {renderRepeatChecklist()}
       {grouped.map(({ exercise, sets, setupNote }) => (
         <div key={exercise.id} className="section-gap">
           {/* The row carries the 44px floor and the link fills it, rather than an
