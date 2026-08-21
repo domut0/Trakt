@@ -1,6 +1,6 @@
 # Anything But The Notes App
 
-A frictionless workout logger for lifters. Weight and reps — nothing else in the way.
+A frictionless workout logger for lifters. Weight and reps, nothing else in the way.
 
 It's an offline-first, installable PWA: all data lives on your device (IndexedDB),
 there's no account and no backend, and it keeps working with no network.
@@ -10,21 +10,26 @@ or point an LLM at it. That's off until you turn it on, and logging never waits 
 
 ## Features
 
-- **Fast logging** — start a session, log sets with weight/reps/RPE; the next set's
+- **Fast logging**: start a session, log sets with weight/reps/RPE; the next set's
   values pre-fill from your last one so logging is mostly confirming.
-- **Smart suggestions** — the next session name, exercise, and starting weights are
+- **Smart suggestions**: the next session name, exercise, and starting weights are
   predicted from your history. Suggestions show in grey and commit only when you accept.
-- **Per-set setup notes** — jot machine settings (seat height, pin, grip) once; they
+- **Per-set setup notes**: jot machine settings (seat height, pin, grip) once; they
   resurface as a grey hint next time and travel with each set as a snapshot.
-- **PR detection** — celebrates estimated-1RM and rep PRs at the end of a session.
-- **History, calendar, and charts** — browse past sessions, a month calendar view, and
+- **PR detection** (logic only, not yet on any screen): `src/lib/pr.ts` finds three kinds
+  of record across a finished session, weight, estimated 1RM, and reps at a given load or
+  above, and `src/lib/workout-summary.ts` assembles the end-of-workout summary from them.
+  The first time you perform an exercise sets no records at all: an exercise starts
+  producing them on its second outing, once there is something real to beat. Nothing
+  displays the summary yet.
+- **History, calendar, and charts**: browse past sessions, a month calendar view, and
   progress charts (the Charts tab is toggleable in Settings; the calendar lives in History).
-- **Backup** — export/import your entire dataset as a JSON file; a one-tap "clear data"
-  resets to a clean slate for testing.
-- **Google Sheets sync** (optional) — keeps a spreadsheet you own up to date with your
+- **Backup**: export/import your entire dataset as a JSON file; "clear all data", behind a
+  confirmation step, resets to a clean slate for testing.
+- **Google Sheets sync** (optional): keeps a spreadsheet you own up to date with your
   log, and lets you edit nutrition, set values and session notes from a keyboard. See
   [`google-apps-script/README.md`](google-apps-script/README.md) for setup.
-- **Installable PWA** — add to home screen; controlled service-worker updates prompt
+- **Installable PWA**: add to home screen; controlled service-worker updates prompt
   before taking over.
 
 ## Tech stack
@@ -36,6 +41,12 @@ or point an LLM at it. That's off until you turn it on, and logging never waits 
 - [Dexie](https://dexie.org/) over IndexedDB for on-device persistence
 - [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) for the service worker + manifest
 - [Vitest](https://vitest.dev/) for tests
+- [lucide-react](https://lucide.dev/) for icons, [date-fns](https://date-fns.org/) for dates
+
+There is no component library. Every screen is hand-written Tailwind against the tokens in
+`src/styles.css`, and [`DESIGN.md`](DESIGN.md) is the source of truth for type, colour and
+spacing. The shadcn primitives this project once vendored were removed along with the 41
+dependencies they pulled in, so a `src/components/ui/` import will not resolve.
 
 ## Getting started
 
@@ -68,14 +79,24 @@ npm run dev:device # binds to your network interface (--host)
 
 ```
 src/
-  routes/            # file-based routes (home, workout, history, charts, settings, session)
-  components/        # app UI (sheets, session view, app shell) + ui/ primitives (shadcn)
-  lib/               # store (Zustand), db (Dexie), pure logic (suggestions, PR detection, sync)
+  routes/            # file-based routes (home, workout, history, charts, settings,
+                     #   one session, one exercise)
+  components/        # app UI: sheets, session view, app shell, calendar, sync settings
+  hooks/             # shared UI hooks
+  lib/               # store (Zustand), db (Dexie), and the pure logic the store and
+                     #   screens delegate to: pr.ts, workout-summary.ts, onerm.ts,
+                     #   exercise-history.ts, targets.ts, chart-math.ts, plates.ts,
+                     #   sync.ts. Prefill and next-session suggestions live in store.ts
+  test/              # Vitest setup (fake-indexeddb, jest-dom)
+  router.tsx         # router construction
+  styles.css         # Tailwind theme: the type, colour and spacing tokens in DESIGN.md
   server.ts          # SSR entry (error wrapper)
   start.ts           # request middleware
 public/              # icons + favicon
 google-apps-script/  # the sync endpoint the user deploys into their own sheet
 ```
+
+Tests sit in a `__tests__/` folder beside the code they cover.
 
 All persistence is client-side: the store hydrates from IndexedDB after mount and
 write-throughs mirror every mutation back to the database. IndexedDB stays the source of
