@@ -160,7 +160,20 @@ function Home() {
 
       <section className="px-5 section-gap anim-fade-up">
         <h2 className="group-header px-0 t-caption">Daily log</h2>
-        <div className="group-list p-5">
+        {/*
+          The one elevated surface on the screen, and it is elevated with FILL,
+          which is what DESIGN.md asks for: no border, no shadow. `--muted`
+          #232b36 over `--surface` #1a2029 is the same kind of step `--surface`
+          already makes over `--background` #0e1217, so the ladder is
+          background / everything else / this. Every other container on Today
+          stays `group-list` at `--surface`; if a second card ever takes this
+          fill, the step stops meaning anything and both should go back.
+
+          `bg-muted` after `group-list` is the override: Tailwind emits core
+          colour utilities after custom `@utility` blocks, so the later rule
+          wins. Verified in the built stylesheet and in the screenshots.
+        */}
+        <div className="group-list bg-muted p-5">
           {hasTodayLog ? (
             <button
               onClick={() => setEditingDate(todayKey)}
@@ -640,7 +653,12 @@ function SlimProgressBar({ progress }: { progress: TargetProgress }) {
           {note && <GoalStateNote note={note} />}
         </span>
       </div>
-      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      {/* Track is `--surface`, one step DOWN from the daily-log card's `--muted`
+          fill, so it reads as a groove cut into the card. It used to be
+          `--muted` on a `--surface` card, which lit the empty part of the bar
+          brighter than the card holding it. This bar only ever renders inside
+          that card. */}
+      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-surface">
         <div
           className="h-full rounded-full transition-all"
           style={{ width: `${fillPct}%`, backgroundColor: fill }}
@@ -648,7 +666,7 @@ function SlimProgressBar({ progress }: { progress: TargetProgress }) {
         {/* Where the target sat, once the bar has run past it. Cut in the card's
             own fill so it reads as a gap in the bar rather than another colour. */}
         {notchPct !== null && (
-          <div className="absolute inset-y-0 w-0.5 bg-surface" style={{ left: `${notchPct}%` }} />
+          <div className="absolute inset-y-0 w-0.5 bg-muted" style={{ left: `${notchPct}%` }} />
         )}
       </div>
     </div>
