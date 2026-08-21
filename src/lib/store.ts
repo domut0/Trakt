@@ -345,12 +345,17 @@ interface State {
   suggestedNextExerciseFor: (
     sessionId: string,
   ) => { exerciseId: string; weight?: number; reps?: number; rpe?: number } | undefined;
+  /** `knownSetupNote` is the setup about to be performed, for when the log
+   * sheet has a note typed but no set logged with it yet. Omit it and the note
+   * is read off whatever has already been logged today. */
   prefillFor: (
     sessionId: string,
     exerciseId: string,
+    knownSetupNote?: string,
   ) => { weight?: number; reps?: number; rpe?: number };
-  /** The setup note to suggest for an exercise: the most recently logged
-   * non-empty per-set note, falling back to the exercise's base note. Persists
+  /** The setup note to suggest for an exercise, taken from the same session the
+   * prefilled numbers came from so the two can never describe different days
+   * (see `suggestSetupNote`), falling back to the exercise's base note. Persists
    * across workouts so last week's setup shows up as a grey hint this week. */
   lastSetupNoteFor: (exerciseId: string) => string | undefined;
   /** Clears the write-failure banner. Does not retry the write; the in-memory
@@ -386,15 +391,21 @@ export function matchSlot(slots: SplitSlot[], name: string): SplitSlot | undefin
 }
 
 /**
- * Finds the previous completed occurrence of the same Split Slot as `sess`,
- * for the "pull from last time" heuristics below.
+ * Finds the previous completed occurrence of the same Split Slot as `sess`.
+ *
+ * This decides ORDER only: which exercise comes back next, in the sequence the
+ * slot was last performed in. It deliberately no longer decides WEIGHT. A lift
+ * trained on more than one slot (bench on Full Body 1 and again on Full Body 3)
+ * moves up on whichever day it was last trained, so the numbers have to come
+ * from the last session that actually contains the lift, not from the last
+ * session that happens to share a slot. See `findPrefillSource`.
  *
  * Two guards matter here, and both exist because cardio sessions live in this
  * same array. Cardio sessions are excluded outright, and a session with no
- * `splitSlotId` never matches anything — otherwise two cardio bouts, which BOTH
- * carry `splitSlotId === undefined`, would compare equal to each other and to
+ * `splitSlotId` never matches anything, because otherwise two cardio bouts, which
+ * BOTH carry `splitSlotId === undefined`, would compare equal to each other and to
  * any other slot-less session, and a treadmill run would start feeding the
- * suggestion and prefill engines.
+ * suggestion engine.
  */
 function findLastSessionForSlot(
   sessions: WorkoutSession[],
@@ -414,12 +425,194 @@ function findLastSessionForSlot(
 }
 
 /**
- * "Next Exercise" suggestion: pulls from the last occurrence of the SAME
- * Split Slot, advancing one exercise at a time in the order they were logged
- * that day, skipping exercises already done in the current session.
+ * The comparison key for a setup note, so "bench (tng)" and "bench (pause)"
+ * are never treated as the same lift.
  *
- * Strength-only: cardio sessions are neither a source nor a target (see
- * `findLastSessionForSlot`).
+ * Trimmed and case-folded, because "TNG", "tng" and " tng " are one setup typed
+ * three ways: matching on the exact characters would make the app look like it
+ * forgot last week over a stray capital.
+ *
+ * Absent, empty and whitespace-only all collapse to "", and that empty key is a
+ * REAL bucket rather than a wildcard. An un-noted bench must not prefill from a
+ * paused bench, and a paused bench must not prefill from an un-noted one: "no
+ * note" is a genuine answer ("I just benched"), not a request to match anything
+ * available. Letting it match everything is the same class of bug as matching
+ * by slot, one setup silently borrowing another setup's numbers.
+ *
+ * Takes `unknown` because imported backups reach the heuristics with whatever
+ * was in the file; a non-string note is treated as no note rather than crashing
+ * a prefill.
+ */
+export function setupNoteKey(note: unknown): string {
+  return typeof note === "string" ? note.trim().toLowerCase() : "";
+}
+
+/** The identity of a weight/rep block, e.g. "190x3". */
+function blockKey(s: WorkoutSet): string {
+  return `${s.weight}x${s.reps}`;
+}
+
+/** One exercise's sets within one session, oldest first. */
+function setsOfExerciseIn(sets: WorkoutSet[], sessionId: string, exerciseId: string): WorkoutSet[] {
+  return sets
+    .filter((s) => s.sessionId === sessionId && s.exerciseId === exerciseId)
+    .sort((a, b) => a.loggedAt - b.loggedAt);
+}
+
+/**
+ * The single past session that BOTH the prefilled numbers and the suggested
+ * setup note are read from.
+ *
+ * One source is the whole point. When the numbers and the note are looked up
+ * independently they can disagree, and the user is shown 80x5 next to a note
+ * describing a setup they were not using when they lifted 80x5. Anything the
+ * app suggests about "last time" has to describe one real session.
+ */
+export interface PrefillSource {
+  /** The session the numbers and the note both come from. */
+  session: WorkoutSession;
+  /** Its sets of this exercise, in the matched note bucket, oldest first. Never empty. */
+  sets: WorkoutSet[];
+  /** The note to suggest, exactly as it was typed. Undefined for the un-noted bucket. */
+  setupNote?: string;
+  /** The bucket the source was matched on (see `setupNoteKey`). */
+  noteKey: string;
+}
+
+/**
+ * The note bucket the current session has already committed to for this
+ * exercise, or undefined when nothing has been logged for it yet today.
+ *
+ * The most recently logged set wins, because that is the setup currently in
+ * use: switching from touch-and-go to paused halfway through a session should
+ * immediately start prefilling from paused history, not keep serving up
+ * touch-and-go numbers for the rest of the day.
+ *
+ * Note that a set logged with no note answers "" rather than undefined. Today
+ * being un-noted is knowledge too, and it restricts the search to un-noted
+ * history rather than opening it up to everything.
+ */
+export function currentNoteKeyFor(
+  sets: WorkoutSet[],
+  sessionId: string,
+  exerciseId: string,
+): string | undefined {
+  const today = setsOfExerciseIn(sets, sessionId, exerciseId);
+  const last = today[today.length - 1];
+  return last === undefined ? undefined : setupNoteKey(last.setupNote);
+}
+
+/**
+ * Picks the source session: the most recent COMPLETED session that actually
+ * contains this exercise, regardless of which Split Slot it belonged to.
+ *
+ * The bug this replaces: sourcing by slot meant a lift trained twice a week
+ * only ever saw its own weekday. Push 70x5 on Full Body 1, push 80x5 on Full
+ * Body 3, and the next Full Body 1 still prefilled 70x5, permanently a week
+ * stale on every lift trained more than once a week.
+ *
+ * Setup notes then narrow the search:
+ *
+ * - With a note known for today (`knownSetupNote`, or whatever today's sets
+ *   already say), only sessions containing this exercise in that same bucket
+ *   qualify. A session that contains the exercise under a different setup is
+ *   skipped entirely and an older matching session is used instead, since
+ *   week-old numbers for the right setup beat fresh numbers for the wrong one.
+ * - With nothing known yet, which is the common case on the first set of the
+ *   day, the most recent session containing the exercise wins and its OWN note
+ *   decides the bucket. The bucket is taken from that session's earliest set of
+ *   the exercise, because with nothing logged today the prefill being asked for
+ *   is the first block, and the earliest set is how that session opened.
+ *
+ * Cardio is excluded on both sides: a cardio session is never a source, and
+ * asking on behalf of one gets nothing back. Cardio carries no sets, so a
+ * matching set only ever exists on one through a hand-edited or malformed
+ * import, which is exactly when the guard has to hold.
+ */
+export function findPrefillSource(
+  sessions: WorkoutSession[],
+  sets: WorkoutSet[],
+  sessionId: string,
+  exerciseId: string,
+  knownSetupNote?: string,
+): PrefillSource | undefined {
+  const sess = sessions.find((s) => s.id === sessionId);
+  if (!sess || isCardioSession(sess)) return undefined;
+
+  // An explicit note (the one being typed into the log sheet, before any set
+  // exists to read it off) outranks what today's sets say, because it is the
+  // setup about to be performed.
+  const wantedKey =
+    knownSetupNote === undefined
+      ? currentNoteKeyFor(sets, sessionId, exerciseId)
+      : setupNoteKey(knownSetupNote);
+
+  // `endedAt` keeps an unfinished session out: only a session that was actually
+  // completed is "last time". The slot is not consulted at all, so a session
+  // with no slot at all (malformed import) is still honest history and can
+  // still be a source; unlike slot matching, exercise matching cannot confuse
+  // two slot-less sessions for each other.
+  const candidates = sessions
+    .filter((s) => !isCardioSession(s) && s.id !== sessionId && s.endedAt)
+    .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0) || b.startedAt - a.startedAt);
+
+  for (const candidate of candidates) {
+    const all = setsOfExerciseIn(sets, candidate.id, exerciseId);
+    if (all.length === 0) continue;
+    const noteKey = wantedKey ?? setupNoteKey(all[0].setupNote);
+    const matching = all.filter((s) => setupNoteKey(s.setupNote) === noteKey);
+    // Wrong setup in this session: keep walking back rather than settling.
+    if (matching.length === 0) continue;
+    // Every set here shares one key, so the freshest spelling of it is as good
+    // as any and better than a stale one.
+    const noted = [...matching].reverse().find((s) => setupNoteKey(s.setupNote) !== "");
+    return { session: candidate, sets: matching, setupNote: noted?.setupNote, noteKey };
+  }
+  return undefined;
+}
+
+/**
+ * The setup note to suggest for an exercise, kept in lockstep with the numbers
+ * `computePrefill` returns by reading both from `findPrefillSource`.
+ *
+ * When the source session was un-noted the answer is undefined, NOT the last
+ * note found anywhere. Reaching further back for a note the source session did
+ * not have is precisely how a note ends up describing a different session than
+ * the weights beside it.
+ *
+ * The scan of every set is the fallback for having no source at all: no workout
+ * open (the cardio card asks this way), or an exercise whose only history is in
+ * the session currently in progress.
+ */
+export function suggestSetupNote(
+  sessions: WorkoutSession[],
+  sets: WorkoutSet[],
+  sessionId: string | undefined,
+  exerciseId: string,
+): string | undefined {
+  if (sessionId !== undefined) {
+    const source = findPrefillSource(sessions, sets, sessionId, exerciseId);
+    if (source) return source.setupNote;
+  }
+  return sets
+    .filter((s) => s.exerciseId === exerciseId && setupNoteKey(s.setupNote) !== "")
+    .sort((a, b) => b.loggedAt - a.loggedAt)[0]?.setupNote;
+}
+
+/**
+ * "Next Exercise" suggestion.
+ *
+ * WHICH exercise comes next is a property of the slot: it walks the last
+ * occurrence of the SAME Split Slot in the order things were logged that day,
+ * skipping whatever is already done today. That rotation is the shape of the
+ * program and is left alone.
+ *
+ * The numbers attached to it are not a property of the slot, so they come from
+ * `findPrefillSource` like every other prefill. The suggested exercise is by
+ * definition not yet logged today, so its first block is the one being offered,
+ * which is what `computePrefill` would return for it as well.
+ *
+ * Strength-only: cardio sessions are neither a source nor a target.
  */
 export function suggestNextExercise(
   sessions: WorkoutSession[],
@@ -431,7 +624,7 @@ export function suggestNextExercise(
   const doneExerciseIds = new Set(
     sets.filter((s) => s.sessionId === sessionId).map((s) => s.exerciseId),
   );
-  // Last strength session of this slot (excluding current)
+  // Last strength session of this slot (excluding current), for ORDER only.
   const lastSess = findLastSessionForSlot(sessions, sess);
   if (!lastSess) return undefined;
   const setsInLast = sets
@@ -441,38 +634,52 @@ export function suggestNextExercise(
   for (const s of setsInLast) if (!order.includes(s.exerciseId)) order.push(s.exerciseId);
   const next = order.find((id) => !doneExerciseIds.has(id));
   if (!next) return undefined;
-  const firstSet = setsInLast.find((s) => s.exerciseId === next);
-  return { exerciseId: next, weight: firstSet?.weight, reps: firstSet?.reps, rpe: firstSet?.rpe };
+  const firstBlock = findPrefillSource(sessions, sets, sessionId, next)?.sets[0];
+  return {
+    exerciseId: next,
+    weight: firstBlock?.weight,
+    reps: firstBlock?.reps,
+    rpe: firstBlock?.rpe,
+  };
 }
 
 /**
- * Distinct-weight-block matching: the Nth distinct weight/rep block logged
- * for an exercise in today's session prefills from the Nth distinct
- * weight/rep block logged for that exercise the last time this same Split
- * Slot occurred.
+ * Distinct-weight-block matching: the Nth distinct weight/rep block logged for
+ * an exercise today prefills from the Nth distinct weight/rep block of that
+ * exercise in the source session, so a top single followed by backdown triples
+ * comes back as a top single followed by backdown triples.
  *
- * Strength-only: cardio sessions are neither a source nor a target (see
- * `findLastSessionForSlot`).
+ * Only WHERE the blocks are read from changed: `findPrefillSource` picks the
+ * last session that really contains this exercise (and this setup), where it
+ * used to be the last session sharing a Split Slot.
+ *
+ * Both sides of the count are confined to the source's note bucket. Today's
+ * paused sets are counted against the source's paused blocks and nothing else,
+ * so switching setup mid-session starts that setup's blocks from the top
+ * instead of resuming at whatever index the other setup had reached.
+ *
+ * Strength-only: cardio sessions are neither a source nor a target.
  */
 export function computePrefill(
   sessions: WorkoutSession[],
   sets: WorkoutSet[],
   sessionId: string,
   exerciseId: string,
+  knownSetupNote?: string,
 ): { weight?: number; reps?: number; rpe?: number } {
-  const sess = sessions.find((s) => s.id === sessionId);
-  if (!sess) return {};
-  const setsToday = sets.filter((s) => s.sessionId === sessionId && s.exerciseId === exerciseId);
-  const distinctToday = new Set(setsToday.map((s) => `${s.weight}x${s.reps}`)).size;
-  const lastSess = findLastSessionForSlot(sessions, sess);
-  if (!lastSess) return {};
-  const lastSets = sets
-    .filter((s) => s.sessionId === lastSess.id && s.exerciseId === exerciseId)
-    .sort((a, b) => a.loggedAt - b.loggedAt);
+  const source = findPrefillSource(sessions, sets, sessionId, exerciseId, knownSetupNote);
+  if (!source) return {};
+  const setsToday = sets.filter(
+    (s) =>
+      s.sessionId === sessionId &&
+      s.exerciseId === exerciseId &&
+      setupNoteKey(s.setupNote) === source.noteKey,
+  );
+  const distinctToday = new Set(setsToday.map(blockKey)).size;
   const distinctBlocks: WorkoutSet[] = [];
   const seen = new Set<string>();
-  for (const s of lastSets) {
-    const k = `${s.weight}x${s.reps}`;
+  for (const s of source.sets) {
+    const k = blockKey(s);
     if (!seen.has(k)) {
       seen.add(k);
       distinctBlocks.push(s);
@@ -1411,16 +1618,22 @@ export const useStore = create<State>((set, get) => ({
   suggestedNextExerciseFor: (sessionId) =>
     suggestNextExercise(get().sessions, get().sets, sessionId),
 
-  prefillFor: (sessionId, exerciseId) =>
-    computePrefill(get().sessions, get().sets, sessionId, exerciseId),
+  prefillFor: (sessionId, exerciseId, knownSetupNote) =>
+    computePrefill(get().sessions, get().sets, sessionId, exerciseId, knownSetupNote),
 
   lastSetupNoteFor: (exerciseId) => {
-    const mostRecentWithNote = get()
-      .sets.filter((s) => s.exerciseId === exerciseId && s.setupNote?.trim())
-      .sort((a, b) => b.loggedAt - a.loggedAt)[0];
-    return (
-      mostRecentWithNote?.setupNote ?? get().exercises.find((e) => e.id === exerciseId)?.setupNote
+    // Scoped to the open workout so the hint and the prefilled numbers come off
+    // one session. With no workout open there is no source to agree with, and
+    // suggestSetupNote falls back to the most recent note logged anywhere.
+    const suggested = suggestSetupNote(
+      get().sessions,
+      get().sets,
+      get().activeSessionId,
+      exerciseId,
     );
+    // The exercise's own note is a property of the exercise rather than of any
+    // session, so it stays the last resort for a lift never logged with a note.
+    return suggested ?? get().exercises.find((e) => e.id === exerciseId)?.setupNote;
   },
 
   dismissWriteError: () => set({ writeFailed: false }),
