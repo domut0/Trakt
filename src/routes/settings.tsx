@@ -7,6 +7,7 @@ import { SyncSettings } from "../components/SyncSettings";
 import { TargetsEditor } from "../components/TargetsEditor";
 import { Toggle } from "../components/Toggle";
 import { dailyLogsToCsv, setsToCsv } from "../lib/csv";
+import { isEmptyPlan, type PlannedWeek } from "../lib/plan";
 import {
   BACKUP_VERSION,
   parseBackup,
@@ -38,6 +39,8 @@ function SettingsPage() {
   const setHabitsEnabled = useStore((s) => s.setHabitsEnabled);
   const toolsEnabled = useStore((s) => s.toolsEnabled);
   const setToolsEnabled = useStore((s) => s.setToolsEnabled);
+  const planEnabled = useStore((s) => s.planEnabled);
+  const setPlanEnabled = useStore((s) => s.setPlanEnabled);
   const importData = useStore((s) => s.importData);
   const clearAllData = useStore((s) => s.clearAllData);
   // Read only so the import confirmation can compare the file against what is
@@ -47,6 +50,7 @@ function SettingsPage() {
   const habits = useStore((s) => s.habits);
   const habitEntries = useStore((s) => s.habitEntries);
   const targetProfiles = useStore((s) => s.targetProfiles);
+  const plannedWeek = useStore((s) => s.plannedWeek);
   const router = useRouter();
 
   // Import flow: a selected file is parsed and fully validated (parseBackup)
@@ -79,6 +83,8 @@ function SettingsPage() {
       targetsEnabled,
       habitsEnabled,
       toolsEnabled,
+      planEnabled,
+      plannedWeek,
       unit,
     } = useStore.getState();
     // Annotated as BackupData on purpose. This object literal used to be built
@@ -101,6 +107,8 @@ function SettingsPage() {
       targetsEnabled,
       habitsEnabled,
       toolsEnabled,
+      planEnabled,
+      plannedWeek,
       unit,
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], {
@@ -187,7 +195,13 @@ function SettingsPage() {
   // used habits is told nothing about them.
   const fileCounts = pendingImport ? summarizeBackup(pendingImport) : "";
   const losses = pendingImport
-    ? describeLosses(pendingImport, { dailyLogs, habits, habitEntries, targetProfiles })
+    ? describeLosses(pendingImport, {
+        dailyLogs,
+        habits,
+        habitEntries,
+        targetProfiles,
+        plannedWeek,
+      })
     : [];
 
   return (
@@ -224,6 +238,24 @@ function SettingsPage() {
             checked={chartsEnabled}
             onChange={() => setChartsEnabled(!chartsEnabled)}
             label="Charts tab"
+          />
+        </div>
+
+        {/* Off by default, like every other opt-in surface. The subtitle says
+            what the tab IS rather than repeating "show it in the nav" from the
+            row above: the switch's own position already covers that, and a
+            reader who has never planned a week needs the other half. */}
+        <div className="group-row group-row-sep">
+          <div>
+            <div className="t-body">Plan tab</div>
+            <div className="t-label text-muted-foreground">
+              A weekly template for your main lifts.
+            </div>
+          </div>
+          <Toggle
+            checked={planEnabled}
+            onChange={() => setPlanEnabled(!planEnabled)}
+            label="Plan tab"
           />
         </div>
       </Section>
@@ -556,6 +588,7 @@ function describeLosses(
     habits: unknown[];
     habitEntries: unknown[];
     targetProfiles: TargetProfile[];
+    plannedWeek: PlannedWeek | undefined;
   },
 ): string[] {
   const losses: string[] = [];
@@ -570,6 +603,14 @@ function describeLosses(
   }
   if (!hasTargetData(b.targetProfiles) && hasTargetData(current.targetProfiles)) {
     losses.push(countOf(current.targetProfiles.length, "daily target profile"));
+  }
+  // Not a count, because a plan is one thing rather than a list of them, and
+  // "7 planned days" would read as seven separate losses. `isEmptyPlan` on both
+  // sides for the same reason the target check goes through `hasTargetData`: a
+  // file whose week is seven rest days destroys a real plan exactly as
+  // thoroughly as a file written before planning existed.
+  if (isEmptyPlan(b.plannedWeek) && !isEmptyPlan(current.plannedWeek)) {
+    losses.push("your weekly plan");
   }
   return losses;
 }

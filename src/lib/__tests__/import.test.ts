@@ -90,6 +90,13 @@ const PRE_V4_DEFAULTS = {
   targetsEnabled: false,
   habitsEnabled: false,
   toolsEnabled: false,
+  // The plan rides along on v4 without a version bump, so "an old file" means
+  // one with no plan keys at all. `undefined` is what parseBackup hands back
+  // for exactly that file, which is why it belongs in the shared defaults
+  // rather than being an empty week: a week of seven rest days is a plan the
+  // author of these files never made.
+  planEnabled: false,
+  plannedWeek: undefined,
 };
 
 const validBackup: BackupData = {
@@ -651,6 +658,12 @@ describe("importData (full backup restore)", () => {
       targetsEnabled: true,
       habitsEnabled: true,
       toolsEnabled: true,
+      // No plan, deliberately: this fixture is a v4 file as v4 shipped, and the
+      // plan's own round trip is its own test below. Keeping it plan-less here
+      // is what keeps this one covering the case of a file written before
+      // planning existed.
+      planEnabled: false,
+      plannedWeek: undefined,
       // Not the default, so a settings record that failed to persist is visible.
       unit: "kg",
     };

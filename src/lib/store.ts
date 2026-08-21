@@ -205,6 +205,22 @@ export interface BackupData {
   targetsEnabled: boolean;
   habitsEnabled: boolean;
   toolsEnabled: boolean;
+  planEnabled: boolean;
+  /**
+   * The weekly training plan, or `undefined` for a file written before planning
+   * existed and for anyone who has never planned a day.
+   *
+   * REQUIRED, and spelled `| undefined` rather than `?:`, which is the whole
+   * point of it. A required key is what keeps the `const backup: BackupData`
+   * annotation in settings.tsx a compile error every time this interface
+   * widens; an optional one type-checks happily against an export that never
+   * mentions the field, so exports would keep writing plan-less files and the
+   * only symptom would be a restored backup with the plan gone. TypeScript
+   * still demands the key be written out when the type includes `undefined`,
+   * so the guard survives while the union keeps the distinction plan.ts draws
+   * between "never planned" and "seven explicit rest days".
+   */
+  plannedWeek: PlannedWeek | undefined;
   unit: "lbs" | "kg";
 }
 
@@ -218,7 +234,13 @@ export interface BackupData {
  * v4 adds habit tracking, per-weekday nutrition targets, the three feature
  * toggles they hang off, and session notes. Every one of those is optional on
  * read (see `parseBackup`), so a v1, v2 or v3 file still imports unchanged and
- * simply lands with no habits and a single uniform target profile. */
+ * simply lands with no habits and a single uniform target profile.
+ *
+ * The weekly plan (`planEnabled` / `plannedWeek`) rides along on v4 rather than
+ * forcing a v5. It is read exactly as tolerantly as the rest of v4, so a file
+ * written before planning existed still imports and lands with no plan, and a
+ * version bump would buy nothing: no reader branches on the number, and the
+ * one that reports it to the user reads it off the file. */
 export const BACKUP_VERSION = 4;
 
 type CurrentBlock = {
@@ -726,6 +748,26 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+/** One stored entry of a planned week: a rest day, or a workout with a name and
+ * a list of exercise ids. Mirrors what plan.ts is prepared to resolve, so a week
+ * that passes here cannot land in the store and then read as "no plan". Ids are
+ * NOT checked against the exercise library: an id can go stale long after an
+ * import, which is exactly why `prunePlannedWorkout` exists at read time. */
+function isPlannedDay(v: unknown): v is PlannedWorkout | null {
+  if (v === null) return true;
+  if (!isPlainObject(v)) return false;
+  if (typeof v.name !== "string") return false;
+  return Array.isArray(v.exerciseIds) && v.exerciseIds.every((id) => typeof id === "string");
+}
+
+/** The whole-week check, carrying the same length rule `weekdayTargets` gets and
+ * for the same reason: plan.ts treats any array that is not exactly 7 long as no
+ * plan at all, so a malformed one has to be replaced with "no plan" outright
+ * rather than stored and then silently ignored on every screen that reads it. */
+function isPlannedWeek(v: unknown): v is PlannedWeek {
+  return Array.isArray(v) && v.length === 7 && v.every(isPlannedDay);
+}
+
 function isExercise(v: unknown): v is Exercise {
   if (!isPlainObject(v)) return false;
   if (typeof v.id !== "string" || v.id.length === 0) return false;
@@ -926,6 +968,7 @@ export function parseBackup(text: string): ParseBackupResult {
   const rawProfiles = (parsed as { targetProfiles?: unknown }).targetProfiles;
   const rawHabits = (parsed as { habits?: unknown }).habits;
   const rawHabitEntries = (parsed as { habitEntries?: unknown }).habitEntries;
+  const rawPlannedWeek = (parsed as { plannedWeek?: unknown }).plannedWeek;
   const weekdayTargets =
     Array.isArray(rawWeekdays) && rawWeekdays.length === 7 && rawWeekdays.every(isNonEmptyString)
       ? (rawWeekdays as string[])
@@ -962,6 +1005,13 @@ export function parseBackup(text: string): ParseBackupResult {
       targetsEnabled: (parsed as { targetsEnabled?: unknown }).targetsEnabled === true,
       habitsEnabled: (parsed as { habitsEnabled?: unknown }).habitsEnabled === true,
       toolsEnabled: (parsed as { toolsEnabled?: unknown }).toolsEnabled === true,
+      planEnabled: (parsed as { planEnabled?: unknown }).planEnabled === true,
+      // Anything that is not a well-formed week becomes "no plan" rather than an
+      // import failure, matching how the file's targets and habits degrade: a
+      // hand-edited plan is not worth refusing someone their six weeks of sets
+      // over. A file that never had the key takes this same branch, which is the
+      // whole of what a pre-plan backup needs.
+      plannedWeek: isPlannedWeek(rawPlannedWeek) ? rawPlannedWeek : undefined,
       unit,
     },
   };
@@ -1636,13 +1686,13 @@ export const useStore = create<State>((set, get) => ({
       toolsEnabled: data.toolsEnabled,
       unit: data.unit,
       chartsEnabled: true,
-      // Cleared for the same reason chartsEnabled is reset above: the backup
-      // format does not carry either of them, so `replaceAllData` has just
-      // written a settings record without them. Keeping the old plan in memory
-      // would leave the store disagreeing with the DB until the next reload
-      // silently dropped it.
-      planEnabled: false,
-      plannedWeek: undefined,
+      // Restored from the file, not cleared. `replaceAllData` has just written
+      // both of these into the settings record, so anything else here would
+      // leave the store disagreeing with the DB until the next reload quietly
+      // corrected it. A file with no plan carries `undefined`, which lands the
+      // reader on "never planned" - the same state the file's author was in.
+      planEnabled: data.planEnabled,
+      plannedWeek: data.plannedWeek,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
@@ -1668,6 +1718,8 @@ export const useStore = create<State>((set, get) => ({
       targetsEnabled: false,
       habitsEnabled: false,
       toolsEnabled: false,
+      planEnabled: false,
+      plannedWeek: undefined,
       unit: "lbs",
     });
     set({

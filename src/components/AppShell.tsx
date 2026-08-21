@@ -4,16 +4,24 @@ import { useStore } from "../lib/store";
 import { StartWorkoutSheet } from "./StartWorkoutSheet";
 import { WorkoutChooserSheet } from "./WorkoutChooserSheet";
 
-type TabPath = "/" | "/history" | "/charts" | "/settings";
+type TabPath = "/" | "/plan" | "/history" | "/charts" | "/settings";
 type TabItem = {
   to: TabPath;
   label: string;
-  icon: "home" | "chart" | "calendar" | "settings";
-  requires?: "charts";
+  icon: "home" | "chart" | "calendar" | "settings" | "plan";
+  requires?: "charts" | "plan";
 };
 
+/**
+ * Plan sits next to Today rather than at the end because of what the two are
+ * about: Today is the workout in front of you and Plan is the one after it,
+ * while History and Charts are both the past and belong beside each other.
+ * Order is also the swipe order, so tabs that read as neighbours have to be
+ * neighbours.
+ */
 const ALL_TABS: TabItem[] = [
   { to: "/", label: "Today", icon: "home" },
+  { to: "/plan", label: "Plan", icon: "plan", requires: "plan" },
   { to: "/history", label: "History", icon: "calendar" },
   { to: "/charts", label: "Charts", icon: "chart", requires: "charts" },
   { to: "/settings", label: "Settings", icon: "settings" },
@@ -21,13 +29,19 @@ const ALL_TABS: TabItem[] = [
 
 /**
  * Ordered list of tabs currently shown in the bottom nav, respecting the
- * Charts toggle in Settings. Shared by BottomNav (rendering) and AppShell
- * (swipe navigation + directional transitions) so both always agree on tab
- * order.
+ * Charts and Plan toggles in Settings. Shared by BottomNav (rendering) and
+ * AppShell (swipe navigation + directional transitions) so both always agree
+ * on tab order.
+ *
+ * Takes the toggles as one named object rather than two positional booleans:
+ * with both switched on there are five routed tabs and a transposed pair of
+ * arguments would be invisible at the call site and wrong only in the states
+ * where the two differ.
  */
-function getEnabledTabs(chartsEnabled: boolean): TabItem[] {
+function getEnabledTabs(toggles: { charts: boolean; plan: boolean }): TabItem[] {
   return ALL_TABS.filter((t) => {
-    if (t.requires === "charts") return chartsEnabled;
+    if (t.requires === "charts") return toggles.charts;
+    if (t.requires === "plan") return toggles.plan;
     return true;
   });
 }
@@ -64,7 +78,7 @@ function shouldIgnoreSwipe(target: EventTarget | null): boolean {
   return false;
 }
 
-function Icon({ name }: { name: "home" | "chart" | "calendar" | "settings" }) {
+function Icon({ name }: { name: TabItem["icon"] }) {
   const stroke = "currentColor";
   const common = {
     width: 22,
@@ -91,6 +105,18 @@ function Icon({ name }: { name: "home" | "chart" | "calendar" | "settings" }) {
       <svg {...common}>
         <path d="M4 19h16" />
         <path d="M6 15l4-5 4 3 4-7" />
+      </svg>
+    );
+  if (name === "plan")
+    // A clipboard, not a second calendar: History already owns the dated grid,
+    // and two date glyphs side by side in a five-tab bar are one glance apart.
+    // A written-down list is what a weekly template actually is.
+    return (
+      <svg {...common}>
+        <path d="M9 4.5H7.5A1.5 1.5 0 0 0 6 6v13.5A1.5 1.5 0 0 0 7.5 21h9a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H15" />
+        <rect x="9" y="3" width="6" height="3" rx="1" />
+        <path d="M9 11h6" />
+        <path d="M9 15h4" />
       </svg>
     );
   if (name === "calendar")
@@ -162,8 +188,9 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   const router = useRouter();
   const activeSessionId = useStore((s) => s.activeSessionId);
   const chartsEnabled = useStore((s) => s.chartsEnabled);
+  const planEnabled = useStore((s) => s.planEnabled);
   if (location.pathname === "/workout") return null;
-  const items = getEnabledTabs(chartsEnabled);
+  const items = getEnabledTabs({ charts: chartsEnabled, plan: planEnabled });
   const currentIndex = items.findIndex((it) => it.to === location.pathname);
 
   // Split the ROUTED tabs (never the Workout button) into two halves that sit
@@ -273,6 +300,7 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const activeSessionId = useStore((s) => s.activeSessionId);
   const chartsEnabled = useStore((s) => s.chartsEnabled);
+  const planEnabled = useStore((s) => s.planEnabled);
   const location = useLocation();
   const router = useRouter();
   const showBanner = activeSessionId && location.pathname !== "/workout";
@@ -288,7 +316,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Ordered enabled-tab paths, for both swipe navigation and figuring out
   // whether the current page is a tab at all (swipes only act on tabs,
   // e.g. never on /session/$id, which has its own row swipe gestures).
-  const tabPaths = useMemo(() => getEnabledTabs(chartsEnabled).map((t) => t.to), [chartsEnabled]);
+  const tabPaths = useMemo(
+    () => getEnabledTabs({ charts: chartsEnabled, plan: planEnabled }).map((t) => t.to),
+    [chartsEnabled, planEnabled],
+  );
   const tabIndex = tabPaths.findIndex((p) => p === location.pathname);
 
   // Picked once per mount from whatever direction the bottom-nav tap or

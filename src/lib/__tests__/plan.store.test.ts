@@ -295,7 +295,10 @@ describe("clearAllData", () => {
     // The DB half is the one that matters: leaving the old plan on disk while
     // the store says otherwise would resurrect it on the next reload.
     const settings = await storedSettings();
-    expect(settings?.planEnabled).toBeUndefined();
+    // false, not absent: clearAllData writes the flag off explicitly, exactly
+    // as it does for targetsEnabled/habitsEnabled/toolsEnabled beside it. The
+    // plan itself does go away entirely, which is the half that matters.
+    expect(settings?.planEnabled).toBe(false);
     expect(settings?.plannedWeek).toBeUndefined();
     await reload();
     expect(useStore.getState().plannedWeek).toBeUndefined();

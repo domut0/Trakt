@@ -323,6 +323,8 @@ describe("the merge base and destructive actions", () => {
       targetsEnabled: false,
       habitsEnabled: false,
       toolsEnabled: false,
+      planEnabled: false,
+      plannedWeek: undefined,
       unit: "lbs",
     });
 

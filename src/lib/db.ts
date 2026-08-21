@@ -382,6 +382,12 @@ export async function replaceAllData(data: BackupData): Promise<void> {
         toolsEnabled: data.toolsEnabled,
         targetProfiles: data.targetProfiles,
         weekdayTargets: data.weekdayTargets,
+        planEnabled: data.planEnabled,
+        // Written straight through, `undefined` included: Dexie stores the
+        // record without the key, which is precisely the "never planned" state
+        // and is what `loadAll` reads back. Substituting a week of rest days
+        // here would hand every importer a plan they never made.
+        plannedWeek: data.plannedWeek,
       };
       await db.meta.put(settings);
       await db.meta.put(EMPTY_ACTIVE_SESSION);

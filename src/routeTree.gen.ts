@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChartsRouteImport } from './routes/charts'
 import { Route as HistoryRouteImport } from './routes/history'
+import { Route as PlanRouteImport } from './routes/plan'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as WorkoutRouteImport } from './routes/workout'
 import { Route as ExerciseIdRouteImport } from './routes/exercise.$id'
@@ -30,6 +31,11 @@ const ChartsRoute = ChartsRouteImport.update({
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlanRoute = PlanRouteImport.update({
+  id: '/plan',
+  path: '/plan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/charts': typeof ChartsRoute
   '/history': typeof HistoryRoute
+  '/plan': typeof PlanRoute
   '/settings': typeof SettingsRoute
   '/workout': typeof WorkoutRoute
   '/exercise/$id': typeof ExerciseIdRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/charts': typeof ChartsRoute
   '/history': typeof HistoryRoute
+  '/plan': typeof PlanRoute
   '/settings': typeof SettingsRoute
   '/workout': typeof WorkoutRoute
   '/exercise/$id': typeof ExerciseIdRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/charts': typeof ChartsRoute
   '/history': typeof HistoryRoute
+  '/plan': typeof PlanRoute
   '/settings': typeof SettingsRoute
   '/workout': typeof WorkoutRoute
   '/exercise/$id': typeof ExerciseIdRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/charts'
     | '/history'
+    | '/plan'
     | '/settings'
     | '/workout'
     | '/exercise/$id'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/charts'
     | '/history'
+    | '/plan'
     | '/settings'
     | '/workout'
     | '/exercise/$id'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/charts'
     | '/history'
+    | '/plan'
     | '/settings'
     | '/workout'
     | '/exercise/$id'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChartsRoute: typeof ChartsRoute
   HistoryRoute: typeof HistoryRoute
+  PlanRoute: typeof PlanRoute
   SettingsRoute: typeof SettingsRoute
   WorkoutRoute: typeof WorkoutRoute
   ExerciseIdRoute: typeof ExerciseIdRoute
@@ -142,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plan': {
+      id: '/plan'
+      path: '/plan'
+      fullPath: '/plan'
+      preLoaderRoute: typeof PlanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChartsRoute: ChartsRoute,
   HistoryRoute: HistoryRoute,
+  PlanRoute: PlanRoute,
   SettingsRoute: SettingsRoute,
   WorkoutRoute: WorkoutRoute,
   ExerciseIdRoute: ExerciseIdRoute,
