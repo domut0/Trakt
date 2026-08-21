@@ -931,12 +931,95 @@ async function captureWorkoutFlow(page) {
   await settle(page, 500);
   await shot(page, "5a-today-with-active-session-banner");
 
-  // Leave the workout finished so the run ends in a clean, re-runnable state.
+  // Ending a workout lands on its summary now, so the flow finishes there.
   await page.getByRole("button", { name: /Return to active workout/ }).click();
   await page.waitForSelector("text=Time between sets", { timeout: 15_000 });
-  await page.getByRole("button", { name: "End", exact: true }).click();
+  // 225x5 does not beat the seeded history (the heavy bench block finishes its
+  // sixth week at 230), so this is deliberately the no-records summary: the
+  // volume moved leads, and the app says nothing it has not earned.
+  await endWorkoutAt(page, 47);
+  await page.waitForSelector("text=Finished", { timeout: 15_000 });
+  await settle(page, 600);
+  await shot(page, "5b-workout-summary-no-records");
+  await page.getByRole("button", { name: "Done" }).click();
   await page.waitForSelector("text=Consistency", { timeout: 15_000 });
   await settle(page, 500);
+
+  // The same screen when the workout beat something. Two records, so the
+  // headline and the group of everything else are both in the picture.
+  await startWorkout(page);
+  await logOneSet(page, "Bench Press", 275, 3);
+  await logOneSet(page, "Back Squat", 315, 5);
+  await endWorkoutAt(page, 62);
+  await page.waitForSelector("text=Personal record", { timeout: 15_000 });
+  await settle(page, 600);
+  await shot(page, "5c-workout-summary-record");
+  await page.getByRole("button", { name: "Done" }).click();
+  await page.waitForSelector("text=Consistency", { timeout: 15_000 });
+  await settle(page, 500);
+
+  // An empty workout has no summary: ending one is a cancel, and it goes
+  // straight home the way it always did. Asserted rather than photographed,
+  // since the picture is just the Today screen.
+  await startWorkout(page);
+  await endWorkoutAt(page, 3);
+  await page.waitForSelector("text=Consistency", { timeout: 15_000 });
+  if (await page.locator("text=Finished").count()) {
+    throw new Error("Ending a workout with nothing logged should not show a summary.");
+  }
+  await settle(page, 400);
+}
+
+/** Start workout -> strength -> Start, landing on the live workout screen. */
+async function startWorkout(page) {
+  await page.getByRole("button", { name: "Start workout" }).click();
+  await settle(page, 400);
+  await page.getByRole("button", { name: "Log strength training workout" }).click();
+  await settle(page, 500);
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.waitForSelector("text=Time between sets", { timeout: 15_000 });
+  await settle(page, 400);
+}
+
+/** One set of one exercise, choosing the exercise even when the sheet
+ * remembers the last one. */
+async function logOneSet(page, exercise, weight, reps) {
+  await page.getByRole("button", { name: /Log a set|Log the next set/ }).click();
+  await settle(page, 600);
+  const change = page.getByRole("button", { name: "Change" });
+  if (await change.count()) {
+    await change.click();
+    await settle(page, 400);
+  }
+  await page.getByPlaceholder("Search or add exercise").fill(exercise);
+  await settle(page, 300);
+  await page
+    .getByRole("button", { name: new RegExp(`^${exercise}`) })
+    .first()
+    .click();
+  await settle(page, 500);
+  await page.getByLabel("Weight", { exact: true }).fill(String(weight));
+  await page.getByLabel("Reps", { exact: true }).fill(String(reps));
+  await settle(page, 200);
+  await page.getByRole("button", { name: /^Log set/ }).click();
+  await settle(page, 700);
+}
+
+/**
+ * Ends the workout `minutes` after the frozen instant it started at, then puts
+ * the clock straight back.
+ *
+ * The run's clock is fixed, so a workout started and ended inside the same
+ * instant reports no duration at all, and the summary would be photographed
+ * without the row every real one has. Nudging only for the End press keeps the
+ * shot representative while every other screen stays seeded from FROZEN_NOW.
+ */
+async function endWorkoutAt(page, minutes) {
+  const context = page.context();
+  await context.clock.setFixedTime(new Date(FROZEN_NOW.getTime() + minutes * 60_000));
+  await page.getByRole("button", { name: "End", exact: true }).click();
+  await settle(page, 400);
+  await context.clock.setFixedTime(FROZEN_NOW);
 }
 
 async function captureSessionDetail(page) {

@@ -138,7 +138,7 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
         </section>
 
         <section className="section-gap">
-          <h2 className="group-header t-caption">This session</h2>
+          <h2 className="group-header t-caption">This workout</h2>
           <div className="group-list mx-5">
             {facts.map((fact, i) => (
               <div key={fact.label} className={`group-row ${i === 0 ? "" : "group-row-sep"}`}>

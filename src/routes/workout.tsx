@@ -212,7 +212,7 @@ function WorkoutPage() {
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
         <div>
-          <div className="t-caption text-muted-foreground">This session</div>
+          <div className="t-caption text-muted-foreground">This workout</div>
           <div className="mt-1 flex items-baseline gap-4">
             <div>
               <span className="t-stat">{sessSets.length}</span>{" "}
