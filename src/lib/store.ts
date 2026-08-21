@@ -525,25 +525,68 @@ function isWorkoutSession(v: unknown): v is WorkoutSession {
   return true;
 }
 
+/**
+ * A set that could have actually been performed.
+ *
+ * `typeof v === "number"` was too weak to be a guard here. It admits NaN,
+ * Infinity, -45 and 0 reps, and every one of those reaches arithmetic with no
+ * defence of its own: `volumeFor` sums weights, chart-math scales axes by them,
+ * and pr.ts compares them to decide what to congratulate the user for. NaN is
+ * the most damaging because it is the quietest. It has no bad-looking value to
+ * notice, it propagates through any total that touches it, and one corrupt row
+ * therefore blanks a whole chart rather than one point on it. Infinity is worse
+ * on the record axes, where it wins every comparison forever.
+ *
+ * Rejecting the FILE rather than dropping the row is deliberate and follows
+ * what `parseBackup` already promises: a key that is present but malformed is a
+ * hard failure. Quietly importing 9 of 10 sets would leave the user believing
+ * they had restored a history they no longer have, which is the one outcome a
+ * backup feature must never produce.
+ *
+ * Two limits are deliberately NOT symmetric. A weight of 0 is legitimate and
+ * kept: a pull-up, a dip or a bodyweight squat is a real set with no load, and
+ * rejecting it would refuse honest files. 0 reps is not, because a set of no
+ * reps is a set that did not happen; reps must also be whole, since half a rep
+ * is not something the logger can produce and not something a chart can mean.
+ */
 function isWorkoutSet(v: unknown): v is WorkoutSet {
   if (!isPlainObject(v)) return false;
   if (typeof v.id !== "string" || v.id.length === 0) return false;
-  if (typeof v.sessionId !== "string") return false;
-  if (typeof v.exerciseId !== "string") return false;
-  if (typeof v.weight !== "number") return false;
-  if (typeof v.reps !== "number") return false;
-  if (v.rpe !== undefined && typeof v.rpe !== "number") return false;
+  // Empty ids parse but point at nothing, leaving a set that belongs to no
+  // session and no exercise and so can never be displayed or compared.
+  if (typeof v.sessionId !== "string" || v.sessionId.length === 0) return false;
+  if (typeof v.exerciseId !== "string" || v.exerciseId.length === 0) return false;
+  if (!isFiniteNumber(v.weight) || v.weight < 0) return false;
+  if (typeof v.reps !== "number" || !Number.isInteger(v.reps) || v.reps <= 0) return false;
+  if (!isOptionalFiniteNumber(v.rpe)) return false;
   if (v.isDropsetOrPartial !== undefined && typeof v.isDropsetOrPartial !== "boolean") return false;
   if (v.setupNote !== undefined && typeof v.setupNote !== "string") return false;
-  if (v.timeBetweenSetsSeconds !== undefined && typeof v.timeBetweenSetsSeconds !== "number")
-    return false;
+  // Finite, but deliberately NOT required to be positive, which is the one place
+  // this guard is looser than the rest. `logSet` computes it as a difference
+  // between two clock readings, so a device whose clock corrects backwards mid
+  // session (NTP, a timezone change) writes a negative rest time on its own.
+  // Refusing the file would then reject a backup the app itself produced, over a
+  // number that only ever gets displayed. A NaN is still worth catching, since
+  // it silently poisons rest-time averages the way a NaN weight poisons volume.
+  if (!isOptionalFiniteNumber(v.timeBetweenSetsSeconds)) return false;
   if (v.blockGroupId !== undefined && typeof v.blockGroupId !== "string") return false;
-  if (typeof v.loggedAt !== "number") return false;
+  // Every ordering in the app sorts on this. A NaN never compares true, so one
+  // would scramble the order of a session rather than merely misplace one set.
+  if (!isFiniteNumber(v.loggedAt)) return false;
   return true;
 }
 
 function isOptionalNumber(v: unknown): boolean {
   return v === undefined || typeof v === "number";
+}
+
+/** A stored measurement: a real number, never NaN and never Infinity. */
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+function isOptionalFiniteNumber(v: unknown): boolean {
+  return v === undefined || isFiniteNumber(v);
 }
 
 function isDailyLog(v: unknown): v is DailyLog {

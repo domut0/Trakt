@@ -193,6 +193,131 @@ describe("parseBackup (validation)", () => {
     expect(result.ok).toBe(false);
   });
 
+  /**
+   * The numbers on a set, checked as values rather than as types.
+   *
+   * `typeof weight === "number"` used to be the whole test, which let Infinity,
+   * negative loads, fractional and zero rep counts through into arithmetic that
+   * cannot defend itself: volume sums them, charts scale axes by them, and
+   * pr.ts compares them to decide what to celebrate.
+   *
+   * These fixtures are composed as RAW JSON TEXT on purpose. JSON.stringify
+   * turns Infinity into `null`, so a fixture built from an object literal would
+   * be testing that null is rejected and quietly proving nothing about the case
+   * it is named for. Writing the text by hand is what puts a genuine `1e999` in
+   * front of JSON.parse, which is exactly how an overflowing number reaches a
+   * real import: JSON has no Infinity literal, but it does have exponents.
+   *
+   * A literal NaN has no JSON representation at all and makes the file a syntax
+   * error, so `parseBackup` turns it away one step earlier, at JSON.parse. The
+   * finite checks in `isWorkoutSet` still earn their place: -1e999 is reachable,
+   * and the guard is what stops a future caller reusing it on in-memory data
+   * from inheriting the old hole.
+   */
+  describe("set values that parse as numbers but are not sets that happened", () => {
+    /** Splices a raw sets array into an otherwise valid backup, unstringified. */
+    function backupWithRawSets(rawSets: string): string {
+      const { sets: _omitted, ...rest } = validBackup;
+      const body = JSON.stringify(rest);
+      return `${body.slice(0, -1)},"sets":${rawSets}}`;
+    }
+
+    /** One set, valid apart from whatever `fields` overrides. */
+    function rawSet(fields: string): string {
+      return `[{"id":"set1","sessionId":"sess1","exerciseId":"e1","loggedAt":1500,${fields}}]`;
+    }
+
+    function expectRejected(rawSets: string) {
+      const result = parseBackup(backupWithRawSets(rawSets));
+      expect(result.ok).toBe(false);
+      // Asserted so a test cannot pass by failing somewhere else entirely, e.g.
+      // on malformed JSON rather than on the value under test.
+      if (!result.ok) expect(result.error).toBe("The backup's sets list is missing or malformed.");
+    }
+
+    function expectAccepted(rawSets: string) {
+      const result = parseBackup(backupWithRawSets(rawSets));
+      expect(result.ok).toBe(true);
+    }
+
+    it("rejects a weight that overflows to Infinity", () => {
+      expectRejected(rawSet(`"weight":1e999,"reps":5`));
+    });
+
+    it("rejects a weight that overflows to -Infinity", () => {
+      expectRejected(rawSet(`"weight":-1e999,"reps":5`));
+    });
+
+    it("rejects a negative weight", () => {
+      expectRejected(rawSet(`"weight":-45,"reps":5`));
+    });
+
+    it("rejects a null weight, which is what a stringified NaN becomes", () => {
+      expectRejected(rawSet(`"weight":null,"reps":5`));
+    });
+
+    it("accepts a weight of 0, because a pull-up is a real set", () => {
+      // The one place this validator deliberately stays loose. An unloaded set
+      // is not a corrupt set, and rejecting it would refuse honest files.
+      expectAccepted(rawSet(`"weight":0,"reps":8`));
+    });
+
+    it("rejects a set of zero reps", () => {
+      expectRejected(rawSet(`"weight":225,"reps":0`));
+    });
+
+    it("rejects a negative rep count", () => {
+      expectRejected(rawSet(`"weight":225,"reps":-5`));
+    });
+
+    it("rejects a fractional rep count", () => {
+      expectRejected(rawSet(`"weight":225,"reps":5.5`));
+    });
+
+    it("rejects a rep count that overflows to Infinity", () => {
+      expectRejected(rawSet(`"weight":225,"reps":1e999`));
+    });
+
+    it("rejects a non-finite rpe", () => {
+      expectRejected(rawSet(`"weight":225,"reps":5,"rpe":1e999`));
+    });
+
+    it("rejects a non-finite rest time", () => {
+      expectRejected(rawSet(`"weight":225,"reps":5,"timeBetweenSetsSeconds":1e999`));
+    });
+
+    it("accepts a NEGATIVE rest time, which the app itself can write", () => {
+      // Not an oversight. logSet derives this from two clock readings, so a
+      // device whose clock corrects backwards mid session produces a negative
+      // value with no help from a corrupt file. Rejecting it would refuse a
+      // backup the app made, over a number that is only ever displayed.
+      expectAccepted(rawSet(`"weight":225,"reps":5,"timeBetweenSetsSeconds":-30`));
+    });
+
+    it("rejects a non-finite loggedAt, which would scramble session ordering", () => {
+      const raw = `[{"id":"set1","sessionId":"sess1","exerciseId":"e1","weight":225,"reps":5,"loggedAt":1e999}]`;
+      expectRejected(raw);
+    });
+
+    it("rejects an empty sessionId or exerciseId, which point at nothing", () => {
+      expectRejected(
+        `[{"id":"set1","sessionId":"","exerciseId":"e1","weight":225,"reps":5,"loggedAt":1500}]`,
+      );
+      expectRejected(
+        `[{"id":"set1","sessionId":"sess1","exerciseId":"","weight":225,"reps":5,"loggedAt":1500}]`,
+      );
+    });
+
+    it("still accepts an ordinary set, with and without its optional fields", () => {
+      expectAccepted(rawSet(`"weight":102.5,"reps":5`));
+      expectAccepted(
+        rawSet(
+          `"weight":102.5,"reps":5,"rpe":8.5,"isDropsetOrPartial":true,"setupNote":"seat 4","timeBetweenSetsSeconds":0,"blockGroupId":"b1"`,
+        ),
+      );
+    });
+  });
+
   it("rejects a backup whose dailyLogs entry is missing a date", () => {
     const broken = { ...validBackup, dailyLogs: [{ calories: 2000 }] };
     const result = parseBackup(JSON.stringify(broken));
