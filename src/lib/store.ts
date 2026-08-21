@@ -13,6 +13,13 @@ import {
   type SettingsMeta,
 } from "./db";
 import { isDailyLogEmpty } from "./daily-log";
+import {
+  plannedWorkoutFor,
+  prunePlannedWorkout,
+  emptyPlannedWeek,
+  type PlannedWeek,
+  type PlannedWorkout,
+} from "./plan";
 import { targetProfileFor, type GoalMode } from "./targets";
 import { seedExercises } from "./exercise-library";
 
@@ -226,12 +233,13 @@ type CurrentBlock = {
 interface State {
   unit: "lbs" | "kg";
   chartsEnabled: boolean;
-  /** Feature toggles for the three opt-in additions. Off by default: each one
+  /** Feature toggles for the four opt-in additions. Off by default: each one
    * adds a surface to a screen whose whole point is having nothing in the way,
    * so the user turns them on deliberately. */
   targetsEnabled: boolean;
   habitsEnabled: boolean;
   toolsEnabled: boolean;
+  planEnabled: boolean;
   exercises: Exercise[];
   slots: SplitSlot[];
   sessions: WorkoutSession[];
@@ -242,6 +250,17 @@ interface State {
   targetProfiles: TargetProfile[];
   /** 7 profile ids, MONDAY FIRST. Resolve through targets.ts, never `getDay()`. */
   weekdayTargets: string[];
+  /**
+   * The weekly training plan, 7 entries MONDAY FIRST, or undefined when the user
+   * has never planned anything. Resolve through plan.ts, never `getDay()`.
+   *
+   * Optional rather than seeded with a week of rest days, unlike
+   * `weekdayTargets`: targets ship pre-filled because an empty targets editor is
+   * useless, whereas an unplanned week is a real and permanent state for a user
+   * who never turns planning on, and writing seven nulls into everyone's
+   * settings row to represent it would be storage for nothing.
+   */
+  plannedWeek?: PlannedWeek;
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
@@ -300,6 +319,7 @@ interface State {
   setTargetsEnabled: (v: boolean) => void;
   setHabitsEnabled: (v: boolean) => void;
   setToolsEnabled: (v: boolean) => void;
+  setPlanEnabled: (v: boolean) => void;
 
   /** Free-text note on a whole session. */
   updateSession: (sessionId: string, patch: Pick<WorkoutSession, "note">) => void;
@@ -316,6 +336,16 @@ interface State {
   assignWeekdayTarget: (weekdayIndex: number, profileId: string) => void;
   /** The profile in effect on a "yyyy-MM-dd" day key, if any. */
   targetProfileForDate: (date: string) => TargetProfile | undefined;
+
+  // --- Planned workouts --------------------------------------------------
+  /** Sets one weekday's plan, `weekdayIndex` MONDAY-FIRST (0 = Monday). `null`
+   * makes it a rest day. Creates the week on first use, so the caller never has
+   * to initialise it. */
+  setPlannedDay: (weekdayIndex: number, workout: PlannedWorkout | null) => void;
+  /** The workout planned for a "yyyy-MM-dd" day key, with any exercise that no
+   * longer exists dropped, or undefined when nothing is planned. This is what
+   * `startWorkout` preloads from; it never constrains accessories. */
+  plannedWorkoutForDate: (date: string) => PlannedWorkout | undefined;
 
   // --- Habits ------------------------------------------------------------
   addHabit: (name: string) => Habit;
@@ -983,6 +1013,8 @@ function persistSettingsFrom(s: State) {
     toolsEnabled: s.toolsEnabled,
     targetProfiles: s.targetProfiles,
     weekdayTargets: s.weekdayTargets,
+    planEnabled: s.planEnabled,
+    plannedWeek: s.plannedWeek,
   };
   safeWrite(() => db.meta.put(settings));
 }
@@ -993,6 +1025,7 @@ export const useStore = create<State>((set, get) => ({
   targetsEnabled: false,
   habitsEnabled: false,
   toolsEnabled: false,
+  planEnabled: false,
   exercises: [],
   slots: [],
   sessions: [],
@@ -1053,6 +1086,11 @@ export const useStore = create<State>((set, get) => ({
           targetsEnabled: false,
           habitsEnabled: false,
           toolsEnabled: false,
+          // Not written into the seeded settings record above, only into state:
+          // absent already means "off, nothing planned" on read, so stamping
+          // the default onto storage would buy nothing (same call as `goalMode`).
+          planEnabled: false,
+          plannedWeek: undefined,
           ...targets,
           activeSessionId: undefined,
           currentExerciseId: undefined,
@@ -1079,6 +1117,11 @@ export const useStore = create<State>((set, get) => ({
         toolsEnabled: data.settings.toolsEnabled ?? false,
         targetProfiles: data.settings.targetProfiles ?? defaultTargets().targetProfiles,
         weekdayTargets: data.settings.weekdayTargets ?? defaultTargets().weekdayTargets,
+        // Both default on READ. A settings record written before planning
+        // existed has neither key, and no migration is needed to make it mean
+        // "no plan" (see the note on `plannedWeek` in db.ts).
+        planEnabled: data.settings.planEnabled ?? false,
+        plannedWeek: data.settings.plannedWeek,
         activeSessionId: data.activeSession.activeSessionId,
         currentExerciseId: data.activeSession.currentExerciseId,
         currentBlock: data.activeSession.currentBlock,
@@ -1417,6 +1460,11 @@ export const useStore = create<State>((set, get) => ({
     persistSettingsFrom(get());
   },
 
+  setPlanEnabled: (v) => {
+    set({ planEnabled: v });
+    persistSettingsFrom(get());
+  },
+
   updateSession: (sessionId, patch) => {
     set({ sessions: get().sessions.map((s) => (s.id === sessionId ? { ...s, ...patch } : s)) });
     const updated = get().sessions.find((s) => s.id === sessionId);
@@ -1466,6 +1514,26 @@ export const useStore = create<State>((set, get) => ({
 
   targetProfileForDate: (date) =>
     targetProfileFor(date, get().targetProfiles, get().weekdayTargets),
+
+  // --- Planned workouts --------------------------------------------------
+
+  setPlannedDay: (weekdayIndex, workout) => {
+    if (weekdayIndex < 0 || weekdayIndex > 6) return;
+    // Rebuilt from an empty week whenever what is stored is not a well-formed
+    // one, so a hand-edited backup with a 5-entry array is repaired by the first
+    // edit instead of being written back one day longer and still broken.
+    const current = get().plannedWeek;
+    const next = Array.isArray(current) && current.length === 7 ? [...current] : emptyPlannedWeek();
+    next[weekdayIndex] = workout;
+    set({ plannedWeek: next });
+    persistSettingsFrom(get());
+  },
+
+  plannedWorkoutForDate: (date) =>
+    prunePlannedWorkout(
+      plannedWorkoutFor(date, get().plannedWeek),
+      get().exercises.map((e) => e.id),
+    ),
 
   // --- Habits ------------------------------------------------------------
 
@@ -1568,6 +1636,13 @@ export const useStore = create<State>((set, get) => ({
       toolsEnabled: data.toolsEnabled,
       unit: data.unit,
       chartsEnabled: true,
+      // Cleared for the same reason chartsEnabled is reset above: the backup
+      // format does not carry either of them, so `replaceAllData` has just
+      // written a settings record without them. Keeping the old plan in memory
+      // would leave the store disagreeing with the DB until the next reload
+      // silently dropped it.
+      planEnabled: false,
+      plannedWeek: undefined,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
@@ -1609,6 +1684,8 @@ export const useStore = create<State>((set, get) => ({
       toolsEnabled: false,
       unit: "lbs",
       chartsEnabled: true,
+      planEnabled: false,
+      plannedWeek: undefined,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,

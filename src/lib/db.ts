@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
+import type { PlannedWeek } from "./plan";
 import type { SyncBase } from "./sync";
 import type {
   BackupData,
@@ -47,6 +48,22 @@ export interface SettingsMeta {
    * through `weekdayIndexFor` in targets.ts, never with a raw `getDay()`.
    */
   weekdayTargets?: string[];
+  /** Opt-in: planning main lifts on a weekly template. */
+  planEnabled?: boolean;
+  /**
+   * The weekly training plan, as 7 entries, MONDAY FIRST for the same reason
+   * `weekdayTargets` is. Resolve it through plan.ts, never with a raw
+   * `getDay()`.
+   *
+   * Here on the settings record rather than in its own table, exactly like
+   * `targetProfiles`: it is one small value that is always read with the rest of
+   * settings and never queried. Being a non-indexed addition it also needs no
+   * Dexie version bump (see the note on the version() calls below).
+   *
+   * Absent means the user has never planned anything, which is a different state
+   * from a week of explicit rest days, and both must read as "no plan".
+   */
+  plannedWeek?: PlannedWeek;
 }
 
 export interface ActiveSessionMeta {
