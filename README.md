@@ -16,13 +16,18 @@ or point an LLM at it. That's off until you turn it on, and logging never waits 
   predicted from your history. Suggestions show in grey and commit only when you accept.
 - **Per-set setup notes**: jot machine settings (seat height, pin, grip) once; they
   resurface as a grey hint next time and travel with each set as a snapshot.
-- **PR detection** (logic only, not yet on any screen): `src/lib/pr.ts` finds three kinds
-  of record across a finished session, weight, estimated 1RM, and reps at a given load or
-  above, and `src/lib/workout-summary.ts` assembles the end-of-workout summary from them.
-  The first time you perform an exercise sets no records at all: an exercise starts
-  producing them on its second outing, once there is something real to beat. Nothing
-  displays the summary yet.
-- **History, calendar, and charts**: browse past sessions, a month calendar view, and
+- **PR detection**: `src/lib/pr.ts` finds three kinds of record across a finished
+  workout, weight, estimated 1RM, and reps at a given load or above, and
+  `src/lib/workout-summary.ts` assembles the end-of-workout summary from them. The first
+  time you perform an exercise sets no records at all: an exercise starts producing them
+  on its second outing, once there is something real to beat. Warm-ups are excluded,
+  which is worked out from the workout itself rather than a threshold: a set followed by
+  a heavier set of the same exercise was a warm-up.
+- **A workout ends with what it was**: duration, volume, sets, and any records, on a
+  summary screen instead of a silent redirect home. A workout with no records still gets
+  a real summary; ending one with nothing logged is treated as a cancel and shows
+  nothing.
+- **History, calendar, and charts**: browse past workouts, a month calendar view, and
   progress charts (the Charts tab is toggleable in Settings; the calendar lives in History).
 - **Backup**: export/import your entire dataset as a JSON file; "clear all data", behind a
   confirmation step, resets to a clean slate for testing.
