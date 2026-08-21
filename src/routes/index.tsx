@@ -347,14 +347,19 @@ function ConsistencyStrip({
                   {d.date.getDate()}
                 </div>
 
-                <div className="flex items-center justify-center gap-1 h-2">
+                {/* 10px, not 6px. These two dots are the entire payload of the
+                    strip and a 6px disc is too small for a hue to register as
+                    a hue: at that size accent blue and nutrition green were
+                    reading as two grey specks. The day button keeps its 44px
+                    hit area regardless, since the dots sit inside it. */}
+                <div className="flex h-2.5 items-center justify-center gap-1">
                   <span
-                    className={`h-1.5 w-1.5 rounded-full transition-colors ${
+                    className={`h-2.5 w-2.5 rounded-full transition-colors ${
                       d.hasWorkout ? "bg-accent" : "bg-muted"
                     }`}
                   />
                   <span
-                    className={`h-1.5 w-1.5 rounded-full transition-colors ${
+                    className={`h-2.5 w-2.5 rounded-full transition-colors ${
                       d.hasLog ? "bg-nutrition" : "bg-muted"
                     }`}
                   />
@@ -403,8 +408,12 @@ function DayLogSummary({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* The subject of the screen. The ring is centred and sized around the
+          calorie number rather than the number being shrunk to fit the ring,
+          so the one figure the user opened this screen for is the first thing
+          the eye lands on. The macros read underneath it as its parts. */}
       {showRing && (
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col items-center gap-4">
           {targetsEnabled && calProgress ? (
             <CalorieTargetRing progress={calProgress} />
           ) : (
@@ -417,28 +426,10 @@ function DayLogSummary({
             />
           )}
           {hasMacros && macroTotal > 0 && (
-            <div className="flex flex-1 justify-between gap-2 pr-2">
-              <MacroColumn
-                name="Carbs"
-                grams={log.carbs ?? 0}
-                cal={carbCal}
-                total={macroTotal}
-                colorClass="text-carbs"
-              />
-              <MacroColumn
-                name="Fat"
-                grams={log.fat ?? 0}
-                cal={fatCal}
-                total={macroTotal}
-                colorClass="text-fat"
-              />
-              <MacroColumn
-                name="Protein"
-                grams={log.protein ?? 0}
-                cal={proteinCal}
-                total={macroTotal}
-                colorClass="text-protein"
-              />
+            <div className="flex w-full items-start justify-around gap-3">
+              <MacroColumn name="Carbs" grams={log.carbs ?? 0} colorClass="text-carbs" />
+              <MacroColumn name="Fat" grams={log.fat ?? 0} colorClass="text-fat" />
+              <MacroColumn name="Protein" grams={log.protein ?? 0} colorClass="text-protein" />
             </div>
           )}
         </div>
@@ -664,10 +655,19 @@ function SlimProgressBar({ progress }: { progress: TargetProgress }) {
   );
 }
 
+/** Geometry shared by both rings, so the state-aware ring and the no-targets
+ * fallback are the same object on the screen and only their arcs differ. */
+const RING_SIZE = 124;
+const RING_STROKE = 10;
+
 function CalorieTargetRing({ progress }: { progress: TargetProgress }) {
   const { logged, target, fraction, status } = progress;
-  const size = 72;
-  const strokeWidth = 6;
+  // Sized around the number, not the other way round. `t-hero` is 32px tabular,
+  // so "2,180" measures about 82px; a 124px ring with a 10px stroke leaves an
+  // inner diameter of 104px, which clears it with room for the target beneath.
+  // The old 72px ring is why the number inside it was set at row-label size.
+  const size = RING_SIZE;
+  const strokeWidth = RING_STROKE;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
@@ -684,7 +684,7 @@ function CalorieTargetRing({ progress }: { progress: TargetProgress }) {
 
   return (
     <div
-      className="flex shrink-0 flex-col items-center gap-1"
+      className="flex shrink-0 flex-col items-center gap-2"
       role="img"
       aria-label={goalAriaLabel("Calories", progress, "")}
     >
@@ -714,19 +714,16 @@ function CalorieTargetRing({ progress }: { progress: TargetProgress }) {
             strokeLinecap="round"
           />
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center pt-0.5 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
           {/* Only a reached or broken goal recolours the number. In flight it stays
               plain, so the colour keeps meaning "something happened here". */}
-          <span
-            className="t-body font-bold leading-none"
-            style={status === "progress" ? undefined : { color: arcColor }}
-          >
+          <span className="t-hero" style={status === "progress" ? undefined : { color: arcColor }}>
             {logged.toLocaleString()}
           </span>
           {/* The target stays put in every state. It is the thing the number is
               being compared against, so a ring that hides it once you go over
               leaves the reading with nothing to sit against. */}
-          <span className="mt-0.5 t-caption leading-none text-muted-foreground font-normal">
+          <span className="mt-1 t-label leading-none text-muted-foreground">
             / {target.toLocaleString()}
           </span>
         </div>
@@ -736,25 +733,32 @@ function CalorieTargetRing({ progress }: { progress: TargetProgress }) {
   );
 }
 
+/**
+ * One macro, as a value and a name.
+ *
+ * The metric colour is on the GRAMS, which is the number the user logged. It
+ * used to sit on a percentage-of-calories that the app derived, above a plain
+ * white gram value, which inverted the emphasis and spent a data encoding on
+ * decoration (DESIGN.md: metric colours identify a metric, never decorate).
+ *
+ * The percentage is gone rather than demoted. It is a restatement of the three
+ * grams beside it, the ring already draws the same split as arcs when there
+ * are no targets, and the progress bars below state it against a goal when
+ * there are. Three renderings of one fact is what flattened this card.
+ */
 function MacroColumn({
   name,
   grams,
-  cal,
-  total,
   colorClass,
 }: {
   name: string;
   grams: number;
-  cal: number;
-  total: number;
   colorClass: string;
 }) {
-  const pct = Math.round((cal / total) * 100);
   return (
-    <div className="flex flex-col items-center">
-      <span className={`t-label font-semibold ${colorClass}`}>{pct}%</span>
-      <span className="t-stat mt-0.5 leading-none">{grams}g</span>
-      <span className="mt-1 t-label text-muted-foreground">{name}</span>
+    <div className="flex flex-col items-center gap-1">
+      <span className={`t-stat ${colorClass}`}>{grams}g</span>
+      <span className="t-label text-muted-foreground">{name}</span>
     </div>
   );
 }
@@ -772,12 +776,14 @@ function MacroRing({
   fatCal: number;
   macroTotal: number;
 }) {
-  const size = 72;
-  const strokeWidth = 6;
+  const size = RING_SIZE;
+  const strokeWidth = RING_STROKE;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  const centerText = log.calories !== undefined ? log.calories : macroTotal;
+  // Grouped, like the target ring's number. At hero size an ungrouped "2180"
+  // reads as four loose digits next to a "2,700" two lines away in the bars.
+  const centerText = (log.calories !== undefined ? log.calories : macroTotal).toLocaleString();
   const isNeutralRing = macroTotal === 0;
 
   let offset = 0;
@@ -826,8 +832,8 @@ function MacroRing({
             );
           })}
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center pt-0.5">
-        <span className="t-body font-bold leading-none">{centerText}</span>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="t-hero">{centerText}</span>
         <span className="mt-1 t-caption leading-none text-muted-foreground font-normal">cal</span>
       </div>
     </div>
