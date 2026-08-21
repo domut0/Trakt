@@ -1,11 +1,12 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Check, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DeleteWorkoutButton } from "../components/DeleteWorkoutButton";
 import { LogSetSheet } from "../components/LogSetSheet";
 import { SessionView } from "../components/SessionView";
 import { WorkoutSummaryScreen } from "../components/WorkoutSummaryScreen";
-import { useStore } from "../lib/store";
+import { dayKey } from "../lib/daily-log";
+import { useStore, type Exercise } from "../lib/store";
 import { buildWorkoutSummary, type WorkoutSummaryData } from "../lib/workout-summary";
 
 export const Route = createFileRoute("/workout")({
@@ -50,6 +51,12 @@ function WorkoutPage() {
   const endWorkout = useStore((s) => s.endWorkout);
   const logNextInBlock = useStore((s) => s.logNextInBlock);
   const lastSetupNoteFor = useStore((s) => s.lastSetupNoteFor);
+  const setCurrentExercise = useStore((s) => s.setCurrentExercise);
+  const planEnabled = useStore((s) => s.planEnabled);
+  // Subscribed rather than read through getState() so the list below reacts to
+  // the plan being edited (or the feature being switched off) mid-workout.
+  const plannedWeek = useStore((s) => s.plannedWeek);
+  const plannedWorkoutForDate = useStore((s) => s.plannedWorkoutForDate);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showView, setShowView] = useState(false);
@@ -92,6 +99,31 @@ function WorkoutPage() {
   const lastLoggedAt = sessSets[sessSets.length - 1]?.loggedAt;
   const elapsedSinceLast = useElapsed(lastLoggedAt);
   const currentExercise = exercises.find((e) => e.id === currentExerciseId);
+
+  /**
+   * The main lifts planned for this workout's day, in plan order, or null when
+   * the day is unplanned. Null is the overwhelmingly common case: the feature
+   * is opt-in and most days are rest days, and this screen then renders exactly
+   * what it always has.
+   *
+   * Keyed on the session's OWN start date, not on today: a workout begun at
+   * 11pm keeps the plan it opened with instead of losing it at midnight.
+   *
+   * `plannedWorkoutForDate` does the whole resolution, weekday rotation and
+   * dropping lifts whose exercise has since been deleted, so nothing here
+   * re-derives any of it. The `plannedWeek` guard is the cheap exit for a user
+   * who has never planned anything, and is also what ties this memo to the
+   * subscription above.
+   */
+  const planned = useMemo(() => {
+    if (!planEnabled || !plannedWeek || !session) return null;
+    const workout = plannedWorkoutForDate(dayKey(new Date(session.startedAt)));
+    if (!workout) return null;
+    const lifts = workout.exerciseIds
+      .map((id) => exercises.find((e) => e.id === id))
+      .filter((e): e is Exercise => e !== undefined);
+    return lifts.length > 0 ? { name: workout.name, lifts } : null;
+  }, [planEnabled, plannedWeek, plannedWorkoutForDate, session, exercises]);
   const currentSetupNote = currentExerciseId ? lastSetupNoteFor(currentExerciseId) : undefined;
   const inBlock = !!currentBlock && currentBlock.loggedInBlock < currentBlock.targetSets;
 
@@ -205,6 +237,78 @@ function WorkoutPage() {
           <div className="mt-2 t-label font-medium text-accent">Log set</div>
         )}
       </div>
+
+      {/*
+        Planned lifts, when the day has a plan.
+
+        An OFFER, never a checklist. Nothing here gates the log button, the
+        picker still reaches every exercise in the library, and an accessory that
+        is not in the plan is logged exactly as it always was. Tapping a row only
+        moves the current exercise, which is how a lift is taken out of order or
+        stepped past: the plan never has to be satisfied, or dismissed, to log
+        anything.
+
+        `min-h-0` with its own scroller so a long hand-edited plan shortens
+        instead of pushing the bottom row off a small screen.
+      */}
+      {planned && (
+        <section className="section-gap min-h-0 overflow-y-auto px-5">
+          <div className="group-header flex items-center justify-between px-0">
+            <h2 className="t-caption">Planned</h2>
+            {planned.name.trim() && (
+              <span className="truncate t-label text-muted-foreground">{planned.name}</span>
+            )}
+          </div>
+          <ul className="group-list">
+            {planned.lifts.map((ex, idx) => {
+              const logged = sessSets.filter((s) => s.exerciseId === ex.id).length;
+              const isCurrent = ex.id === currentExerciseId;
+              return (
+                <li key={ex.id}>
+                  <button
+                    onClick={() => setCurrentExercise(ex.id)}
+                    aria-pressed={isCurrent}
+                    className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""}`}
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
+                      {/* Done is a filled check as well as a colour, so the row
+                          still reads without hue. */}
+                      <span
+                        aria-hidden="true"
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                          logged > 0
+                            ? "bg-accent text-accent-foreground"
+                            : isCurrent
+                              ? "border border-accent bg-muted"
+                              : "border border-border bg-muted"
+                        }`}
+                      >
+                        {logged > 0 && <Check size={14} strokeWidth={3} />}
+                      </span>
+                      <span
+                        className={`truncate t-body ${
+                          isCurrent
+                            ? "font-semibold text-accent"
+                            : logged > 0
+                              ? "text-muted-foreground"
+                              : "font-medium text-foreground"
+                        }`}
+                      >
+                        {ex.name}
+                      </span>
+                    </span>
+                    {logged > 0 && (
+                      <span className="shrink-0 t-label text-muted-foreground">
+                        {logged} {logged === 1 ? "set" : "sets"}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* Bottom row: session summary (left) + View workout (right) */}
       <div
