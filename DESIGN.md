@@ -49,6 +49,38 @@ parts. `CalendarView` had six containers on a single screen.
 - Separators are inset from the left, matching iOS. A full-width rule reads as a divider
   _between_ groups.
 
+## Hierarchy: one subject per screen
+
+The rules above remove inconsistency. Applied alone they also remove **rank**, and a
+screen where everything is level reads as bland rather than calm. That was the state
+this document is now correcting: `t-hero` was used exactly once in the whole app,
+`t-body` and `t-label` were 66% of all type and sit 2px apart, and every screen
+resolved to a stack of identical grey boxes. The tell was that `/workout` was the
+best-composed screen in the app and the only one that ignored the card system.
+
+**Every screen has one subject, and it should be obvious within a second which one it
+is.** On Today that is the calorie ring; on a finished workout it is the record, if
+there is one.
+
+- **One elevated surface per screen. At most one.** Two elevated things are two
+  subjects, which is none.
+- **Elevation is fill, never stroke.** The rule above still holds: no borders, no
+  shadows. There is a third step already in the palette, and it is enough:
+  `--background` `#0e1217` → `--surface` `#1a2029` → `--muted` `#232b36`. Surface to
+  muted is the same order of step as background to surface (+9/11/13 per channel
+  against +12/14/18), so a card can lift without a line around it.
+- **Size is the other lever, and it is free.** A number the screen exists to show
+  should be at `t-hero`. If it does not fit its container, grow the container.
+- A track, groove or well goes the **other** way, towards `--background`. A progress
+  bar's track was once lighter than the card holding it, which reads as raised.
+
+One consequence to know before using `--muted` as a card: this document's contrast
+figures are quoted against `--surface`, and on the lighter fill they drop by about
+12%. Recomputed there: muted-foreground 5.72:1, success 8.19:1, warning 8.55:1,
+foreground 13.07:1, all still AA. The tightest is `--fat` `#a97fd0` at **4.51:1**,
+which clears normal-text AA by a hair and large text comfortably. If that margin ever
+feels thin, the thing to change is the fill, not the colour.
+
 ## Spacing
 
 - Page gutter: `px-5` (20px). Every screen, no exceptions.
