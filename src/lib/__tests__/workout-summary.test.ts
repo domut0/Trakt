@@ -192,14 +192,21 @@ describe("buildWorkoutSummary: the facts", () => {
     expect(buildWorkoutSummary(input({ sets, endedAt: START - MINUTE }))?.durationMinutes).toBe(0);
   });
 
-  it("falls back to zero minutes rather than NaN on an unusable timestamp", () => {
+  it("reports no duration at all rather than a zero it cannot vouch for", () => {
+    // Same rule as volume: "0 min" is a claim about the session, and a corrupt
+    // clock gives us nothing to claim.
     const sets = [mkSet({ weight: 225, reps: 5 })];
     const noStart = mkSession({ startedAt: Number.NaN });
-    expect(buildWorkoutSummary(input({ sets, session: noStart }))?.durationMinutes).toBe(0);
+    expect(buildWorkoutSummary(input({ sets, session: noStart }))?.durationMinutes).toBeNull();
     expect(
       buildWorkoutSummary(input({ sets, endedAt: undefined as unknown as number }))
         ?.durationMinutes,
-    ).toBe(0);
+    ).toBeNull();
+  });
+
+  it("keeps a genuine zero, which means a session ended inside its first minute", () => {
+    const sets = [mkSet({ weight: 225, reps: 5 })];
+    expect(buildWorkoutSummary(input({ sets, endedAt: START + 4_000 }))?.durationMinutes).toBe(0);
   });
 
   it("totals the weight moved across every set", () => {

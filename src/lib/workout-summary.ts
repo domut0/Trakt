@@ -38,7 +38,13 @@ export interface SummaryRecord {
 export interface WorkoutSummaryData {
   sessionId: string;
   slotName: string;
-  durationMinutes: number;
+  /**
+   * How long the session ran. `null` when a timestamp was unusable, for the
+   * same reason `volume` is: "0 min" is a claim about the session, and one with
+   * a corrupt clock has nothing to claim. A real 0 still means what it says, a
+   * session ended within the minute it started.
+   */
+  durationMinutes: number | null;
   setCount: number;
   exerciseCount: number;
   /**
@@ -102,7 +108,7 @@ export function buildWorkoutSummary(input: WorkoutSummaryInput): WorkoutSummaryD
   const durationMinutes =
     startedAt != null && finishedAt != null
       ? Math.max(0, Math.round((finishedAt - startedAt) / 60_000))
-      : 0;
+      : null;
 
   const exerciseIds: string[] = [];
   for (const s of sessionSets) {

@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { DeleteWorkoutButton } from "../components/DeleteWorkoutButton";
 import { LogSetSheet } from "../components/LogSetSheet";
 import { SessionView } from "../components/SessionView";
+import { WorkoutSummaryScreen } from "../components/WorkoutSummaryScreen";
 import { useStore } from "../lib/store";
+import { buildWorkoutSummary, type WorkoutSummaryData } from "../lib/workout-summary";
 
 export const Route = createFileRoute("/workout")({
   head: () => ({
@@ -42,6 +44,7 @@ function WorkoutPage() {
   const slots = useStore((s) => s.slots);
   const sets = useStore((s) => s.sets);
   const exercises = useStore((s) => s.exercises);
+  const unit = useStore((s) => s.unit);
   const currentExerciseId = useStore((s) => s.currentExerciseId);
   const currentBlock = useStore((s) => s.currentBlock);
   const endWorkout = useStore((s) => s.endWorkout);
@@ -50,6 +53,12 @@ function WorkoutPage() {
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showView, setShowView] = useState(false);
+  /**
+   * The finished workout, once End has been pressed. Held here rather than
+   * derived, because `endWorkout` clears `activeSessionId` and every value the
+   * summary is built from goes with it.
+   */
+  const [summary, setSummary] = useState<WorkoutSummaryData | null>(null);
 
   // "Set logged" confirmation toast. The nonce keys the toast element so each
   // log remounts it and replays the slide-up/fade animation, even on rapid
@@ -68,9 +77,12 @@ function WorkoutPage() {
     [],
   );
 
+  // No active session means there is nothing to log, so this route sends the
+  // user home. The summary is the one exception: the session it describes has
+  // just been ended on purpose, and the screen has to outlive it.
   useEffect(() => {
-    if (!activeSessionId) router.navigate({ to: "/" });
-  }, [activeSessionId, router]);
+    if (!activeSessionId && !summary) router.navigate({ to: "/" });
+  }, [activeSessionId, summary, router]);
 
   const session = sessions.find((s) => s.id === activeSessionId);
   const slot = slots.find((sl) => sl.id === session?.splitSlotId);
@@ -83,10 +95,40 @@ function WorkoutPage() {
   const currentSetupNote = currentExerciseId ? lastSetupNoteFor(currentExerciseId) : undefined;
   const inBlock = !!currentBlock && currentBlock.loggedInBlock < currentBlock.targetSets;
 
+  const goHome = () => router.navigate({ to: "/" });
+
+  /**
+   * Ends the session, then shows what it came to.
+   *
+   * Order matters twice. The summary is assembled BEFORE `endWorkout`, which
+   * clears the active session and everything read here along with it. And the
+   * build is wrapped, because a summary is never worth the end of a workout: on
+   * any failure the session still ends and the user still goes home, which is
+   * exactly what this button did before there was a summary at all.
+   */
   const handleEnd = () => {
+    let data: WorkoutSummaryData | null = null;
+    try {
+      data = buildWorkoutSummary({
+        session,
+        slotName: slot?.name ?? "",
+        sets,
+        sessions,
+        exercises,
+        unit,
+        endedAt: Date.now(),
+      });
+    } catch {
+      data = null;
+    }
     endWorkout();
-    router.navigate({ to: "/" });
+    // Nothing logged means nothing to summarise, and ending an empty workout
+    // stays the plain cancel it has always been.
+    if (data) setSummary(data);
+    else goHome();
   };
+
+  if (summary) return <WorkoutSummaryScreen data={summary} onDone={goHome} />;
 
   if (!session || !slot) return null;
 
