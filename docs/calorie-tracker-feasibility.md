@@ -5,6 +5,8 @@
 **Date of research:** 2026-08-23. External API facts have a shelf life — the MFP, Open Food
 Facts, USDA and FatSecret terms below should be re-checked before anything is built on them.
 
+**Decisions already taken are recorded in §10.** Read that before §6 and §7 — it constrains both.
+
 This document exists so the investigation does not have to be repeated. It records what was
 found in the codebase, what was found externally, which claims were verified and which were
 not, and the two design decisions that have to be made before any of it can be built.
@@ -268,7 +270,15 @@ Flagged honestly, because several are load-bearing:
    defeat IP whitelisting is reasoning, not a tested result.
 5. **`getUserMedia` in an iOS home-screen PWA.** Documented as fixed since iOS 14.3; not tested
    on the target device.
-6. **The exact column set of the MFP "Download My Data" CSV.** Partially resolved: the export
+6. **FoodYou's actual screens have never been seen.** Its README supplied the feature list
+   quoted in §3.4 and §10, but F-Droid (which hosts the screenshots) was blocked from the
+   research environment. Every statement about its _information architecture_ is inferred from
+   prose, not observed. **Clone it or view the F-Droid listing before designing against it.**
+7. **The ODbL "Produced Work" vs "Derivative Database" reading in §10.3** is an interpretation
+   of the licence, not a checked ruling. It drives a real architectural choice (bundle USDA,
+   query OFF live), so confirm it against the ODbL text and Open Food Facts' own reuse guidance
+   before shipping any bundled food data.
+8. **The exact column set of the MFP "Download My Data" CSV.** Partially resolved: the export
    is documented as three files (Nutrition, Exercise, Progress), with the nutrition file
    containing calories, macronutrients, micronutrients and timestamps **for individual logged
    foods, summarised by meal**, plus food notes. That is per-food rows with macros, which is
@@ -326,3 +336,50 @@ Flagged honestly, because several are load-bearing:
   https://support.myfitnesspal.com/hc/en-us/articles/360032273352-Data-Export-FAQs
 - Open-source MyFitnessPal alternatives (survey) —
   https://alternativeto.net/software/myfitnesspal/?license=opensource
+
+---
+
+## 10. Decisions taken
+
+Settled 2026-08-23. These constrain §6 and §7; revisit deliberately, not by drift.
+
+### 10.1 Design: FoodYou's flows, this app's clothes
+
+**Adopted from FoodYou:** its information architecture only — how food search works, portion
+picking, recipe composition, the multi-source database strategy, micronutrient targets.
+
+**Not adopted:** its Material You visual language. `DESIGN.md` is unchanged and still governs —
+grouped lists rather than floating cards, one subject per screen, seven type roles, no literals.
+
+Concretely, FoodYou's README describes "a modular home screen with customizable cards." That is
+the direct negation of two DESIGN.md section headings and is **explicitly out of scope**. Every
+new nutrition screen must read as this app, not as a port of an Android one.
+
+The rule of thumb: take what makes logging _fast_, leave what makes it look _Material_.
+
+### 10.2 Code licence: permissive, when the repo opens
+
+MIT or Apache-2.0, with **Apache-2.0 preferred** for its explicit patent grant.
+
+**Not yet applied** — the README still reads "Private / unlicensed. All rights reserved." This is
+a one-commit change whenever wanted; nothing in the nutrition plan depends on it.
+
+Note what this does _not_ change: a permissive licence on this repo grants no rights over the
+GPL projects in §3.4. Their code stays uncopyable. GPL is a non-issue here for the reasons §3.4
+gives — different language, different framework, and UX/IA is not what copyright protects — not
+because of anything this repo's licence says.
+
+### 10.3 Data licences: bundle CC0, query ODbL
+
+This is an architectural constraint, not merely a legal one:
+
+- **Bundle USDA FoodData Central.** CC0 / public domain, no obligations. This is the offline
+  starter database that ships with the app.
+- **Query Open Food Facts live.** ODbL, attribution required. This covers the barcode long tail.
+- **Do NOT ship a bundled subset of Open Food Facts.** Distributing one is a Derivative Database
+  under ODbL, which drags share-alike onto that data. A live lookup producing a logged entry is a
+  Produced Work instead — attribution, and nothing more.
+
+This split also happens to be the better engineering: CC0 for the thing embedded in the bundle,
+live lookup for the thing that changes daily. See §8.7 — the licence reading behind it is
+unconfirmed and worth checking before any bundled data ships.
