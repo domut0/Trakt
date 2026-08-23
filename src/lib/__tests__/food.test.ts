@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_MEALS,
+  effectiveDailyLogs,
   entriesByMeal,
   entryMacros,
   formatMeasurement,
@@ -288,5 +289,59 @@ describe("Food type wiring", () => {
       ...per100g,
     };
     expect(f.sourceType).toBe("mfp");
+  });
+});
+
+describe("effectiveDailyLogs", () => {
+  const entry = (date: string, calories: number, id: string): FoodEntry => ({
+    id,
+    date,
+    mealId: "m_1",
+    quantity: 1,
+    unit: "serving",
+    name: "Thing",
+    loggedAt: 0,
+    basisQuantity: 1,
+    basisUnit: "serving",
+    calories,
+  });
+
+  it("substitutes derived macros on a day that has entries", () => {
+    const logs: DailyLog[] = [{ date: "2026-08-23", calories: 1800, steps: 9000 }];
+    const out = effectiveDailyLogs(logs, [
+      entry("2026-08-23", 300, "a"),
+      entry("2026-08-23", 200, "b"),
+    ]);
+    expect(out[0].calories).toBe(500);
+  });
+
+  it("never derives steps, bodyweight or cheat day", () => {
+    // Food logging has no opinion about those, so they must survive untouched.
+    const logs: DailyLog[] = [
+      { date: "2026-08-23", calories: 1800, steps: 9000, bodyweight: 181, isCheatDay: true },
+    ];
+    const out = effectiveDailyLogs(logs, [entry("2026-08-23", 500, "a")]);
+    expect(out[0]).toMatchObject({ steps: 9000, bodyweight: 181, isCheatDay: true });
+  });
+
+  it("leaves a day with no entries exactly as stored", () => {
+    const logs: DailyLog[] = [{ date: "2026-08-22", calories: 1800 }];
+    expect(effectiveDailyLogs(logs, [])).toEqual(logs);
+  });
+
+  it("surfaces a day that has entries but no stored row", () => {
+    // Logging food without opening the day editor must not leave the day
+    // invisible to the charts.
+    const out = effectiveDailyLogs([], [entry("2026-08-21", 700, "a")]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ date: "2026-08-21", calories: 700 });
+  });
+
+  it("returns days in date order", () => {
+    const out = effectiveDailyLogs(
+      [{ date: "2026-08-23", calories: 1 }],
+      [entry("2026-08-21", 2, "a")],
+    );
+    expect(out.map((l) => l.date)).toEqual(["2026-08-21", "2026-08-23"]);
   });
 });

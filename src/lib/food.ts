@@ -301,6 +301,61 @@ export function resolveDayMacros(
   return { source: "none" };
 }
 
+/** Every day's entries, keyed by date. Built once and reused. */
+export function entriesByDate(entries: readonly FoodEntry[]): Map<string, FoodEntry[]> {
+  const out = new Map<string, FoodEntry[]>();
+  for (const e of entries) {
+    const list = out.get(e.date);
+    if (list) list.push(e);
+    else out.set(e.date, [e]);
+  }
+  return out;
+}
+
+/**
+ * The daily logs as the rest of the app should see them, with derived macros
+ * substituted in on every day that has food entries.
+ *
+ * This exists so that Today, the charts, the weekly averages and the sheet push
+ * cannot disagree about what a day's calories are. They all consume `DailyLog[]`
+ * already, so projecting rather than teaching each of them about food entries
+ * keeps decision 6 in exactly one place.
+ *
+ * Two things it deliberately preserves:
+ * - `steps`, `bodyweight` and `isCheatDay` are never derived and always come
+ *   from the stored row. Food logging has no opinion about them.
+ * - A day with entries but no stored row still appears, because otherwise
+ *   logging food without touching the day editor would leave the day invisible
+ *   to the charts.
+ */
+export function effectiveDailyLogs(
+  logs: readonly DailyLog[],
+  entries: readonly FoodEntry[],
+): DailyLog[] {
+  const byDate = entriesByDate(entries);
+  const byLogDate = new Map(logs.map((l) => [l.date, l]));
+  const dates = new Set<string>([...byLogDate.keys(), ...byDate.keys()]);
+
+  const out: DailyLog[] = [];
+  for (const date of dates) {
+    const stored = byLogDate.get(date);
+    const dayEntries = byDate.get(date);
+    if (!dayEntries || dayEntries.length === 0) {
+      if (stored) out.push(stored);
+      continue;
+    }
+    const derived = sumMacros(dayEntries.map(entryMacros));
+    out.push({
+      ...(stored ?? { date }),
+      calories: derived.calories,
+      protein: derived.protein,
+      carbs: derived.carbs,
+      fat: derived.fat,
+    });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 /** Groups a day's entries by meal, in `rank` order, including empty meals. */
 export function entriesByMeal(
   meals: readonly Meal[],
