@@ -1,0 +1,204 @@
+<!--
+  A slice of MyFitnessPal's printable-diary report, reduced to the structure the
+  importer actually reads.
+
+  Structure is reproduced exactly from a real capture: one <table> per day, the
+  date as plain text immediately before it, one <tbody> per meal, meal headings
+  as a two-cell <td> row, food rows as nine <th> cells, and a TOTALS row.
+
+  Food names are invented. The real capture was a personal food diary and this
+  repository is expected to open under a permissive licence one day, so the
+  quirks are kept and the health data is not.
+
+  Every awkward case below was observed in the real export:
+    - "gram(s)" and "grams", which miss a naive unit lookup
+    - "Cake (13 g)" and "slices/64 grams", which carry a serving weight inline
+    - count units with no gram equivalent at all ("egg", "cup dry")
+    - a name containing commas, so the quantity split cannot use the first one
+    - "--" for a field the food has no value for
+    - a custom, lowercase, misspelled meal name
+-->
+<div>
+  <h2>Aug 21, 2026</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>FOODS</th>
+        <th>Calories</th>
+        <th>Carbs</th>
+        <th>Fat</th>
+        <th>Protein</th>
+        <th>Cholest</th>
+        <th>Sodium</th>
+        <th>Sugar</th>
+        <th>Fiber</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Breakfast</td>
+        <td></td>
+      </tr>
+      <tr>
+        <th>Clover Honey, 20 gram</th>
+        <th>61</th>
+        <th>16g</th>
+        <th>0g</th>
+        <th>0g</th>
+        <th>0mg</th>
+        <th>1mg</th>
+        <th>16g</th>
+        <th>0g</th>
+      </tr>
+      <tr>
+        <th>Puffed Snack, 3 Cake (13 g)</th>
+        <th>104</th>
+        <th>22g</th>
+        <th>1g</th>
+        <th>2g</th>
+        <th>0mg</th>
+        <th>88mg</th>
+        <th>0g</th>
+        <th>1g</th>
+      </tr>
+      <tr>
+        <th>Hen Egg, 2 egg</th>
+        <th>144</th>
+        <th>0g</th>
+        <th>10g</th>
+        <th>12g</th>
+        <th>412mg</th>
+        <th>130mg</th>
+        <th>0g</th>
+        <th>0g</th>
+      </tr>
+    </tbody>
+    <tbody>
+      <tr>
+        <td>Lunch</td>
+        <td></td>
+      </tr>
+      <tr>
+        <th>Berries, mixed, frozen, 1 cup</th>
+        <th>38</th>
+        <th>9g</th>
+        <th>0g</th>
+        <th>0g</th>
+        <th>0mg</th>
+        <th>1mg</th>
+        <th>6g</th>
+        <th>2g</th>
+      </tr>
+      <tr>
+        <th>Millhouse - Sandwich Loaf, 2 slices/64 grams</th>
+        <th>160</th>
+        <th>30g</th>
+        <th>2g</th>
+        <th>6g</th>
+        <th>0mg</th>
+        <th>300mg</th>
+        <th>--</th>
+        <th>--</th>
+      </tr>
+    </tbody>
+    <tbody>
+      <tr>
+        <th>TOTALS</th>
+        <th>507</th>
+        <th>77g</th>
+        <th>13g</th>
+        <th>20g</th>
+        <th>412mg</th>
+        <th>520mg</th>
+        <th>22g</th>
+        <th>3g</th>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Aug 22, 2026</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>FOODS</th>
+        <th>Calories</th>
+        <th>Carbs</th>
+        <th>Fat</th>
+        <th>Protein</th>
+        <th>Cholest</th>
+        <th>Sodium</th>
+        <th>Sugar</th>
+        <th>Fiber</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>preworkout</td>
+        <td></td>
+      </tr>
+      <tr>
+        <th>Starch Powder, 30 gram(s)</th>
+        <th>106</th>
+        <th>24g</th>
+        <th>0g</th>
+        <th>2g</th>
+        <th>0mg</th>
+        <th>3mg</th>
+        <th>0g</th>
+        <th>0g</th>
+      </tr>
+      <tr>
+        <th>Rolled Grain - Plain, 0.25 cup dry</th>
+        <th>105</th>
+        <th>17g</th>
+        <th>2g</th>
+        <th>5g</th>
+        <th>0mg</th>
+        <th>0mg</th>
+        <th>0g</th>
+        <th>3g</th>
+      </tr>
+    </tbody>
+    <tbody>
+      <tr>
+        <td>Dinner</td>
+        <td></td>
+      </tr>
+      <tr>
+        <th>Clover Honey, 40 grams</th>
+        <th>122</th>
+        <th>32g</th>
+        <th>0g</th>
+        <th>0g</th>
+        <th>0mg</th>
+        <th>2mg</th>
+        <th>32g</th>
+        <th>0g</th>
+      </tr>
+      <tr>
+        <th>Dairy Co - Whole Milk, 240 ml</th>
+        <th>149</th>
+        <th>12g</th>
+        <th>8g</th>
+        <th>8g</th>
+        <th>24mg</th>
+        <th>105mg</th>
+        <th>12g</th>
+        <th>0g</th>
+      </tr>
+    </tbody>
+    <tbody>
+      <tr>
+        <th>TOTALS</th>
+        <th>482</th>
+        <th>85g</th>
+        <th>10g</th>
+        <th>15g</th>
+        <th>24mg</th>
+        <th>110mg</th>
+        <th>44g</th>
+        <th>3g</th>
+      </tr>
+    </tbody>
+  </table>
+</div>

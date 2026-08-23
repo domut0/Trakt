@@ -32,6 +32,11 @@ function source(overrides: Partial<SyncSource> = {}): SyncSource {
     dailyLogs: [{ date: "2026-08-12", calories: 2400, protein: 180 }],
     habits: [],
     habitEntries: [],
+    foods: [],
+    foodEntries: [],
+    meals: [],
+    recipes: [],
+    recipeIngredients: [],
     unit: "lbs",
     ...overrides,
   };

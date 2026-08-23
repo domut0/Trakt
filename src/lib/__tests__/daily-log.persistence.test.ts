@@ -15,6 +15,11 @@ const DEFAULT_STATE = {
   dailyLogs: [],
   habits: [],
   habitEntries: [],
+  foods: [],
+  foodEntries: [],
+  meals: [],
+  recipes: [],
+  recipeIngredients: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -34,6 +39,11 @@ async function resetDb() {
     db.dailyLogs.clear(),
     db.habits.clear(),
     db.habitEntries.clear(),
+    db.foods.clear(),
+    db.foodEntries.clear(),
+    db.meals.clear(),
+    db.recipes.clear(),
+    db.recipeIngredients.clear(),
     db.meta.clear(),
   ]);
 }

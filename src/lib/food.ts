@@ -164,7 +164,11 @@ export type FactorResult = { ok: true; factor: number } | { ok: false; reason: B
  * food is mass-based, millilitres where it is volume-based, and plain serving
  * counts where the food is only ever known per-serving.
  */
-export function measurementFactor(basis: MacroBasis, quantity: number, unit: MeasurementUnit): FactorResult {
+export function measurementFactor(
+  basis: MacroBasis,
+  quantity: number,
+  unit: MeasurementUnit,
+): FactorResult {
   if (!Number.isFinite(quantity) || quantity < 0) return { ok: false, reason: "incompatibleUnit" };
   if (!Number.isFinite(basis.basisQuantity) || basis.basisQuantity <= 0) {
     return { ok: false, reason: "incompatibleUnit" };
@@ -282,7 +286,10 @@ export function resolveDayMacros(
   if (entries.length > 0) {
     return { ...sumMacros(entries.map(entryMacros)), source: "entries" };
   }
-  if (log && (log.calories != null || log.protein != null || log.carbs != null || log.fat != null)) {
+  if (
+    log &&
+    (log.calories != null || log.protein != null || log.carbs != null || log.fat != null)
+  ) {
     return {
       calories: log.calories,
       protein: log.protein,
@@ -345,8 +352,14 @@ export const DEFAULT_MEALS: readonly Omit<Meal, "id">[] = [
 ] as const;
 
 /** How a portion reads in the UI: "3 cake", "150 g", "1 serving". */
-export function formatMeasurement(basis: MacroBasis, quantity: number, unit: MeasurementUnit): string {
-  const n = Number.isInteger(quantity) ? String(quantity) : String(Math.round(quantity * 100) / 100);
+export function formatMeasurement(
+  basis: MacroBasis,
+  quantity: number,
+  unit: MeasurementUnit,
+): string {
+  const n = Number.isInteger(quantity)
+    ? String(quantity)
+    : String(Math.round(quantity * 100) / 100);
   if (unit === "serving") {
     const label = basis.servingLabel ?? "serving";
     return `${n} ${label}`;

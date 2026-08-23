@@ -51,6 +51,8 @@ export interface SettingsMeta {
   weekdayTargets?: string[];
   /** Opt-in: planning main lifts on a weekly template. */
   planEnabled?: boolean;
+  /** Opt-in: food logging, meals and the food catalogue. */
+  foodEnabled?: boolean;
   /**
    * The weekly training plan, as 7 entries, MONDAY FIRST for the same reason
    * `weekdayTargets` is. Resolve it through plan.ts, never with a raw

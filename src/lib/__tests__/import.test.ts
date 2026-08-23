@@ -22,6 +22,11 @@ const DEFAULT_STATE = {
   dailyLogs: [],
   habits: [],
   habitEntries: [],
+  foods: [],
+  foodEntries: [],
+  meals: [],
+  recipes: [],
+  recipeIngredients: [],
   // Cleared to empty/false rather than to the app's defaults, deliberately. This
   // object stands in for a fresh process that has not read IndexedDB yet, and
   // pre-filling it with the same values a correct hydrate would produce is
@@ -32,6 +37,7 @@ const DEFAULT_STATE = {
   targetsEnabled: false,
   habitsEnabled: false,
   toolsEnabled: false,
+  foodEnabled: false,
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -63,6 +69,11 @@ async function resetDb() {
     db.dailyLogs.clear(),
     db.habits.clear(),
     db.habitEntries.clear(),
+    db.foods.clear(),
+    db.foodEntries.clear(),
+    db.meals.clear(),
+    db.recipes.clear(),
+    db.recipeIngredients.clear(),
     db.meta.clear(),
   ]);
 }
@@ -86,10 +97,16 @@ beforeEach(async () => {
 const PRE_V4_DEFAULTS = {
   habits: [],
   habitEntries: [],
+  foods: undefined,
+  foodEntries: undefined,
+  meals: undefined,
+  recipes: undefined,
+  recipeIngredients: undefined,
   ...defaultTargets(),
   targetsEnabled: false,
   habitsEnabled: false,
   toolsEnabled: false,
+  foodEnabled: false,
   // The plan rides along on v4 without a version bump, so "an old file" means
   // one with no plan keys at all. `undefined` is what parseBackup hands back
   // for exactly that file, which is why it belongs in the shared defaults
@@ -658,12 +675,18 @@ describe("importData (full backup restore)", () => {
       targetsEnabled: true,
       habitsEnabled: true,
       toolsEnabled: true,
+      foodEnabled: false,
       // No plan, deliberately: this fixture is a v4 file as v4 shipped, and the
       // plan's own round trip is its own test below. Keeping it plan-less here
       // is what keeps this one covering the case of a file written before
       // planning existed.
       planEnabled: false,
       plannedWeek: undefined,
+      foods: undefined,
+      foodEntries: undefined,
+      meals: undefined,
+      recipes: undefined,
+      recipeIngredients: undefined,
       // Not the default, so a settings record that failed to persist is visible.
       unit: "kg",
     };
