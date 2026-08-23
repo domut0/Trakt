@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
+import type { Food, FoodEntry, Meal, Recipe, RecipeIngredient } from "./food";
 import type { PlannedWeek } from "./plan";
 import type { SyncBase } from "./sync";
 import type {
@@ -141,6 +142,11 @@ class WorkoutDb extends Dexie {
   dailyLogs!: EntityTable<DailyLog, "date">;
   habits!: EntityTable<Habit, "id">;
   habitEntries!: EntityTable<HabitEntry, "id">;
+  foods!: EntityTable<Food, "id">;
+  foodEntries!: EntityTable<FoodEntry, "id">;
+  meals!: EntityTable<Meal, "id">;
+  recipes!: EntityTable<Recipe, "id">;
+  recipeIngredients!: EntityTable<RecipeIngredient, "id">;
 
   constructor() {
     super("workout-tracker");
@@ -177,6 +183,26 @@ class WorkoutDb extends Dexie {
     this.version(3).stores({
       habits: "id",
       habitEntries: "id, date, habitId",
+    });
+    //
+    // v4 adds food logging, which DOES need a real bump for the same reason v3
+    // did: new tables with new indexes, not new fields on existing records.
+    //
+    // `foodEntries` is indexed on `date` because Today reads a whole day at
+    // once, and on `mealId` because deleting a meal has to find every entry
+    // that pointed at it. `foods` is indexed on `barcode` for scan lookup and
+    // on `name` for the catalogue listing.
+    //
+    // Deliberately NOT indexed: the soft `foodId` on an entry. Nothing ever
+    // queries entries by food, because nothing resolves an entry's macros by
+    // looking its food back up -- the basis is frozen onto the entry itself.
+    // Indexing it would advertise a relationship the design does not have.
+    this.version(4).stores({
+      foods: "id, barcode, name",
+      foodEntries: "id, date, mealId",
+      meals: "id",
+      recipes: "id",
+      recipeIngredients: "id, recipeId",
     });
   }
 }
@@ -239,6 +265,11 @@ export interface AllData {
   dailyLogs: DailyLog[];
   habits: Habit[];
   habitEntries: HabitEntry[];
+  foods: Food[];
+  foodEntries: FoodEntry[];
+  meals: Meal[];
+  recipes: Recipe[];
+  recipeIngredients: RecipeIngredient[];
   settings: SettingsMeta;
   activeSession: ActiveSessionMeta;
 }
@@ -253,6 +284,11 @@ export async function loadAll(): Promise<AllData> {
     dailyLogs,
     habits,
     habitEntries,
+    foods,
+    foodEntries,
+    meals,
+    recipes,
+    recipeIngredients,
     settingsMeta,
     activeSessionMeta,
   ] = await Promise.all([
@@ -263,6 +299,11 @@ export async function loadAll(): Promise<AllData> {
     db.dailyLogs.toArray(),
     db.habits.toArray(),
     db.habitEntries.toArray(),
+    db.foods.toArray(),
+    db.foodEntries.toArray(),
+    db.meals.toArray(),
+    db.recipes.toArray(),
+    db.recipeIngredients.toArray(),
     db.meta.get("settings"),
     db.meta.get("activeSession"),
   ]);
@@ -286,6 +327,11 @@ export async function loadAll(): Promise<AllData> {
     dailyLogs,
     habits,
     habitEntries,
+    foods,
+    foodEntries,
+    meals,
+    recipes,
+    recipeIngredients,
     settings,
     activeSession: (activeSessionMeta as ActiveSessionMeta) ?? EMPTY_ACTIVE_SESSION,
   };
