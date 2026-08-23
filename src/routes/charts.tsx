@@ -11,6 +11,7 @@ import {
 } from "../lib/chart-math";
 import type { DailyLogNumericField } from "../lib/daily-log";
 import { useStore } from "../lib/store";
+import { useEffectiveDailyLogs } from "../lib/use-day-macros";
 
 export const Route = createFileRoute("/charts")({
   head: () => ({
@@ -59,7 +60,7 @@ function formatMetricValue(metricKey: DailyLogNumericField, v: number): string {
 }
 
 function ChartsPage() {
-  const dailyLogs = useStore((s) => s.dailyLogs);
+  const dailyLogs = useEffectiveDailyLogs();
   const unit = useStore((s) => s.unit);
 
   const [metricKey, setMetricKey] = useState<DailyLogNumericField>("calories");

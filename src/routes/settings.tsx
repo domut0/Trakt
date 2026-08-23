@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { MealsEditorSheet } from "../components/MealsEditorSheet";
 import { OneRmCalculatorSheet } from "../components/OneRmCalculatorSheet";
 import { PlateCalculatorSheet } from "../components/PlateCalculatorSheet";
 import { SyncSettings } from "../components/SyncSettings";
@@ -41,6 +42,9 @@ function SettingsPage() {
   const setToolsEnabled = useStore((s) => s.setToolsEnabled);
   const planEnabled = useStore((s) => s.planEnabled);
   const setPlanEnabled = useStore((s) => s.setPlanEnabled);
+  const foodEnabled = useStore((s) => s.foodEnabled);
+  const setFoodEnabled = useStore((s) => s.setFoodEnabled);
+  const seedMealsIfEmpty = useStore((s) => s.seedMealsIfEmpty);
   const importData = useStore((s) => s.importData);
   const clearAllData = useStore((s) => s.clearAllData);
   // Read only so the import confirmation can compare the file against what is
@@ -62,6 +66,7 @@ function SettingsPage() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [plateSheetOpen, setPlateSheetOpen] = useState(false);
   const [oneRmSheetOpen, setOneRmSheetOpen] = useState(false);
+  const [mealsSheetOpen, setMealsSheetOpen] = useState(false);
 
   const confirmClear = async () => {
     await clearAllData();
@@ -310,6 +315,43 @@ function SettingsPage() {
 
         <div className="group-row group-row-sep">
           <div>
+            <div className="t-body">Food logging</div>
+            <div className="t-label text-muted-foreground">
+              Track meals, foods, and daily macros.
+            </div>
+          </div>
+          <Toggle
+            checked={!!foodEnabled}
+            onChange={() => {
+              const next = !foodEnabled;
+              if (next) {
+                seedMealsIfEmpty();
+              }
+              setFoodEnabled(next);
+            }}
+            label="Food logging"
+          />
+        </div>
+        {foodEnabled && (
+          <button
+            type="button"
+            onClick={() => setMealsSheetOpen(true)}
+            className="group-row group-row-sep w-full text-left"
+          >
+            <div>
+              <div className="t-body">Manage meals</div>
+              <div className="t-label text-muted-foreground">
+                Customise meal names, order, and times.
+              </div>
+            </div>
+            <span className="text-accent" aria-hidden="true">
+              →
+            </span>
+          </button>
+        )}
+
+        <div className="group-row group-row-sep">
+          <div>
             <div className="t-body">Calculators</div>
             <div className="t-label text-muted-foreground">
               Add plate loading and 1RM tools here.
@@ -526,6 +568,10 @@ function SettingsPage() {
           <PlateCalculatorSheet open={plateSheetOpen} onClose={() => setPlateSheetOpen(false)} />
           <OneRmCalculatorSheet open={oneRmSheetOpen} onClose={() => setOneRmSheetOpen(false)} />
         </>
+      )}
+
+      {foodEnabled && (
+        <MealsEditorSheet open={mealsSheetOpen} onClose={() => setMealsSheetOpen(false)} />
       )}
     </AppShell>
   );

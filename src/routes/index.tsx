@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { DayEditorSheet } from "../components/DayEditorSheet";
 import { HabitsCard } from "../components/HabitsCard";
+import { MealSection } from "../components/MealSection";
 import { dayKey, isDailyLogEmpty } from "../lib/daily-log";
+import { entriesByDate, entriesByMeal, type ResolvedDayMacros } from "../lib/food";
 import {
   isCardioSession,
   useStore,
@@ -19,6 +21,7 @@ import {
   type TargetProgress,
   type TargetStatus,
 } from "../lib/targets";
+import { useDayMacros } from "../lib/use-day-macros";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -68,6 +71,9 @@ function Home() {
   const exercises = useStore((s) => s.exercises);
   const targetsEnabled = useStore((s) => s.targetsEnabled);
   const habitsEnabled = useStore((s) => s.habitsEnabled);
+  const foodEnabled = useStore((s) => s.foodEnabled);
+  const meals = useStore((s) => s.meals);
+  const foodEntries = useStore((s) => s.foodEntries);
   const targetProfileForDate = useStore((s) => s.targetProfileForDate);
   const upsertDailyLog = useStore((s) => s.upsertDailyLog);
 
@@ -76,6 +82,16 @@ function Home() {
   const todayKey = dayKey(new Date());
   const todayLog = dailyLogs.find((l) => l.date === todayKey);
   const todayProfile = targetsEnabled ? targetProfileForDate(todayKey) : undefined;
+  const todayMacros = useDayMacros(todayKey);
+
+  const todayFoodEntries = useMemo(
+    () => entriesByDate(foodEntries).get(todayKey) ?? [],
+    [foodEntries, todayKey],
+  );
+  const mealGroups = useMemo(
+    () => entriesByMeal(meals, todayFoodEntries),
+    [meals, todayFoodEntries],
+  );
 
   // Yesterday date calculation for the "Copy Yesterday" shortcut action.
   const yesterdayDate = new Date();
@@ -83,7 +99,8 @@ function Home() {
   const yesterdayKey = dayKey(yesterdayDate);
   const yesterdayLog = dailyLogs.find((l) => l.date === yesterdayKey && !isDailyLogEmpty(l));
 
-  const hasTodayLog = todayLog !== undefined && !isDailyLogEmpty(todayLog);
+  const hasTodayLog =
+    todayMacros.source !== "none" || (todayLog !== undefined && !isDailyLogEmpty(todayLog));
   const canCopyYesterday =
     !hasTodayLog &&
     yesterdayLog !== undefined &&
@@ -180,7 +197,8 @@ function Home() {
               className="w-full text-left focus:outline-none min-h-[44px]"
             >
               <DayLogSummary
-                log={todayLog!}
+                log={todayLog}
+                macros={todayMacros}
                 unit={unit}
                 targetsEnabled={targetsEnabled}
                 profile={todayProfile}
@@ -224,6 +242,15 @@ function Home() {
           )}
         </div>
       </section>
+
+      {/* Render meals in rank order below the calorie ring, only when foodEnabled is on */}
+      {foodEnabled && (
+        <div>
+          {mealGroups.map(({ meal, entries }) => (
+            <MealSection key={meal.id} meal={meal} entries={entries} date={todayKey} />
+          ))}
+        </div>
+      )}
 
       <section className="px-5 section-gap pb-8 anim-fade-up">
         <h2 className="group-header px-0 t-caption">Workouts</h2>
@@ -388,36 +415,54 @@ function ConsistencyStrip({
 
 function DayLogSummary({
   log,
+  macros,
   unit,
   targetsEnabled,
   profile,
 }: {
-  log: DailyLog;
+  log: DailyLog | undefined;
+  macros: ResolvedDayMacros;
   unit: "lbs" | "kg";
   targetsEnabled: boolean;
   profile: TargetProfile | undefined;
 }) {
-  const carbCal = (log.carbs ?? 0) * 4;
-  const proteinCal = (log.protein ?? 0) * 4;
-  const fatCal = (log.fat ?? 0) * 9;
+  const calories = macros.calories ?? log?.calories;
+  const protein = macros.protein ?? log?.protein;
+  const carbs = macros.carbs ?? log?.carbs;
+  const fat = macros.fat ?? log?.fat;
+
+  const carbCal = (carbs ?? 0) * 4;
+  const proteinCal = (protein ?? 0) * 4;
+  const fatCal = (fat ?? 0) * 9;
   const macroTotal = carbCal + proteinCal + fatCal;
 
-  const hasMacros = log.carbs !== undefined || log.protein !== undefined || log.fat !== undefined;
-  const hasCalories = log.calories !== undefined;
+  const hasMacros = carbs !== undefined || protein !== undefined || fat !== undefined;
+  const hasCalories = calories !== undefined;
 
   const showRing = hasCalories || hasMacros;
 
+  const effectiveLog: DailyLog = useMemo(
+    () => ({
+      ...(log ?? { date: "" }),
+      calories,
+      protein,
+      carbs,
+      fat,
+    }),
+    [log, calories, protein, carbs, fat],
+  );
+
   const progressRows = useMemo(
-    () => (targetsEnabled && profile ? targetProgressFor(log, profile) : []),
-    [log, targetsEnabled, profile],
+    () => (targetsEnabled && profile ? targetProgressFor(effectiveLog, profile) : []),
+    [effectiveLog, targetsEnabled, profile],
   );
 
   const calProgress = progressRows.find((p) => p.field === "calories");
   const otherProgressRows = progressRows.filter((p) => p.field !== "calories");
 
   const stats: { label: string; value: string }[] = [];
-  if (log.steps !== undefined) stats.push({ label: "steps", value: log.steps.toLocaleString() });
-  if (log.bodyweight !== undefined) stats.push({ label: unit, value: String(log.bodyweight) });
+  if (log?.steps !== undefined) stats.push({ label: "steps", value: log.steps.toLocaleString() });
+  if (log?.bodyweight !== undefined) stats.push({ label: unit, value: String(log.bodyweight) });
 
   return (
     <div className="flex flex-col gap-4">
@@ -431,7 +476,7 @@ function DayLogSummary({
             <CalorieTargetRing progress={calProgress} />
           ) : (
             <MacroRing
-              log={log}
+              calories={calories}
               carbCal={carbCal}
               proteinCal={proteinCal}
               fatCal={fatCal}
@@ -440,9 +485,9 @@ function DayLogSummary({
           )}
           {hasMacros && macroTotal > 0 && (
             <div className="flex w-full items-start justify-around gap-3">
-              <MacroColumn name="Carbs" grams={log.carbs ?? 0} colorClass="text-carbs" />
-              <MacroColumn name="Fat" grams={log.fat ?? 0} colorClass="text-fat" />
-              <MacroColumn name="Protein" grams={log.protein ?? 0} colorClass="text-protein" />
+              <MacroColumn name="Carbs" grams={carbs ?? 0} colorClass="text-carbs" />
+              <MacroColumn name="Fat" grams={fat ?? 0} colorClass="text-fat" />
+              <MacroColumn name="Protein" grams={protein ?? 0} colorClass="text-protein" />
             </div>
           )}
         </div>
@@ -456,7 +501,7 @@ function DayLogSummary({
         </div>
       )}
 
-      {(stats.length > 0 || log.isCheatDay) && (
+      {(stats.length > 0 || log?.isCheatDay) && (
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           {stats.map((s) => (
             <span key={s.label} className="t-body">
@@ -468,7 +513,7 @@ function DayLogSummary({
               It was red, which made a deliberate choice look like an error and
               collided with the goal states above it; state colour belongs to a
               value measured against a goal, and this is neither. */}
-          {log.isCheatDay && (
+          {log?.isCheatDay && (
             <span className="t-label font-medium text-muted-foreground">Cheat day</span>
           )}
         </div>
@@ -782,13 +827,13 @@ function MacroColumn({
 }
 
 function MacroRing({
-  log,
+  calories,
   carbCal,
   proteinCal,
   fatCal,
   macroTotal,
 }: {
-  log: DailyLog;
+  calories?: number;
   carbCal: number;
   proteinCal: number;
   fatCal: number;
@@ -801,7 +846,7 @@ function MacroRing({
 
   // Grouped, like the target ring's number. At hero size an ungrouped "2180"
   // reads as four loose digits next to a "2,700" two lines away in the bars.
-  const centerText = (log.calories !== undefined ? log.calories : macroTotal).toLocaleString();
+  const centerText = (calories !== undefined ? calories : macroTotal).toLocaleString();
   const isNeutralRing = macroTotal === 0;
 
   let offset = 0;
