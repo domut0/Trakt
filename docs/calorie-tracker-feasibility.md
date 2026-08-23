@@ -99,6 +99,39 @@ fallback for US branded gaps. Both are compatible with the no-backend constraint
 
 ---
 
+### 3.4 Open-source prior art worth reading
+
+Several open-source trackers already solve most of this, and reading them is far cheaper than
+rediscovering the same decisions. Ranked by usefulness **to this project specifically**:
+
+| Project                                                               | License  | Stack                     | Why it matters here                                                                                                                                                                                                                                                                       |
+| --------------------------------------------------------------------- | -------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Waistline** (`davidhealey/waistline`)                               | GPL-3.0  | **Cordova — HTML/CSS/JS** | The standout. It is a _web app_, so its logging flows are built from the same primitives this project uses. Uses Open Food Facts + USDA, has barcode scanning. Answers not just "what is the flow" but "how does that flow feel when built out of DOM."                                   |
+| **FoodYou** (`maksimowiczm/FoodYou`)                                  | GPL-3.0  | Kotlin / Jetpack Compose  | Actively maintained, on F-Droid. Integrates Open Food Facts **+ USDA FoodData Central** + Swiss Food Composition DB — which independently validates the source stack recommended in §3.3. Best modern reference for food-search and portion-picker UX.                                    |
+| **OpenNutriTracker** (`simonoppowa/OpenNutriTracker`)                 | GPL-3.0  | Flutter, cross-platform   | Most frequently cited "best open-source MFP alternative." Open Food Facts backed, privacy/offline focused — same posture as this app.                                                                                                                                                     |
+| **wger** (`wger-project/wger`)                                        | AGPL-3.0 | Django                    | Workout **and** nutrition in one app, which is exactly the shape this project is becoming. Read it for the data model: how ingredients, nutrition plans, meals and logs relate, and how that coexists with workout tracking. Its REST API schema is effectively a published domain model. |
+| **python-myfitnesspal** (`coddingtonbear/python-myfitnesspal`)        | —        | Python                    | Not a clone, but its scraping models document MFP's **exact** data structures (`Day` → `meals` → `entries`, `get_food_item_details` returning servings/calories/macros/`mfp_id`). Useful as a schema reference even though scraping itself is off the table (§3.1).                       |
+| **awesome-nutrition-tracking** (`jrhizor/awesome-nutrition-tracking`) | —        | list                      | Index of the wider space, for when a specific problem needs prior art.                                                                                                                                                                                                                    |
+
+Existing MFP CSV parsers worth reading before writing the importer (§6.4): `myFitnessPal-Converter`
+(PyPI), `andrewzey/freemydiary`, `leaherb/myfitnesspal-diary-parser`, and the
+MyFitnessPal-to-Nutritrace exporter gist. They document the export's column format.
+
+**License constraint — read carefully.** Every clone above is GPL-3.0 or AGPL-3.0. This repo is
+"Private / unlicensed. All rights reserved." **Copying code from any of them into this project
+would force it open source under GPL terms.** Reading them to understand UX flows, portion
+math, API integration shape and data-model structure is fine — interaction sequences and schema
+concepts are not what copyright protects. Keep the line clean: read, understand, close the tab,
+write your own. Do not paste.
+
+**What this prior art does and does not replace.** It substantially replaces screenshot-gathering
+for _data model and mechanics_. It does **not** replace it for _muscle memory_, because these
+apps deliberately diverge from MFP — that divergence is why they exist. Both inputs are needed:
+open-source clones for how to build it, MFP screenshots for which taps the user's hands already
+know.
+
+---
+
 ## 4. Barcode scanning
 
 **Verdict: yes, with one iOS-shaped catch.**
@@ -235,11 +268,13 @@ Flagged honestly, because several are load-bearing:
    defeat IP whitelisting is reasoning, not a tested result.
 5. **`getUserMedia` in an iOS home-screen PWA.** Documented as fixed since iOS 14.3; not tested
    on the target device.
-6. **Whether the MFP "Download My Data" CSV carries per-food macro columns** or only the diary
-   text. The Premium export is documented as having meal-level detail; the free GDPR export is
-   documented as containing the food diary, but the exact column set was not inspected. **This
-   is the single most important thing to verify**, because the recommended first slice (§7)
-   depends entirely on it. Request the export early — it takes up to 24h to arrive.
+6. **The exact column set of the MFP "Download My Data" CSV.** Partially resolved: the export
+   is documented as three files (Nutrition, Exercise, Progress), with the nutrition file
+   containing calories, macronutrients, micronutrients and timestamps **for individual logged
+   foods, summarised by meal**, plus food notes. That is per-food rows with macros, which is
+   what the recommended first slice (§7) needs. Still worth confirming against a real export,
+   and the existing parsers listed in §3.4 are the fastest way to learn the headers. **Request
+   the export early — it takes up to 24h to arrive.**
 
 ---
 
@@ -274,3 +309,20 @@ Flagged honestly, because several are load-bearing:
   https://dev.to/albert_nahas_cdc8469a6ae8/parsing-nutrition-labels-with-ai-from-image-to-structured-data-56b2
 - Open nutrition datasets compared —
   https://nutrola.app/en/blog/open-nutrition-datasets-compared-usda-openfoodfacts-nutrola
+- Waistline (Cordova calorie counter, GPL-3.0) — https://github.com/davidhealey/waistline
+- FoodYou (Kotlin/Compose, GPL-3.0, OFF + USDA + Swiss FCD) —
+  https://github.com/maksimowiczm/FoodYou
+- OpenNutriTracker (Flutter, GPL-3.0) — https://github.com/simonoppowa/OpenNutriTracker
+- wger (Django workout + nutrition, AGPL-3.0) — https://github.com/wger-project/wger
+- python-myfitnesspal (MFP data-model reference) —
+  https://github.com/coddingtonbear/python-myfitnesspal
+- awesome-nutrition-tracking (index of the space) —
+  https://github.com/jrhizor/awesome-nutrition-tracking
+- freemydiary (MFP export parser) — https://github.com/andrewzey/freemydiary
+- myfitnesspal-diary-parser (MFP export parser) —
+  https://github.com/leaherb/myfitnesspal-diary-parser
+- myFitnessPal-Converter (MFP export parser) — https://pypi.org/project/myFitnessPal-Converter/
+- MFP Data Export FAQs (file/column breakdown) —
+  https://support.myfitnesspal.com/hc/en-us/articles/360032273352-Data-Export-FAQs
+- Open-source MyFitnessPal alternatives (survey) —
+  https://alternativeto.net/software/myfitnesspal/?license=opensource
