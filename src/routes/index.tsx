@@ -21,7 +21,7 @@ import {
   type TargetProgress,
   type TargetStatus,
 } from "../lib/targets";
-import { useDayMacros } from "../lib/use-day-macros";
+import { useDayMacros, useEffectiveDailyLogs } from "../lib/use-day-macros";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -66,7 +66,10 @@ function Home() {
   const sessions = useStore((s) => s.sessions);
   const slots = useStore((s) => s.slots);
   const sets = useStore((s) => s.sets);
-  const dailyLogs = useStore((s) => s.dailyLogs);
+  // The projection, not the raw table: a day logged purely through food
+  // entries has no typed macros, so reading s.dailyLogs here would report it as
+  // untracked while the ring directly above showed its calories.
+  const dailyLogs = useEffectiveDailyLogs();
   const unit = useStore((s) => s.unit);
   const exercises = useStore((s) => s.exercises);
   const targetsEnabled = useStore((s) => s.targetsEnabled);

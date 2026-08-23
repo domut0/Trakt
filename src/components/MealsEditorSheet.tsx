@@ -210,7 +210,7 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
               No meals configured. Add one above.
             </p>
           ) : (
-            <div className="group-list bg-muted/40">
+            <div className="group-list bg-muted">
               {sortedMeals.map((meal, idx) => {
                 const isAllDay = meal.fromMinutes === meal.toMinutes;
                 const fallback = getFallbackMeal(meal.id);

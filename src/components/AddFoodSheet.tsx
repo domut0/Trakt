@@ -241,7 +241,7 @@ export function AddFoodSheet({
 
               {/* Catalogue results if matched */}
               {filteredFoods.length > 0 && (
-                <div className="group-list bg-muted/40">
+                <div className="group-list bg-muted">
                   <div className="px-3 pt-2 pb-1 t-caption text-muted-foreground">Food library</div>
                   {filteredFoods.map((f, idx) => (
                     <button
@@ -273,9 +273,15 @@ export function AddFoodSheet({
                 </div>
               )}
 
-              {/* Custom / Quick add section */}
-              <div className="group-list bg-muted/40 p-3 space-y-3">
-                <div className="t-caption text-muted-foreground">Quick entry</div>
+              {/*
+                No container here. The sheet is already a surface, and
+                DESIGN.md is explicit that a card inside a card means the outer
+                group is wrong. The caption alone separates this from search.
+              */}
+              <div className="space-y-3">
+                <div className="group-header px-0">
+                  <span className="t-caption">Quick entry</span>
+                </div>
 
                 <div>
                   <label htmlFor="food-name-input" className="sr-only">
@@ -402,7 +408,7 @@ export function AddFoodSheet({
           ) : (
             /* Selected food portion config */
             <div className="space-y-3">
-              <div className="rounded-2xl bg-muted/40 p-3">
+              <div className="pb-1">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="t-body font-semibold text-foreground">{selectedFood.name}</div>
@@ -420,7 +426,7 @@ export function AddFoodSheet({
                 </div>
               </div>
 
-              <div className="group-list bg-muted/40 p-3 space-y-3">
+              <div className="group-list bg-muted p-3 space-y-3">
                 <div className="t-caption text-muted-foreground">Portion</div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>

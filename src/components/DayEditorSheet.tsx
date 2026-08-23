@@ -595,8 +595,17 @@ export function DayEditorSheet({
             </div>
           </div>
 
+          {/*
+            The second sentence stops being true once food entries exist: the
+            day survives on those regardless of what is cleared here. Saying it
+            anyway would be a small lie in the one place the user is deciding
+            whether it is safe to blank a field.
+          */}
           <p className="mt-3 t-label text-muted-foreground">
-            Leave a field blank to record nothing for it. Clearing everything removes the day.
+            Leave a field blank to record nothing for it.
+            {hasEntries
+              ? " Food entries keep the day either way."
+              : " Clearing everything removes the day."}
           </p>
 
           <div className="mt-5 flex items-center gap-2">
