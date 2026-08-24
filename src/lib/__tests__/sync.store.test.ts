@@ -169,7 +169,14 @@ describe("syncNow: the push", () => {
     await useSyncStore.getState().syncNow();
 
     const tabs = sent[0].body.tabs as Record<string, unknown[][]>;
-    expect(Object.keys(tabs).sort()).toEqual(["cardio", "daily", "habits", "sessions", "sets"]);
+    expect(Object.keys(tabs).sort()).toEqual([
+      "Food Log",
+      "cardio",
+      "daily",
+      "habits",
+      "sessions",
+      "sets",
+    ]);
     expect(tabs.sets[1]).toContain("Bench Press");
     expect(tabs.sets[1]).toContain("Heavy Bench");
   });
