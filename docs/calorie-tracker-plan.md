@@ -1,6 +1,14 @@
 # Plan: calorie tracking
 
-**Status:** decisions locked, nothing built. This is the build plan.
+**Status:** BUILT, on branch `claude/food-logging`. Steps 1 to 6 are implemented and
+merged; 835 tests pass with typecheck, lint and prettier clean. Untested by a human, and
+step 0 below is still outstanding.
+
+**The one thing still genuinely unverified:** `getUserMedia` inside an iOS home-screen PWA
+(§8.1). The scanner is written and unit-tested, but nobody has pointed a real iPhone at a
+barcode. Until that happens, treat step 6 as complete-but-unproven rather than done.
+
+**Original status:** decisions locked, nothing built. This is the build plan.
 
 **Companion document:** `calorie-tracker-feasibility.md`. That one asked whether this is
 possible and what the options are. This one records what was chosen. Where the two
