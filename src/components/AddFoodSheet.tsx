@@ -4,13 +4,16 @@ import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import {
   entryMacros,
   MEASUREMENT_UNITS,
+  recipePerServingMacros,
   UNIT_LABELS,
   type Food,
   type FoodEntry,
   type Meal,
   type MeasurementUnit,
+  type Recipe,
 } from "../lib/food";
 import { useStore } from "../lib/store";
+import { RecipeEditorSheet } from "./RecipeEditorSheet";
 
 function toNum(val: string): number | undefined {
   const trimmed = val.trim();
@@ -22,7 +25,7 @@ function toNum(val: string): number | undefined {
 /**
  * Sheet for logging food to a specific meal and date.
  *
- * Supports picking from catalogue foods or typing a quick-add portion directly.
+ * Supports picking from catalogue foods, saved recipes, or typing a quick-add portion directly.
  */
 export function AddFoodSheet({
   open,
@@ -36,10 +39,14 @@ export function AddFoodSheet({
   date: string;
 }) {
   const foods = useStore((s) => s.foods);
+  const recipes = useStore((s) => s.recipes);
+  const recipeIngredients = useStore((s) => s.recipeIngredients);
   const addFoodEntry = useStore((s) => s.addFoodEntry);
 
   const [query, setQuery] = useState("");
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [recipeEditorOpen, setRecipeEditorOpen] = useState(false);
 
   // Quick add / custom entry fields
   const [name, setName] = useState("");
@@ -57,6 +64,7 @@ export function AddFoodSheet({
     if (!open) return;
     setQuery("");
     setSelectedFood(null);
+    setSelectedRecipe(null);
     setName("");
     setBrand("");
     setQuantity("1");
@@ -81,8 +89,19 @@ export function AddFoodSheet({
       .slice(0, 10);
   }, [foods, query]);
 
+  const filteredRecipes = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return recipes.slice(0, 5);
+    return recipes
+      .filter(
+        (r) => r.name.toLowerCase().includes(q) || (r.note && r.note.toLowerCase().includes(q)),
+      )
+      .slice(0, 8);
+  }, [recipes, query]);
+
   const handleSelectFood = (food: Food) => {
     setSelectedFood(food);
+    setSelectedRecipe(null);
     setName(food.name);
     setBrand(food.brand ?? "");
     setQuantity(String(food.basisQuantity));
@@ -93,8 +112,42 @@ export function AddFoodSheet({
     setFat(food.fat !== undefined ? String(food.fat) : "");
   };
 
+  const handleSelectRecipe = (recipe: Recipe) => {
+    setSelectedRecipe(recipe);
+    setSelectedFood(null);
+    setName(recipe.name);
+    setBrand("");
+    setQuantity("1");
+    setUnit("serving");
+    const perServing = recipePerServingMacros(recipe, recipeIngredients, foods);
+    setCalories(perServing.calories !== undefined ? String(perServing.calories) : "");
+    setProtein(perServing.protein !== undefined ? String(perServing.protein) : "");
+    setCarbs(perServing.carbs !== undefined ? String(perServing.carbs) : "");
+    setFat(perServing.fat !== undefined ? String(perServing.fat) : "");
+  };
+
   const previewEntry: FoodEntry = useMemo(() => {
     const q = toNum(quantity) ?? 1;
+    if (selectedRecipe) {
+      const perServing = recipePerServingMacros(selectedRecipe, recipeIngredients, foods);
+      return {
+        id: "preview",
+        date,
+        mealId: meal.id,
+        name: selectedRecipe.name,
+        recipeId: selectedRecipe.id,
+        quantity: q,
+        unit,
+        basisQuantity: 1,
+        basisUnit: "serving",
+        servingLabel: "serving",
+        calories: perServing.calories,
+        protein: perServing.protein,
+        carbs: perServing.carbs,
+        fat: perServing.fat,
+        loggedAt: 0,
+      };
+    }
     if (selectedFood) {
       return {
         id: "preview",
@@ -134,7 +187,10 @@ export function AddFoodSheet({
       loggedAt: 0,
     };
   }, [
+    selectedRecipe,
     selectedFood,
+    recipeIngredients,
+    foods,
     date,
     meal.id,
     name,
@@ -152,7 +208,26 @@ export function AddFoodSheet({
 
   const handleSave = () => {
     const q = toNum(quantity) ?? 1;
-    if (selectedFood) {
+    if (selectedRecipe) {
+      // Decision 18: Logging a recipe freezes resolved per-serving macros as its own basis.
+      // Soft link recipeId is preserved, but past entries never recompute when the recipe is edited.
+      const perServing = recipePerServingMacros(selectedRecipe, recipeIngredients, foods);
+      addFoodEntry({
+        date,
+        mealId: meal.id,
+        name: selectedRecipe.name,
+        recipeId: selectedRecipe.id,
+        quantity: q,
+        unit,
+        basisQuantity: 1,
+        basisUnit: "serving",
+        servingLabel: "serving",
+        calories: perServing.calories,
+        protein: perServing.protein,
+        carbs: perServing.carbs,
+        fat: perServing.fat,
+      });
+    } else if (selectedFood) {
       addFoodEntry({
         date,
         mealId: meal.id,
@@ -193,6 +268,8 @@ export function AddFoodSheet({
 
   if (!open || typeof document === "undefined") return null;
 
+  const hasSelection = selectedFood !== null || selectedRecipe !== null;
+
   return createPortal(
     <div
       data-swipe-ignore
@@ -224,7 +301,7 @@ export function AddFoodSheet({
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-          {!selectedFood ? (
+          {!hasSelection ? (
             <>
               {/* Search or quick name input */}
               <div>
@@ -238,6 +315,53 @@ export function AddFoodSheet({
                   className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body text-foreground outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
                 />
               </div>
+
+              {/* Recipe results if available */}
+              {filteredRecipes.length > 0 && (
+                <div className="group-list bg-muted">
+                  <div className="flex items-center justify-between px-3 pt-2 pb-1">
+                    <span className="t-caption text-muted-foreground">Recipes</span>
+                    <button
+                      type="button"
+                      onClick={() => setRecipeEditorOpen(true)}
+                      className="flex min-h-[44px] items-center px-1 t-label font-semibold text-accent"
+                    >
+                      + New recipe
+                    </button>
+                  </div>
+                  {filteredRecipes.map((r, idx) => {
+                    const perServing = recipePerServingMacros(r, recipeIngredients, foods);
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => handleSelectRecipe(r)}
+                        className={`group-row w-full text-left transition-colors hover:bg-surface/50 ${
+                          idx > 0 ? "group-row-sep" : ""
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate t-body font-medium text-foreground">
+                            {r.name}
+                          </div>
+                          <div className="truncate t-label text-muted-foreground">
+                            {r.servings} {r.servings === 1 ? "serving" : "servings"}
+                            {r.note ? ` · ${r.note}` : ""}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          {perServing.calories !== undefined && (
+                            <div className="t-body font-semibold text-foreground">
+                              {Math.round(perServing.calories)} cal
+                            </div>
+                          )}
+                          <div className="t-label text-muted-foreground">per serving</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Catalogue results if matched */}
               {filteredFoods.length > 0 && (
@@ -273,11 +397,7 @@ export function AddFoodSheet({
                 </div>
               )}
 
-              {/*
-                No container here. The sheet is already a surface, and
-                DESIGN.md is explicit that a card inside a card means the outer
-                group is wrong. The caption alone separates this from search.
-              */}
+              {/* Quick custom entry */}
               <div className="space-y-3">
                 <div className="group-header px-0">
                   <span className="t-caption">Quick entry</span>
@@ -406,19 +526,30 @@ export function AddFoodSheet({
               </div>
             </>
           ) : (
-            /* Selected food portion config */
+            /* Selected food or recipe portion config */
             <div className="space-y-3">
               <div className="pb-1">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <div className="t-body font-semibold text-foreground">{selectedFood.name}</div>
-                    {selectedFood.brand && (
+                    <div className="t-body font-semibold text-foreground">
+                      {selectedRecipe?.name ?? selectedFood?.name}
+                    </div>
+                    {selectedFood?.brand && (
                       <div className="t-label text-muted-foreground">{selectedFood.brand}</div>
+                    )}
+                    {selectedRecipe && (
+                      <div className="t-label text-muted-foreground">
+                        {selectedRecipe.servings}{" "}
+                        {selectedRecipe.servings === 1 ? "serving" : "servings"} recipe
+                      </div>
                     )}
                   </div>
                   <button
                     type="button"
-                    onClick={() => setSelectedFood(null)}
+                    onClick={() => {
+                      setSelectedFood(null);
+                      setSelectedRecipe(null);
+                    }}
                     className="flex min-h-[44px] items-center px-2 t-label font-medium text-accent"
                   >
                     Change
@@ -505,6 +636,12 @@ export function AddFoodSheet({
           </button>
         </div>
       </div>
+
+      <RecipeEditorSheet
+        open={recipeEditorOpen}
+        onClose={() => setRecipeEditorOpen(false)}
+        onSaved={(newRecipe) => handleSelectRecipe(newRecipe)}
+      />
     </div>,
     document.body,
   );

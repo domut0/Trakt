@@ -5,6 +5,7 @@ import { ImportMfpSheet } from "../components/ImportMfpSheet";
 import { MealsEditorSheet } from "../components/MealsEditorSheet";
 import { OneRmCalculatorSheet } from "../components/OneRmCalculatorSheet";
 import { PlateCalculatorSheet } from "../components/PlateCalculatorSheet";
+import { RecipeEditorSheet } from "../components/RecipeEditorSheet";
 import { SyncSettings } from "../components/SyncSettings";
 import { TargetsEditor } from "../components/TargetsEditor";
 import { Toggle } from "../components/Toggle";
@@ -69,6 +70,7 @@ function SettingsPage() {
   const [oneRmSheetOpen, setOneRmSheetOpen] = useState(false);
   const [mealsSheetOpen, setMealsSheetOpen] = useState(false);
   const [importMfpSheetOpen, setImportMfpSheetOpen] = useState(false);
+  const [recipesSheetOpen, setRecipesSheetOpen] = useState(false);
 
   const confirmClear = async () => {
     await clearAllData();
@@ -335,21 +337,38 @@ function SettingsPage() {
           />
         </div>
         {foodEnabled && (
-          <button
-            type="button"
-            onClick={() => setMealsSheetOpen(true)}
-            className="group-row group-row-sep w-full text-left"
-          >
-            <div>
-              <div className="t-body">Manage meals</div>
-              <div className="t-label text-muted-foreground">
-                Customise meal names, order, and times.
+          <>
+            <button
+              type="button"
+              onClick={() => setMealsSheetOpen(true)}
+              className="group-row group-row-sep w-full text-left"
+            >
+              <div>
+                <div className="t-body">Manage meals</div>
+                <div className="t-label text-muted-foreground">
+                  Customise meal names, order, and times.
+                </div>
               </div>
-            </div>
-            <span className="text-accent" aria-hidden="true">
-              →
-            </span>
-          </button>
+              <span className="text-accent" aria-hidden="true">
+                →
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRecipesSheetOpen(true)}
+              className="group-row group-row-sep w-full text-left"
+            >
+              <div>
+                <div className="t-body">Manage recipes</div>
+                <div className="t-label text-muted-foreground">
+                  Create and edit custom recipes and batch meals.
+                </div>
+              </div>
+              <span className="text-accent" aria-hidden="true">
+                →
+              </span>
+            </button>
+          </>
         )}
 
         <div className="group-row group-row-sep">
@@ -588,7 +607,10 @@ function SettingsPage() {
       )}
 
       {foodEnabled && (
-        <MealsEditorSheet open={mealsSheetOpen} onClose={() => setMealsSheetOpen(false)} />
+        <>
+          <MealsEditorSheet open={mealsSheetOpen} onClose={() => setMealsSheetOpen(false)} />
+          <RecipeEditorSheet open={recipesSheetOpen} onClose={() => setRecipesSheetOpen(false)} />
+        </>
       )}
 
       <ImportMfpSheet open={importMfpSheetOpen} onClose={() => setImportMfpSheetOpen(false)} />

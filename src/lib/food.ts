@@ -422,3 +422,32 @@ export function formatMeasurement(
   if (unit === "package") return `${n} package`;
   return `${n} ${UNIT_LABELS[unit]}`;
 }
+
+/**
+ * Calculates per-serving macros for a recipe by summing resolved ingredient macros
+ * and dividing by the recipe's servings count.
+ *
+ * Ingredients that cannot resolve (e.g. missing food or incompatible unit) contribute
+ * nothing. Absent macros stay absent, never 0. Servings < 1 is guarded to 1.
+ */
+export function recipePerServingMacros(
+  recipe: Recipe,
+  ingredients: readonly RecipeIngredient[],
+  foods: readonly Food[],
+): Macros {
+  const servings = !Number.isFinite(recipe.servings) || recipe.servings < 1 ? 1 : recipe.servings;
+  const foodMap = new Map(foods.map((f) => [f.id, f]));
+  const ingredientMacros: Macros[] = [];
+
+  for (const ing of ingredients) {
+    if (ing.recipeId !== recipe.id) continue;
+    const food = foodMap.get(ing.foodId);
+    if (!food) continue;
+    const f = measurementFactor(food, ing.quantity, ing.unit);
+    if (!f.ok) continue;
+    ingredientMacros.push(scaleMacros(food, f.factor));
+  }
+
+  const total = sumMacros(ingredientMacros);
+  return scaleMacros(total, 1 / servings);
+}

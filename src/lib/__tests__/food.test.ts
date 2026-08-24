@@ -7,6 +7,7 @@ import {
   formatMeasurement,
   measurementFactor,
   mealForTime,
+  recipePerServingMacros,
   resolveDayMacros,
   scaleMacros,
   sumMacros,
@@ -14,6 +15,8 @@ import {
   type FoodEntry,
   type MacroBasis,
   type Meal,
+  type Recipe,
+  type RecipeIngredient,
 } from "../food";
 import type { DailyLog } from "../store";
 
@@ -343,5 +346,143 @@ describe("effectiveDailyLogs", () => {
       [entry("2026-08-21", 2, "a")],
     );
     expect(out.map((l) => l.date)).toEqual(["2026-08-21", "2026-08-23"]);
+  });
+});
+
+describe("recipePerServingMacros", () => {
+  const oats: Food = {
+    id: "f_oats",
+    name: "Rolled Oats",
+    sourceType: "user",
+    createdAt: 0,
+    basisQuantity: 100,
+    basisUnit: "g",
+    calories: 380,
+    protein: 13,
+    carbs: 68,
+    fat: 7,
+  };
+
+  const whey: Food = {
+    id: "f_whey",
+    name: "Whey Protein",
+    sourceType: "user",
+    createdAt: 0,
+    basisQuantity: 1,
+    basisUnit: "serving",
+    servingLabel: "scoop",
+    servingWeight: 30,
+    calories: 120,
+    protein: 24,
+    carbs: 3,
+    fat: 1,
+  };
+
+  const berryNoProtein: Food = {
+    id: "f_berries",
+    name: "Blueberries",
+    sourceType: "user",
+    createdAt: 0,
+    basisQuantity: 100,
+    basisUnit: "g",
+    calories: 57,
+    carbs: 14,
+    // protein and fat absent
+  };
+
+  const unresolvableFood: Food = {
+    id: "f_cake",
+    name: "Cake",
+    sourceType: "mfp",
+    createdAt: 0,
+    basisQuantity: 1,
+    basisUnit: "serving",
+    // no servingWeight
+    calories: 200,
+  };
+
+  it("sums ingredients and divides by recipe.servings", () => {
+    const recipe: Recipe = {
+      id: "r_shake",
+      name: "Oat Shake",
+      servings: 2,
+      createdAt: 0,
+    };
+    const ingredients: RecipeIngredient[] = [
+      // 50g oats = 0.5 * (380 cal, 13 P, 68 C, 7 F) = 190 cal, 6.5 P, 34 C, 3.5 F
+      { id: "ri_1", recipeId: "r_shake", foodId: "f_oats", quantity: 50, unit: "g" },
+      // 1 scoop whey = 120 cal, 24 P, 3 C, 1 F
+      { id: "ri_2", recipeId: "r_shake", foodId: "f_whey", quantity: 1, unit: "serving" },
+    ];
+    // Total: 310 cal, 30.5 P, 37 C, 4.5 F
+    // Per serving (divided by 2): 155 cal, 15.25 P, 18.5 C, 2.25 F
+    const macros = recipePerServingMacros(recipe, ingredients, [oats, whey]);
+    expect(macros.calories).toBeCloseTo(155, 6);
+    expect(macros.protein).toBeCloseTo(15.25, 6);
+    expect(macros.carbs).toBeCloseTo(18.5, 6);
+    expect(macros.fat).toBeCloseTo(2.25, 6);
+  });
+
+  it("guards servings < 1 by treating it as 1", () => {
+    const recipeZero: Recipe = {
+      id: "r_1",
+      name: "Single Shake",
+      servings: 0,
+      createdAt: 0,
+    };
+    const ingredients: RecipeIngredient[] = [
+      { id: "ri_1", recipeId: "r_1", foodId: "f_oats", quantity: 100, unit: "g" },
+    ];
+    const macros = recipePerServingMacros(recipeZero, ingredients, [oats]);
+    expect(macros.calories).toBeCloseTo(380, 6);
+    expect(macros.protein).toBeCloseTo(13, 6);
+  });
+
+  it("skips an ingredient that cannot resolve", () => {
+    const recipe: Recipe = {
+      id: "r_mix",
+      name: "Mixed Bowl",
+      servings: 1,
+      createdAt: 0,
+    };
+    const ingredients: RecipeIngredient[] = [
+      { id: "ri_1", recipeId: "r_mix", foodId: "f_oats", quantity: 100, unit: "g" }, // 380 cal
+      // 50g of cake cannot resolve because cake is per-serving without servingWeight
+      { id: "ri_2", recipeId: "r_mix", foodId: "f_cake", quantity: 50, unit: "g" },
+    ];
+    const macros = recipePerServingMacros(recipe, ingredients, [oats, unresolvableFood]);
+    expect(macros.calories).toBeCloseTo(380, 6);
+  });
+
+  it("skips an ingredient whose food does not exist in foods list", () => {
+    const recipe: Recipe = {
+      id: "r_1",
+      name: "Test",
+      servings: 1,
+      createdAt: 0,
+    };
+    const ingredients: RecipeIngredient[] = [
+      { id: "ri_1", recipeId: "r_1", foodId: "f_missing", quantity: 100, unit: "g" },
+      { id: "ri_2", recipeId: "r_1", foodId: "f_oats", quantity: 100, unit: "g" },
+    ];
+    const macros = recipePerServingMacros(recipe, ingredients, [oats]);
+    expect(macros.calories).toBeCloseTo(380, 6);
+  });
+
+  it("keeps absent macros absent, never 0", () => {
+    const recipe: Recipe = {
+      id: "r_berries",
+      name: "Berry Snack",
+      servings: 2,
+      createdAt: 0,
+    };
+    const ingredients: RecipeIngredient[] = [
+      { id: "ri_1", recipeId: "r_berries", foodId: "f_berries", quantity: 100, unit: "g" },
+    ];
+    const macros = recipePerServingMacros(recipe, ingredients, [berryNoProtein]);
+    expect(macros.calories).toBeCloseTo(28.5, 6);
+    expect(macros.carbs).toBeCloseTo(7, 6);
+    expect(macros.protein).toBeUndefined();
+    expect(macros.fat).toBeUndefined();
   });
 });

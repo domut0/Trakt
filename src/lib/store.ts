@@ -423,6 +423,7 @@ interface State {
   /** Deletes the recipe and every recipeIngredient belonging to it. */
   deleteRecipe: (id: string) => void;
   setRecipeIngredients: (recipeId: string, ingredients: RecipeIngredient[]) => void;
+  copyMealFrom: (fromDate: string, fromMealId: string, toDate: string, toMealId: string) => number;
   setFoodEnabled: (v: boolean) => void;
 
   reorderSlots: (fromId: string, toId: string) => void;
@@ -1877,6 +1878,22 @@ export const useStore = create<State>((set, get) => ({
         await db.recipeIngredients.bulkPut(ingredients);
       }
     });
+  },
+
+  copyMealFrom: (fromDate, fromMealId, toDate, toMealId) => {
+    const source = get().foodEntries.filter((e) => e.date === fromDate && e.mealId === fromMealId);
+    if (source.length === 0) return 0;
+    const now = Date.now();
+    const newEntries: FoodEntry[] = source.map((e, idx) => ({
+      ...e,
+      id: `fe_${uid()}`,
+      date: toDate,
+      mealId: toMealId,
+      loggedAt: now + idx,
+    }));
+    set({ foodEntries: [...get().foodEntries, ...newEntries] });
+    safeWrite(() => db.foodEntries.bulkPut(newEntries));
+    return newEntries.length;
   },
 
   setFoodEnabled: (v) => {
