@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { entryMacros, formatMeasurement, type FoodEntry, type Meal } from "../lib/food";
 import { useStore } from "../lib/store";
 import { AddFoodSheet } from "./AddFoodSheet";
+import { CopyMealSheet } from "./CopyMealSheet";
 
 function TrashIcon() {
   return (
@@ -26,8 +27,8 @@ function TrashIcon() {
  * Renders one meal on the Today screen.
  *
  * Displays the meal name in group-header, the list of logged food items with
- * portion and macro breakdown, and an add control. An unresolved portion shows
- * its own inline error rather than reporting 0.
+ * portion and macro breakdown, an add control, and a copy from another day shortcut.
+ * An unresolved portion shows its own inline error rather than reporting 0.
  */
 export function MealSection({
   meal,
@@ -40,6 +41,7 @@ export function MealSection({
 }) {
   const deleteFoodEntry = useStore((s) => s.deleteFoodEntry);
   const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [copySheetOpen, setCopySheetOpen] = useState(false);
 
   const mealMacros = useMemo(() => {
     return entries.map((e) => ({
@@ -155,6 +157,16 @@ export function MealSection({
             Add food
           </button>
         </li>
+        <li>
+          <button
+            type="button"
+            onClick={() => setCopySheetOpen(true)}
+            aria-label={`Copy ${meal.name} from another day`}
+            className="group-row group-row-sep w-full text-left t-body font-medium text-muted-foreground hover:text-foreground"
+          >
+            Copy from another day
+          </button>
+        </li>
       </ul>
 
       <AddFoodSheet
@@ -162,6 +174,13 @@ export function MealSection({
         onClose={() => setAddSheetOpen(false)}
         meal={meal}
         date={date}
+      />
+
+      <CopyMealSheet
+        open={copySheetOpen}
+        onClose={() => setCopySheetOpen(false)}
+        targetMeal={meal}
+        targetDate={date}
       />
     </section>
   );
