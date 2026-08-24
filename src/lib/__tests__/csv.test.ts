@@ -4,6 +4,8 @@ import {
   cardioSessionsInOrder,
   dailyLogsToCsv,
   escapeCsvField,
+  foodEntriesInOrder,
+  foodEntryColumns,
   habitEntriesInOrder,
   habitEntryColumns,
   sessionColumns,
@@ -22,6 +24,7 @@ import type {
   WorkoutSession,
   WorkoutSet,
 } from "../store";
+import type { FoodEntry, Meal } from "../food";
 
 describe("escapeCsvField", () => {
   it("leaves plain text unquoted", () => {
@@ -436,5 +439,203 @@ describe("sheet-only column specs", () => {
     // how a reader tells "stopped tracking" from "stopped doing it".
     expect(rows[1]).toEqual(["2026-08-12", "Ashwagandha", true]);
     expect(rows[2]).toEqual(["2026-08-12", "Creatine", false]);
+  });
+
+  it("orders food entries by date, then meal rank, then loggedAt time", () => {
+    const meals: Meal[] = [
+      { id: "m_b", name: "Breakfast", fromMinutes: 300, toMinutes: 660, rank: 0 },
+      { id: "m_l", name: "Lunch", fromMinutes: 660, toMinutes: 900, rank: 1 },
+      { id: "m_d", name: "Dinner", fromMinutes: 1020, toMinutes: 1320, rank: 2 },
+    ];
+
+    const entries: FoodEntry[] = [
+      {
+        id: "fe_d1",
+        date: "2026-08-12",
+        mealId: "m_d",
+        name: "Steak",
+        quantity: 200,
+        unit: "g",
+        basisQuantity: 100,
+        basisUnit: "g",
+        calories: 250,
+        loggedAt: 1000,
+      },
+      {
+        id: "fe_b1",
+        date: "2026-08-12",
+        mealId: "m_b",
+        name: "Eggs",
+        quantity: 2,
+        unit: "serving",
+        basisQuantity: 1,
+        basisUnit: "serving",
+        calories: 70,
+        loggedAt: 5000, // Logged later in wall-clock time, but belongs to Breakfast
+      },
+      {
+        id: "fe_b2",
+        date: "2026-08-12",
+        mealId: "m_b",
+        name: "Toast",
+        quantity: 1,
+        unit: "serving",
+        basisQuantity: 1,
+        basisUnit: "serving",
+        calories: 80,
+        loggedAt: 6000,
+      },
+      {
+        id: "fe_prev",
+        date: "2026-08-11",
+        mealId: "m_l",
+        name: "Rice",
+        quantity: 150,
+        unit: "g",
+        basisQuantity: 100,
+        basisUnit: "g",
+        calories: 130,
+        loggedAt: 7000,
+      },
+      {
+        id: "fe_unknown",
+        date: "2026-08-12",
+        mealId: "m_deleted",
+        name: "Snack",
+        quantity: 1,
+        unit: "serving",
+        basisQuantity: 1,
+        basisUnit: "serving",
+        calories: 50,
+        loggedAt: 2000,
+      },
+    ];
+
+    const ordered = foodEntriesInOrder(entries, meals);
+    expect(ordered.map((e) => e.id)).toEqual(["fe_prev", "fe_b1", "fe_b2", "fe_d1", "fe_unknown"]);
+  });
+
+  it("exports resolved food entry with numbers and sensible rounding", () => {
+    const meals: Meal[] = [
+      { id: "m_b", name: "Breakfast", fromMinutes: 300, toMinutes: 660, rank: 0 },
+    ];
+
+    const entry: FoodEntry = {
+      id: "fe_1",
+      date: "2026-08-12",
+      mealId: "m_b",
+      name: "Rice Cake",
+      brand: "Quaker",
+      quantity: 3,
+      unit: "serving",
+      basisQuantity: 1,
+      basisUnit: "serving",
+      servingLabel: "cake",
+      calories: 34.667,
+      protein: 0.667,
+      carbs: 7.333,
+      fat: 0.333,
+      loggedAt: 1000,
+    };
+
+    const [header, row] = toRows([entry], foodEntryColumns(meals));
+
+    expect(header).toEqual([
+      "Date",
+      "Meal",
+      "Food",
+      "Brand",
+      "Portion",
+      "Quantity",
+      "Unit",
+      "Calories",
+      "Protein (g)",
+      "Carbs (g)",
+      "Fat (g)",
+    ]);
+
+    expect(row).toEqual([
+      "2026-08-12",
+      "Breakfast",
+      "Rice Cake",
+      "Quaker",
+      "3 cake",
+      3,
+      "serving",
+      104,
+      2,
+      22,
+      1,
+    ]);
+  });
+
+  it("exports blank macro cells for unresolvable entries and never writes zeros", () => {
+    const meals: Meal[] = [
+      { id: "m_b", name: "Breakfast", fromMinutes: 300, toMinutes: 660, rank: 0 },
+    ];
+
+    // A food known only per-serving with no servingWeight cannot resolve grams.
+    const unresolvable: FoodEntry = {
+      id: "fe_unres",
+      date: "2026-08-12",
+      mealId: "m_b",
+      name: "Unknown Weight Item",
+      quantity: 100,
+      unit: "g",
+      basisQuantity: 1,
+      basisUnit: "serving",
+      calories: 200,
+      protein: 10,
+      carbs: 20,
+      fat: 5,
+      loggedAt: 1000,
+    };
+
+    const [, row] = toRows([unresolvable], foodEntryColumns(meals));
+
+    // Raw inputs and portion survive, but macros must be undefined (blank cell), not 0.
+    expect(row[0]).toBe("2026-08-12");
+    expect(row[1]).toBe("Breakfast");
+    expect(row[2]).toBe("Unknown Weight Item");
+    expect(row[3]).toBeUndefined();
+    expect(row[4]).toBe("100 g");
+    expect(row[5]).toBe(100);
+    expect(row[6]).toBe("g");
+    expect(row[7]).toBeUndefined();
+    expect(row[8]).toBeUndefined();
+    expect(row[9]).toBeUndefined();
+    expect(row[10]).toBeUndefined();
+  });
+
+  it("exports fallback meal label for deleted meals without dropping the row", () => {
+    const meals: Meal[] = [
+      { id: "m_b", name: "Breakfast", fromMinutes: 300, toMinutes: 660, rank: 0 },
+    ];
+
+    const orphanEntry: FoodEntry = {
+      id: "fe_orphan",
+      date: "2026-08-12",
+      mealId: "m_deleted_meal_id",
+      name: "Black Coffee",
+      quantity: 1,
+      unit: "serving",
+      basisQuantity: 1,
+      basisUnit: "serving",
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      loggedAt: 1000,
+    };
+
+    const [, row] = toRows([orphanEntry], foodEntryColumns(meals));
+
+    expect(row[1]).toBe("Meal");
+    expect(row[2]).toBe("Black Coffee");
+    // Logged zeros for macros stay as 0, not blank.
+    expect(row[7]).toBe(0);
+    expect(row[8]).toBe(0);
+    expect(row[9]).toBe(0);
+    expect(row[10]).toBe(0);
   });
 });

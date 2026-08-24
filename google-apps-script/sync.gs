@@ -16,7 +16,7 @@ const SECRET = "__SECRET__";
 const SCRIPT_VERSION = 2;
 
 /** Tabs the app writes. Anything else in the spreadsheet is left alone. */
-const APP_TABS = ["sets", "sessions", "daily", "cardio", "habits"];
+const APP_TABS = ["sets", "sessions", "daily", "cardio", "habits", "Food Log"];
 
 /** Tabs the app reads back, because they carry editable columns. */
 const TWO_WAY_TABS = ["sets", "sessions", "daily"];

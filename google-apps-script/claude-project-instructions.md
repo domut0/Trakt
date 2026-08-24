@@ -86,6 +86,21 @@ habits:
     - Habit # the habit's name
     - Archived # TRUE if the user has since stopped tracking this habit
 
+Food Log:
+  what: one row per food entry, day/meal/time order. Push-only.
+  columns:
+    - Date # yyyy-MM-dd
+    - Meal # resolved meal name
+    - Food # food or quick-add name
+    - Brand # brand name, or blank
+    - Portion # human-readable portion, e.g. "3 cake"
+    - Quantity # raw numeric quantity
+    - Unit # raw unit: g | ml | oz | floz | serving | package
+    - Calories
+    - Protein (g)
+    - Carbs (g)
+    - Fat (g)
+
 _sync:
   what: bookkeeping written by the sync script. Not training data.
   shape: Key/Value rows

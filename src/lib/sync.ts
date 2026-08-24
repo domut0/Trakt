@@ -2,6 +2,8 @@ import {
   cardioColumns,
   cardioSessionsInOrder,
   dailyLogColumns,
+  foodEntriesInOrder,
+  foodEntryColumns,
   habitEntriesInOrder,
   habitEntryColumns,
   sessionColumns,
@@ -61,6 +63,7 @@ export const SHEET_TABS = {
   daily: "daily",
   cardio: "cardio",
   habits: "habits",
+  foodLog: "Food Log",
   /** Written by the Apps Script, not by the app. Leading underscore sorts it last. */
   meta: "_sync",
 } as const;
@@ -219,7 +222,18 @@ function withIdColumn<T extends { id: string }>(columns: ColumnSpec<T>[]): Colum
  * the push comes back.
  */
 export function buildSheetTabs(source: SyncSource): Record<string, CellValue[][]> {
-  const { exercises, slots, sessions, sets, dailyLogs, habits, habitEntries, unit } = source;
+  const {
+    exercises,
+    slots,
+    sessions,
+    sets,
+    dailyLogs,
+    habits,
+    habitEntries,
+    foodEntries,
+    meals,
+    unit,
+  } = source;
 
   return {
     [SHEET_TABS.sets]: toRows(
@@ -240,6 +254,7 @@ export function buildSheetTabs(source: SyncSource): Record<string, CellValue[][]
       habitEntriesInOrder(habitEntries, habits),
       habitEntryColumns(habits),
     ),
+    [SHEET_TABS.foodLog]: toRows(foodEntriesInOrder(foodEntries, meals), foodEntryColumns(meals)),
   };
 }
 

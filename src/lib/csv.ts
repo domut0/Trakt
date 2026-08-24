@@ -9,6 +9,7 @@ import type {
   WorkoutSession,
   WorkoutSet,
 } from "./store";
+import { entryMacros, formatMeasurement, type FoodEntry, type Meal } from "./food";
 
 /**
  * Tabular serialisation of the domain objects.
@@ -337,5 +338,80 @@ export function habitEntryColumns(habits: readonly Habit[]): ColumnSpec<HabitEnt
     // docstring), so their entries stay in the table and are flagged instead of
     // being filtered out, which would silently shorten a streak.
     { header: "Archived", accessor: (e) => habitMap.get(e.habitId)?.archived ?? false },
+  ];
+}
+
+/**
+ * Food entries in chronological day order, then by meal rank, then by loggedAt.
+ *
+ * Sorting by meal rank first keeps breakfast above dinner regardless of when
+ * you happened to log them, and loggedAt orders within a meal.
+ */
+export function foodEntriesInOrder(
+  entries: readonly FoodEntry[],
+  meals: readonly Meal[],
+): FoodEntry[] {
+  const mealRank = new Map(meals.map((m) => [m.id, m.rank]));
+  return [...entries].sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      (mealRank.get(a.mealId) ?? Number.MAX_SAFE_INTEGER) -
+        (mealRank.get(b.mealId) ?? Number.MAX_SAFE_INTEGER) ||
+      a.loggedAt - b.loggedAt,
+  );
+}
+
+/**
+ * Column definitions for one logged food entry.
+ *
+ * Resolved macros are rounded to 1 decimal place (integers for calories) so
+ * they land as clean numbers in Sheets. Unresolvable entries leave macro cells
+ * empty rather than writing zeros.
+ */
+export function foodEntryColumns(meals: readonly Meal[]): ColumnSpec<FoodEntry>[] {
+  const mealMap = new Map(meals.map((m) => [m.id, m]));
+
+  return [
+    { header: "Date", accessor: "date" },
+    {
+      header: "Meal",
+      accessor: (e) => mealMap.get(e.mealId)?.name ?? "Meal",
+    },
+    { header: "Food", accessor: "name" },
+    { header: "Brand", accessor: (e) => e.brand },
+    {
+      header: "Portion",
+      accessor: (e) => formatMeasurement(e, e.quantity, e.unit),
+    },
+    { header: "Quantity", accessor: "quantity" },
+    { header: "Unit", accessor: "unit" },
+    {
+      header: "Calories",
+      accessor: (e) => {
+        const cal = entryMacros(e).calories;
+        return cal == null ? undefined : Math.round(cal);
+      },
+    },
+    {
+      header: "Protein (g)",
+      accessor: (e) => {
+        const p = entryMacros(e).protein;
+        return p == null ? undefined : Math.round(p * 10) / 10;
+      },
+    },
+    {
+      header: "Carbs (g)",
+      accessor: (e) => {
+        const c = entryMacros(e).carbs;
+        return c == null ? undefined : Math.round(c * 10) / 10;
+      },
+    },
+    {
+      header: "Fat (g)",
+      accessor: (e) => {
+        const f = entryMacros(e).fat;
+        return f == null ? undefined : Math.round(f * 10) / 10;
+      },
+    },
   ];
 }
