@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { ImportMfpSheet } from "../components/ImportMfpSheet";
 import { MealsEditorSheet } from "../components/MealsEditorSheet";
 import { OneRmCalculatorSheet } from "../components/OneRmCalculatorSheet";
 import { PlateCalculatorSheet } from "../components/PlateCalculatorSheet";
@@ -67,6 +68,7 @@ function SettingsPage() {
   const [plateSheetOpen, setPlateSheetOpen] = useState(false);
   const [oneRmSheetOpen, setOneRmSheetOpen] = useState(false);
   const [mealsSheetOpen, setMealsSheetOpen] = useState(false);
+  const [importMfpSheetOpen, setImportMfpSheetOpen] = useState(false);
 
   const confirmClear = async () => {
     await clearAllData();
@@ -452,6 +454,21 @@ function SettingsPage() {
             →
           </span>
         </label>
+        <button
+          type="button"
+          onClick={() => setImportMfpSheetOpen(true)}
+          className="group-row group-row-sep w-full text-left"
+        >
+          <div>
+            <div className="t-body">Import MyFitnessPal diary</div>
+            <div className="t-label text-muted-foreground">
+              Load foods and macros from an HTML export.
+            </div>
+          </div>
+          <span className="text-accent" aria-hidden="true">
+            →
+          </span>
+        </button>
 
         {importError && (
           <div className="group-row-sep px-5 py-3 t-label text-destructive">{importError}</div>
@@ -573,6 +590,8 @@ function SettingsPage() {
       {foodEnabled && (
         <MealsEditorSheet open={mealsSheetOpen} onClose={() => setMealsSheetOpen(false)} />
       )}
+
+      <ImportMfpSheet open={importMfpSheetOpen} onClose={() => setImportMfpSheetOpen(false)} />
     </AppShell>
   );
 }
