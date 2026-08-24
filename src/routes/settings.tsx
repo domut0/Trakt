@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { ImportMfpSheet } from "../components/ImportMfpSheet";
 import { MealsEditorSheet } from "../components/MealsEditorSheet";
@@ -10,6 +10,7 @@ import { SyncSettings } from "../components/SyncSettings";
 import { TargetsEditor } from "../components/TargetsEditor";
 import { Toggle } from "../components/Toggle";
 import { dailyLogsToCsv, setsToCsv } from "../lib/csv";
+import { loadUsdaKey, saveUsdaKey } from "../lib/db";
 import { isEmptyPlan, type PlannedWeek } from "../lib/plan";
 import {
   BACKUP_VERSION,
@@ -71,6 +72,18 @@ function SettingsPage() {
   const [mealsSheetOpen, setMealsSheetOpen] = useState(false);
   const [importMfpSheetOpen, setImportMfpSheetOpen] = useState(false);
   const [recipesSheetOpen, setRecipesSheetOpen] = useState(false);
+  const [usdaKey, setUsdaKey] = useState("");
+
+  useEffect(() => {
+    loadUsdaKey().then((k) => {
+      if (k) setUsdaKey(k);
+    });
+  }, []);
+
+  const handleUsdaKeyChange = (val: string) => {
+    setUsdaKey(val);
+    saveUsdaKey(val);
+  };
 
   const confirmClear = async () => {
     await clearAllData();
@@ -239,7 +252,7 @@ function SettingsPage() {
               type="button"
               onClick={() => setUnit(u)}
               className={
-                "flex-1 rounded-full py-2.5 t-body font-medium transition-colors " +
+                "flex-1 rounded-full py-2 t-body font-medium transition-colors " +
                 (unit === u ? "bg-foreground text-background" : "bg-muted text-muted-foreground")
               }
             >
@@ -489,6 +502,36 @@ function SettingsPage() {
           </span>
         </button>
 
+        <div className="group-row-sep p-4 space-y-2">
+          <div>
+            <div className="t-body">USDA API key</div>
+            <div className="t-label text-muted-foreground">
+              Required for USDA FoodData Central search. The shared demo key allows only 10 requests
+              an hour.
+            </div>
+          </div>
+          <input
+            type="text"
+            aria-label="USDA API key"
+            value={usdaKey}
+            onChange={(e) => handleUsdaKeyChange(e.target.value)}
+            placeholder="Paste your USDA API key"
+            className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body text-foreground outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
+          />
+          <div className="t-label text-muted-foreground">
+            Stored on this device only and not included in backups. Get a free key at{" "}
+            <a
+              href="https://fdc.nal.usda.gov/api-key-signup.html"
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent underline"
+            >
+              fdc.nal.usda.gov
+            </a>
+            .
+          </div>
+        </div>
+
         {importError && (
           <div className="group-row-sep px-5 py-3 t-label text-destructive">{importError}</div>
         )}
@@ -513,7 +556,7 @@ function SettingsPage() {
               <button
                 type="button"
                 onClick={cancelImport}
-                className="flex-1 rounded-full bg-muted py-2.5 t-body font-medium text-muted-foreground"
+                className="flex-1 rounded-full bg-muted py-2 t-body font-medium text-muted-foreground"
               >
                 Cancel
               </button>
@@ -527,7 +570,7 @@ function SettingsPage() {
                 type="button"
                 onClick={confirmImport}
                 className={
-                  "flex-1 rounded-full py-2.5 t-body font-medium " +
+                  "flex-1 rounded-full py-2 t-body font-medium " +
                   (losses.length > 0
                     ? "bg-destructive text-white"
                     : "bg-foreground text-background")
@@ -577,14 +620,14 @@ function SettingsPage() {
               <button
                 type="button"
                 onClick={() => setShowClearConfirm(false)}
-                className="flex-1 rounded-full bg-muted py-2.5 t-body font-medium text-muted-foreground"
+                className="flex-1 rounded-full bg-muted py-2 t-body font-medium text-muted-foreground"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmClear}
-                className="flex-1 rounded-full bg-destructive py-2.5 t-body font-medium text-white"
+                className="flex-1 rounded-full bg-destructive py-2 t-body font-medium text-white"
               >
                 Clear all data
               </button>
