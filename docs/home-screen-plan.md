@@ -1,7 +1,14 @@
 # Home screen: the day view
 
-**Status: planned, nothing built.** Every decision below is settled. Where a decision
-overrides something already written down, the override is named explicitly in section 8.
+**Status: built.** Every decision below is settled. Where a decision overrides something
+already written down, the override is named explicitly in section 8.
+
+**Six things changed during the build, and section 11 says what and why.** Four of them
+were only visible in the running app. Read section 11 before trusting the details in
+sections 3 and 5: the decisions all held, but three of the specifics were wrong.
+
+Not verified: none of this has been used on a real phone. The nested scroll in
+section 9.1 is still the risk it was.
 
 This document assumes you have read:
 
@@ -59,8 +66,9 @@ the whole feature in one glance.
    screen. `MealSection`'s contents move into a sheet opened by tapping a meal zone.
 9. **Neither card 2 nor card 3 is elevated.** Both sit at `--surface`. Rank comes from size.
    This amends DESIGN.md (section 7.1).
-10. **Bands are grey.** `--muted` fill for actual, dashed `--muted` stroke for planned.
-    Identity comes from an icon and a label. No new colour token is added.
+10. **Bands are grey.** `--muted` fill for actual, dashed stroke for planned. Identity
+    comes from an icon and a label. No new colour token is added. (The stroke shipped as
+    `--border`, not `--muted`. See 11.2.)
 11. **The week strip carries no status dots.** Numbers only, selected day filled, exactly
     like the Apple Calendar reference. The consistency readout is not replaced anywhere,
     because `CalendarView` in History already shows the same workout and nutrition dots on
@@ -188,9 +196,9 @@ It renders **only on today**. It updates on a timer, and the timer is cleared on
 **Identity.** A small icon and a label inside each band. Not hue. There is no strength
 colour token and none is being added.
 
-**Empty day.** A day with no bands at all still renders the canvas and the hour rules, and
-says so once. It does not render six dashed meal zones as its empty state, because the
-default meal set would make every untouched day look identically busy.
+**Empty day.** A day with nothing logged still renders the canvas, the hour rules **and
+the dashed intent bands**, and says so once. See 11.1: the original wording here told the
+build to suppress the bands, which was wrong.
 
 ### 5.4 The meal sheet
 
@@ -300,3 +308,74 @@ decoration, which is precisely what the existing rule would tell them to do.
 - Navigating days does not grow the history stack.
 - The existing food, habit and workout suites still pass unchanged, since no data model
   they touch has moved.
+
+## 11. What changed during the build
+
+Every decision in section 3 survived. Six specifics did not. Four were invisible until the
+screen was opened and scrolled, which is the second time on this codebase that reading
+diffs and passing tests missed defects that one minute of use made obvious.
+
+### 11.1 Dashed bands draw on an empty day (my error, not the build's)
+
+Section 5.3 originally said an empty day must not render dashed meal zones, to stop the
+empty state being six dashed boxes. That instruction was followed exactly and it switched
+off the best case for the whole feature: a fresh morning, the now line above an untouched
+breakfast window, nothing filled in yet. That picture IS intent versus actual.
+
+The bands always draw. Only the note is conditional, and it is a note rather than an
+empty state.
+
+### 11.2 The planned stroke is `--border`, not `--muted`
+
+`--muted` is `#232b36` on a `#1a2029` canvas. As a fill that step is fine; as a one pixel
+dashed hairline it is close to invisible. `--border` `#29323d` is a bigger step off the
+canvas and is the token that exists for hairlines. Decision 10 asked for the wrong one.
+
+### 11.3 All-day windows are a strip, not a band
+
+Snacks ships all-day, so **every** user has a meal whose window is 00:00 to 24:00. Drawn
+on the canvas it is a 1344px dashed rectangle behind everything, which reads as a frame
+around the day rather than as a band in it, and its label lands at noon on top of whatever
+is actually there.
+
+All-day windows now render as chips in a strip above the scrolling canvas, which is what
+Apple Calendar does with all-day events. `TimelineBand.allDay` marks them.
+
+### 11.4 Labels sit at the top, and zones label into a gutter
+
+Two separate problems with one cause: bands were laid out with `items-center`.
+
+A six hour breakfast window centred its name at 08:00, three hours from where the band
+begins. Labels moved to the top edge, as in any calendar.
+
+That then put a dinner window and the workout inside it in the same corner, and the block,
+being on top, hid the window's name. Right-aligning the zone label was not enough on its
+own, because a block running to the same right edge covers that corner too. So blocks stop
+at `right-20` and the zone owns the 80px beyond it. That gutter fits a name but not a name
+plus a count, so a zone shows no detail on the canvas: filled versus dashed already says
+whether the window has anything in it, and the count is one tap away. The narrower block
+stacks its own detail onto a second line.
+
+### 11.5 The empty note lives outside the scroll area
+
+It was absolutely positioned at the top of the canvas, which is midnight. The canvas opens
+scrolled to the now line. It was a message that could only be read by scrolling to 00:00
+first, which nobody would ever do. It now sits on the card itself.
+
+### 11.6 There was a second normaliser
+
+Section 4.1 warned that `plannedWorkoutOf` silently drops any field it does not name.
+`src/routes/plan.tsx` has its **own** reader, `plannedDayAt`, with the same hazard, and the
+plan doc missed it. It is deliberately more forgiving about name and exercises, because the
+editor has to show a half-filled day, so it cannot simply call the other one.
+
+What it must not have is a second opinion about which times are valid. `plannedAtMinutesOf`
+and `plannedDurationMinutesOf` are now exported from `plan.ts` and both readers call them.
+
+### 11.7 Smaller things
+
+- The macro bar glyphs shipped at 28px and read as three specks. Now 56px.
+- The backfill shortcut no longer appears on a future day. Offering to write macros into
+  tomorrow contradicts the stats card above it, which shows a future day no values at all.
+- The Plan week list shows the start time. A time you can set but cannot see anywhere is a
+  setting that looks like it failed to save.
