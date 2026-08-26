@@ -59,11 +59,19 @@ resolved to a stack of identical grey boxes. The tell was that `/workout` was th
 best-composed screen in the app and the only one that ignored the card system.
 
 **Every screen has one subject, and it should be obvious within a second which one it
-is.** On Today that is the calorie ring; on a finished workout it is the record, if
+is.** On the day view that is the timeline; on a finished workout it is the record, if
 there is one.
 
 - **One elevated surface per screen. At most one.** Two elevated things are two
   subjects, which is none.
+- **Rank may come from size instead of fill.** Where two cards are co-equal subjects,
+  neither takes `--muted`: they both sit at `--surface` and the taller one leads. This
+  is not a loophole in the rule above, it is the rule above declining to fire, and it
+  buys something concrete. The day view's timeline draws bands INSIDE itself, and
+  `--muted` is the only fill step they have. A canvas that took `--muted` would leave
+  its own contents nowhere to go, and the fix for that is always someone inventing a
+  fourth step with an opacity variant, which has been shipped and reverted here once
+  already.
 - **Elevation is fill, never stroke.** The rule above still holds: no borders, no
   shadows. There is a third step already in the palette, and it is enough:
   `--background` `#0e1217` → `--surface` `#1a2029` → `--muted` `#232b36`. Surface to
@@ -73,6 +81,14 @@ there is one.
   should be at `t-hero`. If it does not fit its container, grow the container.
 - A track, groove or well goes the **other** way, towards `--background`. A progress
   bar's track was once lighter than the card holding it, which reads as raised.
+- **A stroke may encode state, never elevation.** The no-border rule is about depth,
+  and it stands. It says nothing about meaning. On the day view's timeline a dashed
+  outline means planned and a solid fill means it happened, which is a semantic
+  distinction carried by a channel that is not hue, exactly as the colour section
+  below asks for. This is written down so that nobody reads "no borders" in isolation
+  and deletes the dashed bands as decoration, which is precisely what that rule, taken
+  alone, would tell them to do. The test: remove the stroke and ask whether the screen
+  loses a fact or just a line. If it loses a fact, it stays.
 
 One consequence to know before using `--muted` as a card: this document's contrast
 figures are quoted against `--surface`, and on the lighter fill they drop by about
