@@ -98,8 +98,13 @@ function Home() {
    * at, which is the same idea and works while backfilling a gap. It appears
    * only when this day has nothing and the one before it has something, so it
    * can never overwrite anything.
+   *
+   * NOT on a future day. It is a backfill tool, and offering to write today's
+   * macros into tomorrow contradicts the stats card directly above it, which
+   * deliberately shows a future day its targets and no values at all.
    */
   const canCopyPrevious =
+    selected <= todayKey &&
     (selectedLog === undefined || isDailyLogEmpty(selectedLog)) &&
     previousLog !== undefined &&
     (previousLog.calories !== undefined ||

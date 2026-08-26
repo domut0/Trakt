@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSheetDismiss } from "../hooks/useSheetDismiss";
-import { type PlannedWorkout } from "../lib/plan";
+import { DEFAULT_PLANNED_DURATION_MINUTES, type PlannedWorkout } from "../lib/plan";
 import { useStore } from "../lib/store";
 
 function ArrowUpIcon() {
@@ -62,6 +62,33 @@ function RemoveIcon() {
   );
 }
 
+function toTimeString(mins: number | undefined): string {
+  if (mins === undefined) return "";
+  const h = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function fromTimeString(str: string): number | undefined {
+  const trimmed = str.trim();
+  if (!trimmed) return undefined;
+  const [hStr, mStr] = trimmed.split(":");
+  if (hStr === undefined || mStr === undefined) return undefined;
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  if (Number.isNaN(h) || Number.isNaN(m)) return undefined;
+  if (h < 0 || h >= 24 || m < 0 || m >= 60) return undefined;
+  return h * 60 + m;
+}
+
+function parseDuration(str: string): number | undefined {
+  const trimmed = str.trim();
+  if (!trimmed) return undefined;
+  const n = parseInt(trimmed, 10);
+  if (Number.isNaN(n) || n <= 0) return undefined;
+  return n;
+}
+
 /**
  * Editor for one weekday of the training plan.
  *
@@ -93,6 +120,7 @@ export function PlanEditorSheet({
   onClose: () => void;
 }) {
   const exercises = useStore((s) => s.exercises);
+  const plannedWeek = useStore((s) => s.plannedWeek);
   const setPlannedDay = useStore((s) => s.setPlannedDay);
 
   const [query, setQuery] = useState("");
@@ -123,7 +151,9 @@ export function PlanEditorSheet({
 
   if (!open || typeof document === "undefined") return null;
 
-  const current: PlannedWorkout = workout ?? { name: "", exerciseIds: [] };
+  const storedEntry = Array.isArray(plannedWeek) ? plannedWeek[weekdayIndex] : undefined;
+  const activeWorkout = storedEntry !== undefined ? (storedEntry ?? undefined) : workout;
+  const current: PlannedWorkout = activeWorkout ?? { name: "", exerciseIds: [] };
 
   /**
    * The one write path, so the rest-day rule lives in exactly one place: a day
@@ -132,8 +162,45 @@ export function PlanEditorSheet({
    * are the same gesture as far as the week is concerned.
    */
   const commit = (next: PlannedWorkout) => {
-    const isRest = next.name.trim() === "" && next.exerciseIds.length === 0;
-    setPlannedDay(weekdayIndex, isRest ? null : next);
+    const isRest =
+      next.name.trim() === "" &&
+      next.exerciseIds.length === 0 &&
+      next.atMinutes === undefined &&
+      next.durationMinutes === undefined;
+
+    if (isRest) {
+      setPlannedDay(weekdayIndex, null);
+      return;
+    }
+
+    const cleaned: PlannedWorkout = {
+      name: next.name,
+      exerciseIds: next.exerciseIds,
+    };
+    if (next.atMinutes !== undefined) {
+      cleaned.atMinutes = next.atMinutes;
+    }
+    if (next.durationMinutes !== undefined) {
+      cleaned.durationMinutes = next.durationMinutes;
+    }
+    setPlannedDay(weekdayIndex, cleaned);
+  };
+
+  const handleTimeChange = (timeStr: string) => {
+    const at = fromTimeString(timeStr);
+    commit({
+      ...current,
+      atMinutes: at,
+      durationMinutes: at === undefined ? undefined : current.durationMinutes,
+    });
+  };
+
+  const handleDurationChange = (durStr: string) => {
+    const dur = parseDuration(durStr);
+    commit({
+      ...current,
+      durationMinutes: dur,
+    });
   };
 
   const chosen = current.exerciseIds
@@ -207,8 +274,46 @@ export function PlanEditorSheet({
             value={current.name}
             onChange={(e) => commit({ ...current, name: e.target.value })}
             placeholder="Name this day"
-            className="min-h-[44px] w-full rounded-xl bg-muted px-3.5 t-body outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
+            className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
           />
+
+          <div className="mt-5 flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <label
+                htmlFor="plan-start-time"
+                className="mb-2 block t-caption text-muted-foreground"
+              >
+                Start time
+              </label>
+              <input
+                id="plan-start-time"
+                type="time"
+                aria-label="Start time"
+                value={toTimeString(current.atMinutes)}
+                onChange={(e) => handleTimeChange(e.target.value)}
+                className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <label htmlFor="plan-duration" className="mb-2 block t-caption text-muted-foreground">
+                Duration (min)
+              </label>
+              <input
+                id="plan-duration"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={1440}
+                step={5}
+                disabled={current.atMinutes === undefined}
+                aria-label="Duration in minutes"
+                value={current.durationMinutes ?? ""}
+                onChange={(e) => handleDurationChange(e.target.value)}
+                placeholder={String(DEFAULT_PLANNED_DURATION_MINUTES)}
+                className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent disabled:opacity-30"
+              />
+            </div>
+          </div>
 
           {chosen.length > 0 && (
             <div className="mt-5">
@@ -269,10 +374,10 @@ export function PlanEditorSheet({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search lifts"
-              className="min-h-[44px] w-full rounded-xl bg-muted px-3.5 t-body outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
+              className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
             />
             {candidates.length > 0 ? (
-              <div className="mt-2 max-h-56 overflow-y-auto group-list bg-muted/40">
+              <div className="mt-2 max-h-56 overflow-y-auto group-list bg-muted">
                 {candidates.map((exercise, idx) => (
                   <button
                     key={exercise.id}
@@ -296,7 +401,7 @@ export function PlanEditorSheet({
             )}
           </div>
 
-          {workout !== undefined && (
+          {activeWorkout !== undefined && (
             <button
               type="button"
               onClick={() => setPlannedDay(weekdayIndex, null)}

@@ -119,9 +119,14 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
           )}
         </div>
 
-        {/* Three vertical bar glyphs: protein, fat, carbs */}
+        {/* Three vertical bar glyphs: protein, fat, carbs.
+            56px tall, not 28: these are the card's second reading, the one you get
+            without parsing any digits, and at half this height they read as
+            three specks rather than three bars. The track is bg-background,
+            one step DOWN from the card, because DESIGN.md puts grooves toward
+            the background and a track lighter than its card reads as raised. */}
         <div className="flex items-end gap-1 shrink-0 pt-1" aria-hidden="true">
-          <div className="h-7 w-2 rounded-full bg-background overflow-hidden flex flex-col justify-end">
+          <div className="h-14 w-2.5 rounded-full bg-background overflow-hidden flex flex-col justify-end">
             <div
               className="w-full rounded-full transition-all"
               style={{
@@ -130,7 +135,7 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
               }}
             />
           </div>
-          <div className="h-7 w-2 rounded-full bg-background overflow-hidden flex flex-col justify-end">
+          <div className="h-14 w-2.5 rounded-full bg-background overflow-hidden flex flex-col justify-end">
             <div
               className="w-full rounded-full transition-all"
               style={{
@@ -139,7 +144,7 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
               }}
             />
           </div>
-          <div className="h-7 w-2 rounded-full bg-background overflow-hidden flex flex-col justify-end">
+          <div className="h-14 w-2.5 rounded-full bg-background overflow-hidden flex flex-col justify-end">
             <div
               className="w-full rounded-full transition-all"
               style={{

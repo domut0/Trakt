@@ -5,6 +5,7 @@ import { useStore } from "../lib/store";
 import {
   buildTimelineBands,
   canvasHeightPx,
+  formatMinutesOfDay,
   heightPx,
   initialScrollPx,
   isTimelineEmpty,
@@ -18,12 +19,6 @@ const HOURS_IN_DAY = 24;
 
 function formatHour(h: number): string {
   return `${String(h).padStart(2, "0")}:00`;
-}
-
-function formatTime(mins: number): string {
-  const h = Math.floor(mins / 60) % 24;
-  const m = mins % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 function BandIcon({ kind }: { kind: TimelineBand["kind"] }) {
@@ -122,11 +117,36 @@ export function DayTimeline(props: {
 
   const hours = useMemo(() => Array.from({ length: HOURS_IN_DAY }, (_, i) => i), []);
 
+  // Split before rendering: an all-day window is not a band on the canvas, it
+  // is a chip above it. See the note on TimelineBand.allDay.
+  const allDayBands = bands.filter((b) => b.allDay);
+  const timedBands = bands.filter((b) => !b.allDay);
+
   return (
-    <div className="group-list relative h-[420px] bg-surface">
+    <div className="group-list relative flex h-[420px] flex-col bg-surface">
+      {allDayBands.length > 0 && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 px-4 pt-4 pb-3">
+          {allDayBands.map((band) => (
+            <button
+              key={band.id}
+              type="button"
+              onClick={() => handleBandClick(band)}
+              aria-label={`${band.label}${band.detail ? `, ${band.detail}` : ""}`}
+              className={`flex min-h-[44px] items-center gap-2 rounded-xl px-3 text-left ${
+                band.state === "planned" ? "border border-dashed border-border" : "bg-muted"
+              }`}
+            >
+              <BandIcon kind={band.kind} />
+              <span className="t-body font-medium text-foreground">{band.label}</span>
+              {band.detail && <span className="t-label text-muted-foreground">{band.detail}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div
         ref={scrollRef}
-        className="relative h-full w-full overflow-y-auto"
+        className="relative min-h-0 w-full flex-1 overflow-y-auto"
         style={{ overscrollBehaviorY: "contain" }}
         data-testid="timeline-scroll-container"
       >
@@ -148,22 +168,9 @@ export function DayTimeline(props: {
             );
           })}
 
-          {/*
-            The note, not the empty state. The dashed intent bands below still
-            draw on a day nothing has happened on, because that is the day they
-            are most worth seeing: a fresh morning with the now line above an
-            untouched breakfast window is the whole feature. This line only says
-            that none of it has been filled in yet.
-          */}
-          {isEmpty && (
-            <div className="pointer-events-none absolute left-16 top-4 z-10 t-label text-muted-foreground select-none">
-              {date < dayKey(now) ? "This one went unrecorded." : "Still ahead of you."}
-            </div>
-          )}
-
-          {/* Bands layer. Always rendered, empty day or not: see the note above. */}
+          {/* Bands layer. Always rendered, empty day or not: see the note below. */}
           <div className="absolute inset-y-0 left-14 right-3 pointer-events-none">
-            {bands.map((band) => {
+            {timedBands.map((band) => {
               const top = offsetPx(band.fromMinutes, PX_PER_HOUR);
               const height = heightPx(band, PX_PER_HOUR);
               const isPlanned = band.state === "planned";
@@ -175,8 +182,27 @@ export function DayTimeline(props: {
                   type="button"
                   onClick={() => handleBandClick(band)}
                   aria-label={`${band.label}${band.detail ? `, ${band.detail}` : ""}`}
-                  className={`pointer-events-auto absolute flex items-center gap-2 overflow-hidden px-3 text-left transition-opacity hover:opacity-90 active:opacity-75 ${
-                    isBlock ? "left-5 right-0 z-20" : "left-0 right-0 z-10"
+                  // Two alignment decisions, both from watching it render.
+                  //
+                  // items-start, not items-center: a six hour breakfast window
+                  // centres its label at 08:00, which puts the name of the band
+                  // three hours from where the band begins. Calendars label at
+                  // the top edge and so does this.
+                  //
+                  // A ZONE labels to the RIGHT, into a gutter that blocks are
+                  // kept out of. Dinner and the workout inside it both start
+                  // around 17:00, so with both labelled top-left the block wins
+                  // and the window loses its name. Right-aligning alone was not
+                  // enough, because a block running to the same right edge
+                  // covers that corner too, so blocks stop at right-20 and the
+                  // zone owns the 80px beyond it.
+                  //
+                  // That gutter fits a name but not a name plus a count, which
+                  // is why a zone shows no detail on the canvas. It costs
+                  // nothing: filled versus dashed already says whether the
+                  // window has anything in it, and the count is one tap away.
+                  className={`pointer-events-auto absolute flex items-start gap-2 overflow-hidden px-3 py-2 transition-opacity hover:opacity-90 active:opacity-75 ${
+                    isBlock ? "left-5 right-20 z-20 text-left" : "left-0 right-0 z-10 justify-end"
                   } ${
                     isPlanned ? "border border-dashed border-border bg-transparent" : "bg-muted"
                   } ${band.openEnded ? "rounded-t-xl rounded-b-none border-b-0" : "rounded-xl"}`}
@@ -186,10 +212,26 @@ export function DayTimeline(props: {
                   }}
                 >
                   <BandIcon kind={band.kind} />
-                  <span className="truncate t-body font-medium text-foreground">{band.label}</span>
-                  {band.detail && (
-                    <span className="truncate t-label text-muted-foreground">{band.detail}</span>
-                  )}
+                  {/*
+                    Stacked, not inline. Once blocks stop at right-20 to leave
+                    the zone its gutter, a block on a 375px screen has about
+                    140px of content width, and "Heavy Bench" beside "12 sets"
+                    truncates both to initials. On two lines the name gets the
+                    whole width and the count still fits underneath.
+                  */}
+                  {/* flex-1 on a BLOCK only. On a zone it would fill the width
+                      and undo the justify-end that keeps the name in its
+                      gutter, stranding the icon at the far left. */}
+                  <span className={`min-w-0 ${isBlock ? "flex-1" : ""}`}>
+                    <span className="block truncate t-body font-medium text-foreground">
+                      {band.label}
+                    </span>
+                    {band.detail && isBlock && (
+                      <span className="block truncate t-label text-muted-foreground">
+                        {band.detail}
+                      </span>
+                    )}
+                  </span>
                 </button>
               );
             })}
@@ -203,13 +245,31 @@ export function DayTimeline(props: {
               style={{ top: `${offsetPx(nowMinutes, PX_PER_HOUR)}px` }}
             >
               <div className="flex shrink-0 items-center justify-center rounded-md bg-accent px-2 py-1 t-caption font-semibold text-accent-foreground">
-                {formatTime(nowMinutes)}
+                {formatMinutesOfDay(nowMinutes)}
               </div>
               <div className="h-px flex-1 bg-accent" />
             </div>
           )}
         </div>
       </div>
+
+      {/*
+        The note, not the empty state. It sits OUTSIDE the scrolling canvas, on
+        the card itself, because inside it would be absolutely positioned at
+        midnight: the canvas opens scrolled to the now line, so a note pinned to
+        00:00 is a message nobody ever sees. That is exactly how it shipped for
+        about ten minutes.
+
+        The dashed intent bands underneath still draw on a day nothing has
+        happened on. That is the day they are most worth seeing, since a fresh
+        morning with the now line above an untouched breakfast window is the
+        whole feature. This line only says none of it has been filled in yet.
+      */}
+      {isEmpty && (
+        <div className="pointer-events-none absolute left-16 top-4 z-40 t-label text-muted-foreground select-none">
+          {date < dayKey(now) ? "This one went unrecorded." : "Still ahead of you."}
+        </div>
+      )}
     </div>
   );
 }

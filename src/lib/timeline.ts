@@ -79,6 +79,18 @@ export interface TimelineBand {
    * because its end is not yet a fact.
    */
   openEnded?: boolean;
+  /**
+   * A window that covers the entire day, so it is not really a window at all.
+   *
+   * Snacks ships as all-day by default, which means every user has one of
+   * these. Drawn on the canvas it becomes a full height dashed rectangle behind
+   * everything else, reading as a frame around the day rather than as a band in
+   * it, and its label lands at noon on top of whatever is actually there.
+   *
+   * The caller renders these in a strip ABOVE the scrolling canvas, which is
+   * what Apple Calendar does with all-day events and for the same reason.
+   */
+  allDay?: boolean;
   /** Set on meal zones. Opens the meal sheet. */
   mealId?: string;
   /** Set on logged training blocks. Navigates to the workout. */
@@ -105,6 +117,22 @@ export interface BuildTimelineInput {
 /** Minutes past local midnight for a `Date`. */
 export function minutesOfDay(d: Date): number {
   return d.getHours() * 60 + d.getMinutes();
+}
+
+/**
+ * "17:05" from 1025. The inverse of `minutesOfDay`, for anything that DISPLAYS
+ * a time the user set.
+ *
+ * Not the same job as `PlanEditorSheet`'s own serialiser, which produces a
+ * value for an `<input type="time">` and is therefore contractually 24 hour
+ * zero padded whatever this ever becomes. Keep them separate: the day this
+ * turns into a locale-aware "5:05 PM", the input would silently stop
+ * round-tripping.
+ */
+export function formatMinutesOfDay(minutes: number): string {
+  const h = Math.floor(minutes / 60) % 24;
+  const m = Math.round(minutes) % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 /** Clamped into the day, so a band can never escape the canvas it is drawn on. */
@@ -204,6 +232,8 @@ function mealZones(meals: readonly Meal[], entriesForDay: readonly FoodEntry[]):
         layer: "zone" as const,
         fromMinutes: from,
         toMinutes: to,
+        // Covering the whole day is not a window. See the note on `allDay`.
+        allDay: from === 0 && to === TIMELINE_MINUTES ? true : undefined,
         label: meal.name,
         detail: count > 0 ? `${count} ${count === 1 ? "item" : "items"}` : undefined,
         mealId: meal.id,

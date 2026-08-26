@@ -2,8 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { PlanEditorSheet } from "../components/PlanEditorSheet";
-import { isEmptyPlan, type PlannedWeek, type PlannedWorkout } from "../lib/plan";
+import {
+  isEmptyPlan,
+  plannedAtMinutesOf,
+  plannedDurationMinutesOf,
+  type PlannedWeek,
+  type PlannedWorkout,
+} from "../lib/plan";
 import { WEEKDAY_LABELS, weekdayIndexFor } from "../lib/targets";
+import { formatMinutesOfDay } from "../lib/timeline";
 import { useStore } from "../lib/store";
 
 export const Route = createFileRoute("/plan")({
@@ -57,13 +64,23 @@ const WEEKDAY_FULL = [
 function plannedDayAt(week: PlannedWeek | undefined, index: number): PlannedWorkout | undefined {
   const entry: unknown = Array.isArray(week) ? week[index] : undefined;
   if (entry === null || typeof entry !== "object") return undefined;
-  const { name, exerciseIds } = entry as Partial<PlannedWorkout>;
-  return {
+  const { name, exerciseIds, atMinutes, durationMinutes } = entry as Partial<PlannedWorkout>;
+  const workout: PlannedWorkout = {
     name: typeof name === "string" ? name : "",
     exerciseIds: Array.isArray(exerciseIds)
       ? exerciseIds.filter((id): id is string => typeof id === "string")
       : [],
   };
+  // Through plan.ts, not re-derived here. This reader is deliberately more
+  // forgiving than `plannedWorkoutFor` about name and exercises, because the
+  // editor has to show a half-filled day. What it must not have is its own
+  // opinion about which times are valid: two copies of those bounds is one
+  // careless edit away from a plan that draws on the day view and not here.
+  const at = plannedAtMinutesOf(atMinutes);
+  if (at !== undefined) workout.atMinutes = at;
+  const duration = plannedDurationMinutesOf(durationMinutes);
+  if (duration !== undefined) workout.durationMinutes = duration;
+  return workout;
 }
 
 function PlanPage() {
@@ -125,7 +142,19 @@ function PlanPage() {
           {days.map(({ label, index, planned, lifts }) => {
             const isToday = index === todayIndex;
             const title = planned ? planned.name.trim() || "Untitled" : "Rest day";
-            const detail = planned ? lifts.join(" · ") || "No lifts yet" : "";
+            // The time leads the detail line when there is one. A start time you
+            // can set in the editor but cannot see anywhere in the week is a
+            // setting that appears not to have saved.
+            const detail = planned
+              ? [
+                  planned.atMinutes !== undefined
+                    ? formatMinutesOfDay(planned.atMinutes)
+                    : undefined,
+                  lifts.join(" · ") || "No lifts yet",
+                ]
+                  .filter((part): part is string => part !== undefined)
+                  .join(" · ")
+              : "";
             return (
               <button
                 key={label}

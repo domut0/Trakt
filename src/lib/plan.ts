@@ -80,6 +80,27 @@ function plannedMinutesOf(value: unknown, max: number): number | undefined {
   return value;
 }
 
+/**
+ * The two time validators, exported because `plannedWorkoutOf` is not the only
+ * place a stored plan entry gets normalised.
+ *
+ * `plan.tsx` has its own reader, deliberately: the editor wants to show a
+ * half-filled day (a name with no exercises) where this module wants to answer
+ * "is there a plan or not", so one cannot be expressed in terms of the other.
+ * What they must NOT disagree about is what counts as a valid time, which is
+ * why that part lives here and both call it. Two copies of these bounds is one
+ * refactor away from a plan that draws on one screen and not the other.
+ */
+export function plannedAtMinutesOf(value: unknown): number | undefined {
+  return plannedMinutesOf(value, MINUTES_PER_DAY);
+}
+
+/** A duration may run to a full day. Zero and negatives are meaningless. */
+export function plannedDurationMinutesOf(value: unknown): number | undefined {
+  const v = plannedMinutesOf(value, MINUTES_PER_DAY + 1);
+  return v !== undefined && v > 0 ? v : undefined;
+}
+
 /** Length 7, Monday-first. null = rest day. */
 export type PlannedWeek = (PlannedWorkout | null)[];
 
@@ -126,12 +147,10 @@ function plannedWorkoutOf(entry: unknown): PlannedWorkout | undefined {
   const planned: PlannedWorkout = { name, exerciseIds: [...exerciseIds] };
   // Assigned conditionally rather than always, so a plan with no time round
   // trips through backup JSON without gaining two `undefined` keys.
-  const at = plannedMinutesOf(atMinutes, MINUTES_PER_DAY);
+  const at = plannedAtMinutesOf(atMinutes);
   if (at !== undefined) planned.atMinutes = at;
-  // A duration may legitimately reach a full day; only zero and negatives are
-  // meaningless, and `plannedMinutesOf` already rejects those.
-  const duration = plannedMinutesOf(durationMinutes, MINUTES_PER_DAY + 1);
-  if (duration !== undefined && duration > 0) planned.durationMinutes = duration;
+  const duration = plannedDurationMinutesOf(durationMinutes);
+  if (duration !== undefined) planned.durationMinutes = duration;
   return planned;
 }
 
