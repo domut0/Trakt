@@ -163,8 +163,8 @@ describe("training blocks", () => {
   });
   const SLOTS: SplitSlot[] = [{ id: "slot1", name: "Heavy Bench", rotationOrder: 0 }];
   const SETS: WorkoutSet[] = [
-    { id: "w1", sessionId: "s1", exerciseId: "e", weight: 100, reps: 5 },
-    { id: "w2", sessionId: "s1", exerciseId: "e", weight: 100, reps: 5 },
+    { id: "w1", sessionId: "s1", exerciseId: "e", weight: 100, reps: 5, loggedAt: 0 },
+    { id: "w2", sessionId: "s1", exerciseId: "e", weight: 100, reps: 5, loggedAt: 0 },
   ];
 
   it("draws a logged session filled, from its own start and end", () => {

@@ -190,10 +190,7 @@ function trainingLabel(
  * window is clamped to the end of the day rather than split into two bands: two
  * bands for one meal would be tappable twice and would double its entry count.
  */
-function mealZones(
-  meals: readonly Meal[],
-  entriesForDay: readonly FoodEntry[],
-): TimelineBand[] {
+function mealZones(meals: readonly Meal[], entriesForDay: readonly FoodEntry[]): TimelineBand[] {
   return [...meals]
     .sort((a, b) => a.rank - b.rank)
     .map((meal) => {
@@ -236,11 +233,12 @@ function trainingBlocks(input: BuildTimelineInput): TimelineBand[] {
       // other day: a session left open days ago should not paint the rest of
       // that day, and it is not still running.
       const openEnded = session.endedAt === undefined;
-      const to = session.endedAt !== undefined
-        ? minutesOfDay(new Date(session.endedAt))
-        : isToday
-          ? nowMinutes
-          : from;
+      const to =
+        session.endedAt !== undefined
+          ? minutesOfDay(new Date(session.endedAt))
+          : isToday
+            ? nowMinutes
+            : from;
       return {
         id: `session_${session.id}`,
         kind: isCardioSession(session) ? "cardio" : "strength",
@@ -319,10 +317,10 @@ export function initialScrollPx(
   const isToday = date === dayKey(now);
   const anchorMinutes = isToday
     ? minutesOfDay(now)
-    : bands.reduce<number | undefined>(
+    : (bands.reduce<number | undefined>(
         (min, b) => (min === undefined ? b.fromMinutes : Math.min(min, b.fromMinutes)),
         undefined,
-      ) ?? 0;
+      ) ?? 0);
   const target = offsetPx(anchorMinutes, pxPerHour) - viewportPx / 3;
   const maxScroll = Math.max(canvasHeightPx(pxPerHour) - viewportPx, 0);
   return Math.min(Math.max(target, 0), maxScroll);

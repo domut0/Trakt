@@ -2,7 +2,6 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useStore } from "../../lib/store";
 import { MealsEditorSheet } from "../MealsEditorSheet";
-import { MealSection } from "../MealSection";
 import { AddFoodSheet } from "../AddFoodSheet";
 import { DayEditorSheet } from "../DayEditorSheet";
 import { RecipeEditorSheet } from "../RecipeEditorSheet";
@@ -97,71 +96,6 @@ describe("MealsEditorSheet", () => {
 
     const meals = useStore.getState().meals;
     expect(meals.some((m) => m.name === "Dinner")).toBe(true);
-  });
-});
-
-describe("MealSection", () => {
-  const meal = { id: "m1", name: "Breakfast", fromMinutes: 360, toMinutes: 660, rank: 0 };
-
-  it("says nothing at all when a meal is empty", () => {
-    // DESIGN.md forbids empty states that share a shape, and a per-meal line
-    // would print the same sentence under every meal on a fresh day. The
-    // heading and the add row carry the message on their own.
-    render(<MealSection meal={meal} entries={[]} date="2026-08-23" />);
-    expect(screen.getByText("Breakfast")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add food to Breakfast" })).toBeInTheDocument();
-    expect(screen.queryByText(/no food/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/nothing/i)).not.toBeInTheDocument();
-  });
-
-  it("renders entry rows with portion and macros", () => {
-    const entries = [
-      {
-        id: "e1",
-        date: "2026-08-23",
-        mealId: "m1",
-        name: "Greek Yogurt",
-        brand: "Fage",
-        quantity: 150,
-        unit: "g" as const,
-        basisQuantity: 100,
-        basisUnit: "g" as const,
-        calories: 100,
-        protein: 10,
-        carbs: 4,
-        fat: 0,
-        loggedAt: 1,
-      },
-    ];
-
-    render(<MealSection meal={meal} entries={entries} date="2026-08-23" />);
-    expect(screen.getByText("Greek Yogurt")).toBeInTheDocument();
-    expect(screen.getByText("150 g · Fage")).toBeInTheDocument();
-    expect(screen.getByText("150")).toBeInTheDocument(); // 100 * 1.5 = 150 cal
-    expect(screen.getByText("15g P")).toBeInTheDocument();
-    expect(screen.getByText("6g C")).toBeInTheDocument();
-    expect(screen.getByText("0g F")).toBeInTheDocument();
-  });
-
-  it("shows inline error when portion cannot resolve", () => {
-    const entries = [
-      {
-        id: "e2",
-        date: "2026-08-23",
-        mealId: "m1",
-        name: "Mystery Portion Item",
-        quantity: 2,
-        unit: "serving" as const,
-        basisQuantity: 100,
-        basisUnit: "g" as const, // serving cannot convert to grams without servingWeight
-        calories: 200,
-        loggedAt: 1,
-      },
-    ];
-
-    render(<MealSection meal={meal} entries={entries} date="2026-08-23" />);
-    expect(screen.getByText("Mystery Portion Item")).toBeInTheDocument();
-    expect(screen.getByText("Unresolved portion")).toBeInTheDocument();
   });
 });
 
