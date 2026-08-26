@@ -8,7 +8,6 @@ import {
   formatMinutesOfDay,
   heightPx,
   initialScrollPx,
-  isTimelineEmpty,
   minutesOfDay,
   offsetPx,
   type TimelineBand,
@@ -81,7 +80,6 @@ export function DayTimeline(props: {
     });
   }, [date, now, meals, foodEntries, sessions, sets, exercises, slots, planned, unit]);
 
-  const isEmpty = isTimelineEmpty(bands);
   const isToday = date === dayKey(now);
   const nowMinutes = minutesOfDay(now);
 
@@ -168,7 +166,8 @@ export function DayTimeline(props: {
             );
           })}
 
-          {/* Bands layer. Always rendered, empty day or not: see the note below. */}
+          {/* Bands layer. An empty day still draws its dashed intent bands: that is
+              the day they are most worth seeing. */}
           <div className="absolute inset-y-0 left-14 right-3 pointer-events-none">
             {timedBands.map((band) => {
               const top = offsetPx(band.fromMinutes, PX_PER_HOUR);
@@ -254,22 +253,11 @@ export function DayTimeline(props: {
       </div>
 
       {/*
-        The note, not the empty state. It sits OUTSIDE the scrolling canvas, on
-        the card itself, because inside it would be absolutely positioned at
-        midnight: the canvas opens scrolled to the now line, so a note pinned to
-        00:00 is a message nobody ever sees. That is exactly how it shipped for
-        about ten minutes.
-
-        The dashed intent bands underneath still draw on a day nothing has
-        happened on. That is the day they are most worth seeing, since a fresh
-        morning with the now line above an untouched breakfast window is the
-        whole feature. This line only says none of it has been filled in yet.
+        No empty state. An untouched day already reads as untouched: the dashed
+        intent bands are there with nothing filled in, which says it without a
+        sentence. A line of prose on top of that was saying the same thing twice
+        and reading as debug text.
       */}
-      {isEmpty && (
-        <div className="pointer-events-none absolute left-16 top-4 z-40 t-label text-muted-foreground select-none">
-          {date < dayKey(now) ? "This one went unrecorded." : "Still ahead of you."}
-        </div>
-      )}
     </div>
   );
 }

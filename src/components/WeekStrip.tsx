@@ -28,12 +28,6 @@ export function WeekStrip({
   );
 
   const todayKey = dayKey(new Date());
-  const displayedKeys = useMemo(() => days.map((d) => dayKey(d)), [days]);
-  const weekContainsToday = displayedKeys.includes(todayKey);
-  const isSelectedToday = selectedDate === todayKey;
-  const showToday = !weekContainsToday || !isSelectedToday;
-
-  const monthLabel = format(weekStart, "MMMM yyyy");
 
   const handlePrevWeek = () => {
     setViewedDate((d) => subWeeks(d, 1));
@@ -43,50 +37,31 @@ export function WeekStrip({
     setViewedDate((d) => addWeeks(d, 1));
   };
 
-  const handleToday = () => {
-    const todayStr = dayKey(new Date());
-    setViewedDate(parseDayKey(todayStr));
-    onSelectDate(todayStr);
-  };
-
   return (
-    <div className="group-list p-4">
-      <div className="flex items-center justify-between pb-3">
-        <div className="flex items-center gap-2">
-          <span aria-live="polite" className="t-body font-semibold tracking-tight text-foreground">
-            {monthLabel}
-          </span>
-          {showToday && (
-            <button
-              type="button"
-              onClick={handleToday}
-              className="flex min-h-[44px] items-center px-2 t-label font-medium text-accent hover:text-foreground"
-            >
-              Today
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={handlePrevWeek}
-            aria-label="Previous week"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={handleNextWeek}
-            aria-label="Next week"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <ChevronRight className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
-      </div>
+    /*
+      No month caption and no Today button.
 
-      <div className="grid grid-cols-7 gap-1 text-center">
+      The screen title directly above already names the day, so a month label
+      under it made the header two competing texts, and the strip is a week: the
+      dates in it say which month it is. Returning to today is the bottom nav's
+      Today tab, which navigates to bare `/` and clears the date param, so a
+      second control for it inside the strip was a duplicate of something more
+      discoverable.
+
+      That leaves the chevrons flanking the week rather than sitting in a header
+      row of their own, which is what the header row existed to hold.
+    */
+    <div className="group-list flex items-center gap-1 p-4">
+      <button
+        type="button"
+        onClick={handlePrevWeek}
+        aria-label="Previous week"
+        className="flex h-11 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+      </button>
+
+      <div className="grid flex-1 grid-cols-7 gap-1 text-center">
         {days.map((day, idx) => {
           const key = dayKey(day);
           const isSelected = key === selectedDate;
@@ -119,6 +94,15 @@ export function WeekStrip({
           );
         })}
       </div>
+
+      <button
+        type="button"
+        onClick={handleNextWeek}
+        aria-label="Next week"
+        className="flex h-11 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <ChevronRight className="h-5 w-5" aria-hidden="true" />
+      </button>
     </div>
   );
 }

@@ -279,7 +279,7 @@ describe("DayTimeline", () => {
     expect(onOpenPlan).toHaveBeenCalledTimes(1);
   });
 
-  it("renders empty day note and hour rules when timeline is empty", () => {
+  it("says nothing in prose about an empty day, and still draws its intent", () => {
     render(
       <DayTimeline
         date={otherDate}
@@ -289,32 +289,19 @@ describe("DayTimeline", () => {
       />,
     );
 
-    // otherDate is in the past, so the note says the day went by unrecorded
-    // rather than claiming it is still ahead.
-    expect(screen.getByText("This one went unrecorded.")).toBeInTheDocument();
-
-    // Still renders hour labels
+    // The hour rules are still there.
     expect(screen.getByText("00:00")).toBeInTheDocument();
     expect(screen.getByText("12:00")).toBeInTheDocument();
 
-    // The intent layer still draws. A day with nothing logged is exactly the
-    // day the dashed windows are worth seeing, so "empty" suppresses the note's
-    // absence, never the bands.
+    // And so are the dashed windows, which is the point: a day with nothing on
+    // it is the day the intent layer is most worth seeing.
     const breakfast = screen.getByRole("button", { name: /^Breakfast/i });
-    expect(breakfast).toBeInTheDocument();
     expect(breakfast.className).toContain("border-dashed");
-  });
 
-  it("says the day is still ahead when it has not happened yet", () => {
-    render(
-      <DayTimeline
-        date="2099-01-01"
-        onOpenMeal={() => {}}
-        onOpenSession={() => {}}
-        onOpenPlan={() => {}}
-      />,
-    );
-    expect(screen.getByText("Still ahead of you.")).toBeInTheDocument();
+    // No sentence on top of that. The dashed bands already say it, and a line
+    // of prose repeating them read as debug text.
+    expect(screen.queryByText(/Still ahead of you/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/went unrecorded/i)).not.toBeInTheDocument();
   });
 
   it("draws no meal zones at all when food logging is switched off", () => {

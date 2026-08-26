@@ -133,47 +133,22 @@ describe("WeekStrip", () => {
     expect(onSelectDate).not.toHaveBeenCalled();
   });
 
-  it("shows the Today button when the week or selected date is not today, and clicking it restores today", () => {
+  it("carries no month caption and no Today button", () => {
     const onSelectDate = vi.fn();
-    const { rerender } = render(
-      <WeekStrip selectedDate="2026-08-25" onSelectDate={onSelectDate} />,
-    );
+    render(<WeekStrip selectedDate="2026-08-24" onSelectDate={onSelectDate} />);
 
-    // Viewing current week and selectedDate is today: Today button is hidden
+    // The screen title above already names the day, so a month label under it
+    // made the header two competing texts. The dates in the strip say which
+    // month it is.
+    expect(screen.queryByText(/August 2026/i)).not.toBeInTheDocument();
+
+    // Returning to today is the bottom nav's Today tab, which navigates to bare
+    // "/" and clears the date param. A second control for it in here was a
+    // duplicate of something more discoverable.
     expect(screen.queryByRole("button", { name: "Today" })).toBeNull();
 
-    // Case 1: Page to another week while selectedDate is today
-    const nextButton = screen.getByRole("button", { name: "Next week" });
-    fireEvent.click(nextButton);
-
-    const todayButtonAfterPaging = screen.getByRole("button", { name: "Today" });
-    expect(todayButtonAfterPaging).toBeInTheDocument();
-
-    fireEvent.click(todayButtonAfterPaging);
-    expect(onSelectDate).toHaveBeenCalledWith("2026-08-25");
-    // Strip returns to current week
-    expect(screen.getByRole("button", { name: "Tuesday, August 25, 2026" })).toBeInTheDocument();
-
-    // Case 2: In current week, but a different day is selected
-    rerender(<WeekStrip selectedDate="2026-08-24" onSelectDate={onSelectDate} />);
-    const todayButtonDifferentDate = screen.getByRole("button", { name: "Today" });
-    expect(todayButtonDifferentDate).toBeInTheDocument();
-
-    fireEvent.click(todayButtonDifferentDate);
-    expect(onSelectDate).toHaveBeenCalledWith("2026-08-25");
-  });
-
-  it("displays the month name of the displayed week as a label", () => {
-    const onSelectDate = vi.fn();
-    render(<WeekStrip selectedDate="2026-08-25" onSelectDate={onSelectDate} />);
-
-    expect(screen.getByText("August 2026")).toBeInTheDocument();
-
-    // Page forward 2 weeks to September
-    const nextButton = screen.getByRole("button", { name: "Next week" });
-    fireEvent.click(nextButton);
-    fireEvent.click(nextButton);
-
-    expect(screen.getByText("September 2026")).toBeInTheDocument();
+    // Paging still works, from the chevrons that now flank the week.
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
+    expect(screen.getByRole("button", { name: "Tuesday, September 1, 2026" })).toBeInTheDocument();
   });
 });

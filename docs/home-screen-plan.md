@@ -130,10 +130,9 @@ Replaces `ConsistencyStrip` (`index.tsx:354`), which is deleted.
 - A calendar week, Sunday first, seven cells.
 - Weekday initial above, date number below. Selected day is a filled accent disc. Today,
   when not selected, is marked but not filled.
-- Paging left and right moves a whole week. The month name sits above as a label, matching
-  the reference.
+- Paging left and right moves a whole week, from chevrons that flank the week.
 - No dots. No status. Tapping a cell navigates.
-- A "Today" affordance returns to the current date, and is hidden when already there.
+- No month caption and no Today button. See 11.8.
 
 Accent is correct here and is not decoration: DESIGN.md reserves it for things that are
 actionable or currently selected, and the selected day is exactly that.
@@ -196,9 +195,8 @@ It renders **only on today**. It updates on a timer, and the timer is cleared on
 **Identity.** A small icon and a label inside each band. Not hue. There is no strength
 colour token and none is being added.
 
-**Empty day.** A day with nothing logged still renders the canvas, the hour rules **and
-the dashed intent bands**, and says so once. See 11.1: the original wording here told the
-build to suppress the bands, which was wrong.
+**Empty day.** There is no empty state. A day with nothing logged renders the canvas, the
+hour rules and the dashed intent bands, and says nothing in prose. See 11.1 and 11.8.
 
 ### 5.4 The meal sheet
 
@@ -379,3 +377,22 @@ and `plannedDurationMinutesOf` are now exported from `plan.ts` and both readers 
   tomorrow contradicts the stats card above it, which shows a future day no values at all.
 - The Plan week list shows the start time. A time you can set but cannot see anywhere is a
   setting that looks like it failed to save.
+
+### 11.8 The header lost a caption, a button and a sentence
+
+Three removals, all after seeing the screen in use.
+
+The strip carried a month caption. Directly under a screen title that already names the
+day, that made the header two competing texts saying overlapping things. The dates in the
+strip say which month it is, so the caption went and the chevrons moved to flank the week
+rather than sit in a header row of their own.
+
+The strip also had its own Today button. The bottom nav's Today tab already navigates to
+bare `/`, which clears the date param and returns to today, so the button was a second
+control for something more discoverable. That was verified in the running app before the
+button was removed, because the whole point of a strip you can page through is that you
+can get lost in the week.
+
+And the timeline had a line of prose on an empty day. An untouched day already reads as
+untouched: the dashed bands are there with nothing filled in. Saying it again in words
+read as debug text. `isTimelineEmpty` was its only consumer and is deleted with it.

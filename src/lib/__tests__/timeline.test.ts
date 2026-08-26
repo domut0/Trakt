@@ -7,7 +7,6 @@ import {
   canvasHeightPx,
   heightPx,
   initialScrollPx,
-  isTimelineEmpty,
   minutesOfDay,
   offsetPx,
   MIN_BAND_MINUTES,
@@ -257,23 +256,6 @@ describe("training blocks", () => {
     expect(
       blocks(buildTimelineBands(base({ sessions: [yesterdayEvening], slots: SLOTS }))),
     ).toHaveLength(0);
-  });
-});
-
-describe("emptiness", () => {
-  it("does not count the default meal zones as content", () => {
-    // Every day has the same meals. If zones counted, no day would ever be empty.
-    expect(isTimelineEmpty(buildTimelineBands(base()))).toBe(true);
-  });
-
-  it("is not empty once anything real is on it", () => {
-    const withFood = buildTimelineBands(
-      base({ foodEntries: [entry({ id: "e1", mealId: "m_lunch" })] }),
-    );
-    expect(isTimelineEmpty(withFood)).toBe(false);
-
-    const planned: PlannedWorkout = { name: "Squat day", exerciseIds: ["a"], atMinutes: 1020 };
-    expect(isTimelineEmpty(buildTimelineBands(base({ planned })))).toBe(false);
   });
 });
 

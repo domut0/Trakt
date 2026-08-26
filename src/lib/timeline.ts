@@ -318,17 +318,6 @@ export function buildTimelineBands(input: BuildTimelineInput): TimelineBand[] {
 }
 
 /**
- * True when the day has nothing worth showing: no food, no training, no plan.
- *
- * Meal zones alone do NOT count. Every day has the same default meal set, so
- * treating them as content would make an untouched day look identical to a
- * logged one, and the empty state would never appear at all.
- */
-export function isTimelineEmpty(bands: readonly TimelineBand[]): boolean {
-  return !bands.some((b) => b.state === "actual" || b.kind !== "meal");
-}
-
-/**
  * Where to scroll the canvas so the interesting part of the day is on screen.
  *
  * On today that is the now line, placed about a third of the way down so there
