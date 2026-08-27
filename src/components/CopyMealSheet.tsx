@@ -107,20 +107,20 @@ export function CopyMealSheet({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-sm flex-col rounded-3xl bg-surface p-5 anim-popup"
+        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-border" />
+        <div className="mx-auto mb-3 h-1 w-10 shrink-0 bg-border" />
 
         <div className="flex shrink-0 items-center justify-between pb-3">
           <div>
-            <div className="t-caption text-muted-foreground">{targetMeal.name}</div>
+            <div className="t-caption text-ink-2">{targetMeal.name}</div>
             <h2 className="t-heading font-semibold tracking-tight">Copy from another day</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="-mr-2 flex min-h-[44px] items-center px-2 t-label font-medium text-muted-foreground hover:text-foreground"
+            className="-mr-2 flex min-h-[44px] items-center px-2 t-label text-ink-2 hover:text-ink"
           >
             Cancel
           </button>
@@ -128,38 +128,34 @@ export function CopyMealSheet({
 
         <div className="flex-1 overflow-y-auto space-y-3 pr-1">
           {pastGroups.length === 0 ? (
-            <div className="group-list bg-muted p-4 text-center">
-              <p className="t-label text-muted-foreground">
-                No previous entries for {targetMeal.name}.
-              </p>
+            <div className="group-list bg-wash p-4 text-center">
+              <p className="t-label text-ink-2">No previous entries for {targetMeal.name}.</p>
             </div>
           ) : (
-            <div className="group-list bg-muted">
+            <div className="group-list bg-wash">
               {pastGroups.map((group, idx) => (
                 <button
                   key={group.date}
                   type="button"
                   onClick={() => handleCopyDay(group.date)}
-                  className={`group-row w-full text-left transition-colors hover:bg-surface/50 ${
+                  className={`group-row w-full text-left transition-colors hover:bg-wash ${
                     idx > 0 ? "group-row-sep" : ""
                   }`}
                 >
                   <div className="min-w-0 flex-1 pr-2">
-                    <div className="truncate t-body font-semibold text-foreground">
+                    <div className="truncate t-body font-semibold text-ink">
                       {formatDateLabel(group.date)}
                     </div>
-                    <div className="truncate t-label text-muted-foreground">
-                      {group.itemSummary}
-                    </div>
+                    <div className="truncate t-label text-ink-2">{group.itemSummary}</div>
                   </div>
                   <div className="shrink-0 text-right">
                     {group.totalCalories !== undefined && (
-                      <div className="t-stat text-foreground">
+                      <div className="t-stat text-ink">
                         {Math.round(group.totalCalories)}{" "}
-                        <span className="t-label font-normal text-muted-foreground">cal</span>
+                        <span className="t-label font-normal text-ink-2">cal</span>
                       </div>
                     )}
-                    <div className="t-label text-accent font-medium">
+                    <div className="t-label text-ink">
                       {group.entries.length} {group.entries.length === 1 ? "item" : "items"}
                     </div>
                   </div>

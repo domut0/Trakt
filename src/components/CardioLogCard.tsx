@@ -102,14 +102,14 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
   if (pickingExercise) {
     return (
       <div>
-        <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-border" />
+        <div className="mx-auto mb-1 h-1 w-10 bg-border" />
         <input
           autoFocus
           value={exerciseQuery}
           onChange={(e) => setExerciseQuery(e.target.value)}
           placeholder="Search or add activity"
           aria-label="Search or add a cardio activity"
-          className="mt-3 min-h-[44px] w-full bg-transparent t-heading outline-none placeholder:text-muted-foreground"
+          className="mt-3 min-h-[44px] w-full bg-transparent t-heading outline-none placeholder:text-ink-2"
         />
         <div className="mt-3 max-h-72 overflow-y-auto group-list">
           {filteredRows.map((r, idx) =>
@@ -127,15 +127,15 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
                 onClick={() => addCustom(r.name)}
                 className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""}`}
               >
-                <span className="truncate t-body text-muted-foreground">{r.name}</span>
-                <span className="shrink-0 t-caption text-muted-foreground">Suggested</span>
+                <span className="truncate t-body text-ink-2">{r.name}</span>
+                <span className="shrink-0 t-caption text-ink-2">Suggested</span>
               </button>
             ),
           )}
           {showAddRow && (
             <button
               onClick={() => addCustom(trimmedQuery)}
-              className={`group-row w-full text-left text-accent ${
+              className={`group-row w-full text-left t-action ${
                 filteredRows.length > 0 ? "group-row-sep" : ""
               }`}
             >
@@ -146,7 +146,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
         </div>
         <button
           onClick={onBack}
-          className="mt-4 flex min-h-[44px] w-full items-center justify-center rounded-full py-3 t-body font-medium text-muted-foreground"
+          className="mt-4 flex min-h-[44px] w-full items-center justify-center py-3 t-body font-medium text-ink-2"
         >
           Cancel
         </button>
@@ -156,7 +156,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
 
   return (
     <div>
-      <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-border" />
+      <div className="mx-auto mb-1 h-1 w-10 bg-border" />
       <div className="mt-3 group-list">
         <button
           onClick={() => setPickingExercise(true)}
@@ -164,14 +164,14 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
           className="group-row w-full text-left"
         >
           <div className="min-w-0 flex-1">
-            <div className="t-caption text-muted-foreground">Activity</div>
+            <div className="t-caption text-ink-2">Activity</div>
             <div className="truncate t-heading">{chosen?.name}</div>
           </div>
-          <span className="shrink-0 t-label font-medium text-accent">Change</span>
+          <span className="shrink-0 t-label t-action">Change</span>
         </button>
 
         <div className="group-row group-row-sep">
-          <label htmlFor="cardio-setup-note" className="shrink-0 t-caption text-muted-foreground">
+          <label htmlFor="cardio-setup-note" className="shrink-0 t-caption text-ink-2">
             Setup
           </label>
           <input
@@ -179,12 +179,12 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
             value={setupNote}
             onChange={(e) => setSetupNote(e.target.value)}
             placeholder={suggestedNote ?? "Incline, resistance"}
-            className="min-h-[44px] w-full min-w-0 bg-transparent t-body outline-none placeholder:text-muted-foreground"
+            className="min-h-[44px] w-full min-w-0 bg-transparent t-body outline-none placeholder:text-ink-2"
           />
         </div>
 
         <div className="group-row group-row-sep">
-          <label htmlFor="cardio-duration" className="shrink-0 t-body text-muted-foreground">
+          <label htmlFor="cardio-duration" className="shrink-0 t-body text-ink-2">
             Duration
           </label>
           <div className="flex items-center gap-1.5 min-w-0">
@@ -196,14 +196,14 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
               onChange={(e) => setDuration(e.target.value)}
               onFocus={(e) => e.currentTarget.select()}
               placeholder="0"
-              className="t-stat w-20 text-right bg-transparent outline-none placeholder:text-muted-foreground"
+              className="t-stat w-20 text-right bg-transparent outline-none placeholder:text-ink-2"
             />
-            <span className="t-label text-muted-foreground">min</span>
+            <span className="t-label text-ink-2">min</span>
           </div>
         </div>
 
         <div className="group-row group-row-sep">
-          <label htmlFor="cardio-distance" className="shrink-0 t-body text-muted-foreground">
+          <label htmlFor="cardio-distance" className="shrink-0 t-body text-ink-2">
             Distance
           </label>
           <div className="flex items-center gap-1.5 min-w-0">
@@ -220,9 +220,9 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
               onChange={(e) => setDistance(e.target.value)}
               onFocus={(e) => e.currentTarget.select()}
               placeholder="0"
-              className="t-stat w-20 text-right bg-transparent outline-none placeholder:text-muted-foreground"
+              className="t-stat w-20 text-right bg-transparent outline-none placeholder:text-ink-2"
             />
-            <span className="t-label text-muted-foreground">{unit === "lbs" ? "mi" : "km"}</span>
+            <span className="t-label text-ink-2">{unit === "lbs" ? "mi" : "km"}</span>
           </div>
         </div>
       </div>
@@ -230,13 +230,13 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
       <div className="mt-6 flex items-center gap-2">
         <button
           onClick={onBack}
-          className="flex min-h-[44px] flex-1 items-center justify-center rounded-full py-3 t-body font-medium text-muted-foreground"
+          className="flex min-h-[44px] flex-1 items-center justify-center py-3 t-body font-medium text-ink-2"
         >
           Back
         </button>
         <button
           onClick={doSave}
-          className="flex min-h-[44px] flex-[2] items-center justify-center rounded-full bg-accent py-3 t-body font-semibold text-accent-foreground"
+          className="flex min-h-[44px] flex-[2] items-center justify-center bg-ink py-3 t-body font-semibold text-paper"
         >
           Save
         </button>

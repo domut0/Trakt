@@ -159,17 +159,17 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-sm flex-col rounded-3xl bg-surface p-5 anim-popup"
+        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-border" />
+        <div className="mx-auto mb-3 h-1 w-10 shrink-0 bg-border" />
 
         <div className="flex shrink-0 items-center justify-between pb-3">
           <h2 className="t-heading font-semibold tracking-tight">Manage meals</h2>
           <button
             type="button"
             onClick={onClose}
-            className="-mr-2 flex min-h-[44px] items-center px-2 t-label font-medium text-muted-foreground hover:text-foreground"
+            className="-mr-2 flex min-h-[44px] items-center px-2 t-label text-ink-2 hover:text-ink"
           >
             Done
           </button>
@@ -191,12 +191,12 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
               value={newMealName}
               onChange={(e) => setNewMealName(e.target.value)}
               placeholder="Add meal (e.g. Snack)"
-              className="min-h-[44px] flex-1 rounded-xl bg-muted px-3 t-body outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
+              className="min-h-[44px] flex-1 bg-wash px-3 t-body outline-none placeholder:text-ink-2 focus:ring-1 focus:ring-accent"
             />
             <button
               type="submit"
               disabled={!newMealName.trim()}
-              className="min-h-[44px] rounded-xl bg-accent px-4 t-body font-semibold text-accent-foreground disabled:opacity-40"
+              className="min-h-[44px] bg-ink px-4 t-body font-semibold text-paper disabled:opacity-40"
             >
               Add
             </button>
@@ -206,11 +206,11 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
         {/* Scrollable list of meals */}
         <div className="flex-1 overflow-y-auto pr-1 space-y-3">
           {sortedMeals.length === 0 ? (
-            <p className="py-4 text-center t-label text-muted-foreground">
+            <p className="py-4 text-center t-label text-ink-2">
               No meals configured. Add one above.
             </p>
           ) : (
-            <div className="group-list bg-muted">
+            <div className="group-list bg-wash">
               {sortedMeals.map((meal, idx) => {
                 const isAllDay = meal.fromMinutes === meal.toMinutes;
                 const fallback = getFallbackMeal(meal.id);
@@ -224,7 +224,7 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                   >
                     {confirmDeleteId === meal.id ? (
                       <div className="flex w-full flex-col gap-2 p-1">
-                        <p className="t-label font-medium text-destructive">
+                        <p className="t-label font-medium text-signal">
                           {fallback
                             ? `Delete meal? Entries will move to ${fallback.name}.`
                             : "Cannot delete the last remaining meal."}
@@ -236,14 +236,14 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                               deleteMeal(meal.id);
                               setConfirmDeleteId(null);
                             }}
-                            className="min-h-[44px] flex-1 rounded-lg bg-destructive px-3 t-label font-semibold text-white"
+                            className="min-h-[44px] flex-1 bg-signal px-3 t-label font-semibold text-white"
                           >
                             Delete meal
                           </button>
                           <button
                             type="button"
                             onClick={() => setConfirmDeleteId(null)}
-                            className="min-h-[44px] flex-1 rounded-lg bg-muted px-3 t-label font-medium text-muted-foreground"
+                            className="min-h-[44px] flex-1 bg-wash px-3 t-label font-medium text-ink-2"
                           >
                             Cancel
                           </button>
@@ -268,7 +268,7 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                                     setEditingId(null);
                                   }
                                 }}
-                                className="w-full rounded bg-surface px-2 py-1 t-body font-medium text-foreground outline-none ring-1 ring-accent"
+                                className="w-full px-2 py-1 t-body font-medium text-ink outline-none ring-1 ring-accent"
                               />
                             ) : (
                               <button
@@ -278,7 +278,7 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                                   setEditingName(meal.name);
                                 }}
                                 aria-label={`Rename ${meal.name}`}
-                                className="flex min-h-[44px] w-full items-center text-left t-body font-medium text-foreground hover:text-accent"
+                                className="flex min-h-[44px] w-full items-center text-left t-body t-action text-ink"
                                 title="Tap to rename"
                               >
                                 <span className="truncate">{meal.name}</span>
@@ -292,7 +292,7 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                               onClick={() => moveUp(idx)}
                               disabled={idx === 0}
                               aria-label={`Move ${meal.name} up`}
-                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground disabled:opacity-30"
+                              className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-2 hover:text-ink disabled:opacity-30"
                             >
                               <ArrowUpIcon />
                             </button>
@@ -301,7 +301,7 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                               onClick={() => moveDown(idx)}
                               disabled={idx === sortedMeals.length - 1}
                               aria-label={`Move ${meal.name} down`}
-                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground disabled:opacity-30"
+                              className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-2 hover:text-ink disabled:opacity-30"
                             >
                               <ArrowDownIcon />
                             </button>
@@ -314,7 +314,7 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                                   ? "Cannot delete only meal"
                                   : `Delete ${meal.name}`
                               }
-                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-destructive disabled:opacity-30"
+                              className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-2 hover:text-signal disabled:opacity-30"
                               title={
                                 sortedMeals.length <= 1 ? "Cannot delete only meal" : "Delete meal"
                               }
@@ -328,11 +328,11 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                         <div className="flex items-center justify-between gap-2 pt-1">
                           {isAllDay ? (
                             <div className="flex items-center gap-2">
-                              <span className="t-label text-muted-foreground">All day</span>
+                              <span className="t-label text-ink-2">All day</span>
                               <button
                                 type="button"
                                 onClick={() => setMealWindow(meal.id, 8 * 60, 12 * 60)}
-                                className="flex min-h-[44px] items-center px-1 t-label font-medium text-accent hover:underline"
+                                className="flex min-h-[44px] items-center px-1 t-label t-action hover:underline"
                               >
                                 Set hours
                               </button>
@@ -347,9 +347,9 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                                   const from = fromTimeString(e.target.value);
                                   setMealWindow(meal.id, from, meal.toMinutes);
                                 }}
-                                className="min-h-[44px] rounded-lg bg-surface px-2 py-1 t-label text-foreground outline-none ring-1 ring-border focus:ring-accent"
+                                className="min-h-[44px] px-2 py-1 t-label text-ink outline-none ring-1 ring-rule focus:ring-accent"
                               />
-                              <span className="t-label text-muted-foreground">to</span>
+                              <span className="t-label text-ink-2">to</span>
                               <input
                                 type="time"
                                 aria-label={`${meal.name} end time`}
@@ -358,12 +358,12 @@ export function MealsEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                                   const to = fromTimeString(e.target.value);
                                   setMealWindow(meal.id, meal.fromMinutes, to);
                                 }}
-                                className="min-h-[44px] rounded-lg bg-surface px-2 py-1 t-label text-foreground outline-none ring-1 ring-border focus:ring-accent"
+                                className="min-h-[44px] px-2 py-1 t-label text-ink outline-none ring-1 ring-rule focus:ring-accent"
                               />
                               <button
                                 type="button"
                                 onClick={() => setMealWindow(meal.id, 0, 0)}
-                                className="flex min-h-[44px] items-center px-2 t-label font-medium text-muted-foreground hover:text-foreground"
+                                className="flex min-h-[44px] items-center px-2 t-label text-ink-2 hover:text-ink"
                               >
                                 Make all day
                               </button>

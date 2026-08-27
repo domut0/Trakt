@@ -282,15 +282,15 @@ export function RecipeEditorSheet({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-sm flex-col rounded-3xl bg-surface p-5 anim-popup"
+        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-border" />
+        <div className="mx-auto mb-3 h-1 w-10 shrink-0 bg-border" />
 
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between pb-3">
           <div>
-            <div className="t-caption text-muted-foreground">
+            <div className="t-caption text-ink-2">
               {isEditing ? (activeRecipeId ? "Edit recipe" : "New recipe") : "Recipes"}
             </div>
             <h2 className="t-heading font-semibold tracking-tight">
@@ -307,7 +307,7 @@ export function RecipeEditorSheet({
                 onClose();
               }
             }}
-            className="-mr-2 flex min-h-[44px] items-center px-2 t-label font-medium text-muted-foreground hover:text-foreground"
+            className="-mr-2 flex min-h-[44px] items-center px-2 t-label font-medium text-ink-2 hover:text-ink"
           >
             {isEditing && recipes.length > 0 && !initialRecipe ? "Back" : "Done"}
           </button>
@@ -317,17 +317,17 @@ export function RecipeEditorSheet({
         {!isEditing ? (
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
             <div className="flex items-center justify-between">
-              <span className="t-label text-muted-foreground">Your custom recipes</span>
+              <span className="t-label text-ink-2">Your custom recipes</span>
               <button
                 type="button"
                 onClick={startCreateNew}
-                className="flex min-h-[44px] items-center px-2 t-label font-semibold text-accent"
+                className="flex min-h-[44px] items-center px-2 t-label t-action"
               >
                 + New recipe
               </button>
             </div>
 
-            <div className="group-list bg-muted">
+            <div className="group-list bg-wash">
               {recipes.map((r, idx) => {
                 const perServing = recipePerServingMacros(r, storeIngredients, foods);
                 return (
@@ -335,24 +335,24 @@ export function RecipeEditorSheet({
                     key={r.id}
                     type="button"
                     onClick={() => startEditRecipe(r)}
-                    className={`group-row w-full text-left transition-colors hover:bg-surface/50 ${
+                    className={`group-row w-full text-left transition-colors ${
                       idx > 0 ? "group-row-sep" : ""
                     }`}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate t-body font-medium text-foreground">{r.name}</div>
-                      <div className="truncate t-label text-muted-foreground">
+                      <div className="truncate t-body font-medium text-ink">{r.name}</div>
+                      <div className="truncate t-label text-ink-2">
                         {r.servings} {r.servings === 1 ? "serving" : "servings"}
                         {r.note ? ` · ${r.note}` : ""}
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
                       {perServing.calories !== undefined && (
-                        <div className="t-body font-semibold text-foreground">
+                        <div className="t-body font-semibold text-ink">
                           {Math.round(perServing.calories)} cal
                         </div>
                       )}
-                      <div className="t-label text-muted-foreground">per serving</div>
+                      <div className="t-label text-ink-2">per serving</div>
                     </div>
                   </button>
                 );
@@ -363,19 +363,19 @@ export function RecipeEditorSheet({
           /* Recipe create / edit form */
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
             {/* Live Per-Serving Macros Summary Banner */}
-            <div className="group-list bg-muted p-3">
+            <div className="group-list bg-wash p-3">
               <div className="flex items-center justify-between pb-1">
-                <span className="t-caption text-muted-foreground">Per serving preview</span>
-                <span className="t-caption text-muted-foreground">
+                <span className="t-caption text-ink-2">Per serving preview</span>
+                <span className="t-caption text-ink-2">
                   {servingsCount} {servingsCount === 1 ? "serving" : "servings"}
                 </span>
               </div>
               <div className="flex items-baseline justify-between pt-1">
-                <div className="t-stat text-foreground">
+                <div className="t-stat text-ink">
                   {livePerServingMacros.calories !== undefined
                     ? Math.round(livePerServingMacros.calories)
                     : 0}{" "}
-                  <span className="t-label font-normal text-muted-foreground">cal</span>
+                  <span className="t-label font-normal text-ink-2">cal</span>
                 </div>
                 <div className="flex items-center gap-2 t-caption font-semibold">
                   <span className="text-protein">
@@ -403,10 +403,7 @@ export function RecipeEditorSheet({
             {/* Basic details */}
             <div className="space-y-3">
               <div>
-                <label
-                  htmlFor="recipe-name-input"
-                  className="block t-caption text-muted-foreground mb-1"
-                >
+                <label htmlFor="recipe-name-input" className="block t-caption text-ink-2 mb-1">
                   Recipe name
                 </label>
                 <input
@@ -417,7 +414,7 @@ export function RecipeEditorSheet({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Protein Overnight Oats"
-                  className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
+                  className="min-h-[44px] w-full bg-wash px-3 t-body outline-none placeholder:text-ink-2 focus:ring-1 focus:ring-accent"
                 />
               </div>
 
@@ -425,7 +422,7 @@ export function RecipeEditorSheet({
                 <div>
                   <label
                     htmlFor="recipe-servings-input"
-                    className="block t-caption text-muted-foreground mb-1"
+                    className="block t-caption text-ink-2 mb-1"
                   >
                     Servings (min 1)
                   </label>
@@ -436,29 +433,26 @@ export function RecipeEditorSheet({
                     aria-label="Servings"
                     value={servings}
                     onChange={(e) => setServings(e.target.value)}
-                    className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body outline-none focus:ring-1 focus:ring-accent"
+                    className="min-h-[44px] w-full bg-wash px-3 t-body outline-none focus:ring-1 focus:ring-accent"
                   />
                 </div>
                 <div>
-                  <span className="block t-caption text-muted-foreground mb-1">Liquid recipe</span>
-                  <label className="flex min-h-[44px] items-center gap-2 rounded-xl bg-muted px-3 cursor-pointer">
+                  <span className="block t-caption text-ink-2 mb-1">Liquid recipe</span>
+                  <label className="flex min-h-[44px] items-center gap-2 bg-wash px-3 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={isLiquid}
                       onChange={(e) => setIsLiquid(e.target.checked)}
-                      className="h-4 w-4 rounded accent-accent"
+                      className="h-4 w-4 accent-accent"
                       aria-label="Liquid or beverage recipe"
                     />
-                    <span className="t-label text-foreground">Drink / liquid</span>
+                    <span className="t-label text-ink">Drink / liquid</span>
                   </label>
                 </div>
               </div>
 
               <div>
-                <label
-                  htmlFor="recipe-note-input"
-                  className="block t-caption text-muted-foreground mb-1"
-                >
+                <label htmlFor="recipe-note-input" className="block t-caption text-ink-2 mb-1">
                   Note (optional)
                 </label>
                 <input
@@ -468,7 +462,7 @@ export function RecipeEditorSheet({
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="e.g. 4 containers batch prep"
-                  className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
+                  className="min-h-[44px] w-full bg-wash px-3 t-body outline-none placeholder:text-ink-2 focus:ring-1 focus:ring-accent"
                 />
               </div>
             </div>
@@ -476,7 +470,7 @@ export function RecipeEditorSheet({
             {/* Ingredients Section */}
             <div className="space-y-2 pt-2">
               <div className="flex items-center justify-between">
-                <span className="t-caption text-muted-foreground">Ingredients (foods only)</span>
+                <span className="t-caption text-ink-2">Ingredients (foods only)</span>
                 {!isAddingIngredient && (
                   <button
                     type="button"
@@ -484,7 +478,7 @@ export function RecipeEditorSheet({
                       setIsAddingIngredient(true);
                       setTimeout(() => foodSearchInputRef.current?.focus(), 50);
                     }}
-                    className="flex min-h-[44px] items-center px-2 t-label font-semibold text-accent"
+                    className="flex min-h-[44px] items-center px-2 t-label t-action"
                   >
                     + Add ingredient
                   </button>
@@ -493,15 +487,13 @@ export function RecipeEditorSheet({
 
               {/* Inline Food Picker for Ingredients */}
               {isAddingIngredient && (
-                <div className="group-list bg-muted p-3 space-y-3 anim-fade-up">
+                <div className="group-list bg-wash p-3 space-y-3 anim-fade-up">
                   <div className="flex items-center justify-between">
-                    <span className="t-caption text-muted-foreground">
-                      Select food from library
-                    </span>
+                    <span className="t-caption text-ink-2">Select food from library</span>
                     <button
                       type="button"
                       onClick={() => setIsAddingIngredient(false)}
-                      className="flex min-h-[44px] items-center px-2 t-label font-medium text-muted-foreground hover:text-foreground"
+                      className="flex min-h-[44px] items-center px-2 t-label font-medium text-ink-2 hover:text-ink"
                     >
                       Cancel
                     </button>
@@ -513,37 +505,33 @@ export function RecipeEditorSheet({
                     value={foodSearchQuery}
                     onChange={(e) => setFoodSearchQuery(e.target.value)}
                     placeholder="Search food"
-                    className="min-h-[44px] w-full rounded-xl bg-surface px-3 t-body outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
+                    className="min-h-[44px] w-full px-3 t-body outline-none placeholder:text-ink-2 focus:ring-1 focus:ring-accent"
                   />
 
                   {filteredFoods.length > 0 ? (
-                    <div className="group-list bg-surface">
+                    <div className="group-list">
                       {filteredFoods.map((f, idx) => (
                         <button
                           key={f.id}
                           type="button"
                           onClick={() => handleAddIngredient(f)}
-                          className={`group-row w-full text-left transition-colors hover:bg-muted ${
+                          className={`group-row w-full text-left transition-colors hover:bg-wash ${
                             idx > 0 ? "group-row-sep" : ""
                           }`}
                         >
                           <div className="min-w-0 flex-1">
-                            <div className="truncate t-body font-medium text-foreground">
-                              {f.name}
-                            </div>
+                            <div className="truncate t-body font-medium text-ink">{f.name}</div>
                             {f.brand && (
-                              <div className="truncate t-label text-muted-foreground">
-                                {f.brand}
-                              </div>
+                              <div className="truncate t-label text-ink-2">{f.brand}</div>
                             )}
                           </div>
                           <div className="shrink-0 text-right">
                             {f.calories !== undefined && (
-                              <div className="t-body font-semibold text-foreground">
+                              <div className="t-body font-semibold text-ink">
                                 {Math.round(f.calories)} cal
                               </div>
                             )}
-                            <div className="t-label text-muted-foreground">
+                            <div className="t-label text-ink-2">
                               per {f.basisQuantity} {f.basisUnit}
                             </div>
                           </div>
@@ -551,7 +539,7 @@ export function RecipeEditorSheet({
                       ))}
                     </div>
                   ) : (
-                    <p className="py-2 text-center t-label text-muted-foreground">
+                    <p className="py-2 text-center t-label text-ink-2">
                       No foods found. Add foods in your catalogue first.
                     </p>
                   )}
@@ -560,11 +548,11 @@ export function RecipeEditorSheet({
 
               {/* List of current ingredients */}
               {ingredients.length === 0 ? (
-                <div className="group-list bg-muted p-4 text-center">
-                  <p className="t-label text-muted-foreground">No ingredients added yet.</p>
+                <div className="group-list bg-wash p-4 text-center">
+                  <p className="t-label text-ink-2">No ingredients added yet.</p>
                 </div>
               ) : (
-                <div className="group-list bg-muted">
+                <div className="group-list bg-wash">
                   {ingredients.map((ing, idx) => {
                     const food = foods.find((f) => f.id === ing.foodId);
                     const factorRes = food
@@ -582,22 +570,20 @@ export function RecipeEditorSheet({
                       >
                         <div className="flex items-center justify-between gap-2 pb-1">
                           <div className="min-w-0 flex-1">
-                            <div className="truncate t-body font-medium text-foreground">
+                            <div className="truncate t-body font-medium text-ink">
                               {food?.name ?? "Unknown food"}
                             </div>
                             {food?.brand && (
-                              <div className="truncate t-label text-muted-foreground">
-                                {food.brand}
-                              </div>
+                              <div className="truncate t-label text-ink-2">{food.brand}</div>
                             )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             {ingMacros.calories !== undefined ? (
-                              <span className="t-label font-semibold text-foreground">
+                              <span className="t-label font-semibold text-ink">
                                 {Math.round(ingMacros.calories)} cal
                               </span>
                             ) : (
-                              <span className="t-label font-medium text-destructive">
+                              <span className="t-label font-medium text-signal">
                                 Unresolved unit
                               </span>
                             )}
@@ -605,7 +591,7 @@ export function RecipeEditorSheet({
                               type="button"
                               onClick={() => handleRemoveIngredient(ing.id)}
                               aria-label={`Remove ${food?.name ?? "ingredient"}`}
-                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-destructive"
+                              className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-2 hover:text-signal"
                             >
                               <TrashIcon />
                             </button>
@@ -623,7 +609,7 @@ export function RecipeEditorSheet({
                               const q = toNum(e.target.value) ?? 0;
                               handleUpdateIngredient(ing.id, { quantity: q });
                             }}
-                            className="min-h-[44px] rounded-lg bg-surface px-3 t-body outline-none focus:ring-1 focus:ring-accent"
+                            className="min-h-[44px] px-3 t-body outline-none focus:ring-1 focus:ring-accent"
                           />
                           <select
                             aria-label={`Unit for ${food?.name ?? "ingredient"}`}
@@ -633,7 +619,7 @@ export function RecipeEditorSheet({
                                 unit: e.target.value as MeasurementUnit,
                               })
                             }
-                            className="min-h-[44px] rounded-lg bg-surface px-3 t-body text-foreground outline-none focus:ring-1 focus:ring-accent"
+                            className="min-h-[44px] px-3 t-body text-ink outline-none focus:ring-1 focus:ring-accent"
                           >
                             {MEASUREMENT_UNITS.map((u) => (
                               <option key={u} value={u}>
@@ -653,22 +639,22 @@ export function RecipeEditorSheet({
             {activeRecipeId && (
               <div className="pt-2">
                 {confirmDelete ? (
-                  <div className="group-list bg-muted p-3 space-y-2">
-                    <p className="t-label font-medium text-destructive">
+                  <div className="group-list bg-wash p-3 space-y-2">
+                    <p className="t-label font-medium text-signal">
                       Delete recipe? Past food entries will remain intact.
                     </p>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={handleDelete}
-                        className="min-h-[44px] flex-1 rounded-lg bg-destructive px-3 t-label font-semibold text-white"
+                        className="min-h-[44px] flex-1 bg-signal px-3 t-label font-semibold text-white"
                       >
                         Delete recipe
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmDelete(false)}
-                        className="min-h-[44px] flex-1 rounded-lg bg-surface px-3 t-label font-medium text-muted-foreground"
+                        className="min-h-[44px] flex-1 px-3 t-label font-medium text-ink-2"
                       >
                         Cancel
                       </button>
@@ -678,7 +664,7 @@ export function RecipeEditorSheet({
                   <button
                     type="button"
                     onClick={() => setConfirmDelete(true)}
-                    className="flex min-h-[44px] w-full items-center justify-center rounded-xl bg-muted px-4 t-label font-medium text-destructive hover:bg-muted/80"
+                    className="flex min-h-[44px] w-full items-center justify-center bg-wash px-4 t-label font-medium text-signal hover:bg-wash"
                   >
                     Delete recipe
                   </button>
@@ -695,7 +681,7 @@ export function RecipeEditorSheet({
               type="button"
               onClick={handleSave}
               disabled={!name.trim()}
-              className="flex min-h-[44px] w-full items-center justify-center rounded-xl bg-accent px-4 py-3 t-body font-semibold text-accent-foreground disabled:opacity-40"
+              className="flex min-h-[44px] w-full items-center justify-center bg-ink px-4 py-3 t-body font-semibold text-paper disabled:opacity-40"
             >
               Save recipe
             </button>
