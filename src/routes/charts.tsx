@@ -60,6 +60,25 @@ function formatMetricValue(metricKey: DailyLogNumericField, v: number): string {
   return (Math.round(v * 10) / 10).toLocaleString();
 }
 
+/**
+ * The angle the area under a trace is ruled at.
+ *
+ * Angle carries metric identity in this system, so the chart fills with the
+ * SELECTED metric's own hatch: the Carbs chart is ruled at the Carbs angle and
+ * matches the swatch beside "Carbs" on the day view. The first version ruled
+ * every chart at 45 regardless, which collided with hatch-carbs and quietly
+ * asserted that every metric was carbohydrate.
+ *
+ * 135 is the diagonal no macro owns, so the metrics that have no macro identity
+ * take it.
+ */
+function hatchAngleFor(metricKey: DailyLogNumericField): number {
+  if (metricKey === "protein") return 90;
+  if (metricKey === "carbs") return 45;
+  if (metricKey === "fat") return 0;
+  return 135;
+}
+
 function ChartsPage() {
   const dailyLogs = useEffectiveDailyLogs();
   const unit = useStore((s) => s.unit);
@@ -656,7 +675,7 @@ function Chart({
           width="4"
           height="4"
           patternUnits="userSpaceOnUse"
-          patternTransform="rotate(45)"
+          patternTransform={`rotate(${hatchAngleFor(metricKey)})`}
         >
           <line x1="0" y1="0" x2="0" y2="4" stroke="var(--color-ink)" strokeWidth="0.6" />
         </pattern>

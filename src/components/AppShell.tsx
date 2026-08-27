@@ -278,7 +278,13 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
             // rank with fill and weight instead: a solid glyph and a semibold
             // label against four muted outlined tabs. When it was accent too,
             // two items lit up at once and neither one told you where you were.
-            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 border-t-2 border-transparent py-1 text-ink"
+            // The inked cell, which is this app's one mark for "this one": the
+            // selected day in the week strip and the current lift in the plan
+            // list both wear it. Before this the action button was a 22px glyph
+            // and a label at exactly the routed tabs' size and geometry,
+            // differing only by fill and weight, so it read as a fifth tab
+            // rather than as the thing the bar exists to launch.
+            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 bg-ink px-3 py-1 text-paper"
           >
             <span className="relative flex items-center justify-center">
               <FlameIcon />

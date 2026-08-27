@@ -230,6 +230,42 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
   const showBodyweight = !isFuture && bodyweight !== undefined;
   const round = (n: number) => Math.round(n).toLocaleString();
 
+  /**
+   * A day with nothing logged and no targets set has no table to draw.
+   *
+   * It used to render one anyway: a lone "Not recorded" over an empty ruled
+   * band. That was a table with its contents missing rather than an empty
+   * state, and once the numbers moved above the canvas it was the second thing
+   * on the screen, which made a fresh day and a full day pixel-identical for
+   * their first third. An empty state that shares the populated state's shape
+   * is not an empty state.
+   *
+   * The line below is deliberately not built from the app's usual empty-state
+   * frame. No imperative, no purpose clause, no pointing at a control: the
+   * header directly above it already says "Daily numbers" and carries the Edit
+   * that fills them in.
+   */
+  const nothingToShow =
+    !isFuture &&
+    calories === undefined &&
+    bodyweight === undefined &&
+    targetCalories === undefined &&
+    targetProtein === undefined &&
+    targetFat === undefined &&
+    targetCarbs === undefined &&
+    targetSteps === undefined;
+
+  if (nothingToShow) {
+    return (
+      // -mx-5 to match group-list: every table on this page opens with a rule
+      // that reaches the trim, and an inset one here would read as a different
+      // kind of object rather than as the same table with nothing in it.
+      <div className="-mx-5 rule-heavy-t border-b border-rule-strong px-5 py-4">
+        <p className="t-body text-ink-2">This day is still blank.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="group-list">
       {/* The hero: the one figure this screen exists to show, at timetable

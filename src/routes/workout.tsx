@@ -251,8 +251,17 @@ function WorkoutPage() {
         plan list, which is an offer about what comes NEXT and outranks a
         transcript of what already happened.
       */}
+      {/*
+        Stacked UP from the log bar, not down from the header.
+
+        The rows grow towards the button rather than away from it, so the set
+        you just logged is always the row nearest your thumb and the blank
+        paper collects at the top where nothing needs it. Logging the first
+        set of a session otherwise put one row under the header and left the
+        whole 700px middle empty between it and the control that made it.
+      */}
       {!planned && sessSets.length > 0 && (
-        <section className="min-h-0 flex-1 overflow-y-auto">
+        <section className="flex min-h-0 flex-1 flex-col justify-end overflow-y-auto">
           <ul className="hairline-b">
             {[...sessSets].reverse().map((set, idx) => {
               const ex = exercises.find((e) => e.id === set.exerciseId);

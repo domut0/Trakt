@@ -515,16 +515,21 @@
   background-color: var(--color-ink);
 }
 
-/** A dense measured field, for a quantity read against a ruled scale. Denser
-    than the macro hatches because it is read as an amount rather than as an
-    identity, and it must not be mistaken for one of the three macro keys. */
+/** A measured field: a quantity read against a ruled scale, not an identity.
+
+    135 degrees, and the angle is the whole point. Protein owns 90, carbs owns
+    45 and fat owns 0, so this is the one diagonal no metric answers to. The
+    first version of this utility shipped at 45 and collided head-on with
+    hatch-carbs, which broke the single law the hatch system has: angle carries
+    identity. A field that means "amount" must not be able to be read as a
+    field that means "carbs". */
 @utility hatch-dense {
-  background-image: repeating-linear-gradient(45deg, var(--color-ink) 0 1px, transparent 1px 3px);
+  background-image: repeating-linear-gradient(135deg, var(--color-ink) 0 1px, transparent 1px 3px);
 }
 /** The same field in the second ink, for the part of a measure that overran. */
 @utility hatch-over {
   background-image: repeating-linear-gradient(
-    45deg,
+    135deg,
     var(--color-signal) 0 1px,
     transparent 1px 3px
   );
