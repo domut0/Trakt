@@ -561,6 +561,13 @@
 }
 /** Put this on the element wrapping a figure, keyed so it remounts when the
     value changes. Exponential ease-out from an already-visible default. */
+/** The flap applied to a block-level row rather than an inline figure. Same
+    keyframe, without the inline-block that a figure needs. */
+@utility anim-flap-row {
+  transform-origin: 50% 0%;
+  animation: flap 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @utility anim-flap {
   display: inline-block;
   transform-origin: 50% 0%;

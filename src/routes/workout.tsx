@@ -68,22 +68,23 @@ function WorkoutPage() {
    */
   const [summary, setSummary] = useState<WorkoutSummaryData | null>(null);
 
-  // "Set logged" confirmation toast. The nonce keys the toast element so each
-  // log remounts it and replays the slide-up/fade animation, even on rapid
-  // consecutive logs (multi-set blocks).
-  const [loggedToast, setLoggedToast] = useState<number | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flashLogged = () => {
-    setLoggedToast(Date.now());
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setLoggedToast(null), 1600);
-  };
-  useEffect(
-    () => () => {
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-    },
-    [],
-  );
+  /*
+    There is no "Set logged" toast on this screen any more, and it is not a
+    removal so much as a replacement.
+
+    It was a floating inked block pinned above the log bar. Once the set list
+    began stacking upward from that bar, any fixed position over the list
+    collides with it eventually: at bottom-52 it sat on the two newest rows by
+    the third or fourth set, and two inked blocks at the same weight merge into
+    one shape rather than overlapping. Moving it anywhere else on this layout
+    only changes which set count breaks it.
+
+    The row IS the confirmation now. A logged set mounts a new row directly
+    above the button that made it, at the thumb, and that row lands with the
+    app's flap. That is better feedback than a label that says a thing
+    happened, because it shows the thing that happened, it is permanent, and it
+    cannot collide with the list it is part of.
+  */
 
   // No active session means there is nothing to log, so this route sends the
   // user home. The summary is the one exception: the session it describes has
@@ -269,7 +270,7 @@ function WorkoutPage() {
                 <li
                   key={set.id}
                   className={`flex items-baseline justify-between gap-3 px-5 py-2.5 ${
-                    idx > 0 ? "group-row-sep" : ""
+                    idx > 0 ? "group-row-sep" : "anim-flap-row"
                   }`}
                 >
                   <span className="min-w-0 flex-1 truncate t-body text-ink">
@@ -375,7 +376,6 @@ function WorkoutPage() {
           onClick={() => {
             if (inBlock) {
               logNextInBlock();
-              flashLogged();
             } else {
               setSheetOpen(true);
             }
@@ -426,7 +426,7 @@ function WorkoutPage() {
         </button>
       </div>
 
-      <LogSetSheet open={sheetOpen} onClose={() => setSheetOpen(false)} onLogged={flashLogged} />
+      <LogSetSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
 
       {showView && (
         <div
@@ -451,25 +451,6 @@ function WorkoutPage() {
               <SessionView sessionId={session.id} />
             </div>
           </div>
-        </div>
-      )}
-
-      {loggedToast !== null && (
-        <div
-          key={loggedToast}
-          role="status"
-          aria-live="polite"
-          // A stamped block, not a floating pill. The shadow went with the
-          // radius: this world has no elevation, so a drop shadow was the one
-          // mark on the screen pretending the page had depth.
-          // bottom-52, not bottom-36. The log bar moved down into the thumb arc and
-          // the toast was still anchored where the old 88px disc used to sit, so
-          // the confirmation landed ON the button. Both are inked blocks, so they
-          // did not overlap so much as merge into one shape with two labels.
-          className="anim-toast pointer-events-none fixed bottom-52 left-1/2 z-[60] flex items-center gap-2 bg-ink px-4 py-2.5 t-label font-semibold text-paper"
-        >
-          <Check size={15} />
-          Set logged
         </div>
       )}
     </div>
