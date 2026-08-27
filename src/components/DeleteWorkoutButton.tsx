@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { Trash2 } from "lucide-react";
+import { Trash } from "./icons";
 import { useStore } from "../lib/store";
 
 /**
@@ -35,7 +35,7 @@ export function DeleteWorkoutButton({
         aria-label="Delete workout"
         className="relative flex h-9 w-9 shrink-0 items-center justify-center text-signal after:absolute after:-inset-1 after:content-['']"
       >
-        <Trash2 size={20} aria-hidden="true" />
+        <Trash size={20} aria-hidden="true" />
       </button>
 
       {confirming &&

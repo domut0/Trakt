@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Check, Plus } from "lucide-react";
+import { Check, Plus } from "../components/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DeleteWorkoutButton } from "../components/DeleteWorkoutButton";
 import { Flap } from "../components/Flap";
@@ -234,6 +234,50 @@ function WorkoutPage() {
       )}
 
       {/*
+        The sets you have actually logged, newest first.
+
+        This space used to be empty paper. The plan feature is opt-in and most
+        days are unplanned, which the memo above calls the overwhelmingly common
+        case, so the default state of the app's most-used screen was a header, a
+        button, and roughly 350px of nothing. Worse, the set you had just logged
+        was invisible: the only way to see it was to open "View workout", which
+        is a full-screen overlay you have to dismiss to log the next one.
+
+        A workout is a record being written, so the record is on the page while
+        you write it. Newest first because the set you just logged is the one you
+        are checking, and it is the row the log button is nearest to.
+
+        Only rendered when there is no plan. With a plan the same space is the
+        plan list, which is an offer about what comes NEXT and outranks a
+        transcript of what already happened.
+      */}
+      {!planned && sessSets.length > 0 && (
+        <section className="min-h-0 flex-1 overflow-y-auto">
+          <ul className="hairline-b">
+            {[...sessSets].reverse().map((set, idx) => {
+              const ex = exercises.find((e) => e.id === set.exerciseId);
+              return (
+                <li
+                  key={set.id}
+                  className={`flex items-baseline justify-between gap-3 px-5 py-2.5 ${
+                    idx > 0 ? "group-row-sep" : ""
+                  }`}
+                >
+                  <span className="min-w-0 flex-1 truncate t-body text-ink">
+                    {ex?.name ?? "Unknown exercise"}
+                  </span>
+                  <span className="shrink-0 tnum t-body text-ink">
+                    {set.weight} {unit} × {set.reps}
+                    {set.rpe != null && <span className="t-label text-ink-2"> @ {set.rpe}</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {/*
         Planned lifts, when the day has a plan.
 
         An OFFER, never a checklist. Nothing here gates the log button, the
@@ -340,7 +384,7 @@ function WorkoutPage() {
               </span>
             )}
           </span>
-          <Plus size={26} aria-hidden="true" className="shrink-0" />
+          <Plus size={26} className="shrink-0" />
         </button>
       </div>
 
@@ -415,7 +459,7 @@ function WorkoutPage() {
           // did not overlap so much as merge into one shape with two labels.
           className="anim-toast pointer-events-none fixed bottom-52 left-1/2 z-[60] flex items-center gap-2 bg-ink px-4 py-2.5 t-label font-semibold text-paper"
         >
-          <Check size={13} strokeWidth={3.5} aria-hidden="true" />
+          <Check size={15} />
           Set logged
         </div>
       )}

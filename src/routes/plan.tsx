@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Chevron } from "../components/icons";
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { PlanEditorSheet } from "../components/PlanEditorSheet";
@@ -194,9 +195,7 @@ function PlanPage() {
                     Today
                   </span>
                 )}
-                <span className="shrink-0 t-action" aria-hidden="true">
-                  →
-                </span>
+                <span className="shrink-0 t-action" aria-hidden="true"></span>
               </button>
             );
           })}

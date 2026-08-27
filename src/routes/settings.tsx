@@ -1,4 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { Chevron } from "../components/icons";
 import { useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { ImportMfpSheet } from "../components/ImportMfpSheet";
@@ -352,9 +353,7 @@ function SettingsPage() {
                 <div className="t-body">Manage meals</div>
                 <div className="t-label text-ink-2">Customise meal names, order, and times.</div>
               </div>
-              <span className="t-action" aria-hidden="true">
-                →
-              </span>
+              <Chevron className="shrink-0 text-ink-2" size={16} />
             </button>
             <button
               type="button"
@@ -367,9 +366,7 @@ function SettingsPage() {
                   Create and edit custom recipes and batch meals.
                 </div>
               </div>
-              <span className="t-action" aria-hidden="true">
-                →
-              </span>
+              <Chevron className="shrink-0 text-ink-2" size={16} />
             </button>
           </>
         )}
@@ -396,9 +393,7 @@ function SettingsPage() {
                 <div className="t-body">Plate calculator</div>
                 <div className="t-label text-ink-2">Work out what to load per side.</div>
               </div>
-              <span className="t-action" aria-hidden="true">
-                →
-              </span>
+              <Chevron className="shrink-0 text-ink-2" size={16} />
             </button>
             <button
               type="button"
@@ -409,9 +404,7 @@ function SettingsPage() {
                 <div className="t-body">1RM estimator</div>
                 <div className="t-label text-ink-2">Estimate a max from a weight and reps.</div>
               </div>
-              <span className="t-action" aria-hidden="true">
-                →
-              </span>
+              <Chevron className="shrink-0 text-ink-2" size={16} />
             </button>
           </>
         )}
@@ -423,9 +416,7 @@ function SettingsPage() {
             <div className="t-body">Export backup</div>
             <div className="t-label text-ink-2">Download all data as JSON.</div>
           </div>
-          <span className="t-action" aria-hidden="true">
-            →
-          </span>
+          <Chevron className="shrink-0 text-ink-2" size={16} />
         </button>
         <button
           type="button"
@@ -436,9 +427,7 @@ function SettingsPage() {
             <div className="t-body">Export sets (CSV)</div>
             <div className="t-label text-ink-2">Download set history for spreadsheets.</div>
           </div>
-          <span className="t-action" aria-hidden="true">
-            →
-          </span>
+          <Chevron className="shrink-0 text-ink-2" size={16} />
         </button>
         <button
           type="button"
@@ -449,9 +438,7 @@ function SettingsPage() {
             <div className="t-body">Export daily log (CSV)</div>
             <div className="t-label text-ink-2">Download nutrition and bodyweight history.</div>
           </div>
-          <span className="t-action" aria-hidden="true">
-            →
-          </span>
+          <Chevron className="shrink-0 text-ink-2" size={16} />
         </button>
         <label className="group-row group-row-sep w-full cursor-pointer text-left">
           <div>
@@ -464,9 +451,7 @@ function SettingsPage() {
             className="hidden"
             onChange={handleFileChange}
           />
-          <span className="t-action" aria-hidden="true">
-            →
-          </span>
+          <Chevron className="shrink-0 text-ink-2" size={16} />
         </label>
         <button
           type="button"
@@ -477,9 +462,7 @@ function SettingsPage() {
             <div className="t-body">Import MyFitnessPal diary</div>
             <div className="t-label text-ink-2">Load foods and macros from an HTML export.</div>
           </div>
-          <span className="t-action" aria-hidden="true">
-            →
-          </span>
+          <Chevron className="shrink-0 text-ink-2" size={16} />
         </button>
 
         <div className="group-row-sep p-4 space-y-2">
@@ -580,9 +563,7 @@ function SettingsPage() {
               <div className="t-body text-signal">Clear all data</div>
               <div className="t-label text-ink-2">Wipe all workouts and start fresh.</div>
             </div>
-            <span className="text-signal" aria-hidden="true">
-              →
-            </span>
+            <span className="text-signal" aria-hidden="true"></span>
           </button>
         ) : (
           <div className="space-y-3 p-4">

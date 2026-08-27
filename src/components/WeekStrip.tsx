@@ -1,6 +1,6 @@
 import { useMemo, useState, type JSX } from "react";
 import { addDays, addWeeks, format, startOfWeek, subWeeks } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Chevron, ChevronLeft } from "./icons";
 import { dayKey, parseDayKey } from "../lib/daily-log";
 
 const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"] as const;
@@ -74,7 +74,7 @@ export function WeekStrip({
         aria-label="Previous week"
         className="flex w-10 shrink-0 items-center justify-center text-ink-2 active:bg-wash"
       >
-        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        <ChevronLeft size={16} />
       </button>
 
       <div className="grid flex-1 grid-cols-7">
@@ -117,7 +117,7 @@ export function WeekStrip({
         aria-label="Next week"
         className="flex w-10 shrink-0 items-center justify-center border-l border-rule text-ink-2 active:bg-wash"
       >
-        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        <Chevron size={16} />
       </button>
     </div>
   );

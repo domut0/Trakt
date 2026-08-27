@@ -87,8 +87,10 @@ function Icon({ name }: { name: TabItem["icon"] }) {
     fill: "none",
     stroke,
     strokeWidth: 1.6,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
+    // butt and miter, not round: this world has no round ends and no radius,
+    // and a rounded cap here was the nav being the one soft thing on the page.
+    strokeLinecap: "butt" as const,
+    strokeLinejoin: "miter" as const,
     // Decorative: every tab renders its own visible text label right below the
     // icon, so exposing the glyph too would just double the announcement.
     "aria-hidden": true,
@@ -114,7 +116,7 @@ function Icon({ name }: { name: TabItem["icon"] }) {
     return (
       <svg {...common}>
         <path d="M9 4.5H7.5A1.5 1.5 0 0 0 6 6v13.5A1.5 1.5 0 0 0 7.5 21h9a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H15" />
-        <rect x="9" y="3" width="6" height="3" rx="1" />
+        <rect x="9" y="3" width="6" height="3" />
         <path d="M9 11h6" />
         <path d="M9 15h4" />
       </svg>
@@ -122,7 +124,7 @@ function Icon({ name }: { name: TabItem["icon"] }) {
   if (name === "calendar")
     return (
       <svg {...common}>
-        <rect x="3.5" y="5" width="17" height="16" rx="2.5" />
+        <rect x="3.5" y="5" width="17" height="16" />
         <path d="M3.5 9.5h17" />
         <path d="M8 3v4" />
         <path d="M16 3v4" />
@@ -173,8 +175,8 @@ export function ActiveSessionBanner() {
     >
       <span className="flex min-w-0 items-center gap-2 t-label font-medium">
         <span className="relative flex h-2 w-2 shrink-0">
-          <span className="absolute inset-0 animate-ping rounded-full bg-accent-foreground/60" />
-          <span className="relative h-2 w-2 rounded-full bg-accent-foreground" />
+          <span className="absolute inset-0 animate-ping bg-paper" />
+          <span className="relative h-2 w-2 bg-paper" />
         </span>
         <span className="truncate">Workout in progress · {slot?.name}</span>
       </span>
@@ -287,8 +289,8 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
                   Reduced motion is handled globally in styles.css. */}
               {activeSessionId && (
                 <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-2 w-2">
-                  <span className="absolute inset-0 animate-ping rounded-full bg-foreground/60" />
-                  <span className="relative h-2 w-2 rounded-full bg-foreground ring-2 ring-surface" />
+                  <span className="absolute inset-0 animate-ping bg-ink" />
+                  <span className="relative h-2 w-2 bg-ink ring-2 ring-paper" />
                 </span>
               )}
             </span>

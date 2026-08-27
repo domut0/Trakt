@@ -119,18 +119,23 @@ function MetricRow({
 }
 
 /**
- * The calorie gauge.
+ * The calorie measure.
  *
- * This replaces three 10px-wide rounded bars that stood beside the hero number
- * and encoded protein, fat and carbs in three hues nobody could name. They were
- * a glyph pretending to be a chart: too small to read a quantity from, and
- * repeating information the rows below stated exactly.
+ * Three versions of this have now existed. It began as three 10px rounded bars
+ * beside the hero encoding protein, fat and carbs in three hues nobody could
+ * name: a glyph pretending to be a chart, too small to read a quantity from and
+ * repeating what the rows below state exactly. It then became a solid bar in a
+ * track, which was legible but was a fill meter, and this system says rank comes
+ * from rule weight and never from fill.
  *
- * What is here instead is the one measurement the screen exists to show, drawn
- * the width of the page. The track is the target, so reaching its end is
- * reaching the goal. Over target, the overrun continues past the end of the
- * track in the second ink, saying the same thing the struck rule under the
- * figure says.
+ * It is a ruled measure now. A track outlined in ink, a hatched field for what
+ * has been eaten, and quarter ticks under the rule so the quantity can be read
+ * against a scale rather than estimated from a length. That is how a printed
+ * gauge works, and the hatch is the same device the charts use to fill an area.
+ *
+ * The track IS the target, so reaching its end is reaching the goal. An overrun
+ * continues past the end in the second ink, saying the same thing as the struck
+ * rule under the figure above it.
  */
 function CalorieGauge({
   logged,
@@ -142,22 +147,28 @@ function CalorieGauge({
   exceeded: boolean;
 }) {
   const pct = Math.max(0, Math.min(100, (logged / target) * 100));
-  // The overrun is drawn as its own segment past the track, capped so that a
-  // wildly mis-typed entry cannot push the bar off the page.
-  const overPct = exceeded ? Math.min(100, ((logged - target) / target) * 100) : 0;
+  // Capped so a mistyped entry cannot push the overrun off the page.
+  const overPct = exceeded ? Math.min(60, ((logged - target) / target) * 100) : 0;
 
   return (
-    <div aria-hidden="true" className="mt-3 flex h-2.5 w-full bg-wash">
-      {/* The track IS the target, so its right-hand end is the line he is
-          heading for and no separate tick is needed. The first build drew one
-          there anyway and it read as the end of the bar rather than as a goal,
-          which is a mark that costs ink and says nothing. */}
-      <div className="relative flex-1">
-        <div className="hatch-solid h-full" style={{ width: `${pct}%` }} />
+    <div aria-hidden="true" className="mt-3">
+      <div className="flex items-stretch">
+        <div className="relative h-3 flex-1 border border-ink">
+          <div className="hatch-dense h-full" style={{ width: `${pct}%` }} />
+        </div>
+        {overPct > 0 && (
+          <div
+            className="hatch-over h-3 shrink-0 border border-l-0 border-signal"
+            style={{ width: `${overPct}%` }}
+          />
+        )}
       </div>
-      {overPct > 0 && (
-        <div className="bg-signal h-full shrink-0" style={{ width: `${overPct / 2}%` }} />
-      )}
+      {/* Quarter ticks, hung below the rule so the hatch never hides them. */}
+      <div className="relative h-1">
+        {[25, 50, 75].map((t) => (
+          <span key={t} className="absolute top-0 h-1 w-px bg-ink-3" style={{ left: `${t}%` }} />
+        ))}
+      </div>
     </div>
   );
 }

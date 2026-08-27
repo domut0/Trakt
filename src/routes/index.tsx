@@ -124,73 +124,68 @@ function Home() {
   };
 
   const isToday = selected === todayKey;
-  const title = isToday ? "Today" : format(parseDayKey(selected), "EEE d MMM");
+  /**
+   * The page's own name, always the date.
+   *
+   * This used to read "Today" on today, which is the one day the screen does
+   * not need to be told about: the week strip immediately below already inks
+   * the column you are on, so the largest word on the screen was restating the
+   * thing directly under it and spending the margin on nothing. A timetable
+   * names its page with the date it covers.
+   */
+  const heading = format(parseDayKey(selected), "EEE d MMM").toUpperCase();
+  /** Kept spoken rather than printed: "Today" is the clearer thing to hear. */
+  const spokenDay = isToday ? "today" : format(parseDayKey(selected), "EEE d MMM");
 
   return (
     <AppShell>
       <header className="px-5 pt-14 pb-2">
-        <h1 className="t-title">{title}</h1>
+        <h1 className="t-title">{heading}</h1>
       </header>
 
       <WeekStrip selectedDate={selected} onSelectDate={selectDate} />
 
       {/*
-        The timeline leads.
+        Order: the day is named, the week picks it, the day's numbers, then the
+        day itself, then the habits.
 
-        It is this screen's subject and it was below the fold: the first
-        viewport was a title, a week strip and two tables of numbers, so the one
-        thing the screen exists to show was the one thing you had to scroll for.
-        Directly under the week strip is also where it belongs by meaning, since
-        the strip picks a day and this is that day.
+        The numbers sit above the canvas rather than below it because the
+        contract promises a ruled row of macro figures in the FIRST VIEWPORT and
+        a 420px canvas pushed them two screens down. They are compact - a hero,
+        a measure, and a few ruled rows - so both promises fit above the fold
+        with the canvas opening underneath them.
 
-        No section header above it. The screen title names the day and the strip
-        selects it; a third line saying "The day" over the top was a label on
-        something already labelled twice.
+        No section-gap between the strip and what follows it: the strip picks a
+        day and everything under it IS that day, so blank paper between them
+        reads as a hole rather than as rhythm.
 
-        This does not cost Habits the stable y-offset it was placed for. That
-        note was about the STATS card, whose height moves with how much was
-        logged. The timeline is a fixed 420px in every state, so everything
-        below it is at a constant offset, which is what Habits actually needed.
+        Habits keeps the stable y-offset it was placed for. The note that put it
+        high was about the STATS card, whose height moves with how much was
+        logged; it now sits under a fixed-height canvas, which is the constant
+        offset it actually wanted.
       */}
-      {/* No section-gap above the canvas. The strip picks the day and the table
-          IS that day, so they are one object; 26px of blank paper between them
-          read as a hole in the page rather than as rhythm. Everything below the
-          canvas keeps the gap, because those are separate tables. */}
-      <section className="anim-fade-up">
-        <DayTimeline
-          date={selected}
-          onOpenMeal={setOpenMealId}
-          onOpenSession={(id) => router.navigate({ to: "/session/$id", params: { id } })}
-          onOpenPlan={() => router.navigate({ to: "/plan" })}
-        />
-      </section>
-
-      {/*
-        No HabitEditorSheet here on purpose. HabitsCard owns the sheet and its
-        open state internally, so mounting one here too would give the screen a
-        second, independent editor.
-      */}
-      {habitsEnabled && (
-        <section className="px-5 section-gap anim-fade-up">
-          <h2 className="group-header t-caption">Habits</h2>
-          <HabitsCard date={selected} />
-        </section>
-      )}
-
-      <section className="px-5 section-gap anim-fade-up">
-        <h2 className="group-header t-caption">Daily numbers</h2>
+      <section className="px-5 anim-fade-up">
         {/*
           The card is wrapped rather than given an onEdit prop so that it stays a
           pure readout with one job. Nothing inside it is interactive, so a
           button around the whole thing is unambiguous and gives the 44px hit
           area for free.
+
+          The header comes INSIDE that button so the card can carry a visible
+          "Edit". A whole card that is silently tappable is not an affordance,
+          it is a secret, and this is the control the bedtime session is
+          actually here to use.
         */}
         <button
           type="button"
           onClick={() => setEditorOpen(true)}
-          aria-label={`Edit daily numbers for ${title}`}
+          aria-label={`Edit daily numbers for ${spokenDay}`}
           className="w-full text-left focus:outline-none"
         >
+          <div className="group-header">
+            <h2 className="t-caption">Daily numbers</h2>
+            <span className="t-action t-label">Edit</span>
+          </div>
           <DayStatsCard date={selected} />
         </button>
 
@@ -217,6 +212,27 @@ function Home() {
           </button>
         )}
       </section>
+
+      <section className="section-gap anim-fade-up">
+        <DayTimeline
+          date={selected}
+          onOpenMeal={setOpenMealId}
+          onOpenSession={(id) => router.navigate({ to: "/session/$id", params: { id } })}
+          onOpenPlan={() => router.navigate({ to: "/plan" })}
+        />
+      </section>
+
+      {/*
+        No HabitEditorSheet here on purpose. HabitsCard owns the sheet and its
+        open state internally, so mounting one here too would give the screen a
+        second, independent editor.
+      */}
+      {habitsEnabled && (
+        <section className="px-5 section-gap anim-fade-up">
+          <h2 className="group-header t-caption">Habits</h2>
+          <HabitsCard date={selected} />
+        </section>
+      )}
 
       <div className="pb-8" />
 

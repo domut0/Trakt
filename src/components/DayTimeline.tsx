@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
-import { Activity, Dumbbell, Utensils } from "lucide-react";
+import { Cardio, Dumbbell, Meal } from "./icons";
 import { dayKey } from "../lib/daily-log";
 import { useStore } from "../lib/store";
 import {
@@ -22,12 +22,12 @@ function formatHour(h: number): string {
 
 function BandIcon({ kind }: { kind: TimelineBand["kind"] }) {
   if (kind === "meal") {
-    return <Utensils className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />;
+    return <Meal className="shrink-0 text-ink-2" size={16} />;
   }
   if (kind === "strength") {
-    return <Dumbbell className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />;
+    return <Dumbbell className="shrink-0 text-ink-2" size={16} />;
   }
-  return <Activity className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />;
+  return <Cardio className="shrink-0 text-ink-2" size={16} />;
 }
 
 export function DayTimeline(props: {
@@ -96,7 +96,7 @@ export function DayTimeline(props: {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const viewportPx = el.clientHeight || 420;
+    const viewportPx = el.clientHeight || 360;
     el.scrollTop = initialScrollPx(bands, date, new Date(), PX_PER_HOUR, viewportPx);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
@@ -126,7 +126,7 @@ export function DayTimeline(props: {
   // group-list would hang it 20px off both edges. The rules are drawn directly
   // here because the element is already full width.
   return (
-    <div className="rule-heavy-t rule-b relative flex h-[420px] flex-col">
+    <div className="rule-heavy-t rule-b relative flex h-[360px] flex-col">
       {allDayBands.length > 0 && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 px-4 pt-4 pb-3">
           {allDayBands.map((band) => (
@@ -140,8 +140,8 @@ export function DayTimeline(props: {
               }`}
             >
               <BandIcon kind={band.kind} />
-              <span className="t-body font-medium text-foreground">{band.label}</span>
-              {band.detail && <span className="t-label text-muted-foreground">{band.detail}</span>}
+              <span className="t-body text-ink">{band.label}</span>
+              {band.detail && <span className="t-label text-ink-2">{band.detail}</span>}
             </button>
           ))}
         </div>
@@ -240,13 +240,9 @@ export function DayTimeline(props: {
                       and undo the justify-end that keeps the name in its
                       gutter, stranding the icon at the far left. */}
                   <span className={`min-w-0 ${isBlock ? "flex-1" : ""}`}>
-                    <span className="block truncate t-body font-medium text-foreground">
-                      {band.label}
-                    </span>
+                    <span className="block truncate t-body text-ink">{band.label}</span>
                     {band.detail && isBlock && (
-                      <span className="block truncate t-label text-muted-foreground">
-                        {band.detail}
-                      </span>
+                      <span className="block truncate t-label text-ink-2">{band.detail}</span>
                     )}
                   </span>
                 </button>

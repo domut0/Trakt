@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ArrowDown, ArrowUp } from "../components/icons";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import {
@@ -170,8 +171,11 @@ function ChartsPage() {
   const changeStr = useMemo(() => {
     if (windowChange === null) return "-";
     const sign = windowChange > 0 ? "+" : windowChange < 0 ? "-" : "";
-    const arrow = windowChange > 0 ? "↑ " : windowChange < 0 ? "↓ " : "";
-    return `${arrow}${sign}${formatMetricVal(Math.abs(windowChange))}`;
+    // The direction used to be a Unicode arrow glued to the front of this
+    // string. A character is not an icon: it takes the text metrics, it is a
+    // different shape in every font fallback, and it belongs to no system. The
+    // caller draws the mark now and this returns only the figure.
+    return `${sign}${formatMetricVal(Math.abs(windowChange))}`;
   }, [windowChange, formatMetricVal]);
 
   const rateReadoutText = useMemo(() => {
@@ -316,7 +320,14 @@ function ChartsPage() {
           </div>
           <div className="hairline-t border-l border-rule pl-3 pt-3">
             <div className="t-caption text-ink-2">Change</div>
-            <div className="t-stat mt-1">{changeStr}</div>
+            <div className="mt-1 flex items-center gap-1.5">
+              {windowChange !== null && windowChange !== 0 && (
+                <span className="shrink-0 text-ink">
+                  {windowChange > 0 ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
+                </span>
+              )}
+              <span className="t-stat">{changeStr}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -630,10 +641,25 @@ function Chart({
       }
     >
       <defs>
-        <linearGradient id="chart-area" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0" />
-        </linearGradient>
+        {/*
+            Hatch, not a gradient wash.
+
+            The area under the trace used to fade from 18% ink to nothing, which
+            is a gray ramp - the one thing the design system explicitly bans -
+            and it is also the stock charting-library look on a page that owns
+            three hatches built for exactly this job. A printed chart fills an
+            area by ruling it, so this one does too: 1px ink at 45 degrees on a
+            4px period, the same construction as the macro keys.
+          */}
+        <pattern
+          id="chart-area"
+          width="4"
+          height="4"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <line x1="0" y1="0" x2="0" y2="4" stroke="var(--color-ink)" strokeWidth="0.6" />
+        </pattern>
         {/* Least-squares fitted values can fall outside the data range, so the
             trend line is clipped to the plot box instead of drawing over the X
             axis labels. */}
@@ -668,19 +694,27 @@ function Chart({
       ))}
 
       {/* X axis tick labels */}
-      {renderedXTicks.map((t, i) => (
-        <text
-          key={`x-tick-${i}`}
-          x={t.posX}
-          y={H - 6}
-          fontSize={9}
-          textAnchor="middle"
-          fill="var(--color-muted-foreground)"
-          className="tnum"
-        >
-          {t.label}
-        </text>
-      ))}
+      {renderedXTicks.map((t, i) => {
+        // A middle-anchored label on the last tick hangs half its width past
+        // the plot and gets clipped by the viewBox, which is why the right-hand
+        // date read "Aug 2C". The outermost ticks anchor inwards instead.
+        const isFirst = i === 0;
+        const isLast = i === renderedXTicks.length - 1;
+        const anchor = isLast ? "end" : isFirst ? "start" : "middle";
+        return (
+          <text
+            key={`x-tick-${i}`}
+            x={t.posX}
+            y={H - 6}
+            fontSize={9}
+            textAnchor={anchor}
+            fill="var(--color-muted-foreground)"
+            className="tnum"
+          >
+            {t.label}
+          </text>
+        );
+      })}
 
       {/* Linear regression trend line overlay */}
       {regression && !isSinglePoint && (

@@ -515,6 +515,21 @@
   background-color: var(--color-ink);
 }
 
+/** A dense measured field, for a quantity read against a ruled scale. Denser
+    than the macro hatches because it is read as an amount rather than as an
+    identity, and it must not be mistaken for one of the three macro keys. */
+@utility hatch-dense {
+  background-image: repeating-linear-gradient(45deg, var(--color-ink) 0 1px, transparent 1px 3px);
+}
+/** The same field in the second ink, for the part of a measure that overran. */
+@utility hatch-over {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--color-signal) 0 1px,
+    transparent 1px 3px
+  );
+}
+
 /* ---------------------------------------------------------------------------
    MOTION. One authored moment, not scattered effects.
 

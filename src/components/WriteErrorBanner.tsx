@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Close } from "./icons";
 import { useStore } from "../lib/store";
 
 /**
@@ -28,7 +28,7 @@ export function WriteErrorBanner() {
         // cover content rather than move it.
         className="relative shrink-0 p-1 opacity-90 after:absolute after:-inset-2.5 after:content-['']"
       >
-        <X size={16} />
+        <Close size={16} />
       </button>
     </div>
   );

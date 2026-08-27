@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check } from "./icons";
 import { Component, type ReactNode } from "react";
 import {
   formatDuration,
@@ -121,7 +121,7 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
             // much the same olive as the app's warning colour. Same shape as the
             // goal notes on the daily log.
             <span className="flex items-center gap-1 t-caption text-success">
-              <Check size={12} strokeWidth={3} aria-hidden="true" />
+              <Check size={12} />
               {subject.caption}
             </span>
           ) : (
