@@ -1,22 +1,162 @@
-﻿import { useMemo, type JSX } from "react";
+import { useMemo, type JSX, type ReactNode } from "react";
 import { dayKey } from "../lib/daily-log";
 import { useStore } from "../lib/store";
-import { directionFor } from "../lib/targets";
+import { directionFor, targetStatusFor, type TargetStatus } from "../lib/targets";
 import { useDayMacros } from "../lib/use-day-macros";
 
 /**
- * Day stats card showing calories and macros against targets.
+ * The day's numbers, set as a table.
  *
- * Modelled on Food You:
- * - Hero calories over target with remaining line ("left" on cut/maintain, "to go" on gain).
- * - Three vertical bar glyphs for protein, fat, carbs with track going down to --background.
- * - Macro rows for each configured target.
- * - Steps row if steps target is configured.
- * - Bodyweight row (value only, no target).
+ * Two things changed here beyond the repaint, and both were latent bugs rather
+ * than taste:
  *
- * In future day mode (date after today), shows targets alone with no logged values,
- * no hero number, no remaining line, and no bodyweight row.
+ * 1. The card never called `targetStatusFor`, so a day that hit every target
+ *    looked exactly like a day that missed every target. The library has
+ *    known the difference between a floor, a ceiling and a band since targets
+ *    shipped: a floor cannot be exceeded (12,480 steps against 10,000 is a
+ *    surplus, not a violation) and a ceiling cannot be met (being under your
+ *    calories at 9am is breakfast, not an achievement). The rows now read that
+ *    status instead of printing a bare figure and leaving him to do the
+ *    arithmetic.
+ * 2. Five rows were five near-identical copies of the same twenty lines, which
+ *    is why the missing status was missing five times. There is one row now.
+ *
+ * Status is carried by MARK, never by hue: a filled square for met, and the
+ * second ink with a struck rule under the figure for exceeded. The old card
+ * had no marks at all, and the system it inherited from would have used green
+ * and amber, which its own notes recorded as indistinguishable to a protanope.
  */
+
+type MetricHatch = "protein" | "fat" | "carbs" | "solid" | "open";
+
+const HATCH_CLASS: Record<MetricHatch, string> = {
+  protein: "hatch-protein",
+  fat: "hatch-fat",
+  carbs: "hatch-carbs",
+  solid: "hatch-solid",
+  open: "",
+};
+
+/**
+ * The key beside a metric's name.
+ *
+ * Seven hues became one ink and a set of hatches: angle carries identity,
+ * density carries emphasis. It reads at arm's length in gym light, it survives
+ * any colour vision, and unlike a coloured dot it cannot be mistaken for
+ * decoration, because a hatch has no other job.
+ */
+function MetricKey({ hatch }: { hatch: MetricHatch }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`h-3 w-3 shrink-0 border border-ink-3 ${HATCH_CLASS[hatch]}`}
+    />
+  );
+}
+
+function StatusMark({ status }: { status: TargetStatus }) {
+  if (status === "met") {
+    // Same filled square as a ticked habit. One vocabulary for "done".
+    return (
+      <span aria-hidden="true" className="ml-2 inline-block h-2.5 w-2.5 bg-ink align-middle" />
+    );
+  }
+  return null;
+}
+
+function MetricRow({
+  label,
+  hatch,
+  value,
+  target,
+  unit,
+  status,
+  sep,
+}: {
+  label: string;
+  hatch: MetricHatch;
+  /** Already-rounded display value, or null when nothing was logged. */
+  value: string | null;
+  /** Already-rounded display target, or null when no target is set. */
+  target: string | null;
+  unit?: string;
+  status: TargetStatus | null;
+  sep: boolean;
+}) {
+  const exceeded = status === "exceeded";
+
+  let figure: ReactNode;
+  if (value === null) {
+    figure = <span className="t-label text-ink-3">Not recorded</span>;
+  } else {
+    figure = <span className={`t-stat text-ink ${exceeded ? "mark-over" : ""}`}>{value}</span>;
+  }
+
+  return (
+    <div className={`group-row ${sep ? "group-row-sep" : ""}`}>
+      <div className="flex min-w-0 items-center gap-2.5">
+        <MetricKey hatch={hatch} />
+        <span className="t-body text-ink">{label}</span>
+      </div>
+      <div className="flex shrink-0 items-baseline">
+        {figure}
+        {target !== null && (
+          <span className="ml-1 t-label text-ink-2">
+            / {target}
+            {unit ? ` ${unit}` : ""}
+          </span>
+        )}
+        {target === null && unit && <span className="ml-1 t-label text-ink-2">{unit}</span>}
+        {status && <StatusMark status={status} />}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The calorie gauge.
+ *
+ * This replaces three 10px-wide rounded bars that stood beside the hero number
+ * and encoded protein, fat and carbs in three hues nobody could name. They were
+ * a glyph pretending to be a chart: too small to read a quantity from, and
+ * repeating information the rows below stated exactly.
+ *
+ * What is here instead is the one measurement the screen exists to show, drawn
+ * the width of the page. The track is the target, so reaching its end is
+ * reaching the goal. Over target, the overrun continues past the end of the
+ * track in the second ink, saying the same thing the struck rule under the
+ * figure says.
+ */
+function CalorieGauge({
+  logged,
+  target,
+  exceeded,
+}: {
+  logged: number;
+  target: number;
+  exceeded: boolean;
+}) {
+  const pct = Math.max(0, Math.min(100, (logged / target) * 100));
+  // The overrun is drawn as its own segment past the track, capped so that a
+  // wildly mis-typed entry cannot push the bar off the page.
+  const overPct = exceeded ? Math.min(100, ((logged - target) / target) * 100) : 0;
+
+  return (
+    <div aria-hidden="true" className="mt-3 flex h-2.5 w-full bg-wash">
+      {/* The track IS the target, so its right-hand end is the line he is
+          heading for and no separate tick is needed. The first build drew one
+          there anyway and it read as the end of the bar rather than as a goal,
+          which is a mark that costs ink and says nothing. */}
+      <div className="relative flex-1">
+        <div className="hatch-solid h-full" style={{ width: `${pct}%` }} />
+      </div>
+      {overPct > 0 && (
+        <div className="bg-signal h-full shrink-0" style={{ width: `${overPct / 2}%` }} />
+      )}
+    </div>
+  );
+}
+
 export function DayStatsCard({ date }: { date: string }): JSX.Element {
   const targetsEnabled = useStore((s) => s.targetsEnabled);
   const targetProfileForDate = useStore((s) => s.targetProfileForDate);
@@ -36,16 +176,28 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
   const steps = dayLog?.steps;
   const bodyweight = dayLog?.bodyweight;
 
-  const targetCalories =
-    profile?.calories !== undefined && profile.calories > 0 ? profile.calories : undefined;
-  const targetProtein =
-    profile?.protein !== undefined && profile.protein > 0 ? profile.protein : undefined;
-  const targetFat = profile?.fat !== undefined && profile.fat > 0 ? profile.fat : undefined;
-  const targetCarbs = profile?.carbs !== undefined && profile.carbs > 0 ? profile.carbs : undefined;
-  const targetSteps = profile?.steps !== undefined && profile.steps > 0 ? profile.steps : undefined;
+  const positive = (n: number | undefined) => (n !== undefined && n > 0 ? n : undefined);
+  const targetCalories = positive(profile?.calories);
+  const targetProtein = positive(profile?.protein);
+  const targetFat = positive(profile?.fat);
+  const targetCarbs = positive(profile?.carbs);
+  const targetSteps = positive(profile?.steps);
 
   const calorieDirection = directionFor("calories", profile?.goalMode);
   const isGain = calorieDirection === "floor";
+
+  /** Status for one field, or null when the day is future or either half is
+   * missing. Progress needs both a logged value and a target to mean anything. */
+  const statusOf = (
+    field: "calories" | "protein" | "fat" | "carbs" | "steps",
+    logged: number | undefined,
+    target: number | undefined,
+  ): TargetStatus | null => {
+    if (isFuture || logged === undefined || target === undefined) return null;
+    return targetStatusFor(directionFor(field, profile?.goalMode), logged, target);
+  };
+
+  const calorieStatus = statusOf("calories", calories, targetCalories);
 
   let remainingText: string | null = null;
   if (!isFuture && targetCalories !== undefined) {
@@ -59,257 +211,125 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
     }
   }
 
-  // Three vertical bar percentages (protein, fat, carbs)
-  const proteinPct =
-    targetProtein !== undefined && !isFuture && protein !== undefined
-      ? Math.min(100, Math.max(0, (protein / targetProtein) * 100))
-      : 0;
-
-  const fatPct =
-    targetFat !== undefined && !isFuture && fat !== undefined
-      ? Math.min(100, Math.max(0, (fat / targetFat) * 100))
-      : 0;
-
-  const carbsPct =
-    targetCarbs !== undefined && !isFuture && carbs !== undefined
-      ? Math.min(100, Math.max(0, (carbs / targetCarbs) * 100))
-      : 0;
-
   const showBodyweight = !isFuture && bodyweight !== undefined;
+  const round = (n: number) => Math.round(n).toLocaleString();
 
   return (
     <div className="group-list">
-      {/* Top section: calories, remaining line, and 3 vertical bar glyphs */}
-      <div className="flex items-start justify-between gap-3 p-5">
-        <div className="min-w-0 flex-1">
-          {isFuture ? (
-            <div>
-              {targetCalories !== undefined ? (
-                <div className="t-stat text-foreground">
-                  {Math.round(targetCalories).toLocaleString()}{" "}
-                  <span className="t-label font-normal text-muted-foreground">kcal</span>
-                </div>
-              ) : (
-                <div className="t-label text-muted-foreground">No calorie target</div>
-              )}
+      {/* The hero: the one figure this screen exists to show, at timetable
+          scale, with its gauge directly beneath it. */}
+      <div className="px-5 pt-4 pb-4">
+        {isFuture ? (
+          targetCalories !== undefined ? (
+            <div className="flex items-baseline gap-1.5">
+              <span className="t-hero text-ink">{round(targetCalories)}</span>
+              <span className="t-label text-ink-2">kcal planned</span>
             </div>
           ) : (
-            <>
-              <div className="flex items-baseline gap-2">
-                {calories !== undefined ? (
-                  <span className="t-hero font-bold text-foreground">
-                    {Math.round(calories).toLocaleString()}
-                  </span>
-                ) : (
-                  <span className="t-body font-medium text-muted-foreground">Not recorded</span>
-                )}
-                {targetCalories !== undefined && (
-                  <span className="t-label text-muted-foreground">
-                    / {Math.round(targetCalories).toLocaleString()} kcal
-                  </span>
-                )}
-                {targetCalories === undefined && calories !== undefined && (
-                  <span className="t-label text-muted-foreground">kcal</span>
-                )}
-              </div>
-              {remainingText && (
-                <div className="t-label text-muted-foreground mt-1">{remainingText}</div>
+            <div className="t-label text-ink-2">No calorie target for this day</div>
+          )
+        ) : (
+          <>
+            <div className="flex items-baseline gap-1.5">
+              {calories !== undefined ? (
+                <span
+                  className={`t-hero text-ink ${calorieStatus === "exceeded" ? "mark-over" : ""}`}
+                >
+                  {round(calories)}
+                </span>
+              ) : (
+                <span className="t-stat text-ink-3">Not recorded</span>
               )}
-            </>
-          )}
-        </div>
-
-        {/* Three vertical bar glyphs: protein, fat, carbs.
-            56px tall, not 28: these are the card's second reading, the one you get
-            without parsing any digits, and at half this height they read as
-            three specks rather than three bars. The track is bg-background,
-            one step DOWN from the card, because DESIGN.md puts grooves toward
-            the background and a track lighter than its card reads as raised. */}
-        <div className="flex items-end gap-1 shrink-0 pt-1" aria-hidden="true">
-          <div className="h-14 w-2.5 rounded-full bg-background overflow-hidden flex flex-col justify-end">
-            <div
-              className="w-full rounded-full transition-all"
-              style={{
-                height: `${proteinPct}%`,
-                backgroundColor: "var(--color-protein)",
-              }}
-            />
-          </div>
-          <div className="h-14 w-2.5 rounded-full bg-background overflow-hidden flex flex-col justify-end">
-            <div
-              className="w-full rounded-full transition-all"
-              style={{
-                height: `${fatPct}%`,
-                backgroundColor: "var(--color-fat)",
-              }}
-            />
-          </div>
-          <div className="h-14 w-2.5 rounded-full bg-background overflow-hidden flex flex-col justify-end">
-            <div
-              className="w-full rounded-full transition-all"
-              style={{
-                height: `${carbsPct}%`,
-                backgroundColor: "var(--color-carbs)",
-              }}
-            />
-          </div>
-        </div>
+              {targetCalories !== undefined ? (
+                <span className="t-label text-ink-2">/ {round(targetCalories)} kcal</span>
+              ) : (
+                calories !== undefined && <span className="t-label text-ink-2">kcal</span>
+              )}
+            </div>
+            {remainingText && <div className="mt-1 t-label text-ink-2">{remainingText}</div>}
+            {calories !== undefined && targetCalories !== undefined && (
+              <CalorieGauge
+                logged={calories}
+                target={targetCalories}
+                exceeded={calorieStatus === "exceeded"}
+              />
+            )}
+          </>
+        )}
       </div>
 
-      {/* Three macro rows */}
       {targetProtein !== undefined && (
-        <div className="group-row group-row-sep">
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              aria-hidden="true"
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: "var(--color-protein)" }}
-            />
-            <span className="t-body font-medium text-foreground">Protein</span>
-          </div>
-          <div className="t-stat text-foreground">
-            {isFuture ? (
-              <>
-                {Math.round(targetProtein)}{" "}
-                <span className="t-label font-normal text-muted-foreground">g</span>
-              </>
-            ) : protein !== undefined ? (
-              <>
-                {Math.round(protein)}{" "}
-                <span className="t-label font-normal text-muted-foreground">
-                  / {Math.round(targetProtein)} g
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="t-label font-normal text-muted-foreground">Not recorded</span>{" "}
-                <span className="t-label font-normal text-muted-foreground">
-                  / {Math.round(targetProtein)} g
-                </span>
-              </>
-            )}
-          </div>
-        </div>
+        <MetricRow
+          sep
+          label="Protein"
+          hatch="protein"
+          // On a future day the target IS the figure: there is nothing logged
+          // to compare it against, and printing "Not recorded" against every row
+          // of a day that has not happened yet reports a gap rather than a plan.
+          value={isFuture ? round(targetProtein) : protein !== undefined ? round(protein) : null}
+          target={isFuture ? null : round(targetProtein)}
+          unit="g"
+          status={statusOf("protein", protein, targetProtein)}
+        />
       )}
 
       {targetFat !== undefined && (
-        <div className="group-row group-row-sep">
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              aria-hidden="true"
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: "var(--color-fat)" }}
-            />
-            <span className="t-body font-medium text-foreground">Fat</span>
-          </div>
-          <div className="t-stat text-foreground">
-            {isFuture ? (
-              <>
-                {Math.round(targetFat)}{" "}
-                <span className="t-label font-normal text-muted-foreground">g</span>
-              </>
-            ) : fat !== undefined ? (
-              <>
-                {Math.round(fat)}{" "}
-                <span className="t-label font-normal text-muted-foreground">
-                  / {Math.round(targetFat)} g
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="t-label font-normal text-muted-foreground">Not recorded</span>{" "}
-                <span className="t-label font-normal text-muted-foreground">
-                  / {Math.round(targetFat)} g
-                </span>
-              </>
-            )}
-          </div>
-        </div>
+        <MetricRow
+          sep
+          label="Fat"
+          hatch="fat"
+          // On a future day the target IS the figure: there is nothing logged
+          // to compare it against, and printing "Not recorded" against every row
+          // of a day that has not happened yet reports a gap rather than a plan.
+          value={isFuture ? round(targetFat) : fat !== undefined ? round(fat) : null}
+          target={isFuture ? null : round(targetFat)}
+          unit="g"
+          status={statusOf("fat", fat, targetFat)}
+        />
       )}
 
       {targetCarbs !== undefined && (
-        <div className="group-row group-row-sep">
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              aria-hidden="true"
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: "var(--color-carbs)" }}
-            />
-            <span className="t-body font-medium text-foreground">Carbs</span>
-          </div>
-          <div className="t-stat text-foreground">
-            {isFuture ? (
-              <>
-                {Math.round(targetCarbs)}{" "}
-                <span className="t-label font-normal text-muted-foreground">g</span>
-              </>
-            ) : carbs !== undefined ? (
-              <>
-                {Math.round(carbs)}{" "}
-                <span className="t-label font-normal text-muted-foreground">
-                  / {Math.round(targetCarbs)} g
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="t-label font-normal text-muted-foreground">Not recorded</span>{" "}
-                <span className="t-label font-normal text-muted-foreground">
-                  / {Math.round(targetCarbs)} g
-                </span>
-              </>
-            )}
-          </div>
-        </div>
+        <MetricRow
+          sep
+          label="Carbs"
+          hatch="carbs"
+          // On a future day the target IS the figure: there is nothing logged
+          // to compare it against, and printing "Not recorded" against every row
+          // of a day that has not happened yet reports a gap rather than a plan.
+          value={isFuture ? round(targetCarbs) : carbs !== undefined ? round(carbs) : null}
+          target={isFuture ? null : round(targetCarbs)}
+          unit="g"
+          status={statusOf("carbs", carbs, targetCarbs)}
+        />
       )}
 
-      {/* Steps row */}
       {targetSteps !== undefined && (
-        <div className="group-row group-row-sep">
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              aria-hidden="true"
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: "var(--color-steps)" }}
-            />
-            <span className="t-body font-medium text-foreground">Steps</span>
-          </div>
-          <div className="t-stat text-foreground">
-            {isFuture ? (
-              <>{targetSteps.toLocaleString()}</>
-            ) : steps !== undefined ? (
-              <>
-                {steps.toLocaleString()}{" "}
-                <span className="t-label font-normal text-muted-foreground">
-                  / {targetSteps.toLocaleString()}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="t-label font-normal text-muted-foreground">Not recorded</span>{" "}
-                <span className="t-label font-normal text-muted-foreground">
-                  / {targetSteps.toLocaleString()}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
+        <MetricRow
+          sep
+          label="Steps"
+          hatch="solid"
+          value={
+            isFuture
+              ? targetSteps.toLocaleString()
+              : steps !== undefined
+                ? steps.toLocaleString()
+                : null
+          }
+          target={isFuture ? null : targetSteps.toLocaleString()}
+          status={statusOf("steps", steps, targetSteps)}
+        />
       )}
 
-      {/* Bodyweight row (value only, no target, hidden in future mode) */}
       {showBodyweight && (
-        <div className="group-row group-row-sep">
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              aria-hidden="true"
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ backgroundColor: "var(--color-bodyweight)" }}
-            />
-            <span className="t-body font-medium text-foreground">Bodyweight</span>
-          </div>
-          <div className="t-stat text-foreground">
-            {bodyweight} <span className="t-label font-normal text-muted-foreground">{unit}</span>
-          </div>
-        </div>
+        <MetricRow
+          sep
+          label="Bodyweight"
+          hatch="open"
+          value={String(bodyweight)}
+          target={null}
+          unit={unit}
+          status={null}
+        />
       )}
     </div>
   );

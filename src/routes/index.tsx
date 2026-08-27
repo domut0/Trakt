@@ -135,23 +135,50 @@ function Home() {
       <WeekStrip selectedDate={selected} onSelectDate={selectDate} />
 
       {/*
-        Habits stays above the stats card for the reason it always did: it is
-        tapped every morning and needs to sit at a stable y-offset, which it
-        cannot do below a card whose height changes with how much was logged.
+        The timeline leads.
 
+        It is this screen's subject and it was below the fold: the first
+        viewport was a title, a week strip and two tables of numbers, so the one
+        thing the screen exists to show was the one thing you had to scroll for.
+        Directly under the week strip is also where it belongs by meaning, since
+        the strip picks a day and this is that day.
+
+        No section header above it. The screen title names the day and the strip
+        selects it; a third line saying "The day" over the top was a label on
+        something already labelled twice.
+
+        This does not cost Habits the stable y-offset it was placed for. That
+        note was about the STATS card, whose height moves with how much was
+        logged. The timeline is a fixed 420px in every state, so everything
+        below it is at a constant offset, which is what Habits actually needed.
+      */}
+      {/* No section-gap above the canvas. The strip picks the day and the table
+          IS that day, so they are one object; 26px of blank paper between them
+          read as a hole in the page rather than as rhythm. Everything below the
+          canvas keeps the gap, because those are separate tables. */}
+      <section className="anim-fade-up">
+        <DayTimeline
+          date={selected}
+          onOpenMeal={setOpenMealId}
+          onOpenSession={(id) => router.navigate({ to: "/session/$id", params: { id } })}
+          onOpenPlan={() => router.navigate({ to: "/plan" })}
+        />
+      </section>
+
+      {/*
         No HabitEditorSheet here on purpose. HabitsCard owns the sheet and its
         open state internally, so mounting one here too would give the screen a
         second, independent editor.
       */}
       {habitsEnabled && (
         <section className="px-5 section-gap anim-fade-up">
-          <h2 className="group-header px-0 t-caption">Habits</h2>
+          <h2 className="group-header t-caption">Habits</h2>
           <HabitsCard date={selected} />
         </section>
       )}
 
       <section className="px-5 section-gap anim-fade-up">
-        <h2 className="group-header px-0 t-caption">Daily numbers</h2>
+        <h2 className="group-header t-caption">Daily numbers</h2>
         {/*
           The card is wrapped rather than given an onEdit prop so that it stays a
           pure readout with one job. Nothing inside it is interactive, so a
@@ -181,27 +208,17 @@ function Home() {
             className="mt-3 flex min-h-[44px] w-full items-center justify-between px-5 text-left transition-colors active:opacity-70"
           >
             <span className="flex min-w-0 flex-1 items-center gap-3 pr-3">
-              <span className="shrink-0 t-label font-semibold text-accent">
-                Copy the day before
-              </span>
-              <span className="truncate t-label text-muted-foreground">
+              <span className="shrink-0 t-action t-label">Copy the day before</span>
+              <span className="truncate t-label text-ink-2">
                 {formatPreviousSummary(previousLog)}
               </span>
             </span>
-            <span className="shrink-0 t-label font-semibold text-accent">Copy</span>
+            <span className="shrink-0 t-action t-label">Copy</span>
           </button>
         )}
       </section>
 
-      <section className="px-5 section-gap pb-8 anim-fade-up">
-        <h2 className="group-header px-0 t-caption">The day</h2>
-        <DayTimeline
-          date={selected}
-          onOpenMeal={setOpenMealId}
-          onOpenSession={(id) => router.navigate({ to: "/session/$id", params: { id } })}
-          onOpenPlan={() => router.navigate({ to: "/plan" })}
-        />
-      </section>
+      <div className="pb-8" />
 
       <MealSheet mealId={openMealId} date={selected} onClose={() => setOpenMealId(null)} />
 

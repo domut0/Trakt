@@ -41,17 +41,18 @@ describe("WeekStrip", () => {
     });
     expect(day25Button).toHaveAttribute("aria-pressed", "true");
 
-    const disc25 = day25Button.querySelector(".bg-accent");
-    expect(disc25).not.toBeNull();
-    expect(disc25).toHaveTextContent("25");
-    expect(disc25).toHaveClass("text-accent-foreground");
+    // The selected day is an inked COLUMN, not a disc inside the cell: the
+    // button itself carries the fill, so the mark runs the full height of the
+    // band the way a timetable marks the column you are reading.
+    expect(day25Button).toHaveClass("bg-ink");
+    expect(day25Button).toHaveClass("text-paper");
+    expect(day25Button).toHaveTextContent("25");
 
     const day24Button = screen.getByRole("button", {
       name: "Monday, August 24, 2026",
     });
     expect(day24Button).toHaveAttribute("aria-pressed", "false");
-    const disc24 = day24Button.querySelector(".bg-accent");
-    expect(disc24).toBeNull();
+    expect(day24Button).not.toHaveClass("bg-ink");
   });
 
   it("marks today with accent text and no filled disc when not selected", () => {
@@ -59,32 +60,30 @@ describe("WeekStrip", () => {
     // Selected is Monday Aug 24, while today is Tuesday Aug 25
     render(<WeekStrip selectedDate="2026-08-24" onSelectDate={onSelectDate} />);
 
-    // Day 24 is selected: filled accent disc
+    // Day 24 is selected: inked column
     const day24Button = screen.getByRole("button", {
       name: "Monday, August 24, 2026",
     });
-    const disc24 = day24Button.querySelector(".bg-accent");
-    expect(disc24).not.toBeNull();
-    expect(disc24).toHaveClass("text-accent-foreground");
+    expect(day24Button).toHaveClass("bg-ink");
+    expect(day24Button).toHaveClass("text-paper");
 
-    // Day 25 is today, not selected: accent text, no fill
+    // Day 25 is today but not selected: underscored, never a second fill.
+    // Two filled things in one strip would be two selections.
     const day25Button = screen.getByRole("button", {
       name: "Tuesday, August 25, 2026",
     });
-    const disc25 = day25Button.querySelector(".bg-accent");
-    expect(disc25).toBeNull();
-    const num25 = day25Button.querySelector(".text-accent");
-    expect(num25).not.toBeNull();
+    expect(day25Button).not.toHaveClass("bg-ink");
+    expect(day25Button.querySelector(".border-ink")).not.toBeNull();
+    const num25 = day25Button.querySelector(".border-ink");
     expect(num25).toHaveTextContent("25");
 
     // Day 26 is neither: text-foreground, no fill, no accent text
     const day26Button = screen.getByRole("button", {
       name: "Wednesday, August 26, 2026",
     });
-    const num26 = day26Button.querySelector(".text-foreground");
-    expect(num26).not.toBeNull();
-    expect(num26).not.toHaveClass("bg-accent");
-    expect(num26).not.toHaveClass("text-accent");
+    // An ordinary day carries neither mark: not inked, not underscored.
+    expect(day26Button).not.toHaveClass("bg-ink");
+    expect(day26Button.querySelector(".border-ink")).toBeNull();
   });
 
   it("calls onSelectDate with that day's yyyy-MM-dd key when tapped", () => {

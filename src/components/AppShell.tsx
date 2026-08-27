@@ -229,9 +229,18 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
           // Full width of its flex-1 <li>, with an explicit height floor so the
           // 22px icon plus 11px label can never fall under 44px if either is
           // restyled later.
-          className="flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 py-1"
+          //
+          // The active tab is marked the way a printed index marks the section
+          // you have your thumb in: a heavy rule across the top of its cell.
+          // It used to be a colour swap from muted to accent, which on two inks
+          // is the difference between grey text and black text and reads as
+          // emphasis rather than as position. The rule is unambiguous, and it
+          // matches the inked column in the week strip, so "where I am" looks
+          // the same in both places on this screen.
+          className={`flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 py-1 ${
+            active ? "border-t-2 border-ink text-ink" : "border-t-2 border-transparent text-ink-3"
+          }`}
           aria-current={active ? "page" : undefined}
-          style={{ color: active ? "var(--color-accent)" : "var(--color-muted-foreground)" }}
         >
           <Icon name={it.icon} />
           <span className="t-label font-medium">{it.label}</span>
@@ -243,7 +252,7 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   return (
     <nav
       aria-label="Primary"
-      className="relative z-30 shrink-0 hairline-t bg-surface"
+      className="relative z-30 shrink-0 rule-t bg-paper"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
     >
       <div className="mx-auto flex max-w-md items-stretch justify-between px-2 pt-2">
@@ -267,7 +276,7 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
             // rank with fill and weight instead: a solid glyph and a semibold
             // label against four muted outlined tabs. When it was accent too,
             // two items lit up at once and neither one told you where you were.
-            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 py-1 text-foreground"
+            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 border-t-2 border-transparent py-1 text-ink"
           >
             <span className="relative flex items-center justify-center">
               <FlameIcon />

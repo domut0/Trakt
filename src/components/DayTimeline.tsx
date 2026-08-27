@@ -120,8 +120,13 @@ export function DayTimeline(props: {
   const allDayBands = bands.filter((b) => b.allDay);
   const timedBands = bands.filter((b) => !b.allDay);
 
+  // Deliberately not `group-list`. That utility bleeds itself to the trim with
+  // a -20px inline margin, which only works inside the page's px-5 gutter. The
+  // day view renders this canvas at the top level with no gutter around it, so
+  // group-list would hang it 20px off both edges. The rules are drawn directly
+  // here because the element is already full width.
   return (
-    <div className="group-list relative flex h-[420px] flex-col bg-surface">
+    <div className="rule-heavy-t rule-b relative flex h-[420px] flex-col">
       {allDayBands.length > 0 && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 px-4 pt-4 pb-3">
           {allDayBands.map((band) => (
@@ -130,8 +135,8 @@ export function DayTimeline(props: {
               type="button"
               onClick={() => handleBandClick(band)}
               aria-label={`${band.label}${band.detail ? `, ${band.detail}` : ""}`}
-              className={`flex min-h-[44px] items-center gap-2 rounded-xl px-3 text-left ${
-                band.state === "planned" ? "border border-dashed border-border" : "bg-muted"
+              className={`flex min-h-[44px] items-center gap-2 px-3 text-left ${
+                band.state === "planned" ? "planned" : "actual"
               }`}
             >
               <BandIcon kind={band.kind} />
@@ -158,10 +163,21 @@ export function DayTimeline(props: {
                 className="pointer-events-none absolute left-0 right-0"
                 style={{ top: `${top}px` }}
               >
-                <div className="absolute left-0 w-14 pr-2 text-right t-caption text-muted-foreground -translate-y-1/2 select-none">
-                  {formatHour(h)}
-                </div>
-                <div className="absolute left-14 right-0 h-px bg-border" />
+                {/*
+                  Suppressed when the now line is sitting on this hour.
+
+                  Both labels are drawn at left-0 in the same 56px gutter, so at
+                  09:12 the black now-line tab landed directly on top of "09:00"
+                  and the two read as one smudged token. The line wins: it is
+                  the only thing on this canvas that moves, and the hour it
+                  covers is the hour it is announcing anyway.
+                */}
+                {!(isToday && Math.abs(nowMinutes - h * 60) < 18) && (
+                  <div className="absolute left-0 w-14 pr-2 text-right t-hour text-ink-3 -translate-y-1/2 select-none">
+                    {formatHour(h)}
+                  </div>
+                )}
+                <div className="absolute left-14 right-0 h-px bg-rule" />
               </div>
             );
           })}
@@ -202,9 +218,11 @@ export function DayTimeline(props: {
                   // window has anything in it, and the count is one tap away.
                   className={`pointer-events-auto absolute flex items-start gap-2 overflow-hidden px-3 py-2 transition-opacity hover:opacity-90 active:opacity-75 ${
                     isBlock ? "left-5 right-20 z-20 text-left" : "left-0 right-0 z-10 justify-end"
-                  } ${
-                    isPlanned ? "border border-dashed border-border bg-transparent" : "bg-muted"
-                  } ${band.openEnded ? "rounded-t-xl rounded-b-none border-b-0" : "rounded-xl"}`}
+                  } ${isPlanned ? "planned" : "actual"} ${
+                    // An open-ended band runs off the bottom of its own box, so
+                    // it loses the rule that would otherwise claim it ends here.
+                    band.openEnded ? "border-b-0" : ""
+                  }`}
                   style={{
                     top: `${top}px`,
                     height: `${height}px`,
@@ -243,10 +261,10 @@ export function DayTimeline(props: {
               className="pointer-events-none absolute left-0 right-0 z-30 flex items-center -translate-y-1/2"
               style={{ top: `${offsetPx(nowMinutes, PX_PER_HOUR)}px` }}
             >
-              <div className="flex shrink-0 items-center justify-center rounded-md bg-accent px-2 py-1 t-caption font-semibold text-accent-foreground">
+              <div className="flex shrink-0 items-center justify-center bg-ink px-1.5 py-0.5 t-caption text-paper">
                 {formatMinutesOfDay(nowMinutes)}
               </div>
-              <div className="h-px flex-1 bg-accent" />
+              <div className="h-0.5 flex-1 bg-ink" />
             </div>
           )}
         </div>

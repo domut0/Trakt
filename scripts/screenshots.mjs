@@ -519,6 +519,14 @@ function cachedOrFetch(name, url) {
 }
 
 async function installFontRoutes(context) {
+  // The app no longer loads anything from Google Fonts: Archivo is self-hosted
+  // out of public/fonts and served by the dev server like any other asset, so
+  // the page's typography is already correct without help. Everything below is
+  // kept because it is the only thing that would rescue a run if a webfont ever
+  // returns to the head, but it must not run today: fetching Inter costs ten
+  // seconds and caches a face the app does not use.
+  void context;
+  return;
   mkdirSync(FONT_CACHE_DIR, { recursive: true });
   const css = cachedOrFetch("inter.css", FONT_CSS_URL);
   if (!css) {
@@ -727,7 +735,7 @@ async function importBackup(page, backup, label) {
 async function captureEmptyStates(page) {
   await importBackup(page, buildEmptyBackup(), "empty / fresh install");
 
-  await gotoTab(page, "/", "text=Nothing logged today");
+  await gotoTab(page, "/", '[data-testid="timeline-scroll-container"]');
   await shot(page, "01-empty-today");
 
   await gotoTab(page, "/history", 'h1:text("History")');
@@ -740,14 +748,14 @@ async function captureEmptyStates(page) {
   await gotoTab(page, "/charts", 'h1:text("Charts")');
   await shot(page, "04-empty-charts");
 
-  await gotoTab(page, "/", "text=Nothing logged today");
-  await page.getByRole("button", { name: /Nothing logged today/ }).click();
+  await gotoTab(page, "/", '[data-testid="timeline-scroll-container"]');
+  await page.getByRole("button", { name: /Edit daily numbers/ }).click();
   await settle(page, 600);
   await shot(page, "05-empty-day-editor-sheet");
 }
 
 async function captureToday(page) {
-  await gotoTab(page, "/", "text=Consistency");
+  await gotoTab(page, "/", '[data-testid="timeline-scroll-container"]');
   await page.waitForSelector("text=Habits", { timeout: 15_000 });
   await shot(page, "10-today-populated");
 

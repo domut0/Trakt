@@ -93,13 +93,16 @@ describe("DayTimeline", () => {
     const breakfastBtn = screen.getByRole("button", { name: /^Breakfast/i });
     const lunchBtn = screen.getByRole("button", { name: /^Lunch/i });
 
-    // Breakfast has no entries: planned state -> dashed outline, no solid fill
-    expect(breakfastBtn).toHaveClass("border-dashed");
-    expect(breakfastBtn).not.toHaveClass("bg-muted");
+    // Breakfast has no entries: planned state -> dashed outline, no fill.
+    // The decision is unchanged; it is now expressed by the `planned` /
+    // `actual` utilities rather than by border-dashed and bg-muted spelled out
+    // at every call site, which is what let the two drift apart.
+    expect(breakfastBtn).toHaveClass("planned");
+    expect(breakfastBtn).not.toHaveClass("actual");
 
-    // Lunch has entries: actual state -> solid fill, no dashed outline
-    expect(lunchBtn).toHaveClass("bg-muted");
-    expect(lunchBtn).not.toHaveClass("border-dashed");
+    // Lunch has entries: actual state -> printed on the page, not outlined
+    expect(lunchBtn).toHaveClass("actual");
+    expect(lunchBtn).not.toHaveClass("planned");
 
     // Tapping a meal zone opens that meal
     fireEvent.click(breakfastBtn);
@@ -196,7 +199,9 @@ describe("DayTimeline", () => {
     );
 
     const runningBtn = screen.getByRole("button", { name: /^Workout/i });
-    expect(runningBtn).toHaveClass("rounded-b-none");
+    // No rounded-b-none any more: nothing in this world has a radius, so a
+    // band cannot un-round an edge it never had. Losing the bottom RULE is
+    // what says "this is still running", and that is what is asserted.
     expect(runningBtn).toHaveClass("border-b-0");
   });
 
@@ -296,7 +301,7 @@ describe("DayTimeline", () => {
     // And so are the dashed windows, which is the point: a day with nothing on
     // it is the day the intent layer is most worth seeing.
     const breakfast = screen.getByRole("button", { name: /^Breakfast/i });
-    expect(breakfast.className).toContain("border-dashed");
+    expect(breakfast.className).toContain("planned");
 
     // No sentence on top of that. The dashed bands already say it, and a line
     // of prose repeating them read as debug text.

@@ -1,89 +1,142 @@
 @import "tailwindcss" source(none);
 @source "../src";
 
+/* ---------------------------------------------------------------------------
+   THE PRINTED TIMETABLE
+   Seed 95982b50 - direction contract lives in routes/__root.tsx.
+
+   This app is a schedule, so it is printed like one. The whole visual world is
+   a Swiss railway timetable page: paper ground, one black ink, hairline rules,
+   tabular figures, columns that do not move, and the table running to the trim
+   instead of floating inside a rounded card.
+
+   Two rules from the old dark system are INVERTED here and they are the reason
+   most of this file looks the way it does:
+
+   1. "Elevation is fill." Gone. On paper there is no fill step to lift with, so
+      RANK COMES FROM RULE WEIGHT AND POSITION. A hairline separates, a heavy
+      rule divides, a full-bleed rule announces. Nothing is raised.
+   2. "No borders." Gone, and it was always the wrong rule for this app: a
+      dashed outline already carried a fact (planned) rather than a decoration.
+      Here every rule carries a fact.
+
+   What survives untouched: dashed outline = planned, solid fill = happened.
+   That rule is native to a timetable, where it is the scheduled column against
+   the actual one, so it gets stronger here rather than merely surviving.
+   --------------------------------------------------------------------------- */
+
+/* Self-hosted: this is an offline-first PWA and the previous build fetched
+   Inter from fonts.googleapis.com on every cold load, which is a network
+   dependency in an app whose entire pitch is that it has none. One file, both
+   axes, 88KB, precached by the service worker with everything else in public/. */
+@font-face {
+  font-family: "Archivo Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  src: url("/fonts/archivo-variable.woff2") format("woff2-variations");
+}
+
 @theme {
   --font-sans:
-    "Inter", ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    "Archivo Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  --color-background: var(--background);
-  --color-surface: var(--surface);
-  --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-destructive: var(--destructive);
-  --color-nutrition: var(--nutrition);
-  --color-steps: var(--steps);
-  --color-bodyweight: var(--bodyweight);
-  --color-cardio: var(--cardio);
-  --color-carbs: var(--carbs);
-  --color-fat: var(--fat);
-  --color-protein: var(--protein);
+  /* The world's own names. Use these in new work. */
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-wash: var(--wash);
+  --color-signal: var(--signal);
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  /* Legacy role names, remapped onto the paper world so that no screen renders
+     unstyled while it waits to be recomposed. These are aliases, not a second
+     palette: `bg-surface` deliberately resolves to the paper itself, because a
+     timetable has no cards, and the ruling does the containing a card used to. */
+  --color-background: var(--paper);
+  --color-surface: var(--paper);
+  --color-foreground: var(--ink);
+  --color-muted: var(--wash);
+  --color-muted-foreground: var(--ink-2);
+  --color-border: var(--rule);
+  --color-accent: var(--ink);
+  --color-accent-foreground: var(--paper);
+  --color-destructive: var(--signal);
+
+  /* State used to be carried by hue: green met, amber over. On a two-ink page
+     that is not available and it was never the accessible answer anyway. State
+     is now carried by MARK - a filled square against an open one, a struck
+     rule under an overrun figure - and both of these resolve to plain ink so
+     that a legacy `text-success` reads as an ordinary figure rather than as an
+     invisible one. The marks live in the `mark-*` utilities below. */
+  --color-success: var(--ink);
+  --color-warning: var(--signal);
+
+  /* Metric identity used to be seven hues. On paper it is hatch: angle plus
+     density, which survives photocopying, colour blindness, and a phone held
+     at arm's length in bad gym light. The fills are in the `hatch-*`
+     utilities; these aliases keep legacy text usages legible as ink. */
+  --color-nutrition: var(--ink);
+  --color-steps: var(--ink);
+  --color-bodyweight: var(--ink);
+  --color-cardio: var(--ink);
+  --color-carbs: var(--ink);
+  --color-fat: var(--ink);
+  --color-protein: var(--ink);
+
+  /* A timetable is set on a rectangular grid and nothing on it is rounded. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
 }
 
 :root {
-  /* MyFitnessPal dark theme */
-  --background: #0e1217;
-  --surface: #1a2029;
-  --foreground: #f3f5f8;
-  --muted: #232b36;
-  --muted-foreground: #9ba5b2;
-  --border: #29323d;
-  /* MFP blue accent */
-  --accent: #4b82f5;
-  --accent-foreground: #ffffff;
-  /* STATE. These describe how a value sits against a goal. The metric colours
-     below describe which series a value belongs to. Different jobs, so they are
-     drawn from different tiers on purpose: state sits up at --accent brightness
-     so it reads as a verdict, while the data series stay muted so they read as
-     identity. Never signal state with hue alone; a fill, label or icon has to
-     carry it too. Simulated for protanopia these two fall from 37.9 apart to
-     roughly 10 (CIEDE2000; the exact figure moves with the simulation model)
-     and both land on much the same olive. */
-  /* A goal met. Deliberately NOT --nutrition #4fa97a, which is the daily-log
-     dot's identity colour and has to keep meaning only "nutrition entry": this
-     is 21 points brighter in value, 14 more saturated and 7 degrees warmer in
-     hue, 15.1 apart in CIEDE2000, a wider gap than the carbs/nutrition pair
-     below that the palette already treats as distinct (10.3). Not a general
-     "good news" wash, and never decoration.
-     As text: 10.78:1 on --background, 9.40:1 on --surface. Passes AA. */
-  --success: #4ade80;
-  /* Over a ceiling: past a calorie target, past a macro cap. This is what most
-     of the app's misused red becomes. It is a reading rather than a fault, so
-     it must never escalate to --destructive; nothing has broken just because a
-     number is high. Its nearest neighbour is --protein #e0a44f at 10.7, the one
-     colour it must not be confused with, so keep it off the macro ring.
-     As text: 11.26:1 on --background, 9.81:1 on --surface. Passes AA. */
-  --warning: #fbbf24;
-  /* Destruction and errors ONLY: delete, clear data, a failed write, a sync
-     collision. NOT "this number is large". A cheat day is --warning and a step
-     count over goal is --success; neither of them is an error, and colouring
-     them red is how the app ended up scolding people for using it. */
-  --destructive: #f0554e;
-  --nutrition: #4fa97a;
-  --steps: #c2a25a;
-  --bodyweight: #9179c9;
-  /* Cardio workout dot. Deliberately not blue: it shares the dot slot with the
-     strength accent and has to read as a different kind of day at a glance. */
-  --cardio: #cf6f8f;
-  /* Macro ring segments. Close cousins of --bodyweight / --steps but
-     intentionally distinct values; they are not duplicates to be merged. */
-  --carbs: #4bb3a2;
-  --fat: #a97fd0;
-  --protein: #e0a44f;
+  /* Measured against the paper, not estimated. Ratios in the comments are
+     computed, and every value that ever carries text clears AA on both the
+     paper and the wash.
+
+     The paper is deliberately not #ffffff. Pure white is a flashlight in a
+     dark bedroom, and this app is opened in bed every night; #F3F2EE is the
+     softest ground that still reads as white paper rather than as cream. The
+     warm cast is 5 points across the channels, which is paper. Cream is
+     roughly 30 and is a different, much-visited place. */
+  --paper: #f3f2ee;
+
+  /* Three inks, and they are three real colours rather than one colour at
+     three opacities. Opacity variants are what let secondary text drift below
+     AA in the old system, and the fix that lasts is to name the tone. */
+  --ink: #141310; /* 16.58:1 - body, figures, everything primary */
+  --ink-2: #5a574e; /*  6.45:1 - secondary text, column headers */
+  --ink-3: #6e6b60; /*  4.76:1 - tertiary; still AA, still not a gray ramp */
+
+  /* Rules. These never carry text, so they are free to sit below AA: their job
+     is to divide, and a hairline that meets text contrast is a black bar. */
+  --rule: #d8d6ce; /* hairline: between rows */
+  --rule-strong: #b9b6ab; /* division: between sections, column edges */
+
+  /* The one filled tone. A logged thing is printed on the page rather than
+     outlined on it, and this is what "solid fill = happened" fills with. */
+  --wash: #e9e7e0;
+
+  /* The second ink. A two-colour press gets exactly one, and a timetable spends
+     it on the exception: the footnote, the service that does not run today, the
+     departure that is late. Here it means the same thing, and it means the
+     referee's red light, which is the same idea in the user's own sport.
+
+     It carries BOTH "over a ceiling" and "this broke", which the old system
+     kept apart by hue. They are kept apart here by mark instead: an overrun
+     figure takes a struck rule under it, an error takes a filled flag. Same
+     ink, different mark, and the mark is the part that survives being
+     colourblind. 5.25:1 on paper, 4.75:1 on wash. */
+  --signal: #c8102e;
 }
 
 @layer base {
   * {
-    border-color: var(--color-border);
+    border-color: var(--color-rule);
     -webkit-tap-highlight-color: transparent;
   }
   html,
@@ -100,13 +153,21 @@
     overflow: hidden;
   }
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    background-color: var(--color-paper);
+    color: var(--color-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overscroll-behavior: none;
   }
+
+  /* Figures are tabular EVERYWHERE by default, not opt-in. This is a document
+     made almost entirely of numbers in columns, and a column of proportional
+     digits does not line up. `.pnum` is the escape hatch for running prose. */
+  body {
+    font-variant-numeric: tabular-nums;
+  }
+
   button {
     font-family: inherit;
     transition:
@@ -117,136 +178,373 @@
     transform: scale(0.97);
   }
   input,
-  textarea {
+  textarea,
+  select {
     font-family: inherit;
+    color: var(--color-ink);
+    caret-color: var(--color-signal);
   }
+
+  /* ---- Browser surfaces -------------------------------------------------
+     The parts nobody draws still ship with defaults belonging to no design
+     system: a blue selection, a black caret, a gray scrollbar, a blue focus
+     ring. On a two-ink page every one of those is a third colour arriving
+     uninvited. They are themed here, once. */
+  ::selection {
+    background-color: var(--color-ink);
+    color: var(--color-paper);
+  }
+  ::placeholder {
+    color: var(--color-ink-3);
+    opacity: 1; /* Firefox dims placeholders by default, which drops them below AA */
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-rule-strong) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-rule-strong);
+  }
+  *::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+  a {
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+
   .tnum {
     font-variant-numeric: tabular-nums;
   }
-}
-
-@utility hairline-t {
-  border-top: 1px solid var(--color-border);
-}
-@utility hairline-b {
-  border-bottom: 1px solid var(--color-border);
+  .pnum {
+    font-variant-numeric: proportional-nums;
+  }
 }
 
 /* ---------------------------------------------------------------------------
-   TYPE SCALE. Seven roles, and they are the ONLY sizes app code should use.
-   A `text-[NNpx]` literal in a component is now a bug: the app had grown to 16
-   distinct sizes (65 uses of 12px, 61 of 13px, 55 of 11px, all doing overlapping
-   jobs), which is what made dense screens read as cluttered rather than
-   information-rich. Nothing here is a new look; these are the values already
-   dominant in the codebase, promoted to named roles so drift cannot resume.
-
-   Tracking is negative on the large roles and positive on the caption, which is
-   what keeps big text from looking loose and small caps from looking cramped.
+   RULES. The whole depth system, such as it is. A timetable has no elevation:
+   it has line weights, and they rank things. Three weights, and each one means
+   something different, so a screen can be read by its rules alone.
    --------------------------------------------------------------------------- */
 
-/** Screen title. One per screen, in the header. */
+/** Between rows of the same table. The lightest mark that still divides. */
+@utility hairline-t {
+  border-top: 1px solid var(--color-rule);
+}
+@utility hairline-b {
+  border-bottom: 1px solid var(--color-rule);
+}
+
+/** Between sections, and under column headers. A real division. */
+@utility rule-t {
+  border-top: 1px solid var(--color-rule-strong);
+}
+@utility rule-b {
+  border-bottom: 1px solid var(--color-rule-strong);
+}
+
+/** The heavy rule. Reserved for the top of a table and the now line: the two
+    marks on a timetable page that are allowed to shout. Ink, not gray. */
+@utility rule-heavy-t {
+  border-top: 2px solid var(--color-ink);
+}
+@utility rule-heavy-b {
+  border-bottom: 2px solid var(--color-ink);
+}
+
+/* ---------------------------------------------------------------------------
+   TYPE. The seven roles are kept by name, because 42 files use them and the
+   names were never the problem, but every value is redrawn for the new face
+   and the new job.
+
+   Archivo carries a width axis (62-125%), which is the lever a timetable
+   actually wants: a column narrows without the typeface changing underneath
+   it. Headers are set narrow and tracked; figures are set at normal width so
+   the digits stay open at a glance.
+   --------------------------------------------------------------------------- */
+
+/** The page's own name, set in the top margin the way a timetable names its
+    page. Narrow and heavy: this is a printed title, not a soft app header. */
 @utility t-title {
   font-size: 30px;
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -0.021em;
+  font-weight: 800;
+  font-stretch: 80%;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
 }
 
-/** Card or subsection title. */
+/** A table's name. Sits on the heavy rule that opens the table. */
 @utility t-heading {
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: -0.014em;
+  font-size: 17px;
+  font-weight: 700;
+  font-stretch: 85%;
+  line-height: 1.15;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
 }
 
-/** Primary body text: row labels, values, buttons. */
+/** Row labels, values, buttons. The workhorse. */
 @utility t-body {
   font-size: 15px;
   font-weight: 400;
   line-height: 1.35;
-  letter-spacing: -0.006em;
+  letter-spacing: -0.004em;
 }
 
-/** Secondary text: subtitles, hints, empty-state prose. Pair with text-muted-foreground. */
+/** Secondary text: annotations, hints, the footnote voice. Pair with ink-2. */
 @utility t-label {
   font-size: 13px;
   font-weight: 400;
   line-height: 1.35;
 }
 
-/** Group headers and eyebrows. Carries its own uppercase and tracking. */
+/** A COLUMN HEADER, which is the one thing on this page that looks like an
+    eyebrow and is not one: it labels the column of data beneath it, so
+    deleting it deletes a fact. Narrow, tracked, small, and it always sits on a
+    rule. If it is floating above a heading with no column under it, it is an
+    eyebrow and it should be deleted instead. */
 @utility t-caption {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
+  font-stretch: 75%;
   line-height: 1.2;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-/** A number the user compares against another number. Tabular by construction,
-    so a stat can never ship with jittering digits by forgetting `tnum`. */
+/** A figure compared against another figure. Tabular by construction. */
 @utility t-stat {
   font-size: 22px;
   font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -0.014em;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
-/** The one hero number on a screen (macro ring centre, stopwatch). */
+/** The one figure a screen exists to show. Set at the scale a timetable sets
+    a departure time: big, narrow, and unmistakably a number. */
 @utility t-hero {
-  font-size: 32px;
-  font-weight: 700;
+  font-size: 44px;
+  font-weight: 800;
+  font-stretch: 78%;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/** A text control.
+
+    The old system said "accent marks things that are actionable", and accent
+    was a blue. On a two-ink page there is no blue to spend, and colouring a
+    word black does not make it look pressable. Print has always answered this
+    with a rule under the word, so that is what a control is here. This also
+    quietly rescues every `text-accent` in the tree, which would otherwise have
+    become ordinary black text that happens to be a button. */
+@utility t-action {
+  font-weight: 600;
+  color: var(--color-ink);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+/** The hour column down the left edge of a schedule. Small, narrow, ink-2,
+    and never competing with the rows it indexes. */
+@utility t-hour {
+  font-size: 11px;
+  font-weight: 600;
+  font-stretch: 72%;
   line-height: 1;
-  letter-spacing: -0.021em;
+  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
 }
 
 /* ---------------------------------------------------------------------------
-   GROUPED LISTS. The iOS inset-grouped table pattern, and the main de-clutter
-   lever: related rows share ONE container with hairline separators between
-   them, instead of each row floating in its own bordered card. Six separate
-   rounded boxes on one screen read as six unrelated things.
+   TABLES. What `group-list` used to be. The names are kept so that no screen
+   goes unstyled, but a group is no longer a rounded box floating in a gutter:
+   it is a table ruled top and bottom and run to the trim.
 
-   Deliberately NO border on the container. On a dark theme Apple lifts a group
-   with FILL, not stroke, and --surface #1a2029 against --background #0e1217 is
-   already a clear step. A stroke on top of that is the belt-and-braces look
-   that makes an interface feel busy.
+   The gutter moves from the container to the CELL. That is the change that
+   makes this read as print: the ink starts at the page edge and the text is
+   inset from it, rather than the whole card being pushed inward.
    --------------------------------------------------------------------------- */
 
 @utility group-list {
-  background-color: var(--color-surface);
-  border-radius: 16px;
-  overflow: hidden;
+  background-color: transparent;
+  border-top: 2px solid var(--color-ink);
+  border-bottom: 1px solid var(--color-rule-strong);
+  /* Full-bleed: cancels the page's px-5 so the ruling reaches the trim, while
+     the rows put the gutter back on their own padding. */
+  margin-inline: -20px;
 }
 
-/** A row inside a group-list. Separators come from the row, not the container,
-    so a group can gain or lose rows without anyone maintaining which one is
-    last. Inset from the left only, matching iOS: a separator running the full
-    width reads as a divider BETWEEN groups rather than within one. */
+/** A row inside a table. */
 @utility group-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   min-height: 44px;
-  padding: 12px 20px;
+  padding: 11px 20px;
 }
+
+/** Separator between rows. Inset from the left, matching the old system and
+    every printed table: a rule running the full width reads as the end of the
+    table rather than a division inside it. */
 @utility group-row-sep {
-  box-shadow: inset 0 1px 0 var(--color-border);
+  box-shadow: inset 0 1px 0 var(--color-rule);
 }
 
-/** Group header. Sits OUTSIDE and above its group-list, indented to the same
-    gutter, which is what tells the eye the header labels the group below it. */
+/** The header that labels a table. Sits directly above the table's opening
+    rule, on the page's own gutter.
+
+    Deliberately NO negative margin. The rule below it bleeds to the trim
+    because a printed table's ruling does; its name does not, because a label
+    hanging off the page edge is not a style, it is a clipped word. The first
+    build of this file gave the header the same -20px as the table and every
+    section title on every screen lost its first character. */
 @utility group-header {
-  padding: 0 20px 8px;
-  color: var(--color-muted-foreground);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 5px;
+  color: var(--color-ink-2);
 }
 
-/** Vertical rhythm between sections. One value, so screens cannot drift. */
+/** Vertical rhythm between tables. */
 @utility section-gap {
-  margin-top: 28px;
+  margin-top: 26px;
+}
+
+/* ---------------------------------------------------------------------------
+   MARKS. State, carried by shape rather than by hue.
+
+   The old system signalled "goal met" in green and "over a ceiling" in amber,
+   and its own notes recorded that a protanope reads those two as the same
+   olive. A printed page cannot use hue at all, which turns out to be the
+   accessible answer arriving by a different road.
+   --------------------------------------------------------------------------- */
+
+/** Met, done, logged. A filled square. */
+@utility mark-done {
+  position: relative;
+  padding-left: 16px;
+}
+@utility mark-done-box {
+  width: 10px;
+  height: 10px;
+  background-color: var(--color-ink);
+}
+
+/** Not yet. The same square, open. Same footprint, so a list of them does not
+    reflow as items are completed. */
+@utility mark-open {
+  width: 10px;
+  height: 10px;
+  background-color: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--color-ink-3);
+}
+
+/** Over a ceiling. The figure keeps its ink and takes a struck rule beneath
+    it in the second colour: a reading, not a fault, exactly as the old system
+    insisted, but now distinguishable from an error without seeing colour. */
+@utility mark-over {
+  color: var(--color-signal);
+  border-bottom: 2px solid var(--color-signal);
+  padding-bottom: 1px;
+}
+
+/** Something broke. A filled flag in the second colour. Different shape from
+    mark-over on purpose; that difference is what the hue used to do. */
+@utility mark-error {
+  background-color: var(--color-signal);
+  color: var(--color-paper);
+  padding: 1px 5px;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------
+   PLANNED vs ACTUAL. The user's own rule, and the reason this world was
+   chosen: a timetable is a scheduled column beside an actual one, so the app's
+   central idea is native here rather than imported.
+   --------------------------------------------------------------------------- */
+
+/** Scheduled, intended, not yet done. Outline only, dashed, no fill. */
+@utility planned {
+  background-color: transparent;
+  border: 1px dashed var(--color-rule-strong);
+}
+
+/** It happened. Printed on the page: a solid hairline and the one filled tone. */
+@utility actual {
+  background-color: var(--color-wash);
+  border: 1px solid var(--color-ink-3);
+}
+
+/* ---------------------------------------------------------------------------
+   HATCH. Metric identity without hue.
+
+   Seven data colours became one ink and a set of hatches. Angle carries the
+   identity and density carries the emphasis, which is how every printed chart
+   worked before colour presses were cheap. It reads at arm's length, it
+   survives a protanope, and it cannot be mistaken for decoration because a
+   hatch has no other job.
+   --------------------------------------------------------------------------- */
+
+@utility hatch-protein {
+  background-image: repeating-linear-gradient(90deg, var(--color-ink) 0 1px, transparent 1px 3px);
+}
+@utility hatch-carbs {
+  background-image: repeating-linear-gradient(45deg, var(--color-ink) 0 1px, transparent 1px 4px);
+}
+@utility hatch-fat {
+  background-image: repeating-linear-gradient(0deg, var(--color-ink) 0 1px, transparent 1px 5px);
+}
+/** A generic filled field for anything that is not a macro. */
+@utility hatch-solid {
+  background-color: var(--color-ink);
+}
+
+/* ---------------------------------------------------------------------------
+   MOTION. One authored moment, not scattered effects.
+
+   The signature is the FLAP: a figure that changes rolls into place the way a
+   split-flap board commits a departure. This is the only motion in the app
+   that is about meaning rather than navigation, and it fires exactly where the
+   product's own claim lives - logging is confirming, so a confirmed value
+   should land with a mechanical commit rather than fade in.
+   --------------------------------------------------------------------------- */
+
+@keyframes flap {
+  0% {
+    transform: translateY(-55%) scaleY(0.55);
+    opacity: 0;
+  }
+  55% {
+    transform: translateY(6%) scaleY(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scaleY(1);
+    opacity: 1;
+  }
+}
+/** Put this on the element wrapping a figure, keyed so it remounts when the
+    value changes. Exponential ease-out from an already-visible default. */
+@utility anim-flap {
+  display: inline-block;
+  transform-origin: 50% 0%;
+  animation: flap 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes sheet-up {
