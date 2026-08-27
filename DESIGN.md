@@ -1,205 +1,332 @@
-# Design system
+---
+name: Workout Tracker
+description: A training day printed as a Swiss railway timetable - paper ground, one ink, rules instead of elevation.
+colors:
+  paper: "#F3F2EE"
+  ink: "#141310"
+  ink-2: "#5A574E"
+  ink-3: "#6E6B60"
+  rule: "#D8D6CE"
+  rule-strong: "#B9B6AB"
+  wash: "#E9E7E0"
+  signal: "#C8102E"
+typography:
+  title:
+    fontFamily: "Archivo Variable, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+    fontSize: "30px"
+    fontWeight: 800
+    lineHeight: 1
+    letterSpacing: "-0.02em"
+    fontVariation: "width 80%"
+  heading:
+    fontFamily: "Archivo Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "17px"
+    fontWeight: 700
+    lineHeight: 1.15
+    letterSpacing: "-0.005em"
+    fontVariation: "width 85%"
+  body:
+    fontFamily: "Archivo Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "15px"
+    fontWeight: 400
+    lineHeight: 1.35
+    letterSpacing: "-0.004em"
+  label:
+    fontFamily: "Archivo Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: 1.35
+  caption:
+    fontFamily: "Archivo Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "10px"
+    fontWeight: 700
+    lineHeight: 1.2
+    letterSpacing: "0.1em"
+    fontVariation: "width 75%"
+  stat:
+    fontFamily: "Archivo Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "22px"
+    fontWeight: 600
+    lineHeight: 1.05
+    letterSpacing: "-0.02em"
+    fontFeature: "tabular-nums"
+  hero:
+    fontFamily: "Archivo Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "44px"
+    fontWeight: 800
+    lineHeight: 0.95
+    letterSpacing: "-0.03em"
+    fontVariation: "width 78%"
+    fontFeature: "tabular-nums"
+  action:
+    fontFamily: "Archivo Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "15px"
+    fontWeight: 600
+    lineHeight: 1.35
+  hour:
+    fontFamily: "Archivo Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "11px"
+    fontWeight: 600
+    lineHeight: 1
+    letterSpacing: "0.02em"
+    fontVariation: "width 72%"
+    fontFeature: "tabular-nums"
+rounded:
+  sm: "0px"
+  md: "0px"
+  lg: "0px"
+spacing:
+  gutter: "20px"
+  row-y: "11px"
+  row-gap: "12px"
+  section-gap: "26px"
+  touch-min: "44px"
+components:
+  table:
+    backgroundColor: "transparent"
+    rounded: "{rounded.sm}"
+  table-row:
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    padding: "11px 20px"
+    height: "44px"
+  table-header:
+    textColor: "{colors.ink-2}"
+    typography: "{typography.caption}"
+    padding: "0 0 5px 0"
+  inked-cell:
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.paper}"
+    rounded: "{rounded.sm}"
+  nav-tab:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink-3}"
+    typography: "{typography.label}"
+    height: "44px"
+  nav-tab-active:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink}"
+    typography: "{typography.label}"
+    height: "44px"
+  nav-action:
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.paper}"
+    typography: "{typography.label}"
+    padding: "4px 12px"
+    height: "44px"
+  button-solid:
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.paper}"
+    typography: "{typography.body}"
+    padding: "0 16px"
+    height: "44px"
+  button-quiet:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    padding: "0 16px"
+    height: "44px"
+  button-text:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink}"
+    typography: "{typography.action}"
+  toggle-on:
+    backgroundColor: "{colors.ink}"
+    rounded: "{rounded.sm}"
+    width: "48px"
+    height: "28px"
+  toggle-off:
+    backgroundColor: "{colors.paper}"
+    rounded: "{rounded.sm}"
+    width: "48px"
+    height: "28px"
+  sheet:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.sm}"
+    padding: "20px"
+---
 
-The visual language of this app. Read this before touching any screen.
+# Design System: Workout Tracker
 
-The identity is **fixed and not up for revisiting**: MyFitnessPal-style dark theme,
-Inter, one blue accent. No fonts other than Inter. No noise, grain, texture, mesh
-gradients, glows, or purple-blue "AI" gradients. No second accent colour. The app must
-not read as default AI-generated UI.
+## Overview
 
-What follows is about **restraint and consistency**, not restyling.
+**Creative North Star: "The Printed Timetable"**
 
-## Type: seven roles, no literals
+The app is a schedule, so it is printed like one. The whole visual world is a Swiss railway timetable page: a paper ground, one black ink, hairline rules, tabular figures, columns that hold their position, and tables that run to the trim instead of floating inside rounded cards. Seed key `95982b50`; the direction contract ships as an HTML comment at the top of `<body>` in the built markup.
 
-The app had grown to 16 distinct `text-[NNpx]` sizes doing overlapping jobs. That, more
-than any single layout, is what made it feel cluttered. Use these classes only.
+Two rules from the dark system this replaced are deliberately inverted, and they are why the build looks the way it does. **Elevation was fill; rank now comes from rule weight and position** - on paper there is no fill step to lift with, so a hairline separates, a stronger rule divides, and a 2px ink rule announces. Nothing is raised. **"No borders" is gone**, because it was always the wrong rule here: a dashed outline already carried a fact (planned) rather than a decoration. Every rule on this page carries a fact.
 
-| Class       | Size / weight    | Use for                                        |
-| ----------- | ---------------- | ---------------------------------------------- |
-| `t-title`   | 30 / 600         | Screen title. One per screen.                  |
-| `t-heading` | 20 / 600         | Card or subsection title.                      |
-| `t-body`    | 15 / 400         | Row labels, values, buttons.                   |
-| `t-label`   | 13 / 400         | Subtitles, hints, prose. Add muted colour.     |
-| `t-caption` | 11 / 600 CAPS    | Group headers, eyebrows. Tracking is built in. |
-| `t-stat`    | 22 / 600 tabular | A number compared against another number.      |
-| `t-hero`    | 32 / 700 tabular | The single hero number on a screen.            |
+The one idea that survived untouched is *dashed outline = planned, solid fill = happened*. It is native to a timetable - the scheduled column against the actual one - so it is stronger here than it was, not merely preserved. The palette is two-ink by construction: black on paper, plus a single signal red spent only on the exception, the way a two-colour press spends its second plate. The app is phone-only by product decision, so there is no desktop layout and no breakpoints; the paper is `#F3F2EE` rather than white because the app is opened in a dark bedroom every night and pure white is a flashlight.
 
-**A `text-[NNpx]` literal in a component is now a bug.** Two exceptions already in the
-tree, both genuine one-offs: the workout stopwatch and the 88px log button's own sizing.
+**Key Characteristics:**
+- Paper ground, one ink, one signal; no gray ramp, no opacity variants
+- Rank from rule weight (1px hairline / 1px strong / 2px ink), never from fill or shadow
+- Zero radius everywhere; butt caps and mitred joins in every icon
+- Tabular figures by default across the whole document
+- State carried by mark (filled square, struck rule), never by hue
+- Metric identity carried by hatch angle, consistent across screens
+- Tables bleed to the trim; the gutter lives on the cell
+- One authored motion: the flap
 
-`t-stat` and `t-hero` are tabular by construction, so a stat can no longer ship with
-jittering digits because someone forgot `tnum`. Numbers that are NOT compared (a
-timestamp, a one-off count in prose) can stay `t-body`/`t-label`.
+## Colors
 
-## Layout: grouped lists, not floating cards
+Two inks on paper, and the second one is rationed: a two-colour press gets exactly one extra plate, and a timetable spends it on the exception.
 
-Use `group-list` + `group-row` (+ `group-row-sep` on every row after the first) with a
-`group-header` above. This is the iOS inset-grouped table pattern.
+### Primary
+- **Ink** (`#141310`): The one black. Body text, every figure, the heavy rules that open a table and mark the now line, the fill of the inked cell, the fill of every identity hatch. Measured 16.58:1 on paper.
 
-Related rows share **one** container with hairline separators. Six separate rounded boxes
-on a screen read as six unrelated things; one grouped list reads as one thing with six
-parts. `CalendarView` had six containers on a single screen.
+### Secondary
+- **Signal Red** (`#C8102E`): The second ink, and the only chromatic value in the system. It carries the exception in two senses - *over a ceiling* and *this broke* - kept apart by mark rather than by hue: an overrun figure takes a struck rule beneath it, an error takes a filled flag. Also the text caret. 5.25:1 on paper, 4.75:1 on wash.
 
-- **No border on containers.** On a dark theme, fill does the lifting: `--surface`
-  `#1a2029` against `--background` `#0e1217` is already a clear step. Adding a stroke on
-  top is what makes an interface look busy. Remove `border border-border/40` where you
-  find it.
-- **No card inside a card.** If content needs its own container inside a group, the group
-  is wrong.
-- Separators are inset from the left, matching iOS. A full-width rule reads as a divider
-  _between_ groups.
+### Neutral
+- **Paper** (`#F3F2EE`): The ground, and the only background. Warm by roughly 5 points across the channels, which is paper; cream is roughly 30 and is somewhere else. Deliberately not `#ffffff` because of the bedroom.
+- **Ink 2** (`#5A574E`): Secondary text - annotations, units, column headers, the footnote voice. 6.45:1.
+- **Ink 3** (`#6E6B60`): Tertiary - hour column, placeholders, inactive nav labels, the open mark's stroke, an actual band's outline. 4.76:1, still AA, still not a gray ramp.
+- **Rule** (`#D8D6CE`): The hairline. Between rows of the same table, and the default border colour for every element in the build.
+- **Rule Strong** (`#B9B6AB`): A real division. Between sections, under column headers, at column edges, and the dash of a planned outline.
+- **Wash** (`#E9E7E0`): The one filled tone. What "solid fill = happened" fills with - an actual band on the timeline, a pressed row.
 
-## Hierarchy: one subject per screen
+### Named Rules
 
-The rules above remove inconsistency. Applied alone they also remove **rank**, and a
-screen where everything is level reads as bland rather than calm. That was the state
-this document is now correcting: `t-hero` was used exactly once in the whole app,
-`t-body` and `t-label` were 66% of all type and sit 2px apart, and every screen
-resolved to a stack of identical grey boxes. The tell was that `/workout` was the
-best-composed screen in the app and the only one that ignored the card system.
+**The Three Real Inks Rule.** There are exactly three text tones and each is a measured colour, not one colour at three opacities. Never write an opacity variant on text, and never introduce a fourth gray. Opacity variants are what let secondary text drift below AA in the system this replaced.
 
-**Every screen has one subject, and it should be obvious within a second which one it
-is.** On the day view that is the timeline; on a finished workout it is the record, if
-there is one.
+**The Rules-Below-AA Rule.** `rule` and `rule-strong` sit below AA on purpose, because they never carry text. Their job is to divide, and a hairline that meets text contrast is a black bar. Never put text or a glyph in these two values.
 
-- **One elevated surface per screen. At most one.** Two elevated things are two
-  subjects, which is none.
-- **Rank may come from size instead of fill.** Where two cards are co-equal subjects,
-  neither takes `--muted`: they both sit at `--surface` and the taller one leads. This
-  is not a loophole in the rule above, it is the rule above declining to fire, and it
-  buys something concrete. The day view's timeline draws bands INSIDE itself, and
-  `--muted` is the only fill step they have. A canvas that took `--muted` would leave
-  its own contents nowhere to go, and the fix for that is always someone inventing a
-  fourth step with an opacity variant, which has been shipped and reverted here once
-  already.
-- **Elevation is fill, never stroke.** The rule above still holds: no borders, no
-  shadows. There is a third step already in the palette, and it is enough:
-  `--background` `#0e1217` → `--surface` `#1a2029` → `--muted` `#232b36`. Surface to
-  muted is the same order of step as background to surface (+9/11/13 per channel
-  against +12/14/18), so a card can lift without a line around it.
-- **Size is the other lever, and it is free.** A number the screen exists to show
-  should be at `t-hero`. If it does not fit its container, grow the container.
-- A track, groove or well goes the **other** way, towards `--background`. A progress
-  bar's track was once lighter than the card holding it, which reads as raised.
-- **A stroke may encode state, never elevation.** The no-border rule is about depth,
-  and it stands. It says nothing about meaning. On the day view's timeline a dashed
-  outline means planned and a solid fill means it happened, which is a semantic
-  distinction carried by a channel that is not hue, exactly as the colour section
-  below asks for. This is written down so that nobody reads "no borders" in isolation
-  and deletes the dashed bands as decoration, which is precisely what that rule, taken
-  alone, would tell them to do. The test: remove the stroke and ask whether the screen
-  loses a fact or just a line. If it loses a fact, it stays.
+**The Second Ink Rule.** Signal red appears only on the exception: an overrun measure, an error flag, the caret. It is never a brand colour, never a highlight, never applied to a heading, and it never means "primary action" - the primary action is inked black.
 
-One consequence to know before using `--muted` as a card: this document's contrast
-figures are quoted against `--surface`, and on the lighter fill they drop by about
-12%. Recomputed there: muted-foreground 5.72:1, success 8.19:1, warning 8.55:1,
-foreground 13.07:1, all still AA. The tightest is `--fat` `#a97fd0` at **4.51:1**,
-which clears normal-text AA by a hair and large text comfortably. If that margin ever
-feels thin, the thing to change is the fill, not the colour.
+**The Mark, Not Hue Rule.** State is carried by shape. Filled square = done / met / logged; the same square open = not yet, at the same footprint so a list does not reflow as it completes. Struck rule in the second ink = over a ceiling. Filled flag in the second ink = something broke. The legacy `success`, `warning` and seven metric colour names resolve to plain ink (or signal) so nothing renders unstyled, but new work states status with a mark.
 
-## Spacing
+## Typography
 
-- Page gutter: `px-5` (20px). Every screen, no exceptions.
-- Between sections: `section-gap` (28px).
-- Inside a row: `gap-3` (12px).
-- Steps available: 4 / 8 / 12 / 16 / 20 / 28. Nothing else.
+**Display / Body / Label Font:** Archivo Variable (self-hosted, one 88KB woff2, weight 100-900 and width 62-125%), falling back to `ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto`. There is exactly one family. It is self-hosted because this is an offline-first PWA and a webfont request is a network dependency in an app whose pitch is that it has none.
 
-## Colour
+**Character:** A grotesk with a width axis, which is the lever a timetable actually wants: a column narrows without the typeface changing underneath it. Headers are set narrow and tracked; figures are set at normal width so the digits stay open at a glance. The result reads as printed matter rather than as an interface.
 
-**Red is for things that break, not for numbers that are large.**
+### Hierarchy
+The seven original role names are kept because 42 files use them and the names were never the problem; every value was redrawn for the new face. Two roles are new.
 
-The palette could previously express neutral and failure and nothing else, so hitting a
-protein goal looked exactly like blowing a calorie ceiling. Colour now does three separate
-jobs, and a token does exactly one of them.
+- **Title** (800, 30px, width 80%, uppercase, line-height 1): The page's own name, set in the top margin the way a timetable names its page. One per screen. Not a title card.
+- **Heading** (700, 17px, width 85%, uppercase): A table's name. Sits on the heavy rule that opens the table.
+- **Body** (400, 15px): Row labels, values, buttons. The workhorse.
+- **Label** (400, 13px): Annotations, units, hints, nav labels - the footnote voice. Pair with ink-2.
+- **Caption** (700, 10px, width 75%, tracking 0.1em, uppercase): A *column header*. It labels the column of data beneath it, so deleting it deletes a fact, and it always sits on a rule.
+- **Stat** (600, 22px, tabular): A figure compared against another figure.
+- **Hero** (800, 44px, width 78%, tabular): The one figure a screen exists to show, set at the scale a timetable sets a departure time.
+- **Action** (600, underlined 1.5px at 3px offset): A text control. Accent-as-a-colour does not exist here, so print's own answer applies: a rule under the word.
+- **Hour** (600, 11px, width 72%, tabular, ink-3): The hour column down the left edge of a schedule. Never competes with the rows it indexes.
 
-- Accent (`--color-accent`) marks things that are **actionable or currently selected**.
-  Never decorative. If everything is accented, nothing is.
-- State (`--color-success`, `--color-warning`) is the state of a **value against a goal**,
-  and nothing else. Success `#4ade80` is a goal met; warning `#fbbf24` is over a ceiling.
-  As text both pass AA: success 10.78:1 on background and 9.40:1 on surface, warning
-  11.26:1 and 9.81:1. Success is deliberately not `--nutrition` `#4fa97a`, which is the
-  daily-log dot's identity colour and keeps meaning only "nutrition entry".
-- Destructive (`--color-destructive`) is for **destruction and errors only**: delete,
-  clear data, a failed write, a sync collision. **Never a data value.** A cheat day is not
-  an error. Being over your step goal is not an error. Those are `--warning` and
-  `--success`. Red on a number the user simply logged is the app telling them off for
-  using it.
-- Muted (`--color-muted-foreground`) for secondary text. It measures 6.56:1 on surface
-  and 7.53:1 on background, so it passes AA. **Do not use opacity variants** like
-  `/60` or `/50`: those compute to 3.74:1 and fail.
-- The metric colours (`--color-carbs`, `--fat`, `--protein`, `--steps`, `--bodyweight`,
-  `--cardio`, `--nutrition`) are data encodings. Use them only to identify that metric,
-  never as decoration.
+### Named Rules
 
-**State must never be carried by hue alone.** Whatever the colour says, a fill, a label or
-an icon has to say as well, so "met" is still readable by someone who cannot tell the two
-hues apart. This is measured, not boilerplate: simulated for protanopia, `--success` and
-`--warning` fall from 37.9 apart to roughly 10 (CIEDE2000; the exact figure moves with the
-simulation model), close enough to read as the same olive. A bare green number and a bare amber number are the same number to those users. A
-filled ring, a "goal met" label or a check beside the value all solve it.
+**The Tabular-By-Default Rule.** `font-variant-numeric: tabular-nums` is set on `body`, not opted into. This is a document made almost entirely of numbers in columns, and proportional digits do not line up. `.pnum` is the escape hatch, for running prose only.
 
-The identity declared at the top of this file (lines 5-8) is **unchanged**, and this
-amendment is bounded on purpose. Green and amber are **not a second brand accent**: blue
-is still the only colour that means "press this", and nothing here adds a font, a
-gradient, a glow or a texture. State colours only ever report on a value. If one of them
-ever becomes navigation, a button or a mood, this rule has been broken.
+**The Column-Header Rule.** Caption type is only legal directly above the column it names, sitting on a rule. If a small tracked uppercase line is floating above a heading with no column of data under it, it is an eyebrow, and the correct fix is to delete it, not to restyle it.
 
-## Touch and motion
+**The No-Literal-Sizes Rule.** Carried forward from the incumbent system and still true: a raw pixel font-size in a component is a bug. Every piece of type takes one of the nine roles above.
 
-- 44px minimum hit area on everything interactive. Keep the icon small and expand the hit
-  area with padding or an `after:-inset-*` overlay rather than growing the row.
-- `prefers-reduced-motion` is handled globally in `styles.css`. Do not add per-component
-  handling.
-- Every icon-only button needs an `aria-label` saying what it does.
+**The Underline-Is-The-Control Rule.** A text control is marked by a rule under the word (action role). Colouring a word black does not make it look pressable, and there is no accent hue to spend.
 
-## Copy
+## Layout
 
-- Sentence case. "View workout", not "View Workout".
-- **No em dashes anywhere.** Use a hyphen or restructure. Prefer restructuring: the
-  substitution usually reads worse than the sentence you would have written instead.
-- The habit feature is called **Habits**, generically, on every surface. It is not a
-  supplement tracker; supplements are one thing a user might track with it.
+A single phone column, `max-w-md`, centred, locked to `100dvh`. Phone-only is a product decision: there are no breakpoints and no desktop layout anywhere in the build. The page itself never scrolls - `html`/`body` are `overflow: hidden` and scrolling happens only inside the shell's content area - which is what keeps the bottom nav and every sheet pinned to the visible viewport in the installed PWA.
 
-### One name per thing
+The page gutter is 20px. Vertical rhythm between tables is 26px. Rows are 11px/20px with a 44px minimum height, which is also the floor for every interactive target in the build. The day timeline is a 24-hour canvas at 56px per hour with a narrow tabular hour column at the left; the full 24h span is an explicit product override of an adaptive window, not an inferred default.
 
-A feature with several names reads as several features, and nothing signals "nobody
-read this end to end" faster. Settled:
+### Named Rules
 
-- **Daily numbers.** Not "daily log", "daily summary" or "today's numbers", all of
-  which shipped simultaneously for one feature.
-- **Workout**, never "session", on any user-facing surface. The internal type is still
-  `WorkoutSession`; that is fine, it is not a label.
+**The Bleed-To-Trim Rule.** A table's ruling reaches the page edge and the gutter is put back on the cell's own padding. The table utility does this with `margin-inline: -20px`, which *assumes it sits inside the page's 20px gutter*. Anything rendered at the top level with no gutter must not use it, or it hangs 40px off both trims - the mistake cost two components in this build. Either wrap it (a `mx-5` table inside a `px-5` section is the settings pattern) or rule the element directly, as the week strip does.
 
-### Empty states must not share a shape
+**The Header-Does-Not-Bleed Rule.** The table header deliberately carries no negative margin. The rule below it bleeds because a printed table's ruling does; its name does not, because a label hanging off the page edge is a clipped word. The first build of the stylesheet gave the header the same -20px and every section title on every screen lost its first character.
 
-This is the rule that matters most and the easiest to break by accident. Every empty
-state in the app was once built from one frame:
+**The One-Subject Rule.** Carried forward from the incumbent system, restated in this world's terms: every screen has one subject and it should be obvious within a second which one it is. Rank is now declared by the heavy rule and by hero-scale type, not by an elevated surface.
 
-> [imperative] + [object] + ["to" + purpose]
->
-> "Log your calories on the Today tab **to track progress over time**."
+## Elevation & Depth
 
-Each was fine alone. Six of them in one app is the signature of text generated to a
-pattern, and it is what makes an interface feel machine-written even when every
-sentence is defensible.
+There is no elevation. No shadow token exists in this system, no surface is raised, and no fill step is used to lift anything. Depth is entirely line weight and position - three weights, each meaning something different, so a screen can be read by its rules alone.
 
-**Vary them deliberately.** The current set runs from two words to fourteen, opens
-eight different ways, and five carry no call to action at all. Before adding one, read
-it against the others as a set. Specifically:
+### Rule Vocabulary
+- **Hairline** (`1px solid rule`, top or bottom): Between rows of the same table. The lightest mark that still divides. Also available as an inset box-shadow separator, so it can be inset from the left - a rule running the full width reads as the end of the table rather than a division inside it.
+- **Rule** (`1px solid rule-strong`): A real division - between sections, under column headers, at column edges. Also the top edge of the bottom nav.
+- **Heavy rule** (`2px solid ink`): Reserved for the two marks allowed to shout: the top of a table, and the now line. Also the top edge of every sheet and popup, and the top border of the active nav tab's cell.
 
-- **A purpose clause is almost always deletable.** A screen with nothing on it is
-  usually self-explanatory, and "to track your progress here" tells the user something
-  they already know.
-- **Say what is true, not what is generic.** The Charts empty state used to claim
-  nothing had ever been logged, which was wrong whenever data existed outside the
-  selected range. Naming the metric and the range fixed a bug, not just a sentence.
-- **Check where the component actually renders** before writing a call to action.
-  Pointing at "the big button" is wrong on the screen that has no big button.
-- If every empty state becomes a terse fragment, the rhyme is back in a new key.
+### Named Rules
 
-### Do not manufacture praise
+**The Rank-From-Weight Rule.** Rank comes from rule weight and position, never from fill, shadow, or a lighter background. A thing is more important because a heavier rule opens it, not because it is raised.
 
-The app notices records because a training log is about them. It does not congratulate
-anyone for showing up, and a workout with no records still gets a plain, real summary.
-Hollow encouragement from software that does not know the user is the fastest way to
-sound fake, and it is the opposite of the restraint the rest of this document buys.
+**The Opaque-Overlay Rule.** Deleting a fill is right for a panel on the page and fatal for anything over it. `bg-surface` resolves to the paper itself, so removing it from an in-page panel is correct - but seventeen overlays went transparent during this work for exactly that reason. Every sheet, popup, banner or floating notification carries an explicit paper fill plus its own heavy top rule.
+
+## Shapes
+
+Everything is rectangular. The `sm`, `md` and `lg` radius tokens are all `0px`; a timetable is set on a rectangular grid and nothing on it is rounded. Icons are stroked at 1.6px with `butt` caps and `miter` joins for the same reason - a rounded cap would be the one soft thing on the page - and none of them uses an arc.
+
+The recurring silhouettes are: the **ruled table** (2px ink top, 1px strong bottom, hairline-separated rows, run to the trim); the **inked cell** (a solid ink rectangle with paper knocked out of it); the **open or filled 10px square** that carries state; the **outlined measure** (a 1px ink track, hatched fill, quarter ticks hung below the rule so the fill never hides them); and the **planned/actual band** (1px dashed rule-strong on transparent, versus 1px solid ink-3 on wash).
+
+## Components
+
+### Tables (the card replacement)
+- **Character:** A ruled table, not a container. There are no cards in this system.
+- **Corner style:** Square (0px).
+- **Background:** Transparent. The page's paper shows through.
+- **Border:** 2px ink above, 1px `rule-strong` below; rows separated by a left-inset hairline.
+- **Internal padding:** 11px vertical, 20px horizontal, 12px between a row's own parts, 44px minimum row height.
+- **Header:** Caption type in ink-2, baseline-aligned, 5px above the table's opening rule, on the page gutter. Usually a title on the left and an action-underlined control on the right.
+- **Don't nest.** If content inside a table needs its own table, the grouping is wrong.
+
+### Buttons
+- **Shape:** Square (0px), 44px minimum height, `scale(0.97)` on press, applied globally to every button.
+- **Solid:** Ink fill, paper text, semibold body - the primary commit. On the gym screen this is a full-width 72px inked bar rather than a disc.
+- **Quiet:** 1px `rule-strong` outline, ink text, transparent fill.
+- **Text:** Action role - underlined ink, no chrome. The default for in-table controls.
+- **Focus:** `2px solid ink` outline at 2px offset, themed globally, replacing the browser's blue.
+
+### Inputs / Fields
+- **Style:** Inherit the family and ink; the caret is signal red. Square, ruled, no fill of their own.
+- **Placeholder:** ink-3 at full opacity (Firefox's default dimming drops it below AA).
+- **Selection:** Ink ground, paper text. The browser's blue selection, gray scrollbar and blue focus ring are all a third colour arriving uninvited and are themed out once, globally.
+
+### Toggle
+- **Style:** A printed switch. 48x28, always outlined 1.5px in ink so the control is visibly present in both states, with a 19px square knob. On = ink fill, knob right, paper knob. Off = paper fill, knob left, ink knob. Same filled-versus-open logic as a ticked habit or a met target.
+- **Tap target:** 44px via an absolutely-positioned overlay, so the 28px track stays compact without inflating row height.
+
+### Navigation
+- **Style:** Bottom bar, paper, 1px `rule-strong` on top, safe-area padded. Routed tabs are a 22px outlined icon over a 13px label; two equal flex halves sit either side of a fixed-width centre, so the action button holds the axis whatever the tab count.
+- **Active tab:** A 2px ink rule across the top of its cell, the way a printed index marks the section you have your thumb in. Inactive tabs carry a transparent 2px top border so nothing shifts, and their label sits in ink-3.
+- **Workout action:** The inked cell - ink fill, paper glyph and label, a filled (not stroked) icon. It is an action, not a destination, and it states its rank with fill and weight because colour is spoken for.
+
+### Signature: the inked cell
+One vocabulary for "this one", used in three places and nowhere else: the selected day in the week strip, the current lift row on the gym screen, and the nav's Workout action. Ink ground, paper knocked out. A second filled thing on the same screen would be a second selection - which is why today, when unselected, takes a 2px underscore beneath its figure instead of a fill.
+
+### Signature: hatch
+Metric identity without hue. Angle carries identity, density carries emphasis. Protein 90 degrees (1px/3px), carbs 45 (1px/4px), fat 0 (1px/5px), any non-macro metric a solid ink field. A *measured* quantity uses 135 (`hatch-dense`) and its overrun portion the same 135 in signal (`hatch-over`); 135 is reserved precisely because it is the one diagonal no metric answers to. The Charts area fill rotates to the selected metric's own angle, so the Carbs chart is ruled at the same angle as the Carbs swatch on the day view.
+
+### Signature: the flap
+The one authored motion. A committed figure rolls into place over 0.26s on `cubic-bezier(0.16, 1, 0.3, 1)`, translating and scaling in from above the way a split-flap board commits a departure. It fires on *change only, never on mount*; the wrapper is always present and always inline-block, so enabling it cannot shift layout. Every other animation in the build is navigation or entrance (sheet slide 0.3s, popup settle 0.2s, route slide 0.28s, one-shot toast 1.6s) and is not part of this vocabulary. Reduced motion is clamped globally, with animation delays zeroed so staggered entrances do not become invisible content, and the self-fading toast exempted so its confirmation is still readable. Never add per-component reduced-motion handling.
+
+## Do's and Don'ts
+
+### Do:
+- **Do** use the world's own token names in new work: paper, ink, ink-2, ink-3, rule, rule-strong, wash, signal.
+- **Do** rank things with rule weight: hairline between rows, `rule` between sections, 2px ink to open a table or mark the now line.
+- **Do** carry state with a mark - filled square for met or done, open square for not yet, struck signal rule for an overrun, filled signal flag for an error.
+- **Do** give a new metric its own hatch angle, and keep 135 degrees reserved for measured quantity so a measure can never be misread as carbs.
+- **Do** put an explicit paper fill and a 2px ink top rule on every sheet, popup and floating notification.
+- **Do** put the gutter on the cell and let the table's ruling run to the trim - and check that the table sits inside a 20px-gutter parent before using the bleeding utility.
+- **Do** keep every interactive target at 44px minimum, expanding the hit area with an inset overlay rather than growing the row.
+- **Do** draw new icons in the app's own icon file at 1.6px stroke, butt cap, mitre join, no arcs, and give every icon-only button an aria-label.
+
+### Don't:
+- **Don't** introduce a radius, a shadow, or a raised surface. There is no elevation in this system.
+- **Don't** add a gray between the three named inks, and don't make a tone with opacity. Name the tone or use an existing one.
+- **Don't** put text or a glyph in `rule` or `rule-strong`; they are below AA by design and only divide.
+- **Don't** spend signal red on anything but the exception - no branded headings, no highlights, no primary buttons.
+- **Don't** reintroduce hue as a carrier of state or of metric identity. The legacy `success`, `warning` and seven metric colour names are aliases kept only so nothing renders unstyled, not a second palette.
+- **Don't** apply the bleeding table utility to an element rendered at the top level with no gutter; it will hang 40px off both trims.
+- **Don't** give the table header a negative margin; its first character will be clipped off the page edge.
+- **Don't** use caption type as a floating eyebrow above a heading. If there is no column of data beneath it, delete the line.
+- **Don't** add a second authored motion. The flap is the only motion that carries meaning; everything else is navigation.
+- **Don't** use a Unicode character (arrows, ticks) as an icon, and don't import a second icon family.
+
+## Known open
+
+- **The timeline renders one column.** The direction contract's thesis describes a scheduled column set against an actual column, with the gap between them reading as a delay. That two-column device is *not built*: the day timeline draws a single canvas in which planned and actual are distinguished by outline versus fill. Left deliberately unresolved pending real phone use. Do not treat the two-column layout as an existing rule, and do not treat the single column as a settled one.
+- **The 24-hour canvas span** is an explicit override of an adaptive window.

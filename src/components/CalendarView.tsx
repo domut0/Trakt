@@ -266,7 +266,7 @@ export function CalendarView() {
               {hasLog ? (
                 <button
                   onClick={() => setEditorOpen(true)}
-                  className="group-row w-full flex-col !items-start gap-2 py-4 text-left cursor-pointer transition-colors active:bg-wash/50"
+                  className="group-row w-full flex-col !items-start gap-2 py-4 text-left cursor-pointer transition-colors active:bg-wash"
                 >
                   <div className="flex w-full items-center justify-between gap-3">
                     <span className="t-body font-semibold tracking-tight text-ink">

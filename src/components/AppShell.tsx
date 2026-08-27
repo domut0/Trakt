@@ -308,7 +308,12 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
         </ul>
       </div>
       {activeSessionId && (
-        <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-accent/40" />
+        // A real rule, not ink at 40%. Opacity variants are the thing this
+        // system bans outright, and one had survived here because it sits on a
+        // decorative hairline nobody reads as text. --rule-strong is the tone
+        // it was approximating, and it is a named colour rather than a value
+        // that changes with whatever happens to be behind it.
+        <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-rule-strong" />
       )}
     </nav>
   );

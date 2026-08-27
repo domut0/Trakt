@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-27T00:00:00Z",
+  "title": "Design System: Workout Tracker",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#F3F2EE",
+        "note": "The ground. Deliberately not #ffffff: the app is opened in a dark bedroom every night. Warm by ~5 points across channels.",
+        "tonalRamp": ["#26251F", "#3D3B33", "#565349", "#726F63", "#959285", "#B9B6AB", "#D8D6CE", "#F3F2EE"]
+      },
+      "ink": {
+        "role": "primary",
+        "displayName": "Ink",
+        "canonical": "#141310",
+        "note": "16.58:1 on paper. Text, figures, heavy rules, the inked cell, identity hatches.",
+        "tonalRamp": ["#141310", "#2A2822", "#413E35", "#585448", "#706C5D", "#8B8778", "#B4B0A2", "#DEDBD0"]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Second Ink Tone",
+        "canonical": "#5A574E",
+        "note": "6.45:1. Secondary text, units, column headers.",
+        "tonalRamp": ["#1B1A17", "#2D2B26", "#403E36", "#5A574E", "#767266", "#948F81", "#B7B3A6", "#DCD9D0"]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Third Ink Tone",
+        "canonical": "#6E6B60",
+        "note": "4.76:1. Hour column, placeholders, inactive nav labels, open-mark stroke.",
+        "tonalRamp": ["#1F1E1A", "#332F2A", "#4A473F", "#6E6B60", "#8A8779", "#A6A395", "#C4C1B4", "#E3E0D6"]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Hairline Rule",
+        "canonical": "#D8D6CE",
+        "note": "Below AA on purpose. Never carries text. Divides rows.",
+        "tonalRamp": ["#2C2B26", "#45433C", "#5F5C53", "#7A776C", "#9A9789", "#BAB7AC", "#D8D6CE", "#EFEEE9"]
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Division Rule",
+        "canonical": "#B9B6AB",
+        "note": "Below AA on purpose. Sections, column edges, the dash of a planned outline.",
+        "tonalRamp": ["#26251F", "#3B3931", "#535045", "#6D6A5D", "#8D8A7D", "#B9B6AB", "#D3D1C8", "#EDECE7"]
+      },
+      "wash": {
+        "role": "neutral",
+        "displayName": "Wash",
+        "canonical": "#E9E7E0",
+        "note": "The one filled tone. What 'solid fill = happened' fills with.",
+        "tonalRamp": ["#2A2923", "#413F37", "#5A574D", "#767265", "#96937f", "#B8B5A8", "#D3D1C7", "#E9E7E0"]
+      },
+      "signal": {
+        "role": "secondary",
+        "displayName": "Signal Red",
+        "canonical": "#C8102E",
+        "note": "The second plate. 5.25:1 on paper, 4.75:1 on wash. Only ever the exception: overrun, error, caret.",
+        "tonalRamp": ["#2E040A", "#4B0711", "#6A0A18", "#8B0D20", "#AC0F28", "#C8102E", "#E4405B", "#F49AA9"]
+      }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Title", "purpose": "The page's own name, set in the top margin the way a timetable names its page. One per screen." },
+      "heading": { "displayName": "Heading", "purpose": "A table's name. Sits on the heavy rule that opens the table." },
+      "body": { "displayName": "Body", "purpose": "Row labels, values, buttons. The workhorse." },
+      "label": { "displayName": "Label", "purpose": "Annotations, units, hints, nav labels. The footnote voice; pair with ink-2." },
+      "caption": { "displayName": "Column Header", "purpose": "Labels the column of data beneath it and always sits on a rule. Never a floating eyebrow." },
+      "stat": { "displayName": "Stat", "purpose": "A figure compared against another figure. Tabular by construction." },
+      "hero": { "displayName": "Hero Figure", "purpose": "The one figure a screen exists to show, at departure-time scale." },
+      "action": { "displayName": "Action", "purpose": "A text control, marked by a rule under the word. Replaces accent-as-a-colour." },
+      "hour": { "displayName": "Hour", "purpose": "The hour column down the left edge of the schedule. Never competes with the rows it indexes." }
+    },
+    "shadows": [],
+    "rules": [
+      { "name": "hairline", "value": "1px solid #D8D6CE", "purpose": "Between rows of the same table. Inset from the left when drawn as a separator." },
+      { "name": "rule", "value": "1px solid #B9B6AB", "purpose": "Between sections, under column headers, at column edges, above the bottom nav." },
+      { "name": "rule-heavy", "value": "2px solid #141310", "purpose": "Opens a table, marks the now line, tops every sheet, marks the active nav tab." }
+    ],
+    "motion": [
+      { "name": "flap", "value": "flap 0.26s cubic-bezier(0.16, 1, 0.3, 1) both", "purpose": "The one authored motion: a committed figure rolls into place like a split-flap board. On change only, never on mount." },
+      { "name": "sheet-up", "value": "sheet-up 0.3s cubic-bezier(0.32, 0.72, 0, 1)", "purpose": "Bottom-sheet entrance." },
+      { "name": "popup-up", "value": "popup-up 0.2s cubic-bezier(0.32, 0.72, 0, 1)", "purpose": "Centred popup entrance; shorter and snappier than the sheet slide." },
+      { "name": "route-in", "value": "route-in-right | route-in-left 0.28s cubic-bezier(0.32, 0.72, 0, 1) both", "purpose": "Directional tab-to-tab page transition, with a plain 0.28s fade fallback on fresh loads." },
+      { "name": "toast-up", "value": "toast-up 1.6s cubic-bezier(0.32, 0.72, 0, 1) both", "purpose": "One-shot confirmation: enter, hold, fade out. Exempted from the reduced-motion clamp because its final keyframe is invisible." },
+      { "name": "press", "value": "transform 0.12s ease; :active { transform: scale(0.97) }", "purpose": "Global button press, applied to every button element." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Ruled Table",
+      "kind": "card",
+      "refersTo": "table",
+      "description": "The card replacement. A table ruled 2px ink on top and 1px strong below, run to the trim, with the gutter on the cell.",
+      "html": "<div class=\"ds-table\"><div class=\"ds-row\"><span class=\"ds-row-label\"><span class=\"ds-key ds-hatch-protein\"></span>Protein</span><span class=\"ds-row-val\"><b class=\"ds-stat\">226</b><span class=\"ds-unit\">/ 200 g</span><span class=\"ds-mark-done\"></span></span></div><div class=\"ds-row ds-row-sep\"><span class=\"ds-row-label\"><span class=\"ds-key ds-hatch-carbs\"></span>Carbs</span><span class=\"ds-row-val\"><b class=\"ds-stat ds-mark-over\">312</b><span class=\"ds-unit\">/ 300 g</span></span></div></div>",
+      "css": ".ds-table { background: transparent; border-top: 2px solid var(--color-ink, #141310); border-bottom: 1px solid var(--color-rule-strong, #B9B6AB); font-family: 'Archivo Variable', system-ui, sans-serif; font-variant-numeric: tabular-nums; color: var(--color-ink, #141310); } .ds-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 11px 20px; font-size: 15px; line-height: 1.35; letter-spacing: -0.004em; } .ds-row-sep { box-shadow: inset 0 1px 0 var(--color-rule, #D8D6CE); } .ds-row-label { display: flex; align-items: center; gap: 10px; } .ds-key { width: 12px; height: 12px; border: 1px solid var(--color-ink-3, #6E6B60); display: inline-block; } .ds-hatch-protein { background-image: repeating-linear-gradient(90deg, #141310 0 1px, transparent 1px 3px); } .ds-hatch-carbs { background-image: repeating-linear-gradient(45deg, #141310 0 1px, transparent 1px 4px); } .ds-row-val { display: flex; align-items: baseline; gap: 6px; } .ds-stat { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.05; } .ds-unit { font-size: 13px; color: var(--color-ink-2, #5A574E); } .ds-mark-done { width: 10px; height: 10px; background: var(--color-ink, #141310); display: inline-block; } .ds-mark-over { color: #C8102E; border-bottom: 2px solid #C8102E; padding-bottom: 1px; }"
+    },
+    {
+      "name": "Table Header",
+      "kind": "custom",
+      "refersTo": "table-header",
+      "description": "Names a table. Sits on the page gutter directly above the table's opening rule and deliberately does not bleed.",
+      "html": "<div class=\"ds-table-header\"><span>Daily numbers</span><button class=\"ds-btn-text\">Edit</button></div>",
+      "css": ".ds-table-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 5px; color: var(--color-ink-2, #5A574E); font-family: 'Archivo Variable', system-ui, sans-serif; font-size: 10px; font-weight: 700; font-stretch: 75%; letter-spacing: 0.1em; text-transform: uppercase; line-height: 1.2; }"
+    },
+    {
+      "name": "Solid Button",
+      "kind": "button",
+      "refersTo": "button-solid",
+      "description": "The primary commit. Ink fill, paper text, square, 44px floor.",
+      "html": "<button class=\"ds-btn-solid\">Log set</button>",
+      "css": ".ds-btn-solid { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; background: var(--color-ink, #141310); color: var(--color-paper, #F3F2EE); border: none; border-radius: 0; font-family: 'Archivo Variable', system-ui, sans-serif; font-size: 15px; font-weight: 600; transition: transform 0.12s ease, opacity 0.12s ease; } .ds-btn-solid:active { transform: scale(0.97); } .ds-btn-solid:focus-visible { outline: 2px solid var(--color-ink, #141310); outline-offset: 2px; } .ds-btn-solid:hover { opacity: 0.92; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "The secondary action. Ruled outline, no fill.",
+      "html": "<button class=\"ds-btn-quiet\">Cancel</button>",
+      "css": ".ds-btn-quiet { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; background: transparent; color: var(--color-ink, #141310); border: 1px solid var(--color-rule-strong, #B9B6AB); border-radius: 0; font-family: 'Archivo Variable', system-ui, sans-serif; font-size: 15px; transition: transform 0.12s ease, background 0.12s ease; } .ds-btn-quiet:hover { background: var(--color-wash, #E9E7E0); } .ds-btn-quiet:active { transform: scale(0.97); } .ds-btn-quiet:focus-visible { outline: 2px solid var(--color-ink, #141310); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Control",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "A control marked by a rule under the word, because there is no accent hue to spend.",
+      "html": "<button class=\"ds-btn-text\">Edit habits</button>",
+      "css": ".ds-btn-text { background: none; border: none; padding: 0; font-family: 'Archivo Variable', system-ui, sans-serif; font-size: 15px; font-weight: 600; color: var(--color-ink, #141310); text-decoration-line: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; } .ds-btn-text:hover { text-decoration-thickness: 2px; } .ds-btn-text:focus-visible { outline: 2px solid var(--color-ink, #141310); outline-offset: 2px; }"
+    },
+    {
+      "name": "Printed Toggle",
+      "kind": "input",
+      "refersTo": "toggle-on",
+      "description": "Always outlined in ink so the control is visibly present; the fill says which way it is set.",
+      "html": "<span class=\"ds-toggle-wrap\"><button role=\"switch\" aria-checked=\"true\" class=\"ds-toggle ds-toggle-on\"><span class=\"ds-toggle-knob\"></span></button><button role=\"switch\" aria-checked=\"false\" class=\"ds-toggle ds-toggle-off\"><span class=\"ds-toggle-knob\"></span></button></span>",
+      "css": ".ds-toggle-wrap { display: inline-flex; gap: 16px; } .ds-toggle { position: relative; width: 48px; height: 28px; border: 1.5px solid var(--color-ink, #141310); border-radius: 0; padding: 0; transition: background-color 0.15s ease, transform 0.12s ease; } .ds-toggle-on { background: var(--color-ink, #141310); } .ds-toggle-off { background: var(--color-paper, #F3F2EE); } .ds-toggle-knob { position: absolute; top: 3px; width: 19px; height: 19px; transition: left 0.15s ease, background-color 0.15s ease; } .ds-toggle-on .ds-toggle-knob { left: 22px; background: var(--color-paper, #F3F2EE); } .ds-toggle-off .ds-toggle-knob { left: 3px; background: var(--color-ink, #141310); } .ds-toggle:active { transform: scale(0.97); } .ds-toggle:focus-visible { outline: 2px solid var(--color-ink, #141310); outline-offset: 2px; }"
+    },
+    {
+      "name": "Bottom Navigation",
+      "kind": "nav",
+      "refersTo": "nav-tab-active",
+      "description": "Routed tabs marked by a 2px ink rule over the cell you are in, split around the inked Workout action.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-tab ds-tab-active\" aria-current=\"page\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\"><path d=\"M3 11.5 12 4l9 7.5\"/><path d=\"M5 10v10h14V10\"/></svg><span>Today</span></a><a class=\"ds-tab\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\"><rect x=\"3.5\" y=\"5\" width=\"17\" height=\"16\"/><path d=\"M3.5 9.5h17\"/><path d=\"M8 3v4\"/><path d=\"M16 3v4\"/></svg><span>History</span></a><button class=\"ds-nav-action\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4\"/></svg><span>Workout</span></button><a class=\"ds-tab\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"butt\" stroke-linejoin=\"miter\"><path d=\"M4 19h16\"/><path d=\"M6 15l4-5 4 3 4-7\"/></svg><span>Charts</span></a></nav>",
+      "css": ".ds-nav { display: flex; align-items: stretch; justify-content: space-between; gap: 4px; padding: 8px 8px 0; background: var(--color-paper, #F3F2EE); border-top: 1px solid var(--color-rule-strong, #B9B6AB); font-family: 'Archivo Variable', system-ui, sans-serif; } .ds-tab { flex: 1 1 0%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 44px; padding: 4px 0; border-top: 2px solid transparent; color: var(--color-ink-3, #6E6B60); font-size: 13px; font-weight: 500; text-decoration: none; } .ds-tab-active { border-top-color: var(--color-ink, #141310); color: var(--color-ink, #141310); } .ds-tab:hover { color: var(--color-ink-2, #5A574E); } .ds-nav-action { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 44px; min-width: 56px; padding: 4px 12px; background: var(--color-ink, #141310); color: var(--color-paper, #F3F2EE); border: none; border-radius: 0; font-size: 13px; font-weight: 600; transition: transform 0.12s ease; } .ds-nav-action:active { transform: scale(0.97); } .ds-nav-action:focus-visible { outline: 2px solid var(--color-ink, #141310); outline-offset: 2px; }"
+    },
+    {
+      "name": "Week Strip (the inked cell)",
+      "kind": "chip",
+      "refersTo": "inked-cell",
+      "description": "The app's one mark for 'this one'. The selected day is an inked column knocked out in paper; today, unselected, takes an underscore rather than a second fill.",
+      "html": "<div class=\"ds-strip\"><button class=\"ds-day\"><span class=\"ds-day-cap\">M</span><span class=\"ds-day-num\">17</span></button><button class=\"ds-day ds-day-today\"><span class=\"ds-day-cap\">T</span><span class=\"ds-day-num ds-underscore\">18</span></button><button class=\"ds-day ds-day-selected\"><span class=\"ds-day-cap\">W</span><span class=\"ds-day-num\">19</span></button><button class=\"ds-day\"><span class=\"ds-day-cap\">T</span><span class=\"ds-day-num\">20</span></button></div>",
+      "css": ".ds-strip { display: flex; border-top: 2px solid var(--color-ink, #141310); border-bottom: 1px solid var(--color-rule-strong, #B9B6AB); font-family: 'Archivo Variable', system-ui, sans-serif; font-variant-numeric: tabular-nums; } .ds-day { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 52px; border: none; border-left: 1px solid var(--color-rule, #D8D6CE); background: transparent; color: var(--color-ink, #141310); border-radius: 0; } .ds-day:active { background: var(--color-wash, #E9E7E0); } .ds-day-cap { font-size: 10px; font-weight: 700; font-stretch: 75%; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-ink-3, #6E6B60); } .ds-day-num { font-size: 15px; font-weight: 700; } .ds-underscore { border-bottom: 2px solid var(--color-ink, #141310); line-height: 1; } .ds-day-selected { background: var(--color-ink, #141310); color: var(--color-paper, #F3F2EE); } .ds-day-selected .ds-day-cap { color: var(--color-paper, #F3F2EE); }"
+    },
+    {
+      "name": "Ruled Measure",
+      "kind": "custom",
+      "refersTo": "table",
+      "description": "A quantity read against a ruled scale: 1px ink track, 135-degree hatched fill, overrun in signal, quarter ticks hung below the rule.",
+      "html": "<div class=\"ds-measure\"><div class=\"ds-measure-track\"><div class=\"ds-measure-fill\"></div></div><div class=\"ds-measure-over\"></div></div><div class=\"ds-measure-ticks\"><span style=\"left:25%\"></span><span style=\"left:50%\"></span><span style=\"left:75%\"></span></div>",
+      "css": ".ds-measure { display: flex; align-items: stretch; } .ds-measure-track { position: relative; height: 12px; flex: 1; border: 1px solid var(--color-ink, #141310); } .ds-measure-fill { height: 100%; width: 72%; background-image: repeating-linear-gradient(135deg, #141310 0 1px, transparent 1px 3px); } .ds-measure-over { height: 12px; width: 14%; border: 1px solid #C8102E; border-left: 0; background-image: repeating-linear-gradient(135deg, #C8102E 0 1px, transparent 1px 3px); } .ds-measure-ticks { position: relative; height: 4px; } .ds-measure-ticks span { position: absolute; top: 0; height: 4px; width: 1px; background: var(--color-ink-3, #6E6B60); }"
+    },
+    {
+      "name": "Sheet",
+      "kind": "custom",
+      "refersTo": "sheet",
+      "description": "Any surface over the page. Explicit paper fill plus a 2px ink top rule; transparent overlays are the failure mode this exists to prevent.",
+      "html": "<div class=\"ds-sheet\"><h2 class=\"ds-sheet-title\">Log set</h2><p class=\"ds-sheet-body\">Bench press, set 3.</p><button class=\"ds-btn-solid\">Save</button></div>",
+      "css": ".ds-sheet { background: var(--color-paper, #F3F2EE); border-top: 2px solid var(--color-ink, #141310); border-radius: 0; padding: 20px; font-family: 'Archivo Variable', system-ui, sans-serif; color: var(--color-ink, #141310); animation: ds-sheet-up 0.3s cubic-bezier(0.32, 0.72, 0, 1); } @keyframes ds-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } } .ds-sheet-title { font-size: 17px; font-weight: 700; font-stretch: 85%; letter-spacing: -0.005em; text-transform: uppercase; margin: 0 0 8px; } .ds-sheet-body { font-size: 13px; color: var(--color-ink-2, #5A574E); margin: 0 0 16px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Printed Timetable",
+    "overview": "The app is a schedule, so it is printed like one. The whole visual world is a Swiss railway timetable page: a paper ground, one black ink, hairline rules, tabular figures, columns that hold their position, and tables that run to the trim instead of floating inside rounded cards. Seed key 95982b50; the direction contract ships as an HTML comment at the top of <body> in the built markup.\n\nTwo rules from the dark system this replaced are deliberately inverted, and they are why the build looks the way it does. Elevation was fill; rank now comes from rule weight and position - on paper there is no fill step to lift with, so a hairline separates, a stronger rule divides, and a 2px ink rule announces. Nothing is raised. \"No borders\" is gone, because it was always the wrong rule here: a dashed outline already carried a fact (planned) rather than a decoration. Every rule on this page carries a fact.\n\nThe one idea that survived untouched is dashed outline = planned, solid fill = happened. It is native to a timetable - the scheduled column against the actual one - so it is stronger here than it was, not merely preserved. The palette is two-ink by construction: black on paper, plus a single signal red spent only on the exception, the way a two-colour press spends its second plate. The app is phone-only by product decision, so there is no desktop layout and no breakpoints; the paper is #F3F2EE rather than white because the app is opened in a dark bedroom every night and pure white is a flashlight.",
+    "keyCharacteristics": [
+      "Paper ground, one ink, one signal; no gray ramp, no opacity variants",
+      "Rank from rule weight (1px hairline / 1px strong / 2px ink), never from fill or shadow",
+      "Zero radius everywhere; butt caps and mitred joins in every icon",
+      "Tabular figures by default across the whole document",
+      "State carried by mark (filled square, struck rule), never by hue",
+      "Metric identity carried by hatch angle, consistent across screens",
+      "Tables bleed to the trim; the gutter lives on the cell",
+      "One authored motion: the flap"
+    ],
+    "rules": [
+      { "name": "The Three Real Inks Rule", "body": "There are exactly three text tones and each is a measured colour, not one colour at three opacities. Never write an opacity variant on text, and never introduce a fourth gray. Opacity variants are what let secondary text drift below AA in the system this replaced.", "section": "colors" },
+      { "name": "The Rules-Below-AA Rule", "body": "rule and rule-strong sit below AA on purpose, because they never carry text. Their job is to divide, and a hairline that meets text contrast is a black bar. Never put text or a glyph in these two values.", "section": "colors" },
+      { "name": "The Second Ink Rule", "body": "Signal red appears only on the exception: an overrun measure, an error flag, the caret. It is never a brand colour, never a highlight, never applied to a heading, and it never means \"primary action\" - the primary action is inked black.", "section": "colors" },
+      { "name": "The Mark, Not Hue Rule", "body": "State is carried by shape. Filled square = done / met / logged; the same square open = not yet, at the same footprint so a list does not reflow as it completes. Struck rule in the second ink = over a ceiling. Filled flag in the second ink = something broke.", "section": "colors" },
+      { "name": "The Tabular-By-Default Rule", "body": "font-variant-numeric: tabular-nums is set on body, not opted into. This is a document made almost entirely of numbers in columns, and proportional digits do not line up. .pnum is the escape hatch, for running prose only.", "section": "typography" },
+      { "name": "The Column-Header Rule", "body": "Caption type is only legal directly above the column it names, sitting on a rule. If a small tracked uppercase line is floating above a heading with no column of data under it, it is an eyebrow, and the correct fix is to delete it, not to restyle it.", "section": "typography" },
+      { "name": "The No-Literal-Sizes Rule", "body": "Carried forward from the incumbent system and still true: a raw pixel font-size in a component is a bug. Every piece of type takes one of the nine roles.", "section": "typography" },
+      { "name": "The Underline-Is-The-Control Rule", "body": "A text control is marked by a rule under the word (action role). Colouring a word black does not make it look pressable, and there is no accent hue to spend.", "section": "typography" },
+      { "name": "The Bleed-To-Trim Rule", "body": "A table's ruling reaches the page edge and the gutter is put back on the cell's own padding. The table utility does this with margin-inline: -20px, which assumes it sits inside the page's 20px gutter. Anything rendered at the top level with no gutter must not use it, or it hangs 40px off both trims.", "section": "layout" },
+      { "name": "The Header-Does-Not-Bleed Rule", "body": "The table header deliberately carries no negative margin. The rule below it bleeds because a printed table's ruling does; its name does not, because a label hanging off the page edge is a clipped word.", "section": "layout" },
+      { "name": "The One-Subject Rule", "body": "Every screen has one subject and it should be obvious within a second which one it is. Rank is declared by the heavy rule and by hero-scale type, not by an elevated surface.", "section": "layout" },
+      { "name": "The Rank-From-Weight Rule", "body": "Rank comes from rule weight and position, never from fill, shadow, or a lighter background. A thing is more important because a heavier rule opens it, not because it is raised.", "section": "elevation" },
+      { "name": "The Opaque-Overlay Rule", "body": "Deleting a fill is right for a panel on the page and fatal for anything over it. bg-surface resolves to the paper itself, so removing it from an in-page panel is correct - but seventeen overlays went transparent during this work for exactly that reason. Every sheet, popup, banner or floating notification carries an explicit paper fill plus its own heavy top rule.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use the world's own token names in new work: paper, ink, ink-2, ink-3, rule, rule-strong, wash, signal.",
+      "Do rank things with rule weight: hairline between rows, rule between sections, 2px ink to open a table or mark the now line.",
+      "Do carry state with a mark - filled square for met or done, open square for not yet, struck signal rule for an overrun, filled signal flag for an error.",
+      "Do give a new metric its own hatch angle, and keep 135 degrees reserved for measured quantity so a measure can never be misread as carbs.",
+      "Do put an explicit paper fill and a 2px ink top rule on every sheet, popup and floating notification.",
+      "Do put the gutter on the cell and let the table's ruling run to the trim - and check that the table sits inside a 20px-gutter parent before using the bleeding utility.",
+      "Do keep every interactive target at 44px minimum, expanding the hit area with an inset overlay rather than growing the row.",
+      "Do draw new icons in the app's own icon file at 1.6px stroke, butt cap, mitre join, no arcs, and give every icon-only button an aria-label."
+    ],
+    "donts": [
+      "Don't introduce a radius, a shadow, or a raised surface. There is no elevation in this system.",
+      "Don't add a gray between the three named inks, and don't make a tone with opacity. Name the tone or use an existing one.",
+      "Don't put text or a glyph in rule or rule-strong; they are below AA by design and only divide.",
+      "Don't spend signal red on anything but the exception - no branded headings, no highlights, no primary buttons.",
+      "Don't reintroduce hue as a carrier of state or of metric identity. The legacy success, warning and seven metric colour names are aliases kept only so nothing renders unstyled, not a second palette.",
+      "Don't apply the bleeding table utility to an element rendered at the top level with no gutter; it will hang 40px off both trims.",
+      "Don't give the table header a negative margin; its first character will be clipped off the page edge.",
+      "Don't use caption type as a floating eyebrow above a heading. If there is no column of data beneath it, delete the line.",
+      "Don't add a second authored motion. The flap is the only motion that carries meaning; everything else is navigation.",
+      "Don't use a Unicode character (arrows, ticks) as an icon, and don't import a second icon family."
+    ]
+  }
+}
