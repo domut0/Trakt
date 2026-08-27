@@ -1,4 +1,5 @@
 import { useMemo, type JSX, type ReactNode } from "react";
+import { Flap } from "./Flap";
 import { dayKey } from "../lib/daily-log";
 import { useStore } from "../lib/store";
 import { directionFor, targetStatusFor, type TargetStatus } from "../lib/targets";
@@ -89,7 +90,11 @@ function MetricRow({
   if (value === null) {
     figure = <span className="t-label text-ink-3">Not recorded</span>;
   } else {
-    figure = <span className={`t-stat text-ink ${exceeded ? "mark-over" : ""}`}>{value}</span>;
+    figure = (
+      <Flap value={value}>
+        <span className={`t-stat text-ink ${exceeded ? "mark-over" : ""}`}>{value}</span>
+      </Flap>
+    );
   }
 
   return (
@@ -232,11 +237,13 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
           <>
             <div className="flex items-baseline gap-1.5">
               {calories !== undefined ? (
-                <span
-                  className={`t-hero text-ink ${calorieStatus === "exceeded" ? "mark-over" : ""}`}
-                >
-                  {round(calories)}
-                </span>
+                <Flap value={round(calories)}>
+                  <span
+                    className={`t-hero text-ink ${calorieStatus === "exceeded" ? "mark-over" : ""}`}
+                  >
+                    {round(calories)}
+                  </span>
+                </Flap>
               ) : (
                 <span className="t-stat text-ink-3">Not recorded</span>
               )}

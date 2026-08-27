@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Check, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DeleteWorkoutButton } from "../components/DeleteWorkoutButton";
+import { Flap } from "../components/Flap";
 import { LogSetSheet } from "../components/LogSetSheet";
 import { SessionView } from "../components/SessionView";
 import { WorkoutSummaryScreen } from "../components/WorkoutSummaryScreen";
@@ -351,7 +352,9 @@ function WorkoutPage() {
           <div className="t-caption text-ink-3">This workout</div>
           <div className="mt-1 flex items-baseline gap-4">
             <div>
-              <span className="t-stat text-ink">{sessSets.length}</span>{" "}
+              <Flap value={sessSets.length}>
+                <span className="t-stat text-ink">{sessSets.length}</span>
+              </Flap>{" "}
               <span className="t-label text-ink-2">sets</span>
             </div>
             <div>
