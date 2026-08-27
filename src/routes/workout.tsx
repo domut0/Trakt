@@ -165,78 +165,72 @@ function WorkoutPage() {
   if (!session || !slot) return null;
 
   return (
-    <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
-      {/* Top bar */}
-      <div className="grid grid-cols-3 items-center px-5 pt-14">
-        {/* Negative vertical margin matches touch target height without taller header bar */}
+    <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-paper">
+      {/*
+        The screen is set as an attempt card: the split names the page in the
+        margin, the lift you are on is the one large thing, and the clock sits
+        in its own column beside it rather than above it.
+
+        It used to be a centred vertical stack - stopwatch, then exercise, then
+        an 88px disc - which put the two things you read between sets on
+        different lines and spent the widest part of the screen on air. Nothing
+        about the FLOW changes: same controls, same handlers, same order of
+        operations.
+      */}
+      {/* Top bar. Negative vertical margin keeps the 44px touch targets without
+          making the header taller. */}
+      <div className="grid grid-cols-3 items-center px-5 pt-14 pb-2">
         <button
           onClick={() => router.navigate({ to: "/" })}
-          className="-my-3 flex min-h-[44px] items-center justify-self-start t-body font-medium text-accent"
+          className="-my-3 flex min-h-[44px] items-center justify-self-start t-action t-body"
         >
           Home
         </button>
-        <div className="min-w-0 justify-self-center text-center">
-          <div className="t-caption text-muted-foreground">Split</div>
-          <h1 className="truncate t-body font-semibold">{slot.name}</h1>
-        </div>
+        <h1 className="min-w-0 truncate justify-self-center text-center t-caption text-ink-2">
+          {slot.name}
+        </h1>
         <button
           onClick={handleEnd}
-          className="-my-3 flex min-h-[44px] items-center justify-self-end t-body font-medium text-muted-foreground"
+          className="-my-3 flex min-h-[44px] items-center justify-self-end t-action t-body"
         >
           End
         </button>
       </div>
 
-      {/* Stopwatch */}
-      <div className="section-gap flex flex-col items-center">
-        <div className="t-caption text-muted-foreground">Time between sets</div>
-        <div className="tnum mt-1 text-[44px] font-semibold leading-none tracking-tight">
-          {sessSets.length === 0 ? "0:00" : fmtTime(elapsedSinceLast)}
+      {/* The lift, and the clock, as two columns of one ruled block. */}
+      <div className="rule-heavy-t rule-b flex items-start gap-4 px-5 py-3">
+        {/*
+          The lift outranks the clock, and it did not in the first cut.
+
+          The stopwatch was set at t-hero and the exercise at t-heading, which
+          made the biggest thing on a gym screen a number the product spec
+          describes as passive: count-up only, no alarms, no targets. What he
+          needs off a glance between sets is WHICH LIFT, so that is the one set
+          large.
+        */}
+        <div className="min-w-0 flex-1">
+          <div className="t-caption text-ink-3">Current exercise</div>
+          <h2 className="mt-1 text-balance break-words t-title text-ink">
+            {currentExercise?.name ?? <span className="text-ink-3">Nothing chosen yet</span>}
+          </h2>
+        </div>
+        <div className="w-[104px] shrink-0 text-right">
+          {/* "Time between sets", never "rest time", and never shortened: the
+              count necessarily includes performing the next set, given that you
+              log after it, and the full phrase is what says so. This was
+              trimmed to "Between sets" to fit the column and that quietly
+              removed a product decision to save six characters. The column got
+              wider instead. */}
+          <div className="t-caption text-ink-3">Time between sets</div>
+          <div className="mt-1 t-stat text-ink">
+            {sessSets.length === 0 ? "0:00" : fmtTime(elapsedSinceLast)}
+          </div>
         </div>
       </div>
 
-      {/* Current exercise */}
-      <div className="section-gap flex flex-col items-center px-5 text-center">
-        <div className="t-caption text-muted-foreground">Current exercise</div>
-        <h2 className="mt-1 text-balance break-words t-title">
-          {currentExercise?.name ?? <span className="text-muted-foreground">-</span>}
-        </h2>
-        {currentSetupNote && (
-          <div className="mt-2 rounded-lg bg-muted px-3 py-2 t-label text-muted-foreground">
-            {currentSetupNote}
-          </div>
-        )}
-      </div>
-
-      {/* Primary action */}
-      <div className="section-gap flex flex-col items-center px-5">
-        <button
-          onClick={() => {
-            if (inBlock) {
-              logNextInBlock();
-              flashLogged();
-            } else {
-              setSheetOpen(true);
-            }
-          }}
-          aria-label={inBlock ? "Log the next set in this block" : "Log a set"}
-          className="flex h-[88px] w-[88px] items-center justify-center rounded-full bg-accent text-accent-foreground"
-        >
-          <Plus size={30} aria-hidden="true" />
-        </button>
-        {inBlock && currentBlock ? (
-          <div className="mt-2 text-center">
-            <div className="t-label font-medium text-accent">Next set</div>
-            <div className="tnum t-label text-muted-foreground">
-              {currentBlock.loggedInBlock + 1} of {currentBlock.targetSets} · {currentBlock.weight}{" "}
-              × {currentBlock.reps}
-              {currentBlock.rpe != null ? ` @ ${currentBlock.rpe}` : ""}
-            </div>
-          </div>
-        ) : (
-          <div className="mt-2 t-label font-medium text-accent">Log set</div>
-        )}
-      </div>
+      {currentSetupNote && (
+        <div className="hairline-b bg-wash px-5 py-2 t-label text-ink-2">{currentSetupNote}</div>
+      )}
 
       {/*
         Planned lifts, when the day has a plan.
@@ -252,11 +246,11 @@ function WorkoutPage() {
         instead of pushing the bottom row off a small screen.
       */}
       {planned && (
-        <section className="section-gap min-h-0 overflow-y-auto px-5">
-          <div className="group-header flex items-center justify-between px-0">
+        <section className="section-gap min-h-0 flex-1 overflow-y-auto px-5">
+          <div className="group-header">
             <h2 className="t-caption">Planned</h2>
             {planned.name.trim() && (
-              <span className="truncate t-label text-muted-foreground">{planned.name}</span>
+              <span className="truncate t-label text-ink-2">{planned.name}</span>
             )}
           </div>
           <ul className="group-list">
@@ -268,37 +262,38 @@ function WorkoutPage() {
                   <button
                     onClick={() => setCurrentExercise(ex.id)}
                     aria-pressed={isCurrent}
-                    className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""}`}
+                    /*
+                      The lift you are on is an INKED ROW, which is the same mark
+                      the week strip uses for the day you are on. One vocabulary
+                      for "you are here" across the app, and on a two-ink page it
+                      is the only unambiguous one: the previous version said it
+                      with accent-coloured semibold text, which next to a plain
+                      row is emphasis rather than position.
+                    */
+                    className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""} ${
+                      isCurrent ? "bg-ink text-paper" : "text-ink"
+                    }`}
                   >
                     <span className="flex min-w-0 items-center gap-3">
-                      {/* Done is a filled check as well as a colour, so the row
-                          still reads without hue. */}
+                      {/* Same filled-versus-open square as a ticked habit. */}
                       <span
                         aria-hidden="true"
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                        className={`h-[14px] w-[14px] shrink-0 ${
                           logged > 0
-                            ? "bg-accent text-accent-foreground"
+                            ? isCurrent
+                              ? "bg-paper"
+                              : "bg-ink"
                             : isCurrent
-                              ? "border border-accent bg-muted"
-                              : "border border-border bg-muted"
+                              ? "border-paper border-[1.5px]"
+                              : "mark-open"
                         }`}
-                      >
-                        {logged > 0 && <Check size={14} strokeWidth={3} />}
-                      </span>
-                      <span
-                        className={`truncate t-body ${
-                          isCurrent
-                            ? "font-semibold text-accent"
-                            : logged > 0
-                              ? "text-muted-foreground"
-                              : "font-medium text-foreground"
-                        }`}
-                      >
-                        {ex.name}
-                      </span>
+                      />
+                      <span className="truncate t-body">{ex.name}</span>
                     </span>
                     {logged > 0 && (
-                      <span className="shrink-0 t-label text-muted-foreground">
+                      <span
+                        className={`shrink-0 tnum t-label ${isCurrent ? "text-paper" : "text-ink-2"}`}
+                      >
                         {logged} {logged === 1 ? "set" : "sets"}
                       </span>
                     )}
@@ -311,26 +306,65 @@ function WorkoutPage() {
       )}
 
       {/* Bottom row: session summary (left) + View workout (right) */}
+      {/*
+        Primary action, and it sits in the bottom third on purpose.
+
+        A full-width inked bar rather than an 88px disc. Three reasons and none
+        of them is taste: nothing in this world is round; a bar is roughly four
+        times the tap area of the disc it replaces, which is what a sweaty hand
+        at arm's length actually needs; and the disc's own label had to sit
+        underneath it, so the button and the words describing it were two
+        objects. Here the button says what it does.
+      */}
+      <div className="mt-auto px-5 pb-4">
+        <button
+          onClick={() => {
+            if (inBlock) {
+              logNextInBlock();
+              flashLogged();
+            } else {
+              setSheetOpen(true);
+            }
+          }}
+          aria-label={inBlock ? "Log the next set in this block" : "Log a set"}
+          className="flex min-h-[72px] w-full items-center justify-between gap-3 bg-ink px-5 text-paper"
+        >
+          <span className="min-w-0 text-left">
+            <span className="block t-heading">{inBlock ? "Next set" : "Log set"}</span>
+            {inBlock && currentBlock && (
+              <span className="mt-0.5 block truncate tnum t-label">
+                {currentBlock.loggedInBlock + 1} of {currentBlock.targetSets} ·{" "}
+                {currentBlock.weight} × {currentBlock.reps}
+                {currentBlock.rpe != null ? ` @ ${currentBlock.rpe}` : ""}
+              </span>
+            )}
+          </span>
+          <Plus size={26} aria-hidden="true" className="shrink-0" />
+        </button>
+      </div>
+
       <div
-        className="mt-auto flex items-end justify-between px-5 pt-7"
+        className="rule-t flex items-end justify-between gap-4 px-5 pt-3"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
-        <div>
-          <div className="t-caption text-muted-foreground">This workout</div>
+        <div className="min-w-0">
+          <div className="t-caption text-ink-3">This workout</div>
           <div className="mt-1 flex items-baseline gap-4">
             <div>
-              <span className="t-stat">{sessSets.length}</span>{" "}
-              <span className="t-label text-muted-foreground">sets</span>
+              <span className="t-stat text-ink">{sessSets.length}</span>{" "}
+              <span className="t-label text-ink-2">sets</span>
             </div>
             <div>
-              <span className="t-stat">{new Set(sessSets.map((s) => s.exerciseId)).size}</span>{" "}
-              <span className="t-label text-muted-foreground">exercises</span>
+              <span className="t-stat text-ink">
+                {new Set(sessSets.map((s) => s.exerciseId)).size}
+              </span>{" "}
+              <span className="t-label text-ink-2">exercises</span>
             </div>
           </div>
         </div>
         <button
           onClick={() => setShowView(true)}
-          className="flex min-h-[44px] shrink-0 items-center rounded-full bg-surface px-4 py-2 t-body font-medium"
+          className="flex min-h-[44px] shrink-0 items-center t-action t-body"
         >
           View workout
         </button>
@@ -340,17 +374,17 @@ function WorkoutPage() {
 
       {showView && (
         <div
-          className="fixed inset-x-0 top-0 z-50 h-[100dvh] bg-background anim-backdrop"
+          className="fixed inset-x-0 top-0 z-50 h-[100dvh] bg-paper anim-backdrop"
           onClick={() => setShowView(false)}
         >
           <div
             className="mx-auto flex h-full max-w-md flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between gap-3 px-5 pt-14 pb-3">
+            <div className="rule-b flex items-center justify-between gap-3 px-5 pt-14 pb-3">
               <button
                 onClick={() => setShowView(false)}
-                className="-my-3 flex min-h-[44px] shrink-0 items-center t-body font-medium text-accent"
+                className="-my-3 flex min-h-[44px] shrink-0 items-center t-action t-body"
               >
                 Done
               </button>
@@ -369,11 +403,16 @@ function WorkoutPage() {
           key={loggedToast}
           role="status"
           aria-live="polite"
-          className="anim-toast pointer-events-none fixed bottom-36 left-1/2 z-[60] flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 t-label font-semibold text-background shadow-lg"
+          // A stamped block, not a floating pill. The shadow went with the
+          // radius: this world has no elevation, so a drop shadow was the one
+          // mark on the screen pretending the page had depth.
+          // bottom-52, not bottom-36. The log bar moved down into the thumb arc and
+          // the toast was still anchored where the old 88px disc used to sit, so
+          // the confirmation landed ON the button. Both are inked blocks, so they
+          // did not overlap so much as merge into one shape with two labels.
+          className="anim-toast pointer-events-none fixed bottom-52 left-1/2 z-[60] flex items-center gap-2 bg-ink px-4 py-2.5 t-label font-semibold text-paper"
         >
-          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-accent">
-            <Check size={11} strokeWidth={3.5} className="text-accent-foreground" />
-          </span>
+          <Check size={13} strokeWidth={3.5} aria-hidden="true" />
           Set logged
         </div>
       )}

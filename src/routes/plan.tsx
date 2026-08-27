@@ -122,7 +122,7 @@ function PlanPage() {
       <header className="px-5 pb-4 pt-14">
         <h1 className="t-title">Plan</h1>
         {nothingPlanned && (
-          <p className="mt-2 t-label text-muted-foreground">
+          <p className="mt-2 t-label text-ink-2">
             The week is empty. Any day you tap becomes a training day.
           </p>
         )}
@@ -168,7 +168,7 @@ function PlanPage() {
                 className={
                   "group-row w-full text-left " +
                   (index > 0 ? "group-row-sep " : "") +
-                  (isToday ? "bg-muted" : "")
+                  (isToday ? "bg-wash" : "")
                 }
                 aria-label={`${WEEKDAY_FULL[index]}, ${
                   planned ? `${title}${lifts.length ? `: ${lifts.join(", ")}` : ""}` : "rest day"
@@ -178,27 +178,23 @@ function PlanPage() {
                     Monday-first labels, same caption type, same muted colour.
                     Vertical because a row has to hold three or four lift names
                     and a seven-across grid cannot. */}
-                <span aria-hidden="true" className="w-12 shrink-0 t-caption text-muted-foreground">
+                <span aria-hidden="true" className="w-12 shrink-0 t-caption text-ink-2">
                   {label}
                 </span>
                 <span className="min-w-0 flex-1" aria-hidden="true">
-                  <span
-                    className={"block truncate t-body " + (planned ? "" : "text-muted-foreground")}
-                  >
+                  <span className={"block truncate t-body " + (planned ? "" : "text-ink-2")}>
                     {title}
                   </span>
                   {detail && (
-                    <span className="mt-0.5 block truncate t-label text-muted-foreground">
-                      {detail}
-                    </span>
+                    <span className="mt-0.5 block truncate t-label text-ink-2">{detail}</span>
                   )}
                 </span>
                 {isToday && (
-                  <span aria-hidden="true" className="shrink-0 t-caption text-muted-foreground">
+                  <span aria-hidden="true" className="shrink-0 t-caption text-ink-2">
                     Today
                   </span>
                 )}
-                <span className="shrink-0 text-accent" aria-hidden="true">
+                <span className="shrink-0 t-action" aria-hidden="true">
                   →
                 </span>
               </button>

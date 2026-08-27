@@ -32,12 +32,12 @@ function HistoryPage() {
   return (
     <AppShell>
       <header className="flex items-center justify-between px-5 pb-4 pt-14">
-        <h1 className="t-title text-foreground">History</h1>
+        <h1 className="t-title text-ink">History</h1>
         <div
           data-swipe-ignore
           role="group"
           aria-label="History view"
-          className="flex shrink-0 gap-1 rounded-full bg-muted p-1"
+          className="flex shrink-0 gap-1 bg-wash p-1"
         >
           {/* The pills stay compact so they sit on the same line as the title,
               so the 44px target comes from an inset pseudo-element overlay
@@ -48,8 +48,8 @@ function HistoryPage() {
             onClick={() => setView("weekly")}
             aria-pressed={view === "weekly"}
             className={
-              "relative rounded-full px-3 py-1.5 t-label font-medium transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] " +
-              (view === "weekly" ? "bg-accent text-accent-foreground" : "text-muted-foreground")
+              "relative px-3 py-1.5 t-label font-medium transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] " +
+              (view === "weekly" ? "bg-ink text-paper" : "text-ink-2")
             }
           >
             Weekly
@@ -58,8 +58,8 @@ function HistoryPage() {
             onClick={() => setView("calendar")}
             aria-pressed={view === "calendar"}
             className={
-              "relative rounded-full px-3 py-1.5 t-label font-medium transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] " +
-              (view === "calendar" ? "bg-accent text-accent-foreground" : "text-muted-foreground")
+              "relative px-3 py-1.5 t-label font-medium transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] " +
+              (view === "calendar" ? "bg-ink text-paper" : "text-ink-2")
             }
           >
             Calendar

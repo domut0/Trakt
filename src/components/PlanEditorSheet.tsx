@@ -247,17 +247,17 @@ export function PlanEditorSheet({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-sm flex-col rounded-3xl bg-surface p-5 anim-popup"
+        className="bg-paper rule-heavy-t flex max-h-[85vh] w-full max-w-sm flex-col p-5 anim-popup"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-border" />
+        <div className="mx-auto mb-3 h-1 w-10 shrink-0 bg-border" />
 
         <div className="flex shrink-0 items-center justify-between pb-4">
           <h2 className="t-heading">{dayName}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="-mr-2 flex min-h-[44px] items-center px-2 t-label font-medium text-muted-foreground"
+            className="-mr-2 flex min-h-[44px] items-center px-2 t-label font-medium text-ink-2"
           >
             Done
           </button>
@@ -274,15 +274,12 @@ export function PlanEditorSheet({
             value={current.name}
             onChange={(e) => commit({ ...current, name: e.target.value })}
             placeholder="Name this day"
-            className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
+            className="min-h-[44px] w-full bg-wash px-3 t-body outline-none placeholder:text-ink-2 focus:ring-1 focus:ring-ink"
           />
 
           <div className="mt-5 flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <label
-                htmlFor="plan-start-time"
-                className="mb-2 block t-caption text-muted-foreground"
-              >
+              <label htmlFor="plan-start-time" className="mb-2 block t-caption text-ink-2">
                 Start time
               </label>
               <input
@@ -291,11 +288,11 @@ export function PlanEditorSheet({
                 aria-label="Start time"
                 value={toTimeString(current.atMinutes)}
                 onChange={(e) => handleTimeChange(e.target.value)}
-                className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body outline-none focus:ring-1 focus:ring-accent"
+                className="min-h-[44px] w-full bg-wash px-3 t-body outline-none focus:ring-1 focus:ring-ink"
               />
             </div>
             <div className="min-w-0 flex-1">
-              <label htmlFor="plan-duration" className="mb-2 block t-caption text-muted-foreground">
+              <label htmlFor="plan-duration" className="mb-2 block t-caption text-ink-2">
                 Duration (min)
               </label>
               <input
@@ -310,15 +307,15 @@ export function PlanEditorSheet({
                 value={current.durationMinutes ?? ""}
                 onChange={(e) => handleDurationChange(e.target.value)}
                 placeholder={String(DEFAULT_PLANNED_DURATION_MINUTES)}
-                className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent disabled:opacity-30"
+                className="min-h-[44px] w-full bg-wash px-3 t-body outline-none placeholder:text-ink-2 focus:ring-1 focus:ring-ink disabled:opacity-30"
               />
             </div>
           </div>
 
           {chosen.length > 0 && (
             <div className="mt-5">
-              <h3 className="mb-2 t-caption text-muted-foreground">Lifts</h3>
-              <div className="group-list bg-muted">
+              <h3 className="mb-2 t-caption text-ink-2">Lifts</h3>
+              <div className="group-list bg-wash">
                 {chosen.map((exercise, idx) => (
                   <div
                     key={exercise.id}
@@ -335,7 +332,7 @@ export function PlanEditorSheet({
                         onClick={() => moveLift(idx, -1)}
                         disabled={idx === 0}
                         aria-label={`Move ${exercise.name} up`}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground disabled:opacity-30"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-2 disabled:opacity-30"
                       >
                         <ArrowUpIcon />
                       </button>
@@ -344,7 +341,7 @@ export function PlanEditorSheet({
                         onClick={() => moveLift(idx, 1)}
                         disabled={idx === chosen.length - 1}
                         aria-label={`Move ${exercise.name} down`}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground disabled:opacity-30"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-2 disabled:opacity-30"
                       >
                         <ArrowDownIcon />
                       </button>
@@ -352,7 +349,7 @@ export function PlanEditorSheet({
                         type="button"
                         onClick={() => removeLift(idx)}
                         aria-label={`Remove ${exercise.name}`}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-2"
                       >
                         <RemoveIcon />
                       </button>
@@ -364,7 +361,7 @@ export function PlanEditorSheet({
           )}
 
           <div className="mt-5">
-            <h3 className="mb-2 t-caption text-muted-foreground">Add a lift</h3>
+            <h3 className="mb-2 t-caption text-ink-2">Add a lift</h3>
             <label htmlFor="plan-lift-search" className="sr-only">
               Search lifts
             </label>
@@ -374,10 +371,10 @@ export function PlanEditorSheet({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search lifts"
-              className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
+              className="min-h-[44px] w-full bg-wash px-3 t-body outline-none placeholder:text-ink-2 focus:ring-1 focus:ring-ink"
             />
             {candidates.length > 0 ? (
-              <div className="mt-2 max-h-56 overflow-y-auto group-list bg-muted">
+              <div className="mt-2 max-h-56 overflow-y-auto group-list bg-wash">
                 {candidates.map((exercise, idx) => (
                   <button
                     key={exercise.id}
@@ -386,14 +383,14 @@ export function PlanEditorSheet({
                     className={"group-row w-full text-left " + (idx > 0 ? "group-row-sep" : "")}
                   >
                     <span className="min-w-0 truncate t-body font-medium">{exercise.name}</span>
-                    <span className="shrink-0 t-caption text-muted-foreground">
+                    <span className="shrink-0 t-caption text-ink-2">
                       {exercise.type === "main" ? "Main" : "Accessory"}
                     </span>
                   </button>
                 ))}
               </div>
             ) : (
-              <p className="mt-3 t-label text-muted-foreground">
+              <p className="mt-3 t-label text-ink-2">
                 {q
                   ? `Nothing in the library matches "${query.trim()}".`
                   : "Every lift is on the day already."}
@@ -405,7 +402,7 @@ export function PlanEditorSheet({
             <button
               type="button"
               onClick={() => setPlannedDay(weekdayIndex, null)}
-              className="mt-5 flex min-h-[44px] w-full items-center justify-center rounded-xl bg-muted t-body font-medium text-muted-foreground"
+              className="mt-5 flex min-h-[44px] w-full items-center justify-center bg-wash t-body font-medium text-ink-2"
             >
               Make this a rest day
             </button>

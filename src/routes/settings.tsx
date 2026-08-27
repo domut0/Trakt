@@ -245,15 +245,15 @@ function SettingsPage() {
       </header>
 
       <Section title="Units" delay={0}>
-        <div className="flex gap-2 p-3">
+        <div className="m-3 flex border-[1.5px] border-ink divide-x-[1.5px] divide-ink">
           {(["lbs", "kg"] as const).map((u) => (
             <button
               key={u}
               type="button"
               onClick={() => setUnit(u)}
               className={
-                "flex-1 rounded-full py-2 t-body font-medium transition-colors " +
-                (unit === u ? "bg-foreground text-background" : "bg-muted text-muted-foreground")
+                "min-h-[44px] flex-1 t-body font-medium transition-colors " +
+                (unit === u ? "bg-ink text-paper" : "text-ink-2")
               }
             >
               {u}
@@ -266,7 +266,7 @@ function SettingsPage() {
         <div className="group-row">
           <div>
             <div className="t-body">Charts tab</div>
-            <div className="t-label text-muted-foreground">Show the Charts tab in the nav.</div>
+            <div className="t-label text-ink-2">Show the Charts tab in the nav.</div>
           </div>
           <Toggle
             checked={chartsEnabled}
@@ -282,9 +282,7 @@ function SettingsPage() {
         <div className="group-row group-row-sep">
           <div>
             <div className="t-body">Plan tab</div>
-            <div className="t-label text-muted-foreground">
-              A weekly template for your main lifts.
-            </div>
+            <div className="t-label text-ink-2">A weekly template for your main lifts.</div>
           </div>
           <Toggle
             checked={planEnabled}
@@ -298,9 +296,7 @@ function SettingsPage() {
         <div className="group-row">
           <div>
             <div className="t-body">Daily targets</div>
-            <div className="t-label text-muted-foreground">
-              Show goal progress on the daily log.
-            </div>
+            <div className="t-label text-ink-2">Show goal progress on the daily log.</div>
           </div>
           <Toggle
             checked={targetsEnabled}
@@ -319,9 +315,7 @@ function SettingsPage() {
         <div className="group-row group-row-sep">
           <div>
             <div className="t-body">Habits</div>
-            <div className="t-label text-muted-foreground">
-              Adds a daily checklist to the Today tab.
-            </div>
+            <div className="t-label text-ink-2">Adds a daily checklist to the Today tab.</div>
           </div>
           <Toggle
             checked={habitsEnabled}
@@ -333,9 +327,7 @@ function SettingsPage() {
         <div className="group-row group-row-sep">
           <div>
             <div className="t-body">Food logging</div>
-            <div className="t-label text-muted-foreground">
-              Track meals, foods, and daily macros.
-            </div>
+            <div className="t-label text-ink-2">Track meals, foods, and daily macros.</div>
           </div>
           <Toggle
             checked={!!foodEnabled}
@@ -358,11 +350,9 @@ function SettingsPage() {
             >
               <div>
                 <div className="t-body">Manage meals</div>
-                <div className="t-label text-muted-foreground">
-                  Customise meal names, order, and times.
-                </div>
+                <div className="t-label text-ink-2">Customise meal names, order, and times.</div>
               </div>
-              <span className="text-accent" aria-hidden="true">
+              <span className="t-action" aria-hidden="true">
                 →
               </span>
             </button>
@@ -373,11 +363,11 @@ function SettingsPage() {
             >
               <div>
                 <div className="t-body">Manage recipes</div>
-                <div className="t-label text-muted-foreground">
+                <div className="t-label text-ink-2">
                   Create and edit custom recipes and batch meals.
                 </div>
               </div>
-              <span className="text-accent" aria-hidden="true">
+              <span className="t-action" aria-hidden="true">
                 →
               </span>
             </button>
@@ -387,9 +377,7 @@ function SettingsPage() {
         <div className="group-row group-row-sep">
           <div>
             <div className="t-body">Calculators</div>
-            <div className="t-label text-muted-foreground">
-              Add plate loading and 1RM tools here.
-            </div>
+            <div className="t-label text-ink-2">Add plate loading and 1RM tools here.</div>
           </div>
           <Toggle
             checked={toolsEnabled}
@@ -406,9 +394,9 @@ function SettingsPage() {
             >
               <div>
                 <div className="t-body">Plate calculator</div>
-                <div className="t-label text-muted-foreground">Work out what to load per side.</div>
+                <div className="t-label text-ink-2">Work out what to load per side.</div>
               </div>
-              <span className="text-accent" aria-hidden="true">
+              <span className="t-action" aria-hidden="true">
                 →
               </span>
             </button>
@@ -419,11 +407,9 @@ function SettingsPage() {
             >
               <div>
                 <div className="t-body">1RM estimator</div>
-                <div className="t-label text-muted-foreground">
-                  Estimate a max from a weight and reps.
-                </div>
+                <div className="t-label text-ink-2">Estimate a max from a weight and reps.</div>
               </div>
-              <span className="text-accent" aria-hidden="true">
+              <span className="t-action" aria-hidden="true">
                 →
               </span>
             </button>
@@ -435,9 +421,9 @@ function SettingsPage() {
         <button type="button" onClick={exportJson} className="group-row w-full text-left">
           <div>
             <div className="t-body">Export backup</div>
-            <div className="t-label text-muted-foreground">Download all data as JSON.</div>
+            <div className="t-label text-ink-2">Download all data as JSON.</div>
           </div>
-          <span className="text-accent" aria-hidden="true">
+          <span className="t-action" aria-hidden="true">
             →
           </span>
         </button>
@@ -448,11 +434,9 @@ function SettingsPage() {
         >
           <div>
             <div className="t-body">Export sets (CSV)</div>
-            <div className="t-label text-muted-foreground">
-              Download set history for spreadsheets.
-            </div>
+            <div className="t-label text-ink-2">Download set history for spreadsheets.</div>
           </div>
-          <span className="text-accent" aria-hidden="true">
+          <span className="t-action" aria-hidden="true">
             →
           </span>
         </button>
@@ -463,18 +447,16 @@ function SettingsPage() {
         >
           <div>
             <div className="t-body">Export daily log (CSV)</div>
-            <div className="t-label text-muted-foreground">
-              Download nutrition and bodyweight history.
-            </div>
+            <div className="t-label text-ink-2">Download nutrition and bodyweight history.</div>
           </div>
-          <span className="text-accent" aria-hidden="true">
+          <span className="t-action" aria-hidden="true">
             →
           </span>
         </button>
         <label className="group-row group-row-sep w-full cursor-pointer text-left">
           <div>
             <div className="t-body">Import backup</div>
-            <div className="t-label text-muted-foreground">Restore from a previous export.</div>
+            <div className="t-label text-ink-2">Restore from a previous export.</div>
           </div>
           <input
             type="file"
@@ -482,7 +464,7 @@ function SettingsPage() {
             className="hidden"
             onChange={handleFileChange}
           />
-          <span className="text-accent" aria-hidden="true">
+          <span className="t-action" aria-hidden="true">
             →
           </span>
         </label>
@@ -493,11 +475,9 @@ function SettingsPage() {
         >
           <div>
             <div className="t-body">Import MyFitnessPal diary</div>
-            <div className="t-label text-muted-foreground">
-              Load foods and macros from an HTML export.
-            </div>
+            <div className="t-label text-ink-2">Load foods and macros from an HTML export.</div>
           </div>
-          <span className="text-accent" aria-hidden="true">
+          <span className="t-action" aria-hidden="true">
             →
           </span>
         </button>
@@ -505,7 +485,7 @@ function SettingsPage() {
         <div className="group-row-sep p-4 space-y-2">
           <div>
             <div className="t-body">USDA API key</div>
-            <div className="t-label text-muted-foreground">
+            <div className="t-label text-ink-2">
               Required for USDA FoodData Central search. The shared demo key allows only 10 requests
               an hour.
             </div>
@@ -516,15 +496,15 @@ function SettingsPage() {
             value={usdaKey}
             onChange={(e) => handleUsdaKeyChange(e.target.value)}
             placeholder="Paste your USDA API key"
-            className="min-h-[44px] w-full rounded-xl bg-muted px-3 t-body text-foreground outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
+            className="min-h-[44px] w-full bg-wash px-3 t-body text-ink outline-none placeholder:text-ink-2 focus:ring-1 focus:ring-ink"
           />
-          <div className="t-label text-muted-foreground">
+          <div className="t-label text-ink-2">
             Stored on this device only and not included in backups. Get a free key at{" "}
             <a
               href="https://fdc.nal.usda.gov/api-key-signup.html"
               target="_blank"
               rel="noreferrer"
-              className="text-accent underline"
+              className="t-action underline"
             >
               fdc.nal.usda.gov
             </a>
@@ -533,12 +513,12 @@ function SettingsPage() {
         </div>
 
         {importError && (
-          <div className="group-row-sep px-5 py-3 t-label text-destructive">{importError}</div>
+          <div className="group-row-sep px-5 py-3 t-label text-signal">{importError}</div>
         )}
 
         {pendingImport && (
           <div className="group-row-sep space-y-3 p-4">
-            <div className="t-label text-muted-foreground">
+            <div className="t-label text-ink-2">
               Backup format v{pendingImport.version}
               {pendingImport.version < BACKUP_VERSION
                 ? ", written by an older version of the app"
@@ -547,7 +527,7 @@ function SettingsPage() {
               device, along with your unit and feature switches. This cannot be undone.
             </div>
             {losses.length > 0 && (
-              <div className="t-label text-destructive">
+              <div className="t-label text-signal">
                 Importing this file deletes {joinList(losses)}. The file contains none of it. Export
                 a backup first if you want to keep it.
               </div>
@@ -556,7 +536,7 @@ function SettingsPage() {
               <button
                 type="button"
                 onClick={cancelImport}
-                className="flex-1 rounded-full bg-muted py-2 t-body font-medium text-muted-foreground"
+                className="flex-1 bg-wash py-2 t-body font-medium text-ink-2"
               >
                 Cancel
               </button>
@@ -570,10 +550,8 @@ function SettingsPage() {
                 type="button"
                 onClick={confirmImport}
                 className={
-                  "flex-1 rounded-full py-2 t-body font-medium " +
-                  (losses.length > 0
-                    ? "bg-destructive text-white"
-                    : "bg-foreground text-background")
+                  "flex-1 py-2 t-body font-medium " +
+                  (losses.length > 0 ? "bg-signal text-white" : "bg-ink text-paper")
                 }
               >
                 Replace all data
@@ -583,9 +561,7 @@ function SettingsPage() {
         )}
 
         {importSuccess && (
-          <div className="group-row-sep px-5 py-3 t-label text-muted-foreground">
-            Backup imported.
-          </div>
+          <div className="group-row-sep px-5 py-3 t-label text-ink-2">Backup imported.</div>
         )}
       </Section>
 
@@ -601,18 +577,16 @@ function SettingsPage() {
             className="group-row w-full text-left"
           >
             <div>
-              <div className="t-body text-destructive">Clear all data</div>
-              <div className="t-label text-muted-foreground">
-                Wipe all workouts and start fresh.
-              </div>
+              <div className="t-body text-signal">Clear all data</div>
+              <div className="t-label text-ink-2">Wipe all workouts and start fresh.</div>
             </div>
-            <span className="text-destructive" aria-hidden="true">
+            <span className="text-signal" aria-hidden="true">
               →
             </span>
           </button>
         ) : (
           <div className="space-y-3 p-4">
-            <div className="t-label text-muted-foreground">
+            <div className="t-label text-ink-2">
               This permanently deletes every split, session, and set on this device and resets your
               settings. The exercise library is kept. This cannot be undone.
             </div>
@@ -620,14 +594,14 @@ function SettingsPage() {
               <button
                 type="button"
                 onClick={() => setShowClearConfirm(false)}
-                className="flex-1 rounded-full bg-muted py-2 t-body font-medium text-muted-foreground"
+                className="flex-1 bg-wash py-2 t-body font-medium text-ink-2"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmClear}
-                className="flex-1 rounded-full bg-destructive py-2 t-body font-medium text-white"
+                className="flex-1 bg-signal py-2 t-body font-medium text-white"
               >
                 Clear all data
               </button>
@@ -636,7 +610,7 @@ function SettingsPage() {
         )}
       </Section>
 
-      <p className="px-5 pt-6 t-label text-muted-foreground">
+      <p className="px-5 pt-6 t-label text-ink-2">
         v0.1 · local first · no accounts, sync optional.
       </p>
 
@@ -768,7 +742,10 @@ function Section({
 }) {
   return (
     <section className="section-gap anim-fade-up" style={{ animationDelay: `${delay}ms` }}>
-      <h2 className="group-header t-caption">{title}</h2>
+      {/* px-5: the list below cancels group-list's own -20px bleed with mx-5,
+          so it reaches the trim, but the heading has no gutter of its own and
+          was sitting flush against the left edge of the screen. */}
+      <h2 className="group-header t-caption px-5">{title}</h2>
       <div className="group-list mx-5">{children}</div>
     </section>
   );

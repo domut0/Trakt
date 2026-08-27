@@ -770,9 +770,12 @@ async function captureToday(page) {
   await page.keyboard.press("Escape");
   await settle(page);
 
-  // Backfilling an older day from the consistency strip, which is the other way
-  // in to the same sheet.
-  await page.locator('[aria-label^="Log for "]').first().click();
+  // Backfilling an older day from the week strip, which is the other way in to
+  // the same sheet. The old consistency strip labelled its days "Log for ...";
+  // WeekStrip labels them with the full date.
+  await page.getByRole("button", { name: "Monday, August 17, 2026" }).click();
+  await settle(page);
+  await page.getByRole("button", { name: /Edit daily numbers/ }).click();
   await settle(page, 600);
   await shot(page, "13-day-editor-backfill-older-day");
   await page.keyboard.press("Escape");
@@ -783,7 +786,7 @@ async function captureTargetsOff(page) {
   await gotoTab(page, "/settings", "text=Daily targets");
   await page.getByRole("switch", { name: "Daily targets" }).click();
   await settle(page);
-  await gotoTab(page, "/", "text=Consistency");
+  await gotoTab(page, "/", '[data-testid="timeline-scroll-container"]');
   await shot(page, "14-today-targets-off-macro-ring");
   await gotoTab(page, "/settings", "text=Daily targets");
   await page.getByRole("switch", { name: "Daily targets" }).click();
@@ -877,7 +880,7 @@ async function captureSettings(page) {
 }
 
 async function captureWorkoutFlow(page) {
-  await gotoTab(page, "/", "text=Consistency");
+  await gotoTab(page, "/", '[data-testid="timeline-scroll-container"]');
 
   await page.getByRole("button", { name: "Start workout" }).click();
   await settle(page, 500);
@@ -950,7 +953,7 @@ async function captureWorkoutFlow(page) {
   await settle(page, 600);
   await shot(page, "5b-workout-summary-no-records");
   await page.getByRole("button", { name: "Done" }).click();
-  await page.waitForSelector("text=Consistency", { timeout: 15_000 });
+  await page.waitForSelector('[data-testid="timeline-scroll-container"]', { timeout: 15_000 });
   await settle(page, 500);
 
   // The same screen when the workout beat something. Two records, so the
@@ -963,7 +966,7 @@ async function captureWorkoutFlow(page) {
   await settle(page, 600);
   await shot(page, "5c-workout-summary-record");
   await page.getByRole("button", { name: "Done" }).click();
-  await page.waitForSelector("text=Consistency", { timeout: 15_000 });
+  await page.waitForSelector('[data-testid="timeline-scroll-container"]', { timeout: 15_000 });
   await settle(page, 500);
 
   // An empty workout has no summary: ending one is a cancel, and it goes
@@ -971,7 +974,7 @@ async function captureWorkoutFlow(page) {
   // since the picture is just the Today screen.
   await startWorkout(page);
   await endWorkoutAt(page, 3);
-  await page.waitForSelector("text=Consistency", { timeout: 15_000 });
+  await page.waitForSelector('[data-testid="timeline-scroll-container"]', { timeout: 15_000 });
   if (await page.locator("text=Finished").count()) {
     throw new Error("Ending a workout with nothing logged should not show a summary.");
   }
@@ -1031,7 +1034,7 @@ async function endWorkoutAt(page, minutes) {
 }
 
 async function captureSessionDetail(page) {
-  await gotoTab(page, "/", "text=Consistency");
+  await gotoTab(page, "/", '[data-testid="timeline-scroll-container"]');
   await scrollMain(page, 99_999);
   const sessionRow = page.locator("section", { hasText: "Workouts" }).getByRole("button").first();
   if (await sessionRow.count()) {

@@ -202,10 +202,8 @@ function ChartsPage() {
               onClick={() => setMetricKey(m.key)}
               aria-pressed={metricKey === m.key}
               className={
-                "flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-full px-4 py-2 t-label font-medium transition-colors duration-150 " +
-                (metricKey === m.key
-                  ? "bg-foreground text-background"
-                  : "bg-surface text-muted-foreground")
+                "flex min-h-[44px] items-center justify-center whitespace-nowrap px-4 py-2 t-label font-medium transition-colors duration-150 " +
+                (metricKey === m.key ? "bg-ink text-paper" : "text-ink-2")
               }
             >
               {m.label}
@@ -231,10 +229,8 @@ function ChartsPage() {
               className={
                 // min-w matters as much as min-h here: the "7" chip is a single
                 // character and would otherwise be a 34px-wide tap target.
-                "flex min-h-[44px] min-w-[44px] items-center justify-center whitespace-nowrap rounded-full px-3.5 py-2 t-label font-medium transition-colors duration-150 tnum " +
-                (rangeDays === r.days
-                  ? "bg-foreground text-background"
-                  : "bg-surface text-muted-foreground")
+                "flex min-h-[44px] min-w-[44px] items-center justify-center whitespace-nowrap px-3.5 py-2 t-label font-medium transition-colors duration-150 tnum " +
+                (rangeDays === r.days ? "bg-ink text-paper" : "text-ink-2")
               }
             >
               {r.label}
@@ -243,27 +239,26 @@ function ChartsPage() {
         </div>
       </div>
 
-      <div
-        className="mx-5 rounded-2xl bg-surface p-5 anim-fade-up"
-        style={{ animationDelay: "40ms" }}
-      >
+      <div className="mx-5 p-5 anim-fade-up" style={{ animationDelay: "40ms" }}>
         {/* Inline segmented control on chart card to toggle raw vs smoothed series */}
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="t-caption text-muted-foreground truncate">{metric.label}</h2>
+          <h2 className="t-caption text-ink-2 truncate">{metric.label}</h2>
           <div
             role="group"
             aria-label="Series"
-            className="inline-flex rounded-xl bg-muted p-1 gap-1"
+            // One ruled box split in two, not two floating chips. The selected
+            // half is inked; it used to be marked with shadow-xs, which on a
+            // page with no elevation left the two states differing only by the
+            // shade of their text.
+            className="inline-flex border-[1.5px] border-ink divide-x-[1.5px] divide-ink"
           >
             <button
               type="button"
               onClick={() => setViewMode("daily")}
               aria-pressed={viewMode === "daily"}
               className={
-                "flex min-h-[44px] min-w-[60px] items-center justify-center rounded-lg px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
-                (viewMode === "daily"
-                  ? "bg-surface text-foreground shadow-xs"
-                  : "text-muted-foreground")
+                "flex min-h-[44px] min-w-[60px] items-center justify-center px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
+                (viewMode === "daily" ? "bg-ink text-paper" : "text-ink-2")
               }
             >
               Daily
@@ -273,10 +268,8 @@ function ChartsPage() {
               onClick={() => setViewMode("avg7")}
               aria-pressed={viewMode === "avg7"}
               className={
-                "flex min-h-[44px] min-w-[76px] items-center justify-center rounded-lg px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
-                (viewMode === "avg7"
-                  ? "bg-surface text-foreground shadow-xs"
-                  : "text-muted-foreground")
+                "flex min-h-[44px] min-w-[76px] items-center justify-center px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
+                (viewMode === "avg7" ? "bg-ink text-paper" : "text-ink-2")
               }
             >
               7-day avg
@@ -297,7 +290,7 @@ function ChartsPage() {
 
         {/* Rate readout derived from linear regression slope */}
         {rateReadoutText && (
-          <div className="mt-3 text-center t-label font-medium text-muted-foreground tnum">
+          <div className="mt-3 text-center t-label font-medium text-ink-2 tnum">
             Trend: {rateReadoutText}
           </div>
         )}
@@ -305,24 +298,24 @@ function ChartsPage() {
         {/* Grouped 2x2 stats grid with hairline separators: Latest, Average, Range, Change */}
         <div className="mt-4 grid grid-cols-2 pt-4 hairline-t">
           <div className="pr-3 pb-3">
-            <div className="t-caption text-muted-foreground">Latest</div>
+            <div className="t-caption text-ink-2">Latest</div>
             <div className="t-stat mt-1">
               {latestValStr}
               {currentPoints.length > 0 && (
-                <span className="ml-1 t-label text-muted-foreground">{metricUnit}</span>
+                <span className="ml-1 t-label text-ink-2">{metricUnit}</span>
               )}
             </div>
           </div>
-          <div className="border-l border-border pl-3 pb-3">
-            <div className="t-caption text-muted-foreground">Average</div>
+          <div className="border-l border-rule pl-3 pb-3">
+            <div className="t-caption text-ink-2">Average</div>
             <div className="t-stat mt-1">{avgValStr}</div>
           </div>
           <div className="hairline-t pr-3 pt-3">
-            <div className="t-caption text-muted-foreground">Range</div>
+            <div className="t-caption text-ink-2">Range</div>
             <div className="t-stat mt-1">{rangeStr}</div>
           </div>
-          <div className="hairline-t border-l border-border pl-3 pt-3">
-            <div className="t-caption text-muted-foreground">Change</div>
+          <div className="hairline-t border-l border-rule pl-3 pt-3">
+            <div className="t-caption text-ink-2">Change</div>
             <div className="t-stat mt-1">{changeStr}</div>
           </div>
         </div>
