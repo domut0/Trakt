@@ -519,20 +519,20 @@ export function AddFoodSheet({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-sm flex-col rounded-3xl bg-surface p-5 anim-popup"
+        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-border" />
+        <div className="mx-auto mb-3 h-1 w-10 shrink-0 bg-border" />
 
         <div className="flex shrink-0 items-center justify-between pb-3">
           <div>
-            <div className="t-caption text-muted-foreground">{meal.name}</div>
+            <div className="t-caption text-ink-2">{meal.name}</div>
             <h2 className="t-heading font-semibold tracking-tight">Add food</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="-mr-2 flex min-h-[44px] items-center px-2 t-label font-medium text-muted-foreground hover:text-foreground"
+            className="-mr-2 flex min-h-[44px] items-center px-2 t-label font-medium text-ink-2 hover:text-ink"
           >
             Cancel
           </button>
@@ -550,13 +550,13 @@ export function AddFoodSheet({
                   value={query}
                   onChange={(e) => handleQueryChange(e.target.value)}
                   placeholder="Search food or type a name"
-                  className="min-h-[44px] w-full rounded-xl bg-muted pl-3 pr-12 t-body text-foreground outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-accent"
+                  className="min-h-[44px] w-full bg-wash pl-3 pr-12 t-body text-ink outline-none placeholder:text-ink-2 focus:ring-1 focus:ring-accent"
                 />
                 <button
                   type="button"
                   onClick={() => setScannerOpen(true)}
                   aria-label="Scan barcode"
-                  className="absolute right-1 flex min-h-[44px] min-w-[44px] items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-1 flex min-h-[44px] min-w-[44px] items-center justify-center text-ink-2 hover:text-ink transition-colors"
                 >
                   <BarcodeScanIcon />
                 </button>
@@ -567,10 +567,10 @@ export function AddFoodSheet({
                 <button
                   type="button"
                   onClick={() => handleTabClick("local")}
-                  className={`flex min-h-[44px] shrink-0 items-center rounded-full px-3 py-2 t-label font-medium transition-colors ${
+                  className={`flex min-h-[44px] shrink-0 items-center px-3 py-2 t-label font-medium transition-colors ${
                     activeSource === "local"
                       ? "bg-foreground text-background"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
+                      : "bg-wash text-ink-2 hover:text-ink"
                   }`}
                 >
                   Your food ({localCount})
@@ -578,10 +578,10 @@ export function AddFoodSheet({
                 <button
                   type="button"
                   onClick={() => handleTabClick("off")}
-                  className={`flex min-h-[44px] shrink-0 items-center rounded-full px-3 py-2 t-label font-medium transition-colors ${
+                  className={`flex min-h-[44px] shrink-0 items-center px-3 py-2 t-label font-medium transition-colors ${
                     activeSource === "off"
                       ? "bg-foreground text-background"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
+                      : "bg-wash text-ink-2 hover:text-ink"
                   }`}
                 >
                   Open Food Facts
@@ -590,10 +590,10 @@ export function AddFoodSheet({
                 <button
                   type="button"
                   onClick={() => handleTabClick("usda")}
-                  className={`flex min-h-[44px] shrink-0 items-center rounded-full px-3 py-2 t-label font-medium transition-colors ${
+                  className={`flex min-h-[44px] shrink-0 items-center px-3 py-2 t-label font-medium transition-colors ${
                     activeSource === "usda"
                       ? "bg-foreground text-background"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
+                      : "bg-wash text-ink-2 hover:text-ink"
                   }`}
                 >
                   USDA{usdaState.status === "success" ? ` (${usdaState.results.length})` : ""}
@@ -605,13 +605,13 @@ export function AddFoodSheet({
                 <>
                   {/* Recipe results if available */}
                   {filteredRecipes.length > 0 && (
-                    <div className="group-list bg-muted">
+                    <div className="group-list bg-wash">
                       <div className="flex items-center justify-between px-3 pt-2 pb-1">
-                        <span className="t-caption text-muted-foreground">Recipes</span>
+                        <span className="t-caption text-ink-2">Recipes</span>
                         <button
                           type="button"
                           onClick={() => setRecipeEditorOpen(true)}
-                          className="flex min-h-[44px] items-center px-1 t-label font-semibold text-accent"
+                          className="flex min-h-[44px] items-center px-1 t-label t-action"
                         >
                           + New recipe
                         </button>
@@ -623,26 +623,24 @@ export function AddFoodSheet({
                             key={r.id}
                             type="button"
                             onClick={() => handleSelectRecipe(r)}
-                            className={`group-row w-full text-left transition-colors hover:bg-surface/50 ${
+                            className={`group-row w-full text-left transition-colors ${
                               idx > 0 ? "group-row-sep" : ""
                             }`}
                           >
                             <div className="min-w-0 flex-1">
-                              <div className="truncate t-body font-medium text-foreground">
-                                {r.name}
-                              </div>
-                              <div className="truncate t-label text-muted-foreground">
+                              <div className="truncate t-body font-medium text-ink">{r.name}</div>
+                              <div className="truncate t-label text-ink-2">
                                 {r.servings} {r.servings === 1 ? "serving" : "servings"}
                                 {r.note ? ` · ${r.note}` : ""}
                               </div>
                             </div>
                             <div className="shrink-0 text-right">
                               {perServing.calories !== undefined && (
-                                <div className="t-body font-semibold text-foreground">
+                                <div className="t-body font-semibold text-ink">
                                   {Math.round(perServing.calories)} cal
                                 </div>
                               )}
-                              <div className="t-label text-muted-foreground">per serving</div>
+                              <div className="t-label text-ink-2">per serving</div>
                             </div>
                           </button>
                         );
@@ -652,36 +650,30 @@ export function AddFoodSheet({
 
                   {/* Catalogue results if matched */}
                   {filteredFoods.length > 0 && (
-                    <div className="group-list bg-muted">
-                      <div className="px-3 pt-2 pb-1 t-caption text-muted-foreground">
-                        Food library
-                      </div>
+                    <div className="group-list bg-wash">
+                      <div className="px-3 pt-2 pb-1 t-caption text-ink-2">Food library</div>
                       {filteredFoods.map((f, idx) => (
                         <button
                           key={f.id}
                           type="button"
                           onClick={() => handleSelectFood(f)}
-                          className={`group-row w-full text-left transition-colors hover:bg-surface/50 ${
+                          className={`group-row w-full text-left transition-colors ${
                             idx > 0 ? "group-row-sep" : ""
                           }`}
                         >
                           <div className="min-w-0 flex-1">
-                            <div className="truncate t-body font-medium text-foreground">
-                              {f.name}
-                            </div>
+                            <div className="truncate t-body font-medium text-ink">{f.name}</div>
                             {f.brand && (
-                              <div className="truncate t-label text-muted-foreground">
-                                {f.brand}
-                              </div>
+                              <div className="truncate t-label text-ink-2">{f.brand}</div>
                             )}
                           </div>
                           <div className="shrink-0 text-right">
                             {f.calories !== undefined && (
-                              <div className="t-body font-semibold text-foreground">
+                              <div className="t-body font-semibold text-ink">
                                 {Math.round(f.calories)} cal
                               </div>
                             )}
-                            <div className="t-label text-muted-foreground">
+                            <div className="t-label text-ink-2">
                               per {f.basisQuantity} {f.basisUnit}
                             </div>
                           </div>
@@ -692,11 +684,11 @@ export function AddFoodSheet({
 
                   {/* Local empty state: names remote chips and invites a tap */}
                   {filteredFoods.length === 0 && filteredRecipes.length === 0 && query.trim() && (
-                    <div className="flex flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center">
-                      <p className="t-body font-medium text-foreground">
+                    <div className="flex flex-col items-center justify-center bg-wash p-5 text-center">
+                      <p className="t-body font-medium text-ink">
                         No matching food in your catalogue
                       </p>
-                      <p className="mt-1 t-label text-muted-foreground">
+                      <p className="mt-1 t-label text-ink-2">
                         Tap Open Food Facts or USDA above to search online, or enter details below.
                       </p>
                     </div>
@@ -719,7 +711,7 @@ export function AddFoodSheet({
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder={query.trim() || "Food name (e.g. Rice)"}
-                        className="min-h-[44px] w-full rounded-lg bg-surface px-3 t-body outline-none focus:ring-1 focus:ring-accent"
+                        className="min-h-[44px] w-full px-3 t-body outline-none focus:ring-1 focus:ring-accent"
                       />
                     </div>
 
@@ -727,7 +719,7 @@ export function AddFoodSheet({
                       <div>
                         <label
                           htmlFor="food-barcode-input"
-                          className="block t-caption text-muted-foreground mb-1"
+                          className="block t-caption text-ink-2 mb-1"
                         >
                           Barcode
                         </label>
@@ -737,7 +729,7 @@ export function AddFoodSheet({
                           aria-label="Barcode"
                           value={barcode}
                           onChange={(e) => setBarcode(e.target.value)}
-                          className="min-h-[44px] w-full rounded-lg bg-surface px-3 t-body font-mono outline-none focus:ring-1 focus:ring-accent"
+                          className="min-h-[44px] w-full px-3 t-body font-mono outline-none focus:ring-1 focus:ring-accent"
                         />
                       </div>
                     )}
@@ -746,7 +738,7 @@ export function AddFoodSheet({
                       <div>
                         <label
                           htmlFor="portion-qty-input"
-                          className="block t-caption text-muted-foreground mb-1"
+                          className="block t-caption text-ink-2 mb-1"
                         >
                           Quantity
                         </label>
@@ -757,13 +749,13 @@ export function AddFoodSheet({
                           aria-label="Quantity"
                           value={quantity}
                           onChange={(e) => setQuantity(e.target.value)}
-                          className="min-h-[44px] w-full rounded-lg bg-surface px-3 t-body outline-none focus:ring-1 focus:ring-accent"
+                          className="min-h-[44px] w-full px-3 t-body outline-none focus:ring-1 focus:ring-accent"
                         />
                       </div>
                       <div>
                         <label
                           htmlFor="portion-unit-select"
-                          className="block t-caption text-muted-foreground mb-1"
+                          className="block t-caption text-ink-2 mb-1"
                         >
                           Unit
                         </label>
@@ -771,7 +763,7 @@ export function AddFoodSheet({
                           id="portion-unit-select"
                           value={unit}
                           onChange={(e) => setUnit(e.target.value as MeasurementUnit)}
-                          className="min-h-[44px] w-full rounded-lg bg-surface px-3 t-body text-foreground outline-none focus:ring-1 focus:ring-accent"
+                          className="min-h-[44px] w-full px-3 t-body text-ink outline-none focus:ring-1 focus:ring-accent"
                         >
                           {MEASUREMENT_UNITS.map((u) => (
                             <option key={u} value={u}>
@@ -784,10 +776,7 @@ export function AddFoodSheet({
 
                     <div className="grid grid-cols-4 gap-2 pt-1">
                       <div>
-                        <label
-                          htmlFor="food-cal-input"
-                          className="block t-caption text-muted-foreground mb-1"
-                        >
+                        <label htmlFor="food-cal-input" className="block t-caption text-ink-2 mb-1">
                           Calories
                         </label>
                         <input
@@ -798,7 +787,7 @@ export function AddFoodSheet({
                           value={calories}
                           onChange={(e) => setCalories(e.target.value)}
                           placeholder="0"
-                          className="min-h-[44px] w-full rounded-lg bg-surface px-2 text-center t-body outline-none focus:ring-1 focus:ring-accent"
+                          className="min-h-[44px] w-full px-2 text-center t-body outline-none focus:ring-1 focus:ring-accent"
                         />
                       </div>
                       <div>
@@ -816,7 +805,7 @@ export function AddFoodSheet({
                           value={protein}
                           onChange={(e) => setProtein(e.target.value)}
                           placeholder="0g"
-                          className="min-h-[44px] w-full rounded-lg bg-surface px-2 text-center t-body outline-none focus:ring-1 focus:ring-accent"
+                          className="min-h-[44px] w-full px-2 text-center t-body outline-none focus:ring-1 focus:ring-accent"
                         />
                       </div>
                       <div>
@@ -834,7 +823,7 @@ export function AddFoodSheet({
                           value={carbs}
                           onChange={(e) => setCarbs(e.target.value)}
                           placeholder="0g"
-                          className="min-h-[44px] w-full rounded-lg bg-surface px-2 text-center t-body outline-none focus:ring-1 focus:ring-accent"
+                          className="min-h-[44px] w-full px-2 text-center t-body outline-none focus:ring-1 focus:ring-accent"
                         />
                       </div>
                       <div>
@@ -849,7 +838,7 @@ export function AddFoodSheet({
                           value={fat}
                           onChange={(e) => setFat(e.target.value)}
                           placeholder="0g"
-                          className="min-h-[44px] w-full rounded-lg bg-surface px-2 text-center t-body outline-none focus:ring-1 focus:ring-accent"
+                          className="min-h-[44px] w-full px-2 text-center t-body outline-none focus:ring-1 focus:ring-accent"
                         />
                       </div>
                     </div>
@@ -861,20 +850,20 @@ export function AddFoodSheet({
               {activeSource === "off" && (
                 <div className="space-y-3">
                   {offState.status === "idle" && (
-                    <div className="flex min-h-[140px] flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center space-y-3">
-                      <p className="t-body font-medium text-foreground">
+                    <div className="flex min-h-[140px] flex-col items-center justify-center bg-wash p-5 text-center space-y-3">
+                      <p className="t-body font-medium text-ink">
                         {query.trim()
                           ? `Search Open Food Facts for "${query.trim()}"`
                           : "Search Open Food Facts"}
                       </p>
-                      <p className="t-label text-muted-foreground">
+                      <p className="t-label text-ink-2">
                         Tap below to search the Open Food Facts online database.
                       </p>
                       {query.trim() && (
                         <button
                           type="button"
                           onClick={() => performOffSearch(query.trim())}
-                          className="flex min-h-[44px] items-center justify-center rounded-xl bg-accent px-4 t-body font-semibold text-accent-foreground"
+                          className="flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
                         >
                           Search Open Food Facts
                         </button>
@@ -883,29 +872,25 @@ export function AddFoodSheet({
                   )}
 
                   {offState.status === "loading" && (
-                    <div className="flex min-h-[140px] flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center">
-                      <p className="t-body font-medium text-foreground">
-                        Searching Open Food Facts...
-                      </p>
+                    <div className="flex min-h-[140px] flex-col items-center justify-center bg-wash p-5 text-center">
+                      <p className="t-body font-medium text-ink">Searching Open Food Facts...</p>
                     </div>
                   )}
 
                   {offState.status === "success" && (
                     <>
                       {offState.results.length === 0 ? (
-                        <div className="flex min-h-[140px] flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center">
-                          <p className="t-body font-medium text-foreground">
-                            No matching foods found
-                          </p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                        <div className="flex min-h-[140px] flex-col items-center justify-center bg-wash p-5 text-center">
+                          <p className="t-body font-medium text-ink">No matching foods found</p>
+                          <p className="mt-1 t-label text-ink-2">
                             Open Food Facts returned no products for this search.
                           </p>
                         </div>
                       ) : (
-                        <div className="group-list bg-muted">
+                        <div className="group-list bg-wash">
                           <div className="flex items-center justify-between px-3 pt-2 pb-1">
-                            <span className="t-caption text-muted-foreground">Open Food Facts</span>
-                            <span className="t-caption text-muted-foreground">
+                            <span className="t-caption text-ink-2">Open Food Facts</span>
+                            <span className="t-caption text-ink-2">
                               {offState.results.length} results
                             </span>
                           </div>
@@ -916,34 +901,32 @@ export function AddFoodSheet({
                                 key={`${f.barcode || f.name}-${idx}`}
                                 type="button"
                                 onClick={() => handleSelectRemoteFood(f)}
-                                className={`group-row w-full text-left transition-colors hover:bg-surface/50 ${
+                                className={`group-row w-full text-left transition-colors ${
                                   idx > 0 ? "group-row-sep" : ""
                                 }`}
                               >
                                 <div className="min-w-0 flex-1">
-                                  <div className="truncate t-body font-medium text-foreground">
+                                  <div className="truncate t-body font-medium text-ink">
                                     {f.name}
                                   </div>
                                   {f.brand && (
-                                    <div className="truncate t-label text-muted-foreground">
-                                      {f.brand}
-                                    </div>
+                                    <div className="truncate t-label text-ink-2">{f.brand}</div>
                                   )}
                                 </div>
                                 <div className="shrink-0 text-right">
                                   {f.calories !== undefined && (
-                                    <div className="t-body font-semibold text-foreground">
+                                    <div className="t-body font-semibold text-ink">
                                       {Math.round(f.calories)} cal
                                     </div>
                                   )}
-                                  <div className="t-label text-muted-foreground">
+                                  <div className="t-label text-ink-2">
                                     per {f.basisQuantity} {f.basisUnit}
                                   </div>
                                 </div>
                               </button>
                             );
                           })}
-                          <div className="px-3 py-2 t-caption text-muted-foreground">
+                          <div className="px-3 py-2 t-caption text-ink-2">
                             Data from Open Food Facts (ODbL).
                           </div>
                         </div>
@@ -952,21 +935,19 @@ export function AddFoodSheet({
                   )}
 
                   {offState.status === "error" && (
-                    <div className="flex min-h-[140px] flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center">
+                    <div className="flex min-h-[140px] flex-col items-center justify-center bg-wash p-5 text-center">
                       {offState.reason === "offline" && (
                         <>
-                          <p className="t-body font-semibold text-destructive">Device is offline</p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                          <p className="t-body font-semibold text-signal">Device is offline</p>
+                          <p className="mt-1 t-label text-ink-2">
                             Connect to the internet to search Open Food Facts.
                           </p>
                         </>
                       )}
                       {offState.reason === "rateLimited" && (
                         <>
-                          <p className="t-body font-semibold text-destructive">
-                            Rate limit exceeded
-                          </p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                          <p className="t-body font-semibold text-signal">Rate limit exceeded</p>
+                          <p className="mt-1 t-label text-ink-2">
                             Open Food Facts request limit reached. Please wait a moment before
                             retrying.
                           </p>
@@ -974,22 +955,22 @@ export function AddFoodSheet({
                       )}
                       {offState.reason === "notFound" && (
                         <>
-                          <p className="t-body font-medium text-foreground">No foods found</p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                          <p className="t-body font-medium text-ink">No foods found</p>
+                          <p className="mt-1 t-label text-ink-2">
                             No matching products were found on Open Food Facts.
                           </p>
                         </>
                       )}
                       {offState.reason === "network" && (
                         <>
-                          <p className="t-body font-semibold text-destructive">Network error</p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                          <p className="t-body font-semibold text-signal">Network error</p>
+                          <p className="mt-1 t-label text-ink-2">
                             {offState.message || "Check your connection and try again."}
                           </p>
                           <button
                             type="button"
                             onClick={() => performOffSearch(query.trim())}
-                            className="mt-3 flex min-h-[44px] items-center justify-center rounded-xl bg-accent px-4 t-body font-semibold text-accent-foreground"
+                            className="mt-3 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
                           >
                             Try again
                           </button>
@@ -997,15 +978,15 @@ export function AddFoodSheet({
                       )}
                       {offState.reason === "badResponse" && (
                         <>
-                          <p className="t-body font-semibold text-destructive">Invalid response</p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                          <p className="t-body font-semibold text-signal">Invalid response</p>
+                          <p className="mt-1 t-label text-ink-2">
                             {offState.message ||
                               "Received an unexpected response from Open Food Facts."}
                           </p>
                           <button
                             type="button"
                             onClick={() => performOffSearch(query.trim())}
-                            className="mt-3 flex min-h-[44px] items-center justify-center rounded-xl bg-accent px-4 t-body font-semibold text-accent-foreground"
+                            className="mt-3 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
                           >
                             Try again
                           </button>
@@ -1020,20 +1001,20 @@ export function AddFoodSheet({
               {activeSource === "usda" && (
                 <div className="space-y-3">
                   {usdaState.status === "idle" && (
-                    <div className="flex min-h-[140px] flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center space-y-3">
-                      <p className="t-body font-medium text-foreground">
+                    <div className="flex min-h-[140px] flex-col items-center justify-center bg-wash p-5 text-center space-y-3">
+                      <p className="t-body font-medium text-ink">
                         {query.trim()
                           ? `Search USDA FoodData Central for "${query.trim()}"`
                           : "Search USDA FoodData Central"}
                       </p>
-                      <p className="t-label text-muted-foreground">
+                      <p className="t-label text-ink-2">
                         Tap below to search the USDA FoodData Central database.
                       </p>
                       {query.trim() && (
                         <button
                           type="button"
                           onClick={() => performUsdaSearch(query.trim())}
-                          className="flex min-h-[44px] items-center justify-center rounded-xl bg-accent px-4 t-body font-semibold text-accent-foreground"
+                          className="flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
                         >
                           Search USDA
                         </button>
@@ -1042,8 +1023,8 @@ export function AddFoodSheet({
                   )}
 
                   {usdaState.status === "loading" && (
-                    <div className="flex min-h-[140px] flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center">
-                      <p className="t-body font-medium text-foreground">
+                    <div className="flex min-h-[140px] flex-col items-center justify-center bg-wash p-5 text-center">
+                      <p className="t-body font-medium text-ink">
                         Searching USDA FoodData Central...
                       </p>
                     </div>
@@ -1052,21 +1033,17 @@ export function AddFoodSheet({
                   {usdaState.status === "success" && (
                     <>
                       {usdaState.results.length === 0 ? (
-                        <div className="flex min-h-[140px] flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center">
-                          <p className="t-body font-medium text-foreground">
-                            No matching foods found
-                          </p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                        <div className="flex min-h-[140px] flex-col items-center justify-center bg-wash p-5 text-center">
+                          <p className="t-body font-medium text-ink">No matching foods found</p>
+                          <p className="mt-1 t-label text-ink-2">
                             USDA FoodData Central returned no foods for this search.
                           </p>
                         </div>
                       ) : (
-                        <div className="group-list bg-muted">
+                        <div className="group-list bg-wash">
                           <div className="flex items-center justify-between px-3 pt-2 pb-1">
-                            <span className="t-caption text-muted-foreground">
-                              USDA FoodData Central
-                            </span>
-                            <span className="t-caption text-muted-foreground">
+                            <span className="t-caption text-ink-2">USDA FoodData Central</span>
+                            <span className="t-caption text-ink-2">
                               {usdaState.results.length} results
                             </span>
                           </div>
@@ -1077,27 +1054,25 @@ export function AddFoodSheet({
                                 key={`${f.barcode || f.name}-${idx}`}
                                 type="button"
                                 onClick={() => handleSelectRemoteFood(f)}
-                                className={`group-row w-full text-left transition-colors hover:bg-surface/50 ${
+                                className={`group-row w-full text-left transition-colors ${
                                   idx > 0 ? "group-row-sep" : ""
                                 }`}
                               >
                                 <div className="min-w-0 flex-1">
-                                  <div className="truncate t-body font-medium text-foreground">
+                                  <div className="truncate t-body font-medium text-ink">
                                     {f.name}
                                   </div>
                                   {f.brand && (
-                                    <div className="truncate t-label text-muted-foreground">
-                                      {f.brand}
-                                    </div>
+                                    <div className="truncate t-label text-ink-2">{f.brand}</div>
                                   )}
                                 </div>
                                 <div className="shrink-0 text-right">
                                   {f.calories !== undefined && (
-                                    <div className="t-body font-semibold text-foreground">
+                                    <div className="t-body font-semibold text-ink">
                                       {Math.round(f.calories)} cal
                                     </div>
                                   )}
-                                  <div className="t-label text-muted-foreground">
+                                  <div className="t-label text-ink-2">
                                     per {f.basisQuantity} {f.basisUnit}
                                   </div>
                                 </div>
@@ -1110,13 +1085,11 @@ export function AddFoodSheet({
                   )}
 
                   {usdaState.status === "error" && (
-                    <div className="flex min-h-[140px] flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center">
+                    <div className="flex min-h-[140px] flex-col items-center justify-center bg-wash p-5 text-center">
                       {usdaState.reason === "noApiKey" && (
                         <>
-                          <p className="t-body font-semibold text-destructive">
-                            USDA API key required
-                          </p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                          <p className="t-body font-semibold text-signal">USDA API key required</p>
+                          <p className="mt-1 t-label text-ink-2">
                             Add your USDA API key in Settings under Data to search USDA FoodData
                             Central.
                           </p>
@@ -1124,40 +1097,38 @@ export function AddFoodSheet({
                       )}
                       {usdaState.reason === "offline" && (
                         <>
-                          <p className="t-body font-semibold text-destructive">Device is offline</p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                          <p className="t-body font-semibold text-signal">Device is offline</p>
+                          <p className="mt-1 t-label text-ink-2">
                             Connect to the internet to search USDA FoodData Central.
                           </p>
                         </>
                       )}
                       {usdaState.reason === "rateLimited" && (
                         <>
-                          <p className="t-body font-semibold text-destructive">
-                            Rate limit exceeded
-                          </p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                          <p className="t-body font-semibold text-signal">Rate limit exceeded</p>
+                          <p className="mt-1 t-label text-ink-2">
                             USDA API rate limit reached. Please wait a moment before retrying.
                           </p>
                         </>
                       )}
                       {usdaState.reason === "notFound" && (
                         <>
-                          <p className="t-body font-medium text-foreground">No foods found</p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                          <p className="t-body font-medium text-ink">No foods found</p>
+                          <p className="mt-1 t-label text-ink-2">
                             No matching foods found in USDA FoodData Central.
                           </p>
                         </>
                       )}
                       {usdaState.reason === "network" && (
                         <>
-                          <p className="t-body font-semibold text-destructive">Network error</p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                          <p className="t-body font-semibold text-signal">Network error</p>
+                          <p className="mt-1 t-label text-ink-2">
                             {usdaState.message || "Check your connection and try again."}
                           </p>
                           <button
                             type="button"
                             onClick={() => performUsdaSearch(query.trim())}
-                            className="mt-3 flex min-h-[44px] items-center justify-center rounded-xl bg-accent px-4 t-body font-semibold text-accent-foreground"
+                            className="mt-3 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
                           >
                             Try again
                           </button>
@@ -1165,15 +1136,15 @@ export function AddFoodSheet({
                       )}
                       {usdaState.reason === "badResponse" && (
                         <>
-                          <p className="t-body font-semibold text-destructive">Invalid response</p>
-                          <p className="mt-1 t-label text-muted-foreground">
+                          <p className="t-body font-semibold text-signal">Invalid response</p>
+                          <p className="mt-1 t-label text-ink-2">
                             {usdaState.message ||
                               "Received an unexpected response from USDA FoodData Central."}
                           </p>
                           <button
                             type="button"
                             onClick={() => performUsdaSearch(query.trim())}
-                            className="mt-3 flex min-h-[44px] items-center justify-center rounded-xl bg-accent px-4 t-body font-semibold text-accent-foreground"
+                            className="mt-3 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
                           >
                             Try again
                           </button>
@@ -1190,14 +1161,14 @@ export function AddFoodSheet({
               <div className="pb-1">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <div className="t-body font-semibold text-foreground">
+                    <div className="t-body font-semibold text-ink">
                       {selectedRecipe?.name ?? selectedFood?.name}
                     </div>
                     {selectedFood?.brand && (
-                      <div className="t-label text-muted-foreground">{selectedFood.brand}</div>
+                      <div className="t-label text-ink-2">{selectedFood.brand}</div>
                     )}
                     {selectedRecipe && (
-                      <div className="t-label text-muted-foreground">
+                      <div className="t-label text-ink-2">
                         {selectedRecipe.servings}{" "}
                         {selectedRecipe.servings === 1 ? "serving" : "servings"} recipe
                       </div>
@@ -1209,21 +1180,18 @@ export function AddFoodSheet({
                       setSelectedFood(null);
                       setSelectedRecipe(null);
                     }}
-                    className="flex min-h-[44px] items-center px-2 t-label font-medium text-accent"
+                    className="flex min-h-[44px] items-center px-2 t-label t-action"
                   >
                     Change
                   </button>
                 </div>
               </div>
 
-              <div className="group-list bg-muted p-3 space-y-3">
-                <div className="t-caption text-muted-foreground">Portion</div>
+              <div className="group-list bg-wash p-3 space-y-3">
+                <div className="t-caption text-ink-2">Portion</div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label
-                      htmlFor="sel-portion-qty"
-                      className="block t-caption text-muted-foreground mb-1"
-                    >
+                    <label htmlFor="sel-portion-qty" className="block t-caption text-ink-2 mb-1">
                       Quantity
                     </label>
                     <input
@@ -1233,21 +1201,18 @@ export function AddFoodSheet({
                       aria-label="Quantity"
                       value={quantity}
                       onChange={(e) => setQuantity(e.target.value)}
-                      className="min-h-[44px] w-full rounded-lg bg-surface px-3 t-body outline-none focus:ring-1 focus:ring-accent"
+                      className="min-h-[44px] w-full px-3 t-body outline-none focus:ring-1 focus:ring-accent"
                     />
                   </div>
                   <div>
-                    <label
-                      htmlFor="sel-portion-unit"
-                      className="block t-caption text-muted-foreground mb-1"
-                    >
+                    <label htmlFor="sel-portion-unit" className="block t-caption text-ink-2 mb-1">
                       Unit
                     </label>
                     <select
                       id="sel-portion-unit"
                       value={unit}
                       onChange={(e) => setUnit(e.target.value as MeasurementUnit)}
-                      className="min-h-[44px] w-full rounded-lg bg-surface px-3 t-body text-foreground outline-none focus:ring-1 focus:ring-accent"
+                      className="min-h-[44px] w-full px-3 t-body text-ink outline-none focus:ring-1 focus:ring-accent"
                     >
                       {MEASUREMENT_UNITS.map((u) => (
                         <option key={u} value={u}>
@@ -1260,12 +1225,10 @@ export function AddFoodSheet({
 
                 {/* Macro readout preview */}
                 <div className="pt-2 hairline-t flex items-center justify-between">
-                  <span className="t-label text-muted-foreground">Estimated macros:</span>
+                  <span className="t-label text-ink-2">Estimated macros:</span>
                   <div className="flex items-center gap-2 t-caption font-semibold">
                     {calculatedMacros.calories !== undefined && (
-                      <span className="text-foreground">
-                        {Math.round(calculatedMacros.calories)} cal
-                      </span>
+                      <span className="text-ink">{Math.round(calculatedMacros.calories)} cal</span>
                     )}
                     {calculatedMacros.protein !== undefined && (
                       <span className="text-protein">
@@ -1289,7 +1252,7 @@ export function AddFoodSheet({
           <button
             type="button"
             onClick={handleSave}
-            className="flex min-h-[44px] w-full items-center justify-center rounded-xl bg-accent px-4 py-3 t-body font-semibold text-accent-foreground"
+            className="flex min-h-[44px] w-full items-center justify-center bg-ink px-4 py-3 t-body font-semibold text-paper"
           >
             Add to {meal.name}
           </button>

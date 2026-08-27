@@ -193,10 +193,10 @@ export function BarcodeScannerSheet({ open, onClose, onDetected }: BarcodeScanne
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-sm flex-col rounded-3xl bg-surface p-5 anim-popup"
+        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-border" />
+        <div className="mx-auto mb-3 h-1 w-10 shrink-0 bg-border" />
 
         <div className="flex shrink-0 items-center justify-between pb-3">
           <h2 className="t-heading font-semibold tracking-tight">Scan barcode</h2>
@@ -204,28 +204,28 @@ export function BarcodeScannerSheet({ open, onClose, onDetected }: BarcodeScanne
             type="button"
             onClick={onClose}
             aria-label="Close barcode scanner"
-            className="-mr-2 flex min-h-[44px] items-center px-2 t-label font-medium text-muted-foreground hover:text-foreground"
+            className="-mr-2 flex min-h-[44px] items-center px-2 t-label font-medium text-ink-2 hover:text-ink"
           >
             Close
           </button>
         </div>
 
         {state === "requesting_permission" && (
-          <div className="flex min-h-[240px] flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center">
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-surface text-accent">
+          <div className="flex min-h-[240px] flex-col items-center justify-center bg-wash p-5 text-center">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center text-ink">
               <CameraIcon />
             </div>
-            <p className="t-body font-semibold text-foreground">Requesting camera access</p>
-            <p className="mt-1 t-label text-muted-foreground">
+            <p className="t-body font-semibold text-ink">Requesting camera access</p>
+            <p className="mt-1 t-label text-ink-2">
               Please allow camera permissions to scan barcodes.
             </p>
           </div>
         )}
 
         {state === "permission_denied" && (
-          <div className="flex min-h-[240px] flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center">
-            <p className="t-body font-semibold text-destructive">Camera permission denied</p>
-            <p className="mt-1 t-label text-muted-foreground">
+          <div className="flex min-h-[240px] flex-col items-center justify-center bg-wash p-5 text-center">
+            <p className="t-body font-semibold text-signal">Camera permission denied</p>
+            <p className="mt-1 t-label text-ink-2">
               Camera access was denied. Enable camera access in your device settings to scan
               barcodes.
             </p>
@@ -233,7 +233,7 @@ export function BarcodeScannerSheet({ open, onClose, onDetected }: BarcodeScanne
               type="button"
               onClick={startScanning}
               aria-label="Retry camera permission"
-              className="mt-4 flex min-h-[44px] items-center justify-center rounded-xl bg-accent px-4 t-body font-semibold text-accent-foreground"
+              className="mt-4 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
             >
               Try again
             </button>
@@ -241,25 +241,23 @@ export function BarcodeScannerSheet({ open, onClose, onDetected }: BarcodeScanne
         )}
 
         {state === "no_camera" && (
-          <div className="flex min-h-[240px] flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center">
-            <p className="t-body font-semibold text-destructive">No camera detected</p>
-            <p className="mt-1 t-label text-muted-foreground">
-              No usable camera was found on this device.
-            </p>
+          <div className="flex min-h-[240px] flex-col items-center justify-center bg-wash p-5 text-center">
+            <p className="t-body font-semibold text-signal">No camera detected</p>
+            <p className="mt-1 t-label text-ink-2">No usable camera was found on this device.</p>
           </div>
         )}
 
         {state === "decode_failed" && (
-          <div className="flex min-h-[240px] flex-col items-center justify-center rounded-2xl bg-muted p-5 text-center">
-            <p className="t-body font-semibold text-destructive">Scanner unavailable</p>
-            <p className="mt-1 t-label text-muted-foreground">
+          <div className="flex min-h-[240px] flex-col items-center justify-center bg-wash p-5 text-center">
+            <p className="t-body font-semibold text-signal">Scanner unavailable</p>
+            <p className="mt-1 t-label text-ink-2">
               {errorMessage || "Barcode scanning could not be initialized on this device."}
             </p>
             <button
               type="button"
               onClick={startScanning}
               aria-label="Retry barcode scanner"
-              className="mt-4 flex min-h-[44px] items-center justify-center rounded-xl bg-accent px-4 t-body font-semibold text-accent-foreground"
+              className="mt-4 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
             >
               Try again
             </button>
@@ -268,7 +266,7 @@ export function BarcodeScannerSheet({ open, onClose, onDetected }: BarcodeScanne
 
         {/* Video preview element stays in the DOM while scanning */}
         <div className={state === "scanning" ? "flex flex-col items-center space-y-3" : "hidden"}>
-          <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black">
+          <div className="relative aspect-square w-full overflow-hidden bg-black">
             <video
               ref={videoRef}
               playsInline
@@ -278,12 +276,10 @@ export function BarcodeScannerSheet({ open, onClose, onDetected }: BarcodeScanne
               className="h-full w-full object-cover"
             />
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-5">
-              <div className="h-44 w-44 rounded-2xl ring-2 ring-accent/80" />
+              <div className="h-44 w-44 ring-2 ring-ink" />
             </div>
           </div>
-          <p className="text-center t-label text-muted-foreground">
-            Point your camera at a barcode
-          </p>
+          <p className="text-center t-label text-ink-2">Point your camera at a barcode</p>
         </div>
       </div>
     </div>,

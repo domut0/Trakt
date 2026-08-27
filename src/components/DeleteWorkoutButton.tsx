@@ -33,7 +33,7 @@ export function DeleteWorkoutButton({
       <button
         onClick={() => setConfirming(true)}
         aria-label="Delete workout"
-        className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-destructive after:absolute after:-inset-1 after:content-['']"
+        className="relative flex h-9 w-9 shrink-0 items-center justify-center text-signal after:absolute after:-inset-1 after:content-['']"
       >
         <Trash2 size={20} aria-hidden="true" />
       </button>
@@ -46,25 +46,25 @@ export function DeleteWorkoutButton({
             onClick={() => setConfirming(false)}
           >
             <div
-              className="w-full max-w-md rounded-t-3xl bg-surface p-5 anim-sheet"
+              className="w-full max-w-md bg-paper rule-heavy-t p-5 anim-sheet"
               onClick={(e) => e.stopPropagation()}
               style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
             >
-              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" />
+              <div className="mx-auto mb-4 h-1 w-10 bg-border" />
               <h2 className="t-heading">Delete this workout?</h2>
-              <p className="mt-1 t-label text-muted-foreground">
+              <p className="mt-1 t-label text-ink-2">
                 This permanently removes the session and all its sets. This can't be undone.
               </p>
               <div className="mt-5 flex gap-2">
                 <button
                   onClick={() => setConfirming(false)}
-                  className="flex min-h-[44px] flex-1 items-center justify-center rounded-full bg-muted py-3 t-body font-medium text-muted-foreground"
+                  className="flex min-h-[44px] flex-1 items-center justify-center bg-wash py-3 t-body font-medium text-ink-2"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={doDelete}
-                  className="flex min-h-[44px] flex-1 items-center justify-center rounded-full bg-destructive py-3 t-body font-semibold text-white"
+                  className="flex min-h-[44px] flex-1 items-center justify-center bg-signal py-3 t-body font-semibold text-white"
                 >
                   Delete
                 </button>

@@ -1,4 +1,4 @@
-﻿import { useMemo, useState, type JSX } from "react";
+import { useMemo, useState, type JSX } from "react";
 import { createPortal } from "react-dom";
 import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { entryMacros, formatMeasurement, type Meal } from "../lib/food";
@@ -87,32 +87,32 @@ export function MealSheet({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-sm flex-col rounded-3xl bg-surface p-5 anim-popup"
+        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-border" />
+        <div className="mx-auto mb-3 h-1 w-10 shrink-0 bg-border" />
 
         <div className="flex shrink-0 items-center justify-between pb-3">
           <div>
             <h2 className="t-heading font-semibold tracking-tight">{meal.name}</h2>
-            <div className="t-label text-muted-foreground">
+            <div className="t-label text-ink-2">
               {formatMealWindow(meal.fromMinutes, meal.toMinutes)}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="-mr-2 flex min-h-[44px] items-center px-2 t-label font-medium text-muted-foreground hover:text-foreground"
+            className="-mr-2 flex min-h-[44px] items-center px-2 t-label text-ink-2 hover:text-ink"
           >
             Cancel
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-          <ul className="group-list bg-muted">
+          <ul className="group-list bg-wash">
             {entries.length === 0 ? (
               <li className="p-4 text-center">
-                <p className="t-label text-muted-foreground">Empty so far.</p>
+                <p className="t-label text-ink-2">Empty so far.</p>
               </li>
             ) : (
               mealMacros.map(({ entry, macros }, idx) => {
@@ -126,10 +126,8 @@ export function MealSheet({
                   <li key={entry.id}>
                     <div className={`group-row ${idx > 0 ? "group-row-sep" : ""}`}>
                       <div className="min-w-0 flex-1 pr-2">
-                        <div className="truncate t-body font-medium text-foreground">
-                          {entry.name}
-                        </div>
-                        <div className="truncate t-label text-muted-foreground">
+                        <div className="truncate t-body font-medium text-ink">{entry.name}</div>
+                        <div className="truncate t-label text-ink-2">
                           {formatMeasurement(entry, entry.quantity, entry.unit)}
                           {entry.brand ? ` · ${entry.brand}` : ""}
                         </div>
@@ -137,17 +135,15 @@ export function MealSheet({
 
                       <div className="flex items-center gap-2 shrink-0">
                         {isUnresolved ? (
-                          <span className="t-label font-medium text-destructive">
+                          <span className="t-label font-medium text-signal">
                             Unresolved portion
                           </span>
                         ) : (
                           <div className="flex flex-col items-end gap-1">
                             {macros.calories !== undefined && (
-                              <span className="t-stat text-foreground">
+                              <span className="t-stat text-ink">
                                 {Math.round(macros.calories)}
-                                <span className="ml-1 t-label font-normal text-muted-foreground">
-                                  cal
-                                </span>
+                                <span className="ml-1 t-label font-normal text-ink-2">cal</span>
                               </span>
                             )}
                             <div className="flex items-center gap-2 t-caption font-semibold">
@@ -170,7 +166,7 @@ export function MealSheet({
                           type="button"
                           onClick={() => deleteFoodEntry(entry.id)}
                           aria-label={`Delete ${entry.name}`}
-                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-destructive"
+                          className="flex h-11 w-11 shrink-0 items-center justify-center text-ink-2 hover:text-signal"
                           title="Delete entry"
                         >
                           <TrashIcon />
@@ -187,7 +183,7 @@ export function MealSheet({
                 type="button"
                 onClick={() => setAddSheetOpen(true)}
                 aria-label={`Add food to ${meal.name}`}
-                className="group-row group-row-sep w-full text-left t-body font-medium text-accent"
+                className="group-row group-row-sep w-full text-left t-body t-action"
               >
                 Add food
               </button>
@@ -197,7 +193,7 @@ export function MealSheet({
                 type="button"
                 onClick={() => setCopySheetOpen(true)}
                 aria-label={`Copy ${meal.name} from another day`}
-                className="group-row group-row-sep w-full text-left t-body font-medium text-muted-foreground hover:text-foreground"
+                className="group-row group-row-sep w-full text-left t-body font-medium text-ink-2 hover:text-ink"
               >
                 Copy from another day
               </button>

@@ -96,31 +96,31 @@ export function StartWorkoutSheet({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-t-3xl bg-surface p-5 pb-8 anim-sheet"
+        className="w-full max-w-md bg-paper rule-heavy-t p-5 pb-8 anim-sheet"
         onClick={(e) => e.stopPropagation()}
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" />
-        <h2 className="t-caption text-muted-foreground">Today's session</h2>
+        <div className="mx-auto mb-4 h-1 w-10 bg-border" />
+        <h2 className="t-caption text-ink-2">Today's session</h2>
         <input
           ref={inputRef}
           aria-label="Today's session name"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={predicted ? `suggested: ${predicted}` : "Heavy Bench, D2, Arms…"}
-          className="mt-2 w-full bg-transparent t-title font-semibold tracking-tight outline-none placeholder:t-title placeholder:font-normal placeholder:text-muted-foreground"
+          className="mt-2 w-full bg-transparent t-title font-semibold tracking-tight outline-none placeholder:t-title placeholder:font-normal placeholder:text-ink-2"
           onKeyDown={(e) => {
             if (e.key === "Enter") handleStart();
           }}
         />
         {suggestions.length > 0 && (
-          <ul className="mt-3 group-list bg-muted/40">
+          <ul className="mt-3 group-list bg-wash">
             {suggestions.map((s, idx) => (
               <li key={s.id}>
                 <button
                   type="button"
                   onClick={() => handleStart(s.name)}
-                  className={`group-row w-full text-left t-body text-foreground hover:bg-muted ${
+                  className={`group-row w-full text-left t-body text-ink hover:bg-wash ${
                     idx > 0 ? "group-row-sep" : ""
                   }`}
                 >
@@ -135,10 +135,10 @@ export function StartWorkoutSheet({
             <div className="group-header flex items-center justify-between px-0">
               <h2 className="t-caption">Planned</h2>
               {planned.name.trim() && (
-                <span className="truncate t-label text-muted-foreground">{planned.name}</span>
+                <span className="truncate t-label text-ink-2">{planned.name}</span>
               )}
             </div>
-            <ul className="group-list max-h-52 overflow-y-auto bg-muted/40">
+            <ul className="group-list max-h-52 overflow-y-auto bg-wash">
               {planned.lifts.map((ex, idx) => (
                 <li key={ex.id} className={`group-row ${idx > 0 ? "group-row-sep" : ""}`}>
                   <span className="truncate t-body font-medium">{ex.name}</span>
@@ -151,7 +151,7 @@ export function StartWorkoutSheet({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 min-h-[44px] rounded-full py-3 t-body font-medium text-muted-foreground"
+            className="flex-1 min-h-[44px] py-3 t-body font-medium text-ink-2"
           >
             Cancel
           </button>
@@ -159,7 +159,7 @@ export function StartWorkoutSheet({
             type="button"
             onClick={() => handleStart()}
             disabled={!(trimmed || predicted)}
-            className="flex-[2] min-h-[44px] rounded-full bg-accent py-3 t-body font-semibold text-accent-foreground disabled:opacity-40"
+            className="flex-[2] min-h-[44px] bg-ink py-3 t-body font-semibold text-paper disabled:opacity-40"
           >
             Start
           </button>

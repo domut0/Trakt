@@ -27,11 +27,11 @@ export function Toggle({
       // added as an absolutely positioned overlay rather than as padding, which
       // would make every settings row taller. shrink-0 keeps long descriptions
       // from squeezing the switch out of shape at 390px.
-      className="relative h-7 w-12 shrink-0 rounded-full transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-['']"
+      className="relative h-7 w-12 shrink-0 transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-['']"
       style={{ backgroundColor: checked ? "var(--color-accent)" : "var(--color-border)" }}
     >
       <span
-        className="absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all"
+        className="absolute top-0.5 h-6 w-6 bg-white transition-all"
         style={{ left: checked ? 22 : 2 }}
       />
     </button>

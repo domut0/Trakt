@@ -296,7 +296,7 @@ export function DayEditorSheet({
       style={{ opacity: dragY > 0 ? Math.max(0, 1 - dragY / 300) : 1 }}
     >
       <div
-        className="w-full max-w-md rounded-t-3xl bg-surface anim-sheet"
+        className="w-full max-w-md bg-paper rule-heavy-t anim-sheet"
         onClick={(e) => e.stopPropagation()}
         style={{
           paddingBottom: `max(env(safe-area-inset-bottom), ${20 + keyboardOffset}px)`,
@@ -314,21 +314,21 @@ export function DayEditorSheet({
           className="flex min-h-[44px] w-full cursor-grab touch-none items-center active:cursor-grabbing"
           aria-label="Drag down to close sheet"
         >
-          <div className="mx-auto h-1 w-10 rounded-full bg-border" />
+          <div className="mx-auto h-1 w-10 bg-border" />
         </div>
 
         <div className="px-5 pb-5">
-          <div className="t-caption text-muted-foreground">{existing ? "Edit day" : "Log day"}</div>
+          <div className="t-caption text-ink-2">{existing ? "Edit day" : "Log day"}</div>
           <div className="mt-0.5 t-heading font-semibold tracking-tight">{headerLabel(date)}</div>
 
           {/* Grouped list of labelled numeric rows and cheat day switch */}
-          <div className="mt-4 group-list bg-muted/40">
+          <div className="mt-4 group-list bg-wash">
             {/* Macros info row when derived from entries */}
             {hasEntries && (
               <div className="group-row">
                 <div>
-                  <div className="t-body font-medium text-foreground">Macros</div>
-                  <div className="t-label text-muted-foreground">Calculated from food entries</div>
+                  <div className="t-body font-medium text-ink">Macros</div>
+                  <div className="t-label text-ink-2">Calculated from food entries</div>
                 </div>
                 <div className="text-right">
                   {/*
@@ -338,13 +338,13 @@ export function DayEditorSheet({
                   */}
                   {dayMacros.calories !== undefined ? (
                     <>
-                      <span className="t-stat text-foreground">
+                      <span className="t-stat text-ink">
                         {Math.round(dayMacros.calories).toLocaleString()}
                       </span>
-                      <span className="ml-1 t-label text-muted-foreground">cal</span>
+                      <span className="ml-1 t-label text-ink-2">cal</span>
                     </>
                   ) : (
-                    <span className="t-label text-muted-foreground">Not recorded</span>
+                    <span className="t-label text-ink-2">Not recorded</span>
                   )}
                 </div>
               </div>
@@ -353,7 +353,7 @@ export function DayEditorSheet({
             {/* Calories - only editable when not derived from entries */}
             {!hasEntries && (
               <div className="group-row">
-                <label htmlFor="day-field-calories" className="t-body font-medium text-foreground">
+                <label htmlFor="day-field-calories" className="t-body font-medium text-ink">
                   Calories
                 </label>
                 <div className="flex min-w-0 items-baseline justify-end gap-1">
@@ -378,7 +378,7 @@ export function DayEditorSheet({
                       }
                     }}
                     placeholder="Not logged"
-                    className="t-stat w-32 bg-transparent text-right outline-none placeholder:t-body placeholder:text-muted-foreground"
+                    className="t-stat w-32 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
                   />
                 </div>
               </div>
@@ -386,7 +386,7 @@ export function DayEditorSheet({
 
             {/* Steps */}
             <div className="group-row group-row-sep">
-              <label htmlFor="day-field-steps" className="t-body font-medium text-foreground">
+              <label htmlFor="day-field-steps" className="t-body font-medium text-ink">
                 Steps
               </label>
               <div className="flex min-w-0 items-baseline justify-end gap-1">
@@ -411,7 +411,7 @@ export function DayEditorSheet({
                     }
                   }}
                   placeholder="Not logged"
-                  className="t-stat w-32 bg-transparent text-right outline-none placeholder:t-body placeholder:text-muted-foreground"
+                  className="t-stat w-32 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
                 />
               </div>
             </div>
@@ -421,7 +421,7 @@ export function DayEditorSheet({
               <>
                 {/* Protein */}
                 <div className="group-row group-row-sep">
-                  <label htmlFor="day-field-protein" className="t-body font-medium text-foreground">
+                  <label htmlFor="day-field-protein" className="t-body font-medium text-ink">
                     Protein
                   </label>
                   <div className="flex min-w-0 items-baseline justify-end gap-1">
@@ -446,15 +446,15 @@ export function DayEditorSheet({
                         }
                       }}
                       placeholder="0"
-                      className="t-stat w-24 bg-transparent text-right outline-none placeholder:t-body placeholder:text-muted-foreground"
+                      className="t-stat w-24 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
                     />
-                    <span className="t-label text-muted-foreground">g</span>
+                    <span className="t-label text-ink-2">g</span>
                   </div>
                 </div>
 
                 {/* Carbs */}
                 <div className="group-row group-row-sep">
-                  <label htmlFor="day-field-carbs" className="t-body font-medium text-foreground">
+                  <label htmlFor="day-field-carbs" className="t-body font-medium text-ink">
                     Carbs
                   </label>
                   <div className="flex min-w-0 items-baseline justify-end gap-1">
@@ -479,15 +479,15 @@ export function DayEditorSheet({
                         }
                       }}
                       placeholder="0"
-                      className="t-stat w-24 bg-transparent text-right outline-none placeholder:t-body placeholder:text-muted-foreground"
+                      className="t-stat w-24 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
                     />
-                    <span className="t-label text-muted-foreground">g</span>
+                    <span className="t-label text-ink-2">g</span>
                   </div>
                 </div>
 
                 {/* Fat */}
                 <div className="group-row group-row-sep">
-                  <label htmlFor="day-field-fat" className="t-body font-medium text-foreground">
+                  <label htmlFor="day-field-fat" className="t-body font-medium text-ink">
                     Fat
                   </label>
                   <div className="flex min-w-0 items-baseline justify-end gap-1">
@@ -512,9 +512,9 @@ export function DayEditorSheet({
                         }
                       }}
                       placeholder="0"
-                      className="t-stat w-24 bg-transparent text-right outline-none placeholder:t-body placeholder:text-muted-foreground"
+                      className="t-stat w-24 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
                     />
-                    <span className="t-label text-muted-foreground">g</span>
+                    <span className="t-label text-ink-2">g</span>
                   </div>
                 </div>
               </>
@@ -522,7 +522,7 @@ export function DayEditorSheet({
 
             {/* Bodyweight */}
             <div className="group-row group-row-sep">
-              <label htmlFor="day-field-bodyweight" className="t-body font-medium text-foreground">
+              <label htmlFor="day-field-bodyweight" className="t-body font-medium text-ink">
                 Bodyweight
               </label>
               <div className="flex items-center gap-1.5 min-w-0">
@@ -532,7 +532,7 @@ export function DayEditorSheet({
                   aria-label="Decrease Bodyweight"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => stepBodyweight(-1)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center t-body font-semibold text-ink active:scale-95"
                 >
                   −
                 </button>
@@ -558,9 +558,9 @@ export function DayEditorSheet({
                       }
                     }}
                     placeholder="Not logged"
-                    className="t-stat w-24 bg-transparent text-center outline-none placeholder:t-body placeholder:text-muted-foreground"
+                    className="t-stat w-24 bg-transparent text-center outline-none placeholder:t-body placeholder:text-ink-2"
                   />
-                  <span className="t-label text-muted-foreground">{unit}</span>
+                  <span className="t-label text-ink-2">{unit}</span>
                 </div>
                 <button
                   type="button"
@@ -568,7 +568,7 @@ export function DayEditorSheet({
                   aria-label="Increase Bodyweight"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => stepBodyweight(1)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center t-body font-semibold text-ink active:scale-95"
                 >
                   +
                 </button>
@@ -577,14 +577,14 @@ export function DayEditorSheet({
 
             {/* Cheat day */}
             <div className="group-row group-row-sep">
-              <span className="t-body font-medium text-foreground">Cheat day</span>
+              <span className="t-body font-medium text-ink">Cheat day</span>
               <button
                 type="button"
                 role="checkbox"
                 aria-checked={isCheatDay}
                 aria-label="Cheat day"
                 onClick={() => setIsCheatDay(!isCheatDay)}
-                className="flex h-6 w-6 items-center justify-center rounded-full t-label font-semibold transition-colors"
+                className="flex h-6 w-6 items-center justify-center t-label font-semibold transition-colors"
                 style={{
                   backgroundColor: isCheatDay ? "var(--color-accent)" : "var(--color-border)",
                   color: isCheatDay ? "var(--color-accent-foreground)" : "transparent",
@@ -601,7 +601,7 @@ export function DayEditorSheet({
             anyway would be a small lie in the one place the user is deciding
             whether it is safe to blank a field.
           */}
-          <p className="mt-3 t-label text-muted-foreground">
+          <p className="mt-3 t-label text-ink-2">
             Leave a field blank to record nothing for it.
             {hasEntries
               ? " Food entries keep the day either way."
@@ -611,13 +611,13 @@ export function DayEditorSheet({
           <div className="mt-5 flex items-center gap-2">
             <button
               onClick={onClose}
-              className="flex-1 min-h-[44px] rounded-full py-3 t-body font-medium text-muted-foreground"
+              className="flex-1 min-h-[44px] py-3 t-body font-medium text-ink-2"
             >
               Cancel
             </button>
             <button
               onClick={save}
-              className="flex-[2] min-h-[44px] rounded-full bg-accent py-3 t-body font-semibold text-accent-foreground"
+              className="flex-[2] min-h-[44px] bg-ink py-3 t-body font-semibold text-paper"
             >
               Save
             </button>
