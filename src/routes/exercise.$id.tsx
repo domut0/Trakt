@@ -35,9 +35,7 @@ function ExercisePage() {
   if (!exercise) {
     return (
       <AppShell>
-        <div className="px-5 py-20 text-center t-body text-muted-foreground">
-          Exercise not found.
-        </div>
+        <div className="px-5 py-20 text-center t-body text-ink-2">Exercise not found.</div>
       </AppShell>
     );
   }
@@ -54,19 +52,17 @@ function ExercisePage() {
       <div className="flex items-center justify-between px-5 pt-14 pb-2">
         <button
           onClick={goBack}
-          className="-my-[11px] flex min-h-[44px] items-center t-body font-medium text-accent"
+          className="-my-[11px] flex min-h-[44px] items-center t-body font-medium t-action"
         >
           Back
         </button>
       </div>
 
       <header className="px-5 pb-4">
-        <div className="t-caption text-muted-foreground">{typeLabel}</div>
+        <div className="t-caption text-ink-2">{typeLabel}</div>
         <h1 className="mt-1 text-balance break-words t-title">{exercise.name}</h1>
         {exercise.setupNote && (
-          <div className="mt-2 rounded-lg bg-muted px-3 py-2 t-label text-muted-foreground">
-            {exercise.setupNote}
-          </div>
+          <div className="mt-2 bg-wash px-3 py-2 t-label text-ink-2">{exercise.setupNote}</div>
         )}
       </header>
 
@@ -74,24 +70,22 @@ function ExercisePage() {
       <div className="px-5">
         <div className="group-list">
           <div className="group-row">
-            <span className="t-body text-muted-foreground">Best set</span>
+            <span className="t-body text-ink-2">Best set</span>
             <span className="t-stat">
               {best ? (
                 <>
-                  {best.weight} <span className="t-label text-muted-foreground">{unit}</span>
+                  {best.weight} <span className="t-label text-ink-2">{unit}</span>
                   {" × "}
                   {best.reps}
-                  {best.rpe != null && (
-                    <span className="t-label text-muted-foreground"> @ {best.rpe}</span>
-                  )}
+                  {best.rpe != null && <span className="t-label text-ink-2"> @ {best.rpe}</span>}
                 </>
               ) : (
-                <span className="t-body text-muted-foreground">None</span>
+                <span className="t-body text-ink-2">None</span>
               )}
             </span>
           </div>
           <div className="group-row group-row-sep">
-            <span className="t-body text-muted-foreground">Total sets</span>
+            <span className="t-body text-ink-2">Total sets</span>
             <span className="t-stat">{exSets.length}</span>
           </div>
         </div>
@@ -106,7 +100,7 @@ function ExercisePage() {
             {exercise.type === "cardio" ? (
               <>
                 <h3 className="t-heading">Not tracked here</h3>
-                <p className="mt-1 t-label text-muted-foreground">
+                <p className="mt-1 t-label text-ink-2">
                   Cardio is logged as duration and distance, so it shows up on the History tab.
                 </p>
               </>
@@ -119,7 +113,7 @@ function ExercisePage() {
             {grouped.map(({ session, date, sets }) => (
               <div key={session.id}>
                 <div className="group-header flex items-baseline justify-between px-0 pb-2">
-                  <span className="t-body font-semibold text-foreground">
+                  <span className="t-body font-semibold text-ink">
                     {date.toLocaleDateString(undefined, {
                       weekday: "short",
                       month: "short",
@@ -127,7 +121,7 @@ function ExercisePage() {
                       year: "numeric",
                     })}
                   </span>
-                  <span className="t-label text-muted-foreground">
+                  <span className="t-label text-ink-2">
                     {sets.length} {sets.length === 1 ? "set" : "sets"}
                   </span>
                 </div>
@@ -135,22 +129,16 @@ function ExercisePage() {
                   {sets.map((s, idx) => (
                     <div key={s.id} className={`group-row ${idx > 0 ? "group-row-sep" : ""}`}>
                       <div className="flex min-w-0 flex-wrap items-baseline gap-3">
-                        <span className="t-label w-5 shrink-0 text-muted-foreground">
-                          {idx + 1}
-                        </span>
+                        <span className="t-label w-5 shrink-0 text-ink-2">{idx + 1}</span>
                         <span className="t-stat">
                           {s.weight}
-                          <span className="t-label text-muted-foreground"> {unit}</span>
+                          <span className="t-label text-ink-2"> {unit}</span>
                         </span>
-                        <span className="text-muted-foreground">×</span>
+                        <span className="text-ink-2">×</span>
                         <span className="t-stat">{s.reps}</span>
-                        {s.rpe != null && (
-                          <span className="t-label text-muted-foreground">@ {s.rpe}</span>
-                        )}
+                        {s.rpe != null && <span className="t-label text-ink-2">@ {s.rpe}</span>}
                         {s.isDropsetOrPartial && (
-                          <span className="rounded-full bg-muted px-1.5 py-0.5 t-caption text-muted-foreground">
-                            drop
-                          </span>
+                          <span className="bg-wash px-1.5 py-0.5 t-caption text-ink-2">drop</span>
                         )}
                       </div>
                     </div>

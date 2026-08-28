@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useEffectiveDailyLogs } from "../lib/use-day-macros";
 import { useMemo, useState } from "react";
 import {
   addMonths,
@@ -50,7 +51,9 @@ export function CalendarView() {
   const slots = useStore((s) => s.slots);
   const exercises = useStore((s) => s.exercises);
   const sets = useStore((s) => s.sets);
-  const dailyLogs = useStore((s) => s.dailyLogs);
+  // Same reason as Today: a day tracked only through food entries must not
+  // render as an untracked day on the calendar.
+  const dailyLogs = useEffectiveDailyLogs();
   const unit = useStore((s) => s.unit);
 
   const [viewedMonth, setViewedMonth] = useState(() => startOfMonth(new Date()));
@@ -110,19 +113,19 @@ export function CalendarView() {
       <div className="mx-5 mb-3 flex items-center justify-between">
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(subMonths(m, 1)))}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted t-heading text-foreground"
+          className="flex h-11 w-11 shrink-0 items-center justify-center bg-wash t-heading text-ink"
           aria-label="Previous month"
         >
           <span aria-hidden="true">‹</span>
         </button>
         {/* Announced on change: stepping the month replaces the whole grid below
             but moves no focus, so without this the change is silent. */}
-        <span aria-live="polite" className="t-body font-semibold tracking-tight text-foreground">
+        <span aria-live="polite" className="t-body font-semibold tracking-tight text-ink">
           {monthLabel}
         </span>
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(addMonths(m, 1)))}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted t-heading text-foreground"
+          className="flex h-11 w-11 shrink-0 items-center justify-center bg-wash t-heading text-ink"
           aria-label="Next month"
         >
           <span aria-hidden="true">›</span>
@@ -134,7 +137,7 @@ export function CalendarView() {
           cell below names its own weekday in full. */}
       <div
         aria-hidden="true"
-        className="mx-5 grid grid-cols-7 text-center t-caption text-muted-foreground py-1"
+        className="mx-5 grid grid-cols-7 text-center t-caption text-ink-2 py-1"
       >
         {WEEKDAYS.map((w, i) => (
           <div key={i}>{w}</div>
@@ -143,10 +146,10 @@ export function CalendarView() {
 
       <div
         key={monthLabel}
-        className="mx-5 grid grid-cols-7 gap-px overflow-hidden rounded-2xl bg-border anim-fade-up"
+        className="mx-5 grid grid-cols-7 gap-px overflow-hidden bg-border anim-fade-up"
       >
         {cells.map((cell, i) => {
-          if (!cell) return <div key={`blank-${i}`} className="min-h-[64px] bg-surface" />;
+          if (!cell) return <div key={`blank-${i}`} className="min-h-[64px] " />;
           const workouts = byDay.get(cell.key) ?? [];
           const log = dailyLogs.find((l) => l.date === cell.key);
           const showNutrition =
@@ -186,15 +189,15 @@ export function CalendarView() {
                 logged.length > 0 ? `: ${logged.join(", ")}` : ": nothing logged"
               }`}
               className={
-                "relative flex min-h-[64px] flex-col items-center gap-1 bg-surface pb-1 pt-2 transition-colors " +
-                (isSelected ? "ring-1 ring-inset ring-accent" : "")
+                "relative flex min-h-[64px] flex-col items-center gap-1 pb-1 pt-2 transition-colors " +
+                (isSelected ? "ring-1 ring-inset ring-ink" : "")
               }
             >
               <span
                 aria-hidden="true"
                 className={
-                  "t-body tnum flex h-7 w-7 items-center justify-center rounded-full font-medium " +
-                  (todayCell ? "bg-accent text-accent-foreground" : "text-foreground")
+                  "t-body tnum flex h-7 w-7 items-center justify-center font-medium " +
+                  (todayCell ? "bg-ink text-paper" : "text-ink")
                 }
               >
                 {cell.date.getDate()}
@@ -205,8 +208,7 @@ export function CalendarView() {
                     <span
                       key={w.id}
                       className={
-                        "h-1.5 w-1.5 rounded-full " +
-                        (isCardioSession(w) ? "bg-cardio" : "bg-accent")
+                        "h-1.5 w-1.5 rounded-full " + (isCardioSession(w) ? "bg-cardio" : "bg-ink")
                       }
                     />
                   ))}
@@ -229,9 +231,7 @@ export function CalendarView() {
 
       <section className="section-gap pb-6" key={selectedKey}>
         <div className="group-header">
-          <h2 className="t-caption text-muted-foreground">
-            {format(selectedDate, "EEEE, MMMM d")}
-          </h2>
+          <h2 className="t-caption text-ink-2">{format(selectedDate, "EEEE, MMMM d")}</h2>
         </div>
 
         {(() => {
@@ -250,10 +250,10 @@ export function CalendarView() {
           if (!hasSessions && !hasLog) {
             return (
               <div className="group-list mx-5 p-6 text-center space-y-3 anim-fade-up">
-                <h3 className="t-body font-semibold tracking-tight text-foreground">Empty day</h3>
+                <h3 className="t-body font-semibold tracking-tight text-ink">Empty day</h3>
                 <button
                   onClick={() => setEditorOpen(true)}
-                  className="w-full min-h-[44px] rounded-full bg-muted py-2.5 t-body font-semibold text-foreground transition-colors active:opacity-80"
+                  className="w-full min-h-[44px] bg-wash py-2.5 t-body font-semibold text-ink transition-colors active:opacity-80"
                 >
                   Log daily numbers
                 </button>
@@ -266,14 +266,14 @@ export function CalendarView() {
               {hasLog ? (
                 <button
                   onClick={() => setEditorOpen(true)}
-                  className="group-row w-full flex-col !items-start gap-2 py-4 text-left cursor-pointer transition-colors active:bg-muted/50"
+                  className="group-row w-full flex-col !items-start gap-2 py-4 text-left cursor-pointer transition-colors active:bg-wash"
                 >
                   <div className="flex w-full items-center justify-between gap-3">
-                    <span className="t-body font-semibold tracking-tight text-foreground">
+                    <span className="t-body font-semibold tracking-tight text-ink">
                       Daily numbers
                     </span>
                     {selectedLog.isCheatDay && (
-                      <span className="flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 t-caption text-muted-foreground">
+                      <span className="flex shrink-0 items-center gap-1.5 bg-wash px-2 py-0.5 t-caption text-ink-2">
                         <span
                           aria-hidden="true"
                           className="h-1.5 w-1.5 rounded-full border border-muted-foreground"
@@ -285,46 +285,40 @@ export function CalendarView() {
                   <div className="flex flex-wrap gap-x-4 gap-y-1.5 t-label">
                     {selectedLog.calories !== undefined && (
                       <div>
-                        <span className="text-muted-foreground">Cal:</span>{" "}
-                        <span className="tnum font-medium text-foreground">
-                          {selectedLog.calories}
-                        </span>
+                        <span className="text-ink-2">Cal:</span>{" "}
+                        <span className="tnum font-medium text-ink">{selectedLog.calories}</span>
                       </div>
                     )}
                     {selectedLog.protein !== undefined && (
                       <div>
-                        <span className="text-muted-foreground">P:</span>{" "}
-                        <span className="tnum font-medium text-foreground">
-                          {selectedLog.protein}g
-                        </span>
+                        <span className="text-ink-2">P:</span>{" "}
+                        <span className="tnum font-medium text-ink">{selectedLog.protein}g</span>
                       </div>
                     )}
                     {selectedLog.carbs !== undefined && (
                       <div>
-                        <span className="text-muted-foreground">C:</span>{" "}
-                        <span className="tnum font-medium text-foreground">
-                          {selectedLog.carbs}g
-                        </span>
+                        <span className="text-ink-2">C:</span>{" "}
+                        <span className="tnum font-medium text-ink">{selectedLog.carbs}g</span>
                       </div>
                     )}
                     {selectedLog.fat !== undefined && (
                       <div>
-                        <span className="text-muted-foreground">F:</span>{" "}
-                        <span className="tnum font-medium text-foreground">{selectedLog.fat}g</span>
+                        <span className="text-ink-2">F:</span>{" "}
+                        <span className="tnum font-medium text-ink">{selectedLog.fat}g</span>
                       </div>
                     )}
                     {selectedLog.steps !== undefined && (
                       <div>
-                        <span className="text-muted-foreground">Steps:</span>{" "}
-                        <span className="tnum font-medium text-foreground">
+                        <span className="text-ink-2">Steps:</span>{" "}
+                        <span className="tnum font-medium text-ink">
                           {selectedLog.steps.toLocaleString()}
                         </span>
                       </div>
                     )}
                     {selectedLog.bodyweight !== undefined && (
                       <div>
-                        <span className="text-muted-foreground">BW:</span>{" "}
-                        <span className="tnum font-medium text-foreground">
+                        <span className="text-ink-2">BW:</span>{" "}
+                        <span className="tnum font-medium text-ink">
                           {selectedLog.bodyweight} {unit}
                         </span>
                       </div>
@@ -334,7 +328,7 @@ export function CalendarView() {
               ) : (
                 <button
                   onClick={() => setEditorOpen(true)}
-                  className="group-row w-full justify-center py-3.5 t-body font-semibold text-accent"
+                  className="group-row w-full justify-center py-3.5 t-body font-semibold t-action"
                 >
                   Log daily numbers
                 </button>
@@ -371,17 +365,15 @@ export function CalendarView() {
                     >
                       <div className="min-w-0 flex-1 pr-3">
                         <div className="flex min-w-0 items-baseline gap-2">
-                          <span className="truncate t-body font-semibold tracking-tight text-foreground">
+                          <span className="truncate t-body font-semibold tracking-tight text-ink">
                             {title}
                           </span>
                           {subtitle && (
-                            <span className="t-label shrink-0 text-muted-foreground">
-                              {subtitle}
-                            </span>
+                            <span className="t-label shrink-0 text-ink-2">{subtitle}</span>
                           )}
                         </div>
                       </div>
-                      <span className="t-label shrink-0 text-muted-foreground">
+                      <span className="t-label shrink-0 text-ink-2">
                         {fmtTime(session.startedAt)}
                       </span>
                     </Link>

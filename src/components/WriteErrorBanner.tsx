@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Close } from "./icons";
 import { useStore } from "../lib/store";
 
 /**
@@ -14,7 +14,7 @@ export function WriteErrorBanner() {
 
   return (
     <div
-      className="fixed inset-x-0 top-0 z-50 flex items-center justify-between gap-3 bg-destructive px-4 py-2.5 text-white"
+      className="fixed inset-x-0 top-0 z-50 flex items-center justify-between gap-3 bg-signal px-4 py-2.5 text-white rounded-md"
       style={{ paddingTop: "max(env(safe-area-inset-top), 10px)" }}
     >
       <span className="t-label font-medium">
@@ -26,9 +26,9 @@ export function WriteErrorBanner() {
         // 44px hit area from an inset overlay rather than padding: this banner
         // is position-fixed over the app's own header, so growing it would
         // cover content rather than move it.
-        className="relative shrink-0 rounded-full p-1 opacity-90 after:absolute after:-inset-2.5 after:content-['']"
+        className="relative shrink-0 p-1 opacity-90 after:absolute after:-inset-2.5 after:content-['']"
       >
-        <X size={16} />
+        <Close size={16} />
       </button>
     </div>
   );

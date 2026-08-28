@@ -74,24 +74,24 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-t-3xl bg-surface p-5 anim-sheet"
+        className="w-full max-w-md bg-paper rule-heavy-t p-5 anim-sheet rounded-md"
         onClick={(e) => e.stopPropagation()}
         style={{
           paddingBottom: `max(env(safe-area-inset-bottom), ${20 + keyboardOffset}px)`,
         }}
       >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
+        <div className="mx-auto mb-3 h-1 w-10 bg-border" />
 
         <div className="flex items-center justify-between">
           <div>
-            <div className="t-caption text-muted-foreground">Calculator</div>
+            <div className="t-caption text-ink-2">Calculator</div>
             <h2 className="t-heading font-semibold tracking-tight">1RM estimator</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close 1RM calculator"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground transition-transform active:scale-95"
+            className="flex h-11 w-11 items-center justify-center bg-wash text-ink-2 transition-transform active:scale-95"
           >
             ✕
           </button>
@@ -99,8 +99,8 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
 
         {/* Inputs */}
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-muted p-3">
-            <div className="t-caption text-muted-foreground">Weight ({unit})</div>
+          <div className="bg-wash p-3">
+            <div className="t-caption text-ink-2">Weight ({unit})</div>
             <div className="mt-1 flex items-baseline gap-1">
               <input
                 inputMode="decimal"
@@ -109,14 +109,14 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
                 value={weightStr}
                 onChange={(e) => setWeightStr(e.target.value)}
                 placeholder="0"
-                className="t-stat w-full min-w-0 bg-transparent outline-none placeholder:t-stat placeholder:text-muted-foreground"
+                className="t-stat w-full min-w-0 bg-transparent outline-none placeholder:t-stat placeholder:text-ink-2"
               />
-              <span className="t-label text-muted-foreground">{unit}</span>
+              <span className="t-label text-ink-2">{unit}</span>
             </div>
           </div>
 
-          <div className="rounded-xl bg-muted p-3">
-            <div className="t-caption text-muted-foreground">Reps</div>
+          <div className="bg-wash p-3">
+            <div className="t-caption text-ink-2">Reps</div>
             <div className="mt-1 flex items-baseline gap-1">
               <input
                 inputMode="numeric"
@@ -125,34 +125,34 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
                 value={repsStr}
                 onChange={(e) => setRepsStr(e.target.value)}
                 placeholder="0"
-                className="t-stat w-full min-w-0 bg-transparent outline-none placeholder:t-stat placeholder:text-muted-foreground"
+                className="t-stat w-full min-w-0 bg-transparent outline-none placeholder:t-stat placeholder:text-ink-2"
               />
-              <span className="t-label text-muted-foreground">reps</span>
+              <span className="t-label text-ink-2">reps</span>
             </div>
           </div>
         </div>
 
         {/* Estimates Card */}
-        <div className="mt-4 rounded-2xl bg-muted/40 p-4">
-          <div className="t-caption text-muted-foreground">Estimated 1RM</div>
+        <div className="mt-4 bg-wash p-4">
+          <div className="t-caption text-ink-2">Estimated 1RM</div>
           <div className="mt-1 flex items-baseline justify-between">
             <div>
-              <span className="t-hero text-accent">{estimate.average}</span>
-              <span className="ml-1.5 t-body font-medium text-muted-foreground">{unit} avg</span>
+              <span className="t-hero text-ink">{estimate.average}</span>
+              <span className="ml-1.5 t-body font-medium text-ink-2">{unit} avg</span>
             </div>
 
-            <div className="text-right t-label text-muted-foreground">
+            <div className="text-right t-label text-ink-2">
               <div>
-                Epley: <span className="t-stat text-foreground">{estimate.epley}</span> {unit}
+                Epley: <span className="t-stat text-ink">{estimate.epley}</span> {unit}
               </div>
               <div>
-                Brzycki: <span className="t-stat text-foreground">{estimate.brzycki}</span> {unit}
+                Brzycki: <span className="t-stat text-ink">{estimate.brzycki}</span> {unit}
               </div>
             </div>
           </div>
 
           {numReps > RELIABLE_REP_LIMIT && (
-            <p className="mt-2.5 t-label leading-snug text-muted-foreground">
+            <p className="mt-2.5 t-label leading-snug text-ink-2">
               Past {RELIABLE_REP_LIMIT} reps both formulas drift high. Treat this as a rough
               ceiling, not a number to load.
             </p>
@@ -161,23 +161,23 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
 
         {/* Percentages table */}
         <div className="mt-4">
-          <div className="mb-2 t-caption text-muted-foreground">Percentages</div>
+          <div className="mb-2 t-caption text-ink-2">Percentages</div>
 
-          <div className="max-h-[220px] overflow-y-auto rounded-xl bg-muted/40">
+          <div className="max-h-[220px] overflow-y-auto bg-wash">
             <table className="w-full text-left t-body">
               <thead>
-                <tr className="border-b border-border t-caption text-muted-foreground">
+                <tr className="border-b border-rule t-caption text-ink-2">
                   <th className="px-3 py-2 font-medium">%</th>
                   <th className="px-3 py-2 font-medium">Reps</th>
                   <th className="px-3 py-2 text-right font-medium">Weight ({unit})</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-rule">
                 {rows.map((row) => (
-                  <tr key={row.percentage} className="hover:bg-muted transition-colors">
-                    <td className="px-3 py-2.5 font-semibold text-foreground">{row.percentage}%</td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{row.reps} reps</td>
-                    <td className="px-3 py-2.5 text-right font-bold t-stat text-foreground">
+                  <tr key={row.percentage} className="hover:bg-wash transition-colors">
+                    <td className="px-3 py-2.5 font-semibold text-ink">{row.percentage}%</td>
+                    <td className="px-3 py-2.5 text-ink-2">{row.reps} reps</td>
+                    <td className="px-3 py-2.5 text-right font-bold t-stat text-ink">
                       {row.weight} {unit}
                     </td>
                   </tr>
@@ -190,7 +190,7 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
         <button
           type="button"
           onClick={onClose}
-          className="mt-5 min-h-[44px] h-12 w-full rounded-full bg-accent py-3 t-body font-semibold text-accent-foreground"
+          className="mt-5 min-h-[44px] h-12 w-full bg-ink py-3 t-body font-semibold text-paper rounded-md"
         >
           Done
         </button>

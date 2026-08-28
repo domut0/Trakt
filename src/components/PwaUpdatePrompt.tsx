@@ -15,14 +15,14 @@ function UpdateBanner() {
   return (
     <div
       role="status"
-      className="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-fit max-w-[calc(100vw-32px)] items-center gap-3 rounded-md border border-border bg-surface px-4 py-2.5 text-sm text-foreground shadow-lg"
+      className="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-fit max-w-[calc(100vw-32px)] items-center gap-3 bg-ink px-4 py-2.5 t-label text-paper rounded-md"
       style={{ marginBottom: "env(safe-area-inset-bottom)" }}
     >
       <span>A new version is available.</span>
       <button
         type="button"
         onClick={() => updateServiceWorker(true)}
-        className="shrink-0 rounded-sm bg-accent px-3 py-1.5 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90"
+        className="shrink-0 bg-paper px-3 py-1.5 t-label font-semibold text-ink transition-colors"
       >
         Reload
       </button>

@@ -1,0 +1,488 @@
+import { describe, expect, it } from "vitest";
+import {
+  DEFAULT_MEALS,
+  effectiveDailyLogs,
+  entriesByMeal,
+  entryMacros,
+  formatMeasurement,
+  measurementFactor,
+  mealForTime,
+  recipePerServingMacros,
+  resolveDayMacros,
+  scaleMacros,
+  sumMacros,
+  type Food,
+  type FoodEntry,
+  type MacroBasis,
+  type Meal,
+  type Recipe,
+  type RecipeIngredient,
+} from "../food";
+import type { DailyLog } from "../store";
+
+/** Per-100g, the shape Open Food Facts and USDA hand back. */
+const per100g: MacroBasis = {
+  basisQuantity: 100,
+  basisUnit: "g",
+  calories: 305,
+  protein: 0,
+  carbs: 80,
+  fat: 0,
+};
+
+/** Per-count, the shape most MyFitnessPal foods import as: no gram equivalent. */
+const perCake: MacroBasis = {
+  basisQuantity: 1,
+  basisUnit: "serving",
+  servingLabel: "cake",
+  calories: 34.667,
+  protein: 0.667,
+  carbs: 7.333,
+  fat: 0.333,
+};
+
+describe("measurementFactor", () => {
+  it("scales a per-100g basis by grams", () => {
+    const f = measurementFactor(per100g, 20, "g");
+    expect(f).toEqual({ ok: true, factor: 0.2 });
+  });
+
+  it("converts ounces to grams before scaling", () => {
+    const f = measurementFactor(per100g, 1, "oz");
+    expect(f.ok).toBe(true);
+    if (f.ok) expect(f.factor).toBeCloseTo(0.283495, 6);
+  });
+
+  it("scales a per-count basis by serving count", () => {
+    expect(measurementFactor(perCake, 3, "serving")).toEqual({ ok: true, factor: 3 });
+  });
+
+  it("asks for a serving weight rather than guessing one", () => {
+    // The whole of decision 11: this is a question, not a failure. 56% of
+    // imported foods land here, so it has to be a prompt and not a dead end.
+    expect(measurementFactor(perCake, 50, "g")).toEqual({
+      ok: false,
+      reason: "needsServingWeight",
+    });
+  });
+
+  it("resolves grams against a per-count basis once the serving weight is known", () => {
+    // 13g per cake, so 39g is 3 cakes.
+    const withWeight: MacroBasis = { ...perCake, servingWeight: 13 };
+    const f = measurementFactor(withWeight, 39, "g");
+    expect(f.ok).toBe(true);
+    if (f.ok) expect(f.factor).toBeCloseTo(3, 10);
+  });
+
+  it("resolves servings against a per-100g basis using the serving weight", () => {
+    const withWeight: MacroBasis = { ...per100g, servingWeight: 20 };
+    const f = measurementFactor(withWeight, 2, "serving");
+    expect(f.ok).toBe(true);
+    if (f.ok) expect(f.factor).toBeCloseTo(0.4, 10);
+  });
+
+  it("asks for a package weight rather than guessing one", () => {
+    expect(measurementFactor(per100g, 1, "package")).toEqual({
+      ok: false,
+      reason: "needsPackageWeight",
+    });
+  });
+
+  it("refuses grams against a millilitre basis instead of assuming water", () => {
+    // Assuming 1 g/ml would silently invent a density and produce a number
+    // that looks entirely legitimate. Refusing is the honest answer.
+    const perMl: MacroBasis = { basisQuantity: 100, basisUnit: "ml", calories: 50 };
+    expect(measurementFactor(perMl, 100, "g")).toEqual({
+      ok: false,
+      reason: "incompatibleUnit",
+    });
+  });
+
+  it("rejects a negative or non-finite quantity", () => {
+    expect(measurementFactor(per100g, -1, "g").ok).toBe(false);
+    expect(measurementFactor(per100g, Number.NaN, "g").ok).toBe(false);
+  });
+
+  it("rejects a basis quantity of zero rather than dividing by it", () => {
+    const broken: MacroBasis = { ...per100g, basisQuantity: 0 };
+    expect(measurementFactor(broken, 10, "g").ok).toBe(false);
+  });
+});
+
+describe("scaleMacros", () => {
+  it("leaves an absent macro absent", () => {
+    // An unknown macro is not zero. Scaling it to 0 would let a food with no
+    // recorded protein read as a food with confirmed zero protein.
+    const partial = { calories: 100 };
+    expect(scaleMacros(partial, 2)).toEqual({
+      calories: 200,
+      protein: undefined,
+      carbs: undefined,
+      fat: undefined,
+    });
+  });
+});
+
+const entry = (over: Partial<FoodEntry>): FoodEntry => ({
+  id: "fe_1",
+  date: "2026-08-23",
+  mealId: "m_1",
+  quantity: 1,
+  unit: "serving",
+  name: "Thing",
+  loggedAt: 0,
+  basisQuantity: 1,
+  basisUnit: "serving",
+  calories: 100,
+  protein: 10,
+  carbs: 5,
+  fat: 2,
+  ...over,
+});
+
+describe("entryMacros", () => {
+  it("resolves from the entry's own frozen basis", () => {
+    const e = entry({ quantity: 20, unit: "g", ...per100g });
+    expect(entryMacros(e).calories).toBeCloseTo(61, 6);
+  });
+
+  it("does not consult any food record", () => {
+    // Decision 3. The entry carries everything it needs, which is what stops an
+    // upstream correction from rewriting what you ate last month.
+    const e = entry({ foodId: "does-not-exist", quantity: 2 });
+    expect(entryMacros(e)).toEqual({ calories: 200, protein: 20, carbs: 10, fat: 4 });
+  });
+
+  it("contributes nothing when the portion cannot resolve", () => {
+    // The day still has to render. The offending row shows its own error state.
+    const e = entry({ quantity: 50, unit: "g", ...perCake });
+    expect(entryMacros(e)).toEqual({});
+  });
+});
+
+describe("sumMacros", () => {
+  it("keeps a field absent only when no entry supplied it", () => {
+    const summed = sumMacros([{ calories: 100 }, { calories: 50, protein: 3 }]);
+    expect(summed).toEqual({ calories: 150, protein: 3 });
+  });
+
+  it("returns an empty object for no entries", () => {
+    expect(sumMacros([])).toEqual({});
+  });
+});
+
+describe("resolveDayMacros", () => {
+  const typed: DailyLog = { date: "2026-08-23", calories: 1800, protein: 150 };
+
+  it("prefers entries and ignores typed macros entirely", () => {
+    // Decision 6. Not a merge: an average of the two would be a number the user
+    // never entered and the app never computed.
+    const e = entry({ quantity: 1 });
+    const out = resolveDayMacros([e], typed);
+    expect(out.source).toBe("entries");
+    expect(out.calories).toBe(100);
+  });
+
+  it("falls back to typed macros on a day with no entries", () => {
+    const out = resolveDayMacros([], typed);
+    expect(out.source).toBe("typed");
+    expect(out.calories).toBe(1800);
+  });
+
+  it("reports none when a day has neither", () => {
+    expect(resolveDayMacros([], { date: "2026-08-23", steps: 9000 }).source).toBe("none");
+    expect(resolveDayMacros([], undefined).source).toBe("none");
+  });
+
+  it("treats a day with only steps or bodyweight as having no macros", () => {
+    // Those fields still live on DailyLog and are untouched by food logging.
+    const stepsOnly: DailyLog = { date: "2026-08-23", steps: 12000, bodyweight: 180 };
+    expect(resolveDayMacros([], stepsOnly).source).toBe("none");
+  });
+});
+
+describe("mealForTime", () => {
+  const meals: Meal[] = DEFAULT_MEALS.map((m, i) => ({ ...m, id: `m_${i}` }));
+
+  it("picks the meal whose window contains the time", () => {
+    expect(mealForTime(meals, 8 * 60)?.name).toBe("Breakfast");
+    expect(mealForTime(meals, 12 * 60)?.name).toBe("Lunch");
+    expect(mealForTime(meals, 19 * 60)?.name).toBe("Dinner");
+  });
+
+  it("never lets an all-day meal swallow the others", () => {
+    // Snacks is seeded 0 to 0. If all-day won, nothing else could ever match.
+    expect(mealForTime(meals, 8 * 60)?.name).not.toBe("Snacks");
+  });
+
+  it("falls back to the first meal outside every window", () => {
+    // 03:00 sits in no seeded window.
+    expect(mealForTime(meals, 3 * 60)?.name).toBe("Breakfast");
+  });
+
+  it("handles a window that wraps past midnight", () => {
+    const late: Meal[] = [
+      { id: "m_a", name: "Late", fromMinutes: 22 * 60, toMinutes: 2 * 60, rank: 0 },
+      { id: "m_b", name: "Other", fromMinutes: 9 * 60, toMinutes: 10 * 60, rank: 1 },
+    ];
+    expect(mealForTime(late, 23 * 60)?.name).toBe("Late");
+    expect(mealForTime(late, 1 * 60)?.name).toBe("Late");
+    // 09:30 is inside Other's window, and outside the wrapping one.
+    expect(mealForTime(late, 9 * 60 + 30)?.name).toBe("Other");
+    // 12:00 is in neither, so the first meal takes it.
+    expect(mealForTime(late, 12 * 60)?.name).toBe("Late");
+  });
+
+  it("returns undefined when there are no meals at all", () => {
+    expect(mealForTime([], 600)).toBeUndefined();
+  });
+});
+
+describe("entriesByMeal", () => {
+  const meals: Meal[] = [
+    { id: "m_2", name: "Lunch", fromMinutes: 0, toMinutes: 0, rank: 1 },
+    { id: "m_1", name: "Breakfast", fromMinutes: 0, toMinutes: 0, rank: 0 },
+  ];
+
+  it("returns meals in rank order, including empty ones", () => {
+    const grouped = entriesByMeal(meals, []);
+    expect(grouped.map((g) => g.meal.name)).toEqual(["Breakfast", "Lunch"]);
+    expect(grouped[0].entries).toEqual([]);
+  });
+
+  it("orders entries within a meal by when they were logged", () => {
+    const a = entry({ id: "a", mealId: "m_1", loggedAt: 200 });
+    const b = entry({ id: "b", mealId: "m_1", loggedAt: 100 });
+    const grouped = entriesByMeal(meals, [a, b]);
+    expect(grouped[0].entries.map((e) => e.id)).toEqual(["b", "a"]);
+  });
+
+  it("drops entries whose meal no longer exists", () => {
+    // A deleted meal must not strand its entries in an invisible group.
+    const orphan = entry({ mealId: "gone" });
+    const grouped = entriesByMeal(meals, [orphan]);
+    expect(grouped.flatMap((g) => g.entries)).toEqual([]);
+  });
+});
+
+describe("formatMeasurement", () => {
+  it("uses the food's own serving noun", () => {
+    // "3 cake" is what MyFitnessPal showed, and it is the muscle memory worth keeping.
+    expect(formatMeasurement(perCake, 3, "serving")).toBe("3 cake");
+  });
+
+  it("falls back to 'serving' when a food has no label", () => {
+    expect(formatMeasurement(per100g, 1, "serving")).toBe("1 serving");
+  });
+
+  it("renders mass and volume units plainly", () => {
+    expect(formatMeasurement(per100g, 150, "g")).toBe("150 g");
+    expect(formatMeasurement(per100g, 1.5, "floz")).toBe("1.5 fl oz");
+  });
+});
+
+describe("Food type wiring", () => {
+  it("carries provenance so an imported food is distinguishable", () => {
+    const f: Food = {
+      id: "f_1",
+      name: "Kimchi",
+      brand: "Jongga",
+      sourceType: "mfp",
+      createdAt: 0,
+      ...per100g,
+    };
+    expect(f.sourceType).toBe("mfp");
+  });
+});
+
+describe("effectiveDailyLogs", () => {
+  const entry = (date: string, calories: number, id: string): FoodEntry => ({
+    id,
+    date,
+    mealId: "m_1",
+    quantity: 1,
+    unit: "serving",
+    name: "Thing",
+    loggedAt: 0,
+    basisQuantity: 1,
+    basisUnit: "serving",
+    calories,
+  });
+
+  it("substitutes derived macros on a day that has entries", () => {
+    const logs: DailyLog[] = [{ date: "2026-08-23", calories: 1800, steps: 9000 }];
+    const out = effectiveDailyLogs(logs, [
+      entry("2026-08-23", 300, "a"),
+      entry("2026-08-23", 200, "b"),
+    ]);
+    expect(out[0].calories).toBe(500);
+  });
+
+  it("never derives steps, bodyweight or cheat day", () => {
+    // Food logging has no opinion about those, so they must survive untouched.
+    const logs: DailyLog[] = [
+      { date: "2026-08-23", calories: 1800, steps: 9000, bodyweight: 181, isCheatDay: true },
+    ];
+    const out = effectiveDailyLogs(logs, [entry("2026-08-23", 500, "a")]);
+    expect(out[0]).toMatchObject({ steps: 9000, bodyweight: 181, isCheatDay: true });
+  });
+
+  it("leaves a day with no entries exactly as stored", () => {
+    const logs: DailyLog[] = [{ date: "2026-08-22", calories: 1800 }];
+    expect(effectiveDailyLogs(logs, [])).toEqual(logs);
+  });
+
+  it("surfaces a day that has entries but no stored row", () => {
+    // Logging food without opening the day editor must not leave the day
+    // invisible to the charts.
+    const out = effectiveDailyLogs([], [entry("2026-08-21", 700, "a")]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ date: "2026-08-21", calories: 700 });
+  });
+
+  it("returns days in date order", () => {
+    const out = effectiveDailyLogs(
+      [{ date: "2026-08-23", calories: 1 }],
+      [entry("2026-08-21", 2, "a")],
+    );
+    expect(out.map((l) => l.date)).toEqual(["2026-08-21", "2026-08-23"]);
+  });
+});
+
+describe("recipePerServingMacros", () => {
+  const oats: Food = {
+    id: "f_oats",
+    name: "Rolled Oats",
+    sourceType: "user",
+    createdAt: 0,
+    basisQuantity: 100,
+    basisUnit: "g",
+    calories: 380,
+    protein: 13,
+    carbs: 68,
+    fat: 7,
+  };
+
+  const whey: Food = {
+    id: "f_whey",
+    name: "Whey Protein",
+    sourceType: "user",
+    createdAt: 0,
+    basisQuantity: 1,
+    basisUnit: "serving",
+    servingLabel: "scoop",
+    servingWeight: 30,
+    calories: 120,
+    protein: 24,
+    carbs: 3,
+    fat: 1,
+  };
+
+  const berryNoProtein: Food = {
+    id: "f_berries",
+    name: "Blueberries",
+    sourceType: "user",
+    createdAt: 0,
+    basisQuantity: 100,
+    basisUnit: "g",
+    calories: 57,
+    carbs: 14,
+    // protein and fat absent
+  };
+
+  const unresolvableFood: Food = {
+    id: "f_cake",
+    name: "Cake",
+    sourceType: "mfp",
+    createdAt: 0,
+    basisQuantity: 1,
+    basisUnit: "serving",
+    // no servingWeight
+    calories: 200,
+  };
+
+  it("sums ingredients and divides by recipe.servings", () => {
+    const recipe: Recipe = {
+      id: "r_shake",
+      name: "Oat Shake",
+      servings: 2,
+      createdAt: 0,
+    };
+    const ingredients: RecipeIngredient[] = [
+      // 50g oats = 0.5 * (380 cal, 13 P, 68 C, 7 F) = 190 cal, 6.5 P, 34 C, 3.5 F
+      { id: "ri_1", recipeId: "r_shake", foodId: "f_oats", quantity: 50, unit: "g" },
+      // 1 scoop whey = 120 cal, 24 P, 3 C, 1 F
+      { id: "ri_2", recipeId: "r_shake", foodId: "f_whey", quantity: 1, unit: "serving" },
+    ];
+    // Total: 310 cal, 30.5 P, 37 C, 4.5 F
+    // Per serving (divided by 2): 155 cal, 15.25 P, 18.5 C, 2.25 F
+    const macros = recipePerServingMacros(recipe, ingredients, [oats, whey]);
+    expect(macros.calories).toBeCloseTo(155, 6);
+    expect(macros.protein).toBeCloseTo(15.25, 6);
+    expect(macros.carbs).toBeCloseTo(18.5, 6);
+    expect(macros.fat).toBeCloseTo(2.25, 6);
+  });
+
+  it("guards servings < 1 by treating it as 1", () => {
+    const recipeZero: Recipe = {
+      id: "r_1",
+      name: "Single Shake",
+      servings: 0,
+      createdAt: 0,
+    };
+    const ingredients: RecipeIngredient[] = [
+      { id: "ri_1", recipeId: "r_1", foodId: "f_oats", quantity: 100, unit: "g" },
+    ];
+    const macros = recipePerServingMacros(recipeZero, ingredients, [oats]);
+    expect(macros.calories).toBeCloseTo(380, 6);
+    expect(macros.protein).toBeCloseTo(13, 6);
+  });
+
+  it("skips an ingredient that cannot resolve", () => {
+    const recipe: Recipe = {
+      id: "r_mix",
+      name: "Mixed Bowl",
+      servings: 1,
+      createdAt: 0,
+    };
+    const ingredients: RecipeIngredient[] = [
+      { id: "ri_1", recipeId: "r_mix", foodId: "f_oats", quantity: 100, unit: "g" }, // 380 cal
+      // 50g of cake cannot resolve because cake is per-serving without servingWeight
+      { id: "ri_2", recipeId: "r_mix", foodId: "f_cake", quantity: 50, unit: "g" },
+    ];
+    const macros = recipePerServingMacros(recipe, ingredients, [oats, unresolvableFood]);
+    expect(macros.calories).toBeCloseTo(380, 6);
+  });
+
+  it("skips an ingredient whose food does not exist in foods list", () => {
+    const recipe: Recipe = {
+      id: "r_1",
+      name: "Test",
+      servings: 1,
+      createdAt: 0,
+    };
+    const ingredients: RecipeIngredient[] = [
+      { id: "ri_1", recipeId: "r_1", foodId: "f_missing", quantity: 100, unit: "g" },
+      { id: "ri_2", recipeId: "r_1", foodId: "f_oats", quantity: 100, unit: "g" },
+    ];
+    const macros = recipePerServingMacros(recipe, ingredients, [oats]);
+    expect(macros.calories).toBeCloseTo(380, 6);
+  });
+
+  it("keeps absent macros absent, never 0", () => {
+    const recipe: Recipe = {
+      id: "r_berries",
+      name: "Berry Snack",
+      servings: 2,
+      createdAt: 0,
+    };
+    const ingredients: RecipeIngredient[] = [
+      { id: "ri_1", recipeId: "r_berries", foodId: "f_berries", quantity: 100, unit: "g" },
+    ];
+    const macros = recipePerServingMacros(recipe, ingredients, [berryNoProtein]);
+    expect(macros.calories).toBeCloseTo(28.5, 6);
+    expect(macros.carbs).toBeCloseTo(7, 6);
+    expect(macros.protein).toBeUndefined();
+    expect(macros.fat).toBeUndefined();
+  });
+});

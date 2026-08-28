@@ -93,24 +93,24 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-t-3xl bg-surface p-5 anim-sheet"
+        className="w-full max-w-md bg-paper rule-heavy-t p-5 anim-sheet rounded-md"
         onClick={(e) => e.stopPropagation()}
         style={{
           paddingBottom: `max(env(safe-area-inset-bottom), ${20 + keyboardOffset}px)`,
         }}
       >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
+        <div className="mx-auto mb-3 h-1 w-10 bg-border" />
 
         <div className="flex items-center justify-between">
           <div>
-            <div className="t-caption text-muted-foreground">Calculator</div>
+            <div className="t-caption text-ink-2">Calculator</div>
             <h2 className="t-heading font-semibold tracking-tight">Plate loading</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close plate calculator"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground transition-transform active:scale-95"
+            className="flex h-11 w-11 items-center justify-center bg-wash text-ink-2 transition-transform active:scale-95"
           >
             ✕
           </button>
@@ -118,8 +118,8 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
 
         {/* Input & Bar Selection */}
         <div className="mt-4 space-y-3">
-          <div className="rounded-xl bg-muted p-3">
-            <div className="t-caption text-muted-foreground">Target weight ({unit})</div>
+          <div className="bg-wash p-3">
+            <div className="t-caption text-ink-2">Target weight ({unit})</div>
             <div className="mt-1 flex items-baseline gap-1">
               <input
                 inputMode="decimal"
@@ -128,14 +128,14 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
                 value={targetStr}
                 onChange={(e) => setTargetStr(e.target.value)}
                 placeholder="0"
-                className="t-stat w-full min-w-0 bg-transparent outline-none placeholder:t-stat placeholder:text-muted-foreground"
+                className="t-stat w-full min-w-0 bg-transparent outline-none placeholder:t-stat placeholder:text-ink-2"
               />
-              <span className="t-body font-medium text-muted-foreground">{unit}</span>
+              <span className="t-body font-medium text-ink-2">{unit}</span>
             </div>
           </div>
 
           <div>
-            <div className="mb-1.5 t-caption text-muted-foreground">Bar weight</div>
+            <div className="mb-1.5 t-caption text-ink-2">Bar weight</div>
             <div className="grid grid-cols-3 gap-2">
               {barOptions.map((w) => {
                 const isSelected = barWeight === w;
@@ -145,10 +145,10 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
                     type="button"
                     onClick={() => setBarWeight(w)}
                     aria-label={`Select ${w} ${unit} bar`}
-                    className={`flex min-h-[44px] h-11 items-center justify-center rounded-xl t-body font-medium transition-colors ${
+                    className={`flex min-h-[44px] h-11 items-center justify-center t-body font-medium transition-colors ${
                       isSelected
-                        ? "bg-accent text-accent-foreground font-semibold"
-                        : "bg-muted text-foreground hover:bg-border"
+                        ? "bg-ink text-paper font-semibold"
+                        : "bg-wash text-ink hover:bg-rule"
                     }`}
                   >
                     {w} {unit}
@@ -160,11 +160,11 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
         </div>
 
         {/* Visual Sleeve & Per Side Loading */}
-        <div className="mt-5 rounded-2xl bg-muted/40 p-4">
+        <div className="mt-5 bg-wash p-4">
           <div className="flex items-center justify-between">
-            <span className="t-caption text-muted-foreground">Plates per side</span>
+            <span className="t-caption text-ink-2">Plates per side</span>
             {stack.remainder > 0 && (
-              <span className="rounded-full bg-border px-2.5 py-0.5 t-label font-medium text-muted-foreground">
+              <span className="px-2.5 py-0.5 border border-rule t-label font-medium text-ink-2">
                 {stack.remainder} {unit} short
               </span>
             )}
@@ -173,12 +173,12 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
           <div className="mt-3 flex items-center justify-start gap-1.5 overflow-x-auto py-2">
             {/* Collar bar sleeve representation on left */}
             <div
-              className="flex h-14 w-3 shrink-0 items-center justify-center rounded-l-md bg-border"
+              className="flex h-14 w-3 shrink-0 items-center justify-center bg-border"
               title="Barbell collar"
             />
 
             {expandedPlates.length === 0 ? (
-              <div className="flex h-14 flex-1 items-center justify-center rounded-lg bg-muted px-3 t-body text-muted-foreground">
+              <div className="flex h-14 flex-1 items-center justify-center bg-wash px-3 t-body text-ink-2">
                 Bar only (no plates)
               </div>
             ) : (
@@ -191,23 +191,21 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
                   <div
                     key={`${weight}-${idx}`}
                     style={{ minWidth: `${minWidth}px` }}
-                    className="flex h-14 shrink-0 flex-col items-center justify-center rounded-lg bg-muted px-1.5 text-foreground transition-all"
+                    className="flex h-14 shrink-0 flex-col items-center justify-center bg-wash px-1.5 text-ink transition-all"
                   >
                     <span className="t-stat font-bold leading-none">{weight}</span>
-                    <span className="mt-0.5 t-caption leading-none text-muted-foreground">
-                      {unit}
-                    </span>
+                    <span className="mt-0.5 t-caption leading-none text-ink-2">{unit}</span>
                   </div>
                 );
               })
             )}
           </div>
 
-          <div className="mt-3 flex items-center justify-between t-body text-muted-foreground pt-2.5">
+          <div className="mt-3 flex items-center justify-between t-body text-ink-2 pt-2.5">
             <span>
               Bar: {barWeight} {unit}
             </span>
-            <span className="t-stat text-foreground">
+            <span className="t-stat text-ink">
               Total: {stack.achieved} {unit}
             </span>
           </div>
@@ -216,7 +214,7 @@ export function PlateCalculatorSheet({ open, onClose }: { open: boolean; onClose
         <button
           type="button"
           onClick={onClose}
-          className="mt-5 min-h-[44px] h-12 w-full rounded-full bg-accent py-3 t-body font-semibold text-accent-foreground"
+          className="mt-5 min-h-[44px] h-12 w-full bg-ink py-3 t-body font-semibold text-paper rounded-md"
         >
           Done
         </button>

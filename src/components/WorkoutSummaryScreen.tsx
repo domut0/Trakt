@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check } from "./icons";
 import { Component, type ReactNode } from "react";
 import {
   formatDuration,
@@ -103,12 +103,12 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
   const otherRecords = data.records.slice(1);
 
   return (
-    <div className="mx-auto flex h-[100dvh] max-w-md flex-col bg-background">
+    <div className="mx-auto flex h-[100dvh] max-w-md flex-col bg-paper">
       {/* The content scrolls in its own region so the way out below it is
           always on screen and never sits on top of the last record. */}
       <div className="flex-1 overflow-y-auto">
         <header className="px-5 pt-14 text-center">
-          <div className="t-caption text-muted-foreground">Finished</div>
+          <div className="t-caption text-ink-2">Finished</div>
           <h1 className="mt-1 text-balance break-words t-title">{data.slotName}</h1>
         </header>
 
@@ -121,20 +121,18 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
             // much the same olive as the app's warning colour. Same shape as the
             // goal notes on the daily log.
             <span className="flex items-center gap-1 t-caption text-success">
-              <Check size={12} strokeWidth={3} aria-hidden="true" />
+              <Check size={12} />
               {subject.caption}
             </span>
           ) : (
-            <span className="t-caption text-muted-foreground">{subject.caption}</span>
+            <span className="t-caption text-ink-2">{subject.caption}</span>
           )}
           <div className="mt-3 flex items-baseline gap-2">
             <span className="t-hero">{subject.value}</span>
-            <span className="t-body text-muted-foreground">{subject.suffix}</span>
+            <span className="t-body text-ink-2">{subject.suffix}</span>
           </div>
           {subject.title && <div className="mt-2 text-balance t-body">{subject.title}</div>}
-          {subject.detail && (
-            <div className="mt-1 t-label text-muted-foreground">{subject.detail}</div>
-          )}
+          {subject.detail && <div className="mt-1 t-label text-ink-2">{subject.detail}</div>}
         </section>
 
         <section className="section-gap">
@@ -142,7 +140,7 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
           <div className="group-list mx-5">
             {facts.map((fact, i) => (
               <div key={fact.label} className={`group-row ${i === 0 ? "" : "group-row-sep"}`}>
-                <span className="t-body text-muted-foreground">{fact.label}</span>
+                <span className="t-body text-ink-2">{fact.label}</span>
                 <span className="tnum t-body">{fact.value}</span>
               </div>
             ))}
@@ -162,13 +160,11 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
                   >
                     <div className="min-w-0">
                       <div className="t-body">{recordTitle(record, data.unit)}</div>
-                      <div className="t-label text-muted-foreground">
-                        {recordDetail(record, data.unit)}
-                      </div>
+                      <div className="t-label text-ink-2">{recordDetail(record, data.unit)}</div>
                     </div>
                     <div className="shrink-0 text-right">
                       <span className="tnum t-stat">{value}</span>{" "}
-                      <span className="t-label text-muted-foreground">{suffix}</span>
+                      <span className="t-label text-ink-2">{suffix}</span>
                     </div>
                   </div>
                 );
@@ -186,7 +182,7 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
       >
         <button
           onClick={onDone}
-          className="min-h-[44px] w-full rounded-full bg-accent py-3 t-body font-semibold text-accent-foreground"
+          className="min-h-[44px] w-full bg-ink py-3 t-body font-semibold text-paper rounded-md"
         >
           Done
         </button>

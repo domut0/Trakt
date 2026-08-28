@@ -113,23 +113,21 @@ export function TargetsEditor() {
     <div className="space-y-6">
       {showDayAssignments && (
         <>
-          <div className="rounded-2xl bg-muted p-4">
-            <div className="t-caption text-muted-foreground">This week</div>
-            <div className="tnum mt-1.5 space-y-1 t-label font-medium text-foreground">
+          <div className="rounded-md bg-wash p-4">
+            <div className="t-caption text-ink-2">This week</div>
+            <div className="tnum mt-1.5 space-y-1 t-label font-medium text-ink">
               {summaryLines.map((line) => (
                 <div key={line.key}>{line.text}</div>
               ))}
               {orphanDays.length > 0 && (
-                <div className="text-destructive">No target on {orphanDays.join(", ")}</div>
+                <div className="text-signal">No target on {orphanDays.join(", ")}</div>
               )}
             </div>
           </div>
 
           <div>
-            <h2 className="mb-1 t-caption text-muted-foreground">Day assignments</h2>
-            <p className="mb-2 t-label text-muted-foreground">
-              Tap a day to cycle through your profiles.
-            </p>
+            <h2 className="mb-1 t-caption text-ink-2">Day assignments</h2>
+            <p className="mb-2 t-label text-ink-2">Tap a day to cycle through your profiles.</p>
             <div
               role="group"
               aria-label="Weekday target assignments"
@@ -147,18 +145,27 @@ export function TargetsEditor() {
                     type="button"
                     aria-label={`${label}, currently ${assignedName}. Tap to change.`}
                     onClick={() => handleRotateDayTarget(idx)}
-                    className="flex min-h-[52px] min-w-0 flex-col items-center justify-center rounded-xl bg-muted p-1 text-center transition-transform active:scale-95"
+                    className="flex min-h-[52px] min-w-0 flex-col items-center justify-center rounded-md bg-wash p-1 text-center transition-transform active:scale-95"
                   >
-                    <span aria-hidden="true" className="t-caption text-muted-foreground">
+                    <span aria-hidden="true" className="t-caption text-ink-2">
                       {label}
                     </span>
+                    {/*
+                      The profile INITIAL, not its truncated name.
+
+                      Seven columns on a 390px screen give each chip about 45px,
+                      which turned every profile called anything into "TRA...".
+                      An ellipsis that eats the whole word is not an
+                      abbreviation, it is a word you cannot read. The panel
+                      directly above already names which profile runs on which
+                      days in full, and the accessible name on this button
+                      carries it too, so the chip only has to DISTINGUISH.
+                    */}
                     <span
                       aria-hidden="true"
-                      className={`mt-0.5 max-w-full truncate px-0.5 t-caption ${
-                        assigned ? "text-accent" : "text-muted-foreground"
-                      }`}
+                      className={`mt-0.5 t-caption ${assigned ? "text-ink" : "text-ink-2"}`}
                     >
-                      {assignedName}
+                      {assigned ? assignedName.trim().charAt(0).toUpperCase() : "-"}
                     </span>
                   </button>
                 );
@@ -171,11 +178,11 @@ export function TargetsEditor() {
       <div className="space-y-4">
         {showDayAssignments && (
           <div className="flex items-center justify-between">
-            <h2 className="t-caption text-muted-foreground">Target profiles</h2>
+            <h2 className="t-caption text-ink-2">Target profiles</h2>
             <button
               type="button"
               onClick={() => addTargetProfile("New profile")}
-              className="flex min-h-[44px] items-center t-body font-medium text-accent"
+              className="flex min-h-[44px] items-center t-body t-action"
             >
               + Add profile
             </button>
@@ -193,7 +200,7 @@ export function TargetsEditor() {
         ))}
 
         {!canDeleteProfiles && (
-          <p className="t-label text-muted-foreground">
+          <p className="t-label text-ink-2">
             At least one profile is required while targets are on. Turn targets off to remove them
             all.
           </p>
@@ -203,7 +210,7 @@ export function TargetsEditor() {
           <button
             type="button"
             onClick={handleSplitTargets}
-            className="flex min-h-[44px] w-full items-center t-body font-medium text-accent"
+            className="flex min-h-[44px] w-full items-center t-body t-action"
           >
             Use different targets on some days
           </button>
@@ -225,7 +232,7 @@ function ProfileCard({
   onDelete: () => void;
 }) {
   return (
-    <div className="space-y-4 rounded-2xl bg-muted p-4">
+    <div className="space-y-4 bg-wash p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex-1">
           <label htmlFor={`profile-name-${profile.id}`} className="sr-only">
@@ -237,7 +244,7 @@ function ProfileCard({
             value={profile.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
             placeholder="Profile name"
-            className="min-h-[44px] w-full border-b border-transparent bg-transparent t-heading font-semibold outline-none focus:border-border"
+            className="min-h-[44px] w-full border-b border-transparent bg-transparent t-heading font-semibold outline-none focus:border-rule"
           />
         </div>
         <button
@@ -250,7 +257,7 @@ function ProfileCard({
           title={canDelete ? "Delete profile" : "At least one profile is required"}
           disabled={!canDelete}
           onClick={onDelete}
-          className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:text-destructive disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-muted-foreground"
+          className="flex h-[44px] w-[44px] shrink-0 items-center justify-center text-ink-2 hover:text-signal disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-ink-2"
         >
           <svg
             className="h-5 w-5"
@@ -438,7 +445,7 @@ function GoalModeControl({
 
   return (
     <div>
-      <div className="t-caption text-muted-foreground">Goal</div>
+      <div className="t-caption text-ink-2">Goal</div>
       <div
         role="radiogroup"
         aria-label={`Goal for ${profileName}`}
@@ -459,8 +466,8 @@ function GoalModeControl({
               onClick={() => onUpdate({ goalMode: option })}
               onKeyDown={(e) => handleKeyDown(e, idx)}
               className={
-                "flex min-h-[44px] items-center justify-center rounded-xl px-2 text-center t-label font-medium transition-colors duration-150 " +
-                (selected ? "bg-accent text-accent-foreground" : "bg-surface text-muted-foreground")
+                "flex min-h-[44px] items-center justify-center px-2 text-center t-label font-medium transition-colors duration-150 " +
+                (selected ? "bg-ink text-paper" : "text-ink-2")
               }
             >
               {GOAL_MODE_LABELS[option]}
@@ -468,7 +475,7 @@ function GoalModeControl({
           );
         })}
       </div>
-      <p id={summaryId} className="mt-2 t-label text-muted-foreground">
+      <p id={summaryId} className="mt-2 t-label text-ink-2">
         {goalModeSummary(mode)}
       </p>
     </div>
@@ -504,8 +511,8 @@ function TargetFieldInput({
   const shown = draft ?? (value !== undefined ? String(value) : "");
 
   return (
-    <div className="rounded-xl bg-surface p-3">
-      <label htmlFor={id} className="block t-caption text-muted-foreground">
+    <div className="p-3">
+      <label htmlFor={id} className="block t-caption text-ink-2">
         {label}
       </label>
       <div className="mt-1 flex items-baseline gap-1">
@@ -524,9 +531,9 @@ function TargetFieldInput({
           }}
           onBlur={() => setDraft(null)}
           placeholder="No target"
-          className="tnum min-h-[44px] w-full min-w-0 bg-transparent t-heading font-semibold outline-none placeholder:t-label placeholder:font-normal placeholder:text-muted-foreground"
+          className="tnum min-h-[44px] w-full min-w-0 bg-transparent t-heading font-semibold outline-none placeholder:t-label placeholder:font-normal placeholder:text-ink-2"
         />
-        {suffix && <span className="t-label text-muted-foreground">{suffix}</span>}
+        {suffix && <span className="t-label text-ink-2">{suffix}</span>}
       </div>
     </div>
   );

@@ -169,7 +169,12 @@ function ToastElement({ toast, onDismiss }: { toast: ActiveToast; onDismiss: () 
           onDismiss();
         }
       }}
-      className="fixed left-1/2 z-[60] flex min-h-[44px] w-[calc(100%-2rem)] max-w-sm items-center justify-between gap-3 rounded-2xl bg-surface px-4 py-3 text-foreground shadow-lg hairline-t hairline-b touch-none cursor-pointer"
+      // A stamped block over the page, not a raised card. shadow-lg went with the
+      // radius: this world has no elevation, so the only way a notification can
+      // sit ON TOP of the paper is to be printed in the ink rather than to
+      // pretend it is floating above it. bg-wash was too close to the paper to
+      // read as a separate object at all.
+      className="fixed left-1/2 z-[60] flex min-h-[44px] w-[calc(100%-2rem)] max-w-sm cursor-pointer touch-none items-center justify-between gap-3 bg-ink px-4 py-3 text-paper rounded-md"
       style={{
         bottom: "max(calc(env(safe-area-inset-bottom) + 68px), 76px)",
         transform: `translate(-50%, ${offsetY + (entered ? 0 : 18)}px)`,
@@ -186,7 +191,9 @@ function ToastElement({ toast, onDismiss }: { toast: ActiveToast; onDismiss: () 
         <button
           type="button"
           onClick={handleAction}
-          className="flex min-h-[44px] shrink-0 items-center justify-center px-2 t-body font-semibold text-accent active:scale-95"
+          // t-action would set ink on ink here; on the stamped block the
+          // control keeps the underline but takes the paper colour.
+          className="flex min-h-[44px] shrink-0 items-center justify-center px-2 t-body font-semibold text-paper underline decoration-1 underline-offset-[3px] active:scale-95"
         >
           {toast.actionLabel}
         </button>

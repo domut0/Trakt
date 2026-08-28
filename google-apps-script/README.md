@@ -105,7 +105,7 @@ match. The confirmation names how many sets and days it is about to push, which 
 there so that "0 sets" stops you.
 
 **Your own tabs are safe.** The script only touches `sets`, `sessions`, `daily`,
-`cardio`, `habits` and `_sync`. Any other tab you add, with formulas or pivot
+`cardio`, `habits`, `Food Log` and `_sync`. Any other tab you add, with formulas or pivot
 tables over the synced data, is never read or written.
 
 **Edit these columns only:**

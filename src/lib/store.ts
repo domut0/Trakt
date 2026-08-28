@@ -22,6 +22,14 @@ import {
 } from "./plan";
 import { targetProfileFor, type GoalMode } from "./targets";
 import { seedExercises } from "./exercise-library";
+import {
+  DEFAULT_MEALS,
+  type Food,
+  type FoodEntry,
+  type Meal,
+  type Recipe,
+  type RecipeIngredient,
+} from "./food";
 
 export type ExerciseType = "main" | "accessory" | "cardio";
 
@@ -200,12 +208,18 @@ export interface BackupData {
   dailyLogs: DailyLog[];
   habits: Habit[];
   habitEntries: HabitEntry[];
+  foods: Food[] | undefined;
+  foodEntries: FoodEntry[] | undefined;
+  meals: Meal[] | undefined;
+  recipes: Recipe[] | undefined;
+  recipeIngredients: RecipeIngredient[] | undefined;
   targetProfiles: TargetProfile[];
   weekdayTargets: string[];
   targetsEnabled: boolean;
   habitsEnabled: boolean;
   toolsEnabled: boolean;
   planEnabled: boolean;
+  foodEnabled?: boolean;
   /**
    * The weekly training plan, or `undefined` for a file written before planning
    * existed and for anyone who has never planned a day.
@@ -262,6 +276,7 @@ interface State {
   habitsEnabled: boolean;
   toolsEnabled: boolean;
   planEnabled: boolean;
+  foodEnabled?: boolean;
   exercises: Exercise[];
   slots: SplitSlot[];
   sessions: WorkoutSession[];
@@ -269,6 +284,11 @@ interface State {
   dailyLogs: DailyLog[];
   habits: Habit[];
   habitEntries: HabitEntry[];
+  foods: Food[];
+  foodEntries: FoodEntry[];
+  meals: Meal[];
+  recipes: Recipe[];
+  recipeIngredients: RecipeIngredient[];
   targetProfiles: TargetProfile[];
   /** 7 profile ids, MONDAY FIRST. Resolve through targets.ts, never `getDay()`. */
   weekdayTargets: string[];
@@ -381,6 +401,31 @@ interface State {
   toggleHabit: (date: string, habitId: string) => void;
   /** Habit ids completed on a day key. */
   habitsDoneOn: (date: string) => string[];
+
+  // --- Food & meals ------------------------------------------------------
+  /**
+   * One-time meal seed from DEFAULT_MEALS. Idempotent: no-op if meals already exist.
+   */
+  seedMealsIfEmpty: () => void;
+  addMeal: (name: string) => Meal;
+  renameMeal: (id: string, name: string) => void;
+  setMealWindow: (id: string, fromMinutes: number, toMinutes: number) => void;
+  reorderMeals: (fromId: string, toId: string) => void;
+  /** Removes the meal and every foodEntry logged under it. */
+  deleteMeal: (id: string) => void;
+  upsertFood: (food: Food) => void;
+  /** Deleting a food leaves foodEntries intact: entries carry their own frozen basis. */
+  deleteFood: (id: string) => void;
+  addFoodEntry: (entry: Omit<FoodEntry, "id" | "loggedAt">) => FoodEntry;
+  updateFoodEntry: (id: string, patch: Partial<FoodEntry>) => void;
+  deleteFoodEntry: (id: string) => void;
+  upsertRecipe: (recipe: Recipe) => void;
+  /** Deletes the recipe and every recipeIngredient belonging to it. */
+  deleteRecipe: (id: string) => void;
+  setRecipeIngredients: (recipeId: string, ingredients: RecipeIngredient[]) => void;
+  copyMealFrom: (fromDate: string, fromMealId: string, toDate: string, toMealId: string) => number;
+  setFoodEnabled: (v: boolean) => void;
+
   reorderSlots: (fromId: string, toId: string) => void;
   /** Full backup restore. Assumes `data` has already been validated by
    * `parseBackup` — replaces IndexedDB first (single transaction; a failure
@@ -968,6 +1013,11 @@ export function parseBackup(text: string): ParseBackupResult {
   const rawProfiles = (parsed as { targetProfiles?: unknown }).targetProfiles;
   const rawHabits = (parsed as { habits?: unknown }).habits;
   const rawHabitEntries = (parsed as { habitEntries?: unknown }).habitEntries;
+  const rawFoods = (parsed as { foods?: unknown }).foods;
+  const rawFoodEntries = (parsed as { foodEntries?: unknown }).foodEntries;
+  const rawMeals = (parsed as { meals?: unknown }).meals;
+  const rawRecipes = (parsed as { recipes?: unknown }).recipes;
+  const rawRecipeIngredients = (parsed as { recipeIngredients?: unknown }).recipeIngredients;
   const rawPlannedWeek = (parsed as { plannedWeek?: unknown }).plannedWeek;
   const weekdayTargets =
     Array.isArray(rawWeekdays) && rawWeekdays.length === 7 && rawWeekdays.every(isNonEmptyString)
@@ -1000,12 +1050,20 @@ export function parseBackup(text: string): ParseBackupResult {
         Array.isArray(rawHabitEntries) && rawHabitEntries.every(isHabitEntry)
           ? (rawHabitEntries as HabitEntry[])
           : [],
+      foods: Array.isArray(rawFoods) ? (rawFoods as Food[]) : undefined,
+      foodEntries: Array.isArray(rawFoodEntries) ? (rawFoodEntries as FoodEntry[]) : undefined,
+      meals: Array.isArray(rawMeals) ? (rawMeals as Meal[]) : undefined,
+      recipes: Array.isArray(rawRecipes) ? (rawRecipes as Recipe[]) : undefined,
+      recipeIngredients: Array.isArray(rawRecipeIngredients)
+        ? (rawRecipeIngredients as RecipeIngredient[])
+        : undefined,
       targetProfiles,
       weekdayTargets: safeWeekdays,
       targetsEnabled: (parsed as { targetsEnabled?: unknown }).targetsEnabled === true,
       habitsEnabled: (parsed as { habitsEnabled?: unknown }).habitsEnabled === true,
       toolsEnabled: (parsed as { toolsEnabled?: unknown }).toolsEnabled === true,
       planEnabled: (parsed as { planEnabled?: unknown }).planEnabled === true,
+      foodEnabled: (parsed as { foodEnabled?: unknown }).foodEnabled === true,
       // Anything that is not a well-formed week becomes "no plan" rather than an
       // import failure, matching how the file's targets and habits degrade: a
       // hand-edited plan is not worth refusing someone their six weeks of sets
@@ -1064,6 +1122,7 @@ function persistSettingsFrom(s: State) {
     targetProfiles: s.targetProfiles,
     weekdayTargets: s.weekdayTargets,
     planEnabled: s.planEnabled,
+    foodEnabled: s.foodEnabled,
     plannedWeek: s.plannedWeek,
   };
   safeWrite(() => db.meta.put(settings));
@@ -1076,6 +1135,7 @@ export const useStore = create<State>((set, get) => ({
   habitsEnabled: false,
   toolsEnabled: false,
   planEnabled: false,
+  foodEnabled: false,
   exercises: [],
   slots: [],
   sessions: [],
@@ -1083,6 +1143,11 @@ export const useStore = create<State>((set, get) => ({
   dailyLogs: [],
   habits: [],
   habitEntries: [],
+  foods: [],
+  foodEntries: [],
+  meals: [],
+  recipes: [],
+  recipeIngredients: [],
   ...defaultTargets(),
   activeSessionId: undefined,
   currentExerciseId: undefined,
@@ -1131,6 +1196,11 @@ export const useStore = create<State>((set, get) => ({
           dailyLogs: [],
           habits: [], // the checklist starts empty and opt-in
           habitEntries: [],
+          foods: [],
+          foodEntries: [],
+          meals: [],
+          recipes: [],
+          recipeIngredients: [],
           unit: settings.unit,
           chartsEnabled: true,
           targetsEnabled: false,
@@ -1140,6 +1210,7 @@ export const useStore = create<State>((set, get) => ({
           // absent already means "off, nothing planned" on read, so stamping
           // the default onto storage would buy nothing (same call as `goalMode`).
           planEnabled: false,
+          foodEnabled: false,
           plannedWeek: undefined,
           ...targets,
           activeSessionId: undefined,
@@ -1160,6 +1231,11 @@ export const useStore = create<State>((set, get) => ({
         dailyLogs: data.dailyLogs,
         habits: data.habits,
         habitEntries: data.habitEntries,
+        foods: data.foods,
+        foodEntries: data.foodEntries,
+        meals: data.meals,
+        recipes: data.recipes,
+        recipeIngredients: data.recipeIngredients,
         unit: data.settings.unit,
         chartsEnabled: data.settings.chartsEnabled ?? true,
         targetsEnabled: data.settings.targetsEnabled ?? false,
@@ -1171,6 +1247,7 @@ export const useStore = create<State>((set, get) => ({
         // existed has neither key, and no migration is needed to make it mean
         // "no plan" (see the note on `plannedWeek` in db.ts).
         planEnabled: data.settings.planEnabled ?? false,
+        foodEnabled: data.settings.foodEnabled ?? false,
         plannedWeek: data.settings.plannedWeek,
         activeSessionId: data.activeSession.activeSessionId,
         currentExerciseId: data.activeSession.currentExerciseId,
@@ -1653,6 +1730,177 @@ export const useStore = create<State>((set, get) => ({
       .habitEntries.filter((e) => e.date === date)
       .map((e) => e.habitId),
 
+  // --- Food & meals ------------------------------------------------------
+
+  seedMealsIfEmpty: () => {
+    if (get().meals.length > 0) return;
+    const seeded: Meal[] = DEFAULT_MEALS.map((m) => ({
+      ...m,
+      id: `m_${uid()}`,
+    }));
+    set({ meals: seeded });
+    safeWrite(() => db.meals.bulkPut(seeded));
+  },
+
+  addMeal: (name) => {
+    const ranks = get().meals.map((m) => m.rank);
+    const meal: Meal = {
+      id: `m_${uid()}`,
+      name: name.trim() || "Untitled",
+      fromMinutes: 0,
+      toMinutes: 0,
+      rank: ranks.length ? Math.max(...ranks) + 1 : 0,
+    };
+    set({ meals: [...get().meals, meal] });
+    safeWrite(() => db.meals.put(meal));
+    return meal;
+  },
+
+  renameMeal: (id, name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    set({ meals: get().meals.map((m) => (m.id === id ? { ...m, name: trimmed } : m)) });
+    const updated = get().meals.find((m) => m.id === id);
+    if (updated) safeWrite(() => db.meals.put(updated));
+  },
+
+  setMealWindow: (id, fromMinutes, toMinutes) => {
+    set({ meals: get().meals.map((m) => (m.id === id ? { ...m, fromMinutes, toMinutes } : m)) });
+    const updated = get().meals.find((m) => m.id === id);
+    if (updated) safeWrite(() => db.meals.put(updated));
+  },
+
+  reorderMeals: (fromId, toId) => {
+    const meals = [...get().meals].sort((a, b) => a.rank - b.rank);
+    const fromIdx = meals.findIndex((m) => m.id === fromId);
+    const toIdx = meals.findIndex((m) => m.id === toId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = meals.splice(fromIdx, 1);
+    meals.splice(toIdx, 0, moved);
+    const reordered = meals.map((m, i) => ({ ...m, rank: i }));
+    set({ meals: reordered });
+    safeWrite(() => db.meals.bulkPut(reordered));
+  },
+
+  deleteMeal: (id) => {
+    // Entries are REASSIGNED, never deleted with the meal.
+    //
+    // Cascading would mean tidying up a meal slot you stopped using silently
+    // rewrote every day you ever logged to it. Decision 6 derives day totals
+    // from entries, so those days would quietly report different numbers than
+    // they did yesterday, and nothing would say why. Moving the entries keeps
+    // every total identical and only changes which heading they sit under.
+    const meals = get().meals;
+    // Refusing on the last meal is not a guard against a stray click, it is
+    // structural: an entry with nowhere to live could never be rendered again.
+    if (meals.length <= 1) return;
+    const fallback = [...meals].filter((m) => m.id !== id).sort((a, b) => a.rank - b.rank)[0];
+
+    const moved = get()
+      .foodEntries.filter((e) => e.mealId === id)
+      .map((e) => ({ ...e, mealId: fallback.id }));
+
+    set({
+      meals: meals.filter((m) => m.id !== id),
+      foodEntries: get().foodEntries.map((e) =>
+        e.mealId === id ? { ...e, mealId: fallback.id } : e,
+      ),
+    });
+    safeWrite(() => db.meals.delete(id));
+    if (moved.length) safeWrite(() => db.foodEntries.bulkPut(moved));
+  },
+
+  upsertFood: (food) => {
+    const existing = get().foods.some((f) => f.id === food.id);
+    const next = existing
+      ? get().foods.map((f) => (f.id === food.id ? food : f))
+      : [...get().foods, food];
+    set({ foods: next });
+    safeWrite(() => db.foods.put(food));
+  },
+
+  deleteFood: (id) => {
+    // Deliberately does not touch foodEntries: logged entries carry their own
+    // frozen basis, so history survives deleting or editing a catalogue food.
+    set({ foods: get().foods.filter((f) => f.id !== id) });
+    safeWrite(() => db.foods.delete(id));
+  },
+
+  addFoodEntry: (entry) => {
+    const fullEntry: FoodEntry = {
+      ...entry,
+      id: `fe_${uid()}`,
+      loggedAt: Date.now(),
+    };
+    set({ foodEntries: [...get().foodEntries, fullEntry] });
+    safeWrite(() => db.foodEntries.put(fullEntry));
+    return fullEntry;
+  },
+
+  updateFoodEntry: (id, patch) => {
+    set({
+      foodEntries: get().foodEntries.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+    });
+    const updated = get().foodEntries.find((e) => e.id === id);
+    if (updated) safeWrite(() => db.foodEntries.put(updated));
+  },
+
+  deleteFoodEntry: (id) => {
+    set({ foodEntries: get().foodEntries.filter((e) => e.id !== id) });
+    safeWrite(() => db.foodEntries.delete(id));
+  },
+
+  upsertRecipe: (recipe) => {
+    const existing = get().recipes.some((r) => r.id === recipe.id);
+    const next = existing
+      ? get().recipes.map((r) => (r.id === recipe.id ? recipe : r))
+      : [...get().recipes, recipe];
+    set({ recipes: next });
+    safeWrite(() => db.recipes.put(recipe));
+  },
+
+  deleteRecipe: (id) => {
+    set({
+      recipes: get().recipes.filter((r) => r.id !== id),
+      recipeIngredients: get().recipeIngredients.filter((ri) => ri.recipeId !== id),
+    });
+    safeWrite(() => db.recipes.delete(id));
+    // Indexed on recipeId so this sweep does not scan the table.
+    safeWrite(() => db.recipeIngredients.where("recipeId").equals(id).delete());
+  },
+
+  setRecipeIngredients: (recipeId, ingredients) => {
+    const remaining = get().recipeIngredients.filter((ri) => ri.recipeId !== recipeId);
+    set({ recipeIngredients: [...remaining, ...ingredients] });
+    safeWrite(async () => {
+      await db.recipeIngredients.where("recipeId").equals(recipeId).delete();
+      if (ingredients.length > 0) {
+        await db.recipeIngredients.bulkPut(ingredients);
+      }
+    });
+  },
+
+  copyMealFrom: (fromDate, fromMealId, toDate, toMealId) => {
+    const source = get().foodEntries.filter((e) => e.date === fromDate && e.mealId === fromMealId);
+    if (source.length === 0) return 0;
+    const now = Date.now();
+    const newEntries: FoodEntry[] = source.map((e, idx) => ({
+      ...e,
+      id: `fe_${uid()}`,
+      date: toDate,
+      mealId: toMealId,
+      loggedAt: now + idx,
+    }));
+    set({ foodEntries: [...get().foodEntries, ...newEntries] });
+    safeWrite(() => db.foodEntries.bulkPut(newEntries));
+    return newEntries.length;
+  },
+
+  setFoodEnabled: (v) => {
+    set({ foodEnabled: v });
+    persistSettingsFrom(get());
+  },
+
   reorderSlots: (fromId, toId) => {
     const slots = [...get().slots].sort((a, b) => a.rotationOrder - b.rotationOrder);
     const fromIdx = slots.findIndex((s) => s.id === fromId);
@@ -1679,6 +1927,11 @@ export const useStore = create<State>((set, get) => ({
       dailyLogs: data.dailyLogs,
       habits: data.habits,
       habitEntries: data.habitEntries,
+      foods: data.foods ?? [],
+      foodEntries: data.foodEntries ?? [],
+      meals: data.meals ?? [],
+      recipes: data.recipes ?? [],
+      recipeIngredients: data.recipeIngredients ?? [],
       targetProfiles: data.targetProfiles,
       weekdayTargets: data.weekdayTargets,
       targetsEnabled: data.targetsEnabled,
@@ -1692,6 +1945,7 @@ export const useStore = create<State>((set, get) => ({
       // corrected it. A file with no plan carries `undefined`, which lands the
       // reader on "never planned" - the same state the file's author was in.
       planEnabled: data.planEnabled,
+      foodEnabled: data.foodEnabled,
       plannedWeek: data.plannedWeek,
       activeSessionId: undefined,
       currentExerciseId: undefined,
@@ -1714,11 +1968,17 @@ export const useStore = create<State>((set, get) => ({
       dailyLogs: [],
       habits: [],
       habitEntries: [],
+      foods: [],
+      foodEntries: [],
+      meals: [],
+      recipes: [],
+      recipeIngredients: [],
       ...targets,
       targetsEnabled: false,
       habitsEnabled: false,
       toolsEnabled: false,
       planEnabled: false,
+      foodEnabled: false,
       plannedWeek: undefined,
       unit: "lbs",
     });
@@ -1730,10 +1990,16 @@ export const useStore = create<State>((set, get) => ({
       dailyLogs: [],
       habits: [],
       habitEntries: [],
+      foods: [],
+      foodEntries: [],
+      meals: [],
+      recipes: [],
+      recipeIngredients: [],
       ...targets,
       targetsEnabled: false,
       habitsEnabled: false,
       toolsEnabled: false,
+      foodEnabled: false,
       unit: "lbs",
       chartsEnabled: true,
       planEnabled: false,

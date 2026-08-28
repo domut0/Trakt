@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
+import type { Food, FoodEntry, Meal, Recipe, RecipeIngredient } from "./food";
 import type { PlannedWeek } from "./plan";
 import type { SyncBase } from "./sync";
 import type {
@@ -23,7 +24,8 @@ import type {
  * and calling any of these during server render will throw.
  */
 
-export type MetaKey = "settings" | "activeSession" | "syncConfig" | "syncBase" | "deviceId";
+export type MetaKey =
+  "settings" | "activeSession" | "syncConfig" | "syncBase" | "deviceId" | "usdaKey";
 
 export interface SettingsMeta {
   key: "settings";
@@ -50,6 +52,8 @@ export interface SettingsMeta {
   weekdayTargets?: string[];
   /** Opt-in: planning main lifts on a weekly template. */
   planEnabled?: boolean;
+  /** Opt-in: food logging, meals and the food catalogue. */
+  foodEnabled?: boolean;
   /**
    * The weekly training plan, as 7 entries, MONDAY FIRST for the same reason
    * `weekdayTargets` is. Resolve it through plan.ts, never with a raw
@@ -130,7 +134,25 @@ export interface SyncBaseMeta {
   base: SyncBase;
 }
 
-type MetaRecord = SettingsMeta | ActiveSessionMeta | SyncConfigMeta | SyncBaseMeta | DeviceIdMeta;
+/**
+ * The user's own USDA FoodData Central key.
+ *
+ * Its own meta row, and deliberately absent from BackupData, following
+ * SyncConfigMeta. The case is weaker than the sync secret, which is a bearer
+ * capability over the sheet: a data.gov key grants rate limit and nothing else.
+ * It is kept out of exports anyway, because a habit of putting keys in files
+ * people share is the wrong habit to start, and the cost is retyping one field.
+ *
+ * A registered key is required rather than optional. DEMO_KEY was measured at
+ * 10 requests per hour, which is not enough to search with even once.
+ */
+export interface UsdaKeyMeta {
+  key: "usdaKey";
+  apiKey: string;
+}
+
+type MetaRecord =
+  SettingsMeta | ActiveSessionMeta | SyncConfigMeta | SyncBaseMeta | DeviceIdMeta | UsdaKeyMeta;
 
 class WorkoutDb extends Dexie {
   exercises!: EntityTable<Exercise, "id">;
@@ -141,6 +163,11 @@ class WorkoutDb extends Dexie {
   dailyLogs!: EntityTable<DailyLog, "date">;
   habits!: EntityTable<Habit, "id">;
   habitEntries!: EntityTable<HabitEntry, "id">;
+  foods!: EntityTable<Food, "id">;
+  foodEntries!: EntityTable<FoodEntry, "id">;
+  meals!: EntityTable<Meal, "id">;
+  recipes!: EntityTable<Recipe, "id">;
+  recipeIngredients!: EntityTable<RecipeIngredient, "id">;
 
   constructor() {
     super("workout-tracker");
@@ -177,6 +204,26 @@ class WorkoutDb extends Dexie {
     this.version(3).stores({
       habits: "id",
       habitEntries: "id, date, habitId",
+    });
+    //
+    // v4 adds food logging, which DOES need a real bump for the same reason v3
+    // did: new tables with new indexes, not new fields on existing records.
+    //
+    // `foodEntries` is indexed on `date` because Today reads a whole day at
+    // once, and on `mealId` because deleting a meal has to find every entry
+    // that pointed at it. `foods` is indexed on `barcode` for scan lookup and
+    // on `name` for the catalogue listing.
+    //
+    // Deliberately NOT indexed: the soft `foodId` on an entry. Nothing ever
+    // queries entries by food, because nothing resolves an entry's macros by
+    // looking its food back up -- the basis is frozen onto the entry itself.
+    // Indexing it would advertise a relationship the design does not have.
+    this.version(4).stores({
+      foods: "id, barcode, name",
+      foodEntries: "id, date, mealId",
+      meals: "id",
+      recipes: "id",
+      recipeIngredients: "id, recipeId",
     });
   }
 }
@@ -239,6 +286,11 @@ export interface AllData {
   dailyLogs: DailyLog[];
   habits: Habit[];
   habitEntries: HabitEntry[];
+  foods: Food[];
+  foodEntries: FoodEntry[];
+  meals: Meal[];
+  recipes: Recipe[];
+  recipeIngredients: RecipeIngredient[];
   settings: SettingsMeta;
   activeSession: ActiveSessionMeta;
 }
@@ -253,6 +305,11 @@ export async function loadAll(): Promise<AllData> {
     dailyLogs,
     habits,
     habitEntries,
+    foods,
+    foodEntries,
+    meals,
+    recipes,
+    recipeIngredients,
     settingsMeta,
     activeSessionMeta,
   ] = await Promise.all([
@@ -263,6 +320,11 @@ export async function loadAll(): Promise<AllData> {
     db.dailyLogs.toArray(),
     db.habits.toArray(),
     db.habitEntries.toArray(),
+    db.foods.toArray(),
+    db.foodEntries.toArray(),
+    db.meals.toArray(),
+    db.recipes.toArray(),
+    db.recipeIngredients.toArray(),
     db.meta.get("settings"),
     db.meta.get("activeSession"),
   ]);
@@ -286,6 +348,11 @@ export async function loadAll(): Promise<AllData> {
     dailyLogs,
     habits,
     habitEntries,
+    foods,
+    foodEntries,
+    meals,
+    recipes,
+    recipeIngredients,
     settings,
     activeSession: (activeSessionMeta as ActiveSessionMeta) ?? EMPTY_ACTIVE_SESSION,
   };
@@ -432,6 +499,20 @@ export async function saveSyncConfig(config: SyncConfigMeta): Promise<void> {
 
 export async function deleteSyncConfig(): Promise<void> {
   await db.meta.delete("syncConfig");
+}
+
+export async function loadUsdaKey(): Promise<string | undefined> {
+  return ((await db.meta.get("usdaKey")) as UsdaKeyMeta | undefined)?.apiKey;
+}
+
+export async function saveUsdaKey(apiKey: string): Promise<void> {
+  const trimmed = apiKey.trim();
+  if (!trimmed) {
+    await db.meta.delete("usdaKey");
+    return;
+  }
+  const record: UsdaKeyMeta = { key: "usdaKey", apiKey: trimmed };
+  await db.meta.put(record);
 }
 
 export async function loadSyncBase(): Promise<SyncBase | undefined> {

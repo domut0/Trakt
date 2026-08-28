@@ -2,6 +2,8 @@ import {
   cardioColumns,
   cardioSessionsInOrder,
   dailyLogColumns,
+  foodEntriesInOrder,
+  foodEntryColumns,
   habitEntriesInOrder,
   habitEntryColumns,
   sessionColumns,
@@ -22,6 +24,7 @@ import type {
   WorkoutSession,
   WorkoutSet,
 } from "./store";
+import type { Food, FoodEntry, Meal, Recipe, RecipeIngredient } from "./food";
 
 /**
  * Google Sheets sync: pure logic only.
@@ -60,6 +63,7 @@ export const SHEET_TABS = {
   daily: "daily",
   cardio: "cardio",
   habits: "habits",
+  foodLog: "Food Log",
   /** Written by the Apps Script, not by the app. Leading underscore sorts it last. */
   meta: "_sync",
 } as const;
@@ -136,6 +140,11 @@ const SYNC_SOURCE_KEYS = [
   "dailyLogs",
   "habits",
   "habitEntries",
+  "foods",
+  "foodEntries",
+  "meals",
+  "recipes",
+  "recipeIngredients",
   "unit",
 ] as const;
 
@@ -165,6 +174,11 @@ export interface SyncSource {
   dailyLogs: readonly DailyLog[];
   habits: readonly Habit[];
   habitEntries: readonly HabitEntry[];
+  foods: readonly Food[];
+  foodEntries: readonly FoodEntry[];
+  meals: readonly Meal[];
+  recipes: readonly Recipe[];
+  recipeIngredients: readonly RecipeIngredient[];
   unit: "lbs" | "kg";
 }
 
@@ -208,7 +222,18 @@ function withIdColumn<T extends { id: string }>(columns: ColumnSpec<T>[]): Colum
  * the push comes back.
  */
 export function buildSheetTabs(source: SyncSource): Record<string, CellValue[][]> {
-  const { exercises, slots, sessions, sets, dailyLogs, habits, habitEntries, unit } = source;
+  const {
+    exercises,
+    slots,
+    sessions,
+    sets,
+    dailyLogs,
+    habits,
+    habitEntries,
+    foodEntries,
+    meals,
+    unit,
+  } = source;
 
   return {
     [SHEET_TABS.sets]: toRows(
@@ -229,6 +254,7 @@ export function buildSheetTabs(source: SyncSource): Record<string, CellValue[][]
       habitEntriesInOrder(habitEntries, habits),
       habitEntryColumns(habits),
     ),
+    [SHEET_TABS.foodLog]: toRows(foodEntriesInOrder(foodEntries, meals), foodEntryColumns(meals)),
   };
 }
 

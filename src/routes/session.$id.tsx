@@ -22,9 +22,7 @@ function SessionPage() {
   if (!session) {
     return (
       <AppShell>
-        <div className="px-5 py-20 text-center t-body text-muted-foreground">
-          Session not found.
-        </div>
+        <div className="px-5 py-20 text-center t-body text-ink-2">Session not found.</div>
       </AppShell>
     );
   }
@@ -36,9 +34,7 @@ function SessionPage() {
   if (!isCardio && !slot) {
     return (
       <AppShell>
-        <div className="px-5 py-20 text-center t-body text-muted-foreground">
-          Session not found.
-        </div>
+        <div className="px-5 py-20 text-center t-body text-ink-2">Session not found.</div>
       </AppShell>
     );
   }
@@ -51,7 +47,7 @@ function SessionPage() {
       <div className="flex items-center justify-between px-5 pt-14 pb-2">
         <button
           onClick={() => router.navigate({ to: "/" })}
-          className="-my-3 flex min-h-[44px] items-center t-body font-medium text-accent"
+          className="-my-3 flex min-h-[44px] items-center t-body font-medium t-action"
         >
           Back
         </button>
@@ -61,7 +57,7 @@ function SessionPage() {
         />
       </div>
       <header className="px-5 pb-2">
-        <div className="t-caption text-muted-foreground">
+        <div className="t-caption text-ink-2">
           {d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
         </div>
         <h1 className="mt-1 text-balance break-words t-title">{title}</h1>
@@ -71,10 +67,9 @@ function SessionPage() {
           <div className="group-list">
             {session.durationMinutes != null && (
               <div className="group-row">
-                <span className="t-body text-muted-foreground">Duration</span>
+                <span className="t-body text-ink-2">Duration</span>
                 <span className="t-stat">
-                  {session.durationMinutes}{" "}
-                  <span className="t-label text-muted-foreground">min</span>
+                  {session.durationMinutes} <span className="t-label text-ink-2">min</span>
                 </span>
               </div>
             )}
@@ -82,12 +77,10 @@ function SessionPage() {
               <div
                 className={`group-row ${session.durationMinutes != null ? "group-row-sep" : ""}`}
               >
-                <span className="t-body text-muted-foreground">Distance</span>
+                <span className="t-body text-ink-2">Distance</span>
                 <span className="t-stat">
                   {session.distance}{" "}
-                  <span className="t-label text-muted-foreground">
-                    {unit === "lbs" ? "mi" : "km"}
-                  </span>
+                  <span className="t-label text-ink-2">{unit === "lbs" ? "mi" : "km"}</span>
                 </span>
               </div>
             )}
@@ -97,10 +90,8 @@ function SessionPage() {
                   session.durationMinutes != null || session.distance != null ? "group-row-sep" : ""
                 }`}
               >
-                <span className="t-caption text-muted-foreground">Notes</span>
-                <div className="mt-1 t-body text-foreground whitespace-pre-wrap">
-                  {session.setupNote}
-                </div>
+                <span className="t-caption text-ink-2">Notes</span>
+                <div className="mt-1 t-body text-ink whitespace-pre-wrap">{session.setupNote}</div>
               </div>
             )}
           </div>

@@ -213,7 +213,7 @@ export function LogSetSheet({
       style={{ opacity: dragY > 0 ? Math.max(0, 1 - dragY / 300) : 1 }}
     >
       <div
-        className="w-full max-w-md rounded-t-3xl bg-surface anim-sheet"
+        className="w-full max-w-md bg-paper rule-heavy-t anim-sheet rounded-md"
         onClick={(e) => e.stopPropagation()}
         style={{
           paddingBottom: `max(env(safe-area-inset-bottom), ${20 + keyboardOffset}px)`,
@@ -229,7 +229,7 @@ export function LogSetSheet({
           className="flex min-h-[44px] w-full cursor-grab touch-none items-center active:cursor-grabbing"
           aria-label="Drag down to close sheet"
         >
-          <div className="mx-auto h-1 w-10 rounded-full bg-border" />
+          <div className="mx-auto h-1 w-10 bg-border" />
         </div>
 
         {pickingExercise ? (
@@ -240,9 +240,9 @@ export function LogSetSheet({
               value={exerciseQuery}
               onChange={(e) => setExerciseQuery(e.target.value)}
               placeholder="Search or add exercise"
-              className="w-full bg-transparent t-heading font-semibold tracking-tight outline-none placeholder:text-muted-foreground"
+              className="w-full bg-transparent t-heading font-semibold tracking-tight outline-none placeholder:text-ink-2"
             />
-            <div className="mt-3 group-list bg-muted/40 max-h-72 overflow-y-auto">
+            <div className="mt-3 group-list bg-wash max-h-72 overflow-y-auto">
               {filtered.map((e, idx) => (
                 <button
                   key={e.id}
@@ -258,9 +258,7 @@ export function LogSetSheet({
                   className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""}`}
                 >
                   <span className="t-body font-medium">{e.name}</span>
-                  <span className="t-caption text-muted-foreground">
-                    {exerciseTypeLabel(e.type)}
-                  </span>
+                  <span className="t-caption text-ink-2">{exerciseTypeLabel(e.type)}</span>
                 </button>
               ))}
               {exerciseQuery.trim() &&
@@ -278,7 +276,7 @@ export function LogSetSheet({
                       setRpe("");
                       setNote("");
                     }}
-                    className={`group-row w-full text-left text-accent ${
+                    className={`group-row w-full text-left t-action ${
                       filtered.length > 0 ? "group-row-sep" : ""
                     }`}
                   >
@@ -292,25 +290,22 @@ export function LogSetSheet({
           <div className="px-5 pb-5">
             <div className="flex items-baseline justify-between">
               <button onClick={() => setPickingExercise(true)} className="text-left">
-                <div className="t-caption text-muted-foreground">Exercise</div>
+                <div className="t-caption text-ink-2">Exercise</div>
                 <div className="mt-0.5 t-heading font-semibold tracking-tight">{chosen?.name}</div>
               </button>
               <button
                 onClick={() => setPickingExercise(true)}
-                className="flex min-h-[44px] items-center t-label font-medium text-accent"
+                className="flex min-h-[44px] items-center t-label t-action"
               >
                 Change
               </button>
             </div>
 
             {/* Grouped list of labelled set logging rows */}
-            <div className="mt-4 group-list bg-muted/40">
+            <div className="mt-4 group-list bg-wash">
               {/* Setup note */}
               <div className="group-row">
-                <label
-                  htmlFor="set-field-note"
-                  className="t-body font-medium text-foreground shrink-0"
-                >
+                <label htmlFor="set-field-note" className="t-body font-medium text-ink shrink-0">
                   Setup
                 </label>
                 <input
@@ -326,13 +321,13 @@ export function LogSetSheet({
                     }
                   }}
                   placeholder={suggestedNote ?? "Add notes: seat, pins, grip..."}
-                  className="t-body w-full bg-transparent text-right outline-none placeholder:text-muted-foreground"
+                  className="t-body w-full bg-transparent text-right outline-none placeholder:text-ink-2"
                 />
               </div>
 
               {/* Weight */}
               <div className="group-row group-row-sep">
-                <label htmlFor="set-field-weight" className="t-body font-medium text-foreground">
+                <label htmlFor="set-field-weight" className="t-body font-medium text-ink">
                   Weight
                 </label>
                 <div className="flex min-w-0 items-baseline justify-end gap-1">
@@ -357,15 +352,15 @@ export function LogSetSheet({
                       }
                     }}
                     placeholder={suggestion.weight != null ? String(suggestion.weight) : "0"}
-                    className="t-stat w-28 bg-transparent text-right outline-none placeholder:t-body placeholder:text-muted-foreground"
+                    className="t-stat w-28 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
                   />
-                  <span className="t-label text-muted-foreground">{unit}</span>
+                  <span className="t-label text-ink-2">{unit}</span>
                 </div>
               </div>
 
               {/* Reps */}
               <div className="group-row group-row-sep">
-                <label htmlFor="set-field-reps" className="t-body font-medium text-foreground">
+                <label htmlFor="set-field-reps" className="t-body font-medium text-ink">
                   Reps
                 </label>
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -375,7 +370,7 @@ export function LogSetSheet({
                     aria-label="Decrease reps"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => stepReps(-1)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center t-body font-semibold text-ink active:scale-95"
                   >
                     −
                   </button>
@@ -400,7 +395,7 @@ export function LogSetSheet({
                       }
                     }}
                     placeholder={suggestion.reps != null ? String(suggestion.reps) : "0"}
-                    className="t-stat w-20 bg-transparent text-center outline-none placeholder:t-body placeholder:text-muted-foreground"
+                    className="t-stat w-20 bg-transparent text-center outline-none placeholder:t-body placeholder:text-ink-2"
                   />
                   <button
                     type="button"
@@ -408,7 +403,7 @@ export function LogSetSheet({
                     aria-label="Increase reps"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => stepReps(1)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center t-body font-semibold text-ink active:scale-95"
                   >
                     +
                   </button>
@@ -417,7 +412,7 @@ export function LogSetSheet({
 
               {/* RPE */}
               <div className="group-row group-row-sep">
-                <label htmlFor="set-field-rpe" className="t-body font-medium text-foreground">
+                <label htmlFor="set-field-rpe" className="t-body font-medium text-ink">
                   RPE
                 </label>
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -427,7 +422,7 @@ export function LogSetSheet({
                     aria-label="Decrease RPE"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => stepRpe(-1)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center t-body font-semibold text-ink active:scale-95"
                   >
                     −
                   </button>
@@ -452,7 +447,7 @@ export function LogSetSheet({
                       }
                     }}
                     placeholder={suggestion.rpe != null ? String(suggestion.rpe) : "-"}
-                    className="t-stat w-20 bg-transparent text-center outline-none placeholder:t-body placeholder:text-muted-foreground"
+                    className="t-stat w-20 bg-transparent text-center outline-none placeholder:t-body placeholder:text-ink-2"
                   />
                   <button
                     type="button"
@@ -460,7 +455,7 @@ export function LogSetSheet({
                     aria-label="Increase RPE"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => stepRpe(1)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center t-body font-semibold text-ink active:scale-95"
                   >
                     +
                   </button>
@@ -469,7 +464,7 @@ export function LogSetSheet({
 
               {/* Sets */}
               <div className="group-row group-row-sep">
-                <span className="t-body font-medium text-foreground">Target sets</span>
+                <span className="t-body font-medium text-ink">Target sets</span>
                 <div className="flex items-center gap-1.5 min-w-0">
                   <button
                     type="button"
@@ -477,11 +472,11 @@ export function LogSetSheet({
                     aria-label="Decrease sets"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setTargetSets(Math.max(1, targetSets - 1))}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center t-body font-semibold text-ink active:scale-95"
                   >
                     −
                   </button>
-                  <span className="t-stat font-semibold text-foreground w-12 text-center">
+                  <span className="t-stat font-semibold text-ink w-12 text-center">
                     {targetSets}
                   </span>
                   <button
@@ -490,7 +485,7 @@ export function LogSetSheet({
                     aria-label="Increase sets"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setTargetSets(targetSets + 1)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface t-body font-semibold text-foreground active:scale-95"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center t-body font-semibold text-ink active:scale-95"
                   >
                     +
                   </button>
@@ -501,14 +496,14 @@ export function LogSetSheet({
             <div className="mt-5 flex items-center gap-2">
               <button
                 onClick={onClose}
-                className="flex-1 min-h-[44px] rounded-full py-3 t-body font-medium text-muted-foreground"
+                className="flex-1 min-h-[44px] py-3 t-body font-medium text-ink-2"
               >
                 Cancel
               </button>
               <button
                 onClick={doLog}
                 disabled={!canLog}
-                className="flex-[2] min-h-[44px] rounded-full bg-accent py-3 t-body font-semibold text-accent-foreground disabled:opacity-40"
+                className="flex-[2] min-h-[44px] bg-ink py-3 t-body font-semibold text-paper disabled:opacity-40 rounded-md"
               >
                 {targetSets > 1 ? `Log set 1 of ${targetSets}` : "Log set"}
               </button>
@@ -573,8 +568,8 @@ export function NumField({
   inputRef?: (el: HTMLInputElement | null) => void;
 }) {
   return (
-    <div className="rounded-xl bg-muted p-3">
-      <div className="t-caption text-muted-foreground">{label}</div>
+    <div className="bg-wash p-3">
+      <div className="t-caption text-ink-2">{label}</div>
       <div className="mt-1 flex items-center justify-between gap-1">
         {onStep && (
           <button
@@ -583,7 +578,7 @@ export function NumField({
             aria-label={`Decrease ${label}`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onStep(-1)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface t-heading font-semibold text-foreground hairline-t hairline-b active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center t-heading font-semibold text-ink hairline-t hairline-b active:scale-95"
           >
             −
           </button>
@@ -611,11 +606,11 @@ export function NumField({
               }
             }}
             placeholder={placeholder ?? "0"}
-            className={`t-stat w-full bg-transparent font-semibold outline-none placeholder:t-body placeholder:text-muted-foreground ${
+            className={`t-stat w-full bg-transparent font-semibold outline-none placeholder:t-body placeholder:text-ink-2 ${
               onStep ? "text-center" : ""
             }`}
           />
-          {suffix && <span className="t-label text-muted-foreground">{suffix}</span>}
+          {suffix && <span className="t-label text-ink-2">{suffix}</span>}
         </div>
         {onStep && (
           <button
@@ -624,7 +619,7 @@ export function NumField({
             aria-label={`Increase ${label}`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onStep(1)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface t-heading font-semibold text-foreground hairline-t hairline-b active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center t-heading font-semibold text-ink hairline-t hairline-b active:scale-95"
           >
             +
           </button>

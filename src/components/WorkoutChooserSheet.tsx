@@ -81,15 +81,13 @@ export function WorkoutChooserSheet({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-3xl bg-surface p-5 anim-popup"
+        className="w-full max-w-sm bg-paper rule-heavy-t p-5 anim-popup rounded-md"
         onClick={(e) => e.stopPropagation()}
       >
         {mode === "choose" ? (
           <div>
-            <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-border" />
-            <h2 className="mt-3 text-center t-heading font-medium text-muted-foreground">
-              Log a workout
-            </h2>
+            <div className="mx-auto mb-1 h-1 w-10 bg-border" />
+            <h2 className="mt-3 text-center t-heading font-medium text-ink-2">Log a workout</h2>
             <div className="mt-5 flex items-center justify-center gap-10 py-2">
               <button
                 type="button"
@@ -97,10 +95,10 @@ export function WorkoutChooserSheet({
                 aria-label="Log strength training workout"
                 className="flex flex-col items-center gap-2"
               >
-                <span className="flex h-20 w-20 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                <span className="flex h-20 w-20 items-center justify-center bg-ink text-paper rounded-md">
                   <StrengthIcon />
                 </span>
-                <span className="t-label font-medium text-foreground">Strength training</span>
+                <span className="t-label font-medium text-ink">Strength training</span>
               </button>
               <button
                 type="button"
@@ -108,16 +106,16 @@ export function WorkoutChooserSheet({
                 aria-label="Log cardio workout"
                 className="flex flex-col items-center gap-2"
               >
-                <span className="flex h-20 w-20 items-center justify-center rounded-full bg-muted text-foreground">
+                <span className="flex h-20 w-20 items-center justify-center bg-wash text-ink">
                   <CardioIcon />
                 </span>
-                <span className="t-label font-medium text-foreground">Cardio</span>
+                <span className="t-label font-medium text-ink">Cardio</span>
               </button>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="mt-4 flex min-h-[44px] w-full items-center justify-center rounded-full py-3 t-body font-medium text-muted-foreground"
+              className="mt-4 flex min-h-[44px] w-full items-center justify-center py-3 t-body font-medium text-ink-2"
             >
               Cancel
             </button>

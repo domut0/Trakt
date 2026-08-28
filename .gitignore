@@ -148,3 +148,9 @@ dist
 # Design-review screenshots (regenerate with `npm run screenshots`)
 screenshots/
 screenshots-before/
+
+# Impeccable session artifacts. `design.json` is the DESIGN.md sidecar and IS
+# tracked; these two are not. Review captures are regenerable the same way
+# screenshots/ is, and questions/ is a local decision-server's scratch state.
+.impeccable/review/
+.impeccable/questions/

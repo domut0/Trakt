@@ -10,6 +10,7 @@ import {
   type DailyLogAggregates,
 } from "../lib/daily-log";
 import { isCardioSession, useStore, type DailyLog } from "../lib/store";
+import { useEffectiveDailyLogs } from "../lib/use-day-macros";
 import { DayEditorSheet } from "./DayEditorSheet";
 
 /** A workout as a day card shows it: which split/exercise, set count or cardio details. */
@@ -66,7 +67,7 @@ export function WeeklyView() {
   const slots = useStore((s) => s.slots);
   const exercises = useStore((s) => s.exercises);
   const sets = useStore((s) => s.sets);
-  const dailyLogs = useStore((s) => s.dailyLogs);
+  const dailyLogs = useEffectiveDailyLogs();
   const unit = useStore((s) => s.unit);
 
   // Which day the editor is open on. null = closed. The sheet stays mounted
@@ -127,12 +128,12 @@ export function WeeklyView() {
       <div className="group-list mx-5 p-8 text-center space-y-3">
         {/* h2, not h3: this replaces the whole week list, so there is no section
             heading above it to be a sub-level of. */}
-        <h2 className="t-heading font-semibold tracking-tight text-foreground">
+        <h2 className="t-heading font-semibold tracking-tight text-ink">
           Nothing to look back on yet
         </h2>
         <button
           onClick={() => openEditor(dayKey(new Date()))}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-accent px-5 py-2.5 t-body font-semibold text-accent-foreground"
+          className="inline-flex min-h-[44px] items-center justify-center bg-ink px-5 py-2.5 t-body font-semibold text-paper rounded-md"
         >
           Log today's numbers
         </button>
@@ -222,17 +223,17 @@ function WeekHeader({
   return (
     <div className="group-header">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="t-caption min-w-0 truncate text-muted-foreground">
+        <h2 className="t-caption min-w-0 truncate text-ink-2">
           Week of {format(parseDayKey(weekStart), "MMM d")}
         </h2>
-        <span className="t-caption shrink-0 text-muted-foreground">
+        <span className="t-caption shrink-0 text-ink-2">
           {sessionCount === 0
             ? "No workouts"
             : `${sessionCount} workout${sessionCount === 1 ? "" : "s"}`}
         </span>
       </div>
       {stats.length > 0 && (
-        <div className="mt-0.5 flex flex-wrap gap-x-4 t-label text-muted-foreground">
+        <div className="mt-0.5 flex flex-wrap gap-x-4 t-label text-ink-2">
           {stats.map((s) => (
             <span key={s} className="tnum">
               {s}
@@ -298,14 +299,12 @@ function DayCard({
         className="cursor-pointer px-5 py-4"
       >
         <div className="flex items-baseline justify-between gap-3">
-          <span className="t-body font-semibold tracking-tight text-foreground">
-            {dayLabel(date)}
-          </span>
+          <span className="t-body font-semibold tracking-tight text-ink">{dayLabel(date)}</span>
           {/* A neutral note the user wrote on their own day, so it is muted and
               marked with the same hollow dot the calendar grid uses. Outline
               against filled means the mark is not carried by hue alone. */}
           {log?.isCheatDay && (
-            <span className="flex shrink-0 items-center gap-1.5 t-caption text-muted-foreground">
+            <span className="flex shrink-0 items-center gap-1.5 t-caption text-ink-2">
               <span
                 aria-hidden="true"
                 className="h-1.5 w-1.5 rounded-full border border-muted-foreground"
@@ -330,18 +329,13 @@ function DayCard({
                   onClick={(e) => e.stopPropagation()}
                   className="flex min-h-[44px] items-center gap-2"
                 >
-                  <span className="truncate t-body font-medium tracking-tight text-foreground">
+                  <span className="truncate t-body font-medium tracking-tight text-ink">
                     {session.title}
                   </span>
                   {session.subtitle && (
-                    <span className="t-label shrink-0 text-muted-foreground">
-                      {session.subtitle}
-                    </span>
+                    <span className="t-label shrink-0 text-ink-2">{session.subtitle}</span>
                   )}
-                  <span
-                    aria-hidden="true"
-                    className="ml-auto shrink-0 t-label text-muted-foreground"
-                  >
+                  <span aria-hidden="true" className="ml-auto shrink-0 t-label text-ink-2">
                     ›
                   </span>
                 </Link>
@@ -354,8 +348,8 @@ function DayCard({
           <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
             {stats.map((s) => (
               <span key={s.label} className="t-body">
-                <span className="tnum font-semibold text-foreground">{s.value}</span>{" "}
-                <span className="t-label text-muted-foreground">{s.label}</span>
+                <span className="tnum font-semibold text-ink">{s.value}</span>{" "}
+                <span className="t-label text-ink-2">{s.label}</span>
               </span>
             ))}
           </div>

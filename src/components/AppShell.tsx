@@ -87,6 +87,9 @@ function Icon({ name }: { name: TabItem["icon"] }) {
     fill: "none",
     stroke,
     strokeWidth: 1.6,
+    // Round again, matching src/components/icons.tsx. Square caps belonged to
+    // the zero-radius build; with 4px corners everywhere they were the last
+    // hard edge on the screen.
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
     // Decorative: every tab renders its own visible text label right below the
@@ -173,8 +176,8 @@ export function ActiveSessionBanner() {
     >
       <span className="flex min-w-0 items-center gap-2 t-label font-medium">
         <span className="relative flex h-2 w-2 shrink-0">
-          <span className="absolute inset-0 animate-ping rounded-full bg-accent-foreground/60" />
-          <span className="relative h-2 w-2 rounded-full bg-accent-foreground" />
+          <span className="absolute inset-0 animate-ping bg-paper" />
+          <span className="relative h-2 w-2 bg-paper" />
         </span>
         <span className="truncate">Workout in progress · {slot?.name}</span>
       </span>
@@ -229,9 +232,18 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
           // Full width of its flex-1 <li>, with an explicit height floor so the
           // 22px icon plus 11px label can never fall under 44px if either is
           // restyled later.
-          className="flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 py-1"
+          //
+          // The active tab is marked the way a printed index marks the section
+          // you have your thumb in: a heavy rule across the top of its cell.
+          // It used to be a colour swap from muted to accent, which on two inks
+          // is the difference between grey text and black text and reads as
+          // emphasis rather than as position. The rule is unambiguous, and it
+          // matches the inked column in the week strip, so "where I am" looks
+          // the same in both places on this screen.
+          className={`flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 py-1 ${
+            active ? "border-t-2 border-ink text-ink" : "border-t-2 border-transparent text-ink-3"
+          }`}
           aria-current={active ? "page" : undefined}
-          style={{ color: active ? "var(--color-accent)" : "var(--color-muted-foreground)" }}
         >
           <Icon name={it.icon} />
           <span className="t-label font-medium">{it.label}</span>
@@ -243,7 +255,7 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   return (
     <nav
       aria-label="Primary"
-      className="relative z-30 shrink-0 hairline-t bg-surface"
+      className="relative z-30 shrink-0 rule-t bg-paper"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
     >
       <div className="mx-auto flex max-w-md items-stretch justify-between px-2 pt-2">
@@ -267,7 +279,13 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
             // rank with fill and weight instead: a solid glyph and a semibold
             // label against four muted outlined tabs. When it was accent too,
             // two items lit up at once and neither one told you where you were.
-            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 py-1 text-foreground"
+            // The inked cell, which is this app's one mark for "this one": the
+            // selected day in the week strip and the current lift in the plan
+            // list both wear it. Before this the action button was a 22px glyph
+            // and a label at exactly the routed tabs' size and geometry,
+            // differing only by fill and weight, so it read as a fifth tab
+            // rather than as the thing the bar exists to launch.
+            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 bg-ink px-3 py-1 text-paper rounded-md"
           >
             <span className="relative flex items-center justify-center">
               <FlameIcon />
@@ -278,8 +296,8 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
                   Reduced motion is handled globally in styles.css. */}
               {activeSessionId && (
                 <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-2 w-2">
-                  <span className="absolute inset-0 animate-ping rounded-full bg-foreground/60" />
-                  <span className="relative h-2 w-2 rounded-full bg-foreground ring-2 ring-surface" />
+                  <span className="absolute inset-0 animate-ping bg-ink rounded-md" />
+                  <span className="relative h-2 w-2 bg-ink ring-2 ring-paper rounded-md" />
                 </span>
               )}
             </span>
@@ -291,7 +309,12 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
         </ul>
       </div>
       {activeSessionId && (
-        <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-accent/40" />
+        // A real rule, not ink at 40%. Opacity variants are the thing this
+        // system bans outright, and one had survived here because it sits on a
+        // decorative hairline nobody reads as text. --rule-strong is the tone
+        // it was approximating, and it is a named colour rather than a value
+        // that changes with whatever happens to be behind it.
+        <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-rule-strong" />
       )}
     </nav>
   );

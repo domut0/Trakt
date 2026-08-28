@@ -45,14 +45,14 @@ function SetRow({
 
   return (
     <div className="relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-5 t-label font-medium text-accent">
+      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-5 t-label font-medium t-action">
         Edit
       </div>
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-5 t-label font-medium text-destructive">
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-5 t-label font-medium text-signal">
         Delete
       </div>
       <div
-        className={`group-row relative bg-surface ${isFirst ? "" : "group-row-sep"}`}
+        className={`group-row relative ${isFirst ? "" : "group-row-sep"}`}
         style={{
           transform: `translateX(${dx}px)`,
           transition: startX.current == null ? "transform 160ms ease" : "none",
@@ -68,18 +68,16 @@ function SetRow({
         }}
       >
         <div className="flex min-w-0 flex-wrap items-baseline gap-3">
-          <span className="t-label w-5 shrink-0 text-muted-foreground">{index}</span>
+          <span className="t-label w-5 shrink-0 text-ink-2">{index}</span>
           <span className="t-stat">
             {s.weight}
-            <span className="t-label text-muted-foreground"> {unit}</span>
+            <span className="t-label text-ink-2"> {unit}</span>
           </span>
-          <span className="text-muted-foreground">×</span>
+          <span className="text-ink-2">×</span>
           <span className="t-stat">{s.reps}</span>
-          {s.rpe != null && <span className="t-label text-muted-foreground">@ {s.rpe}</span>}
+          {s.rpe != null && <span className="t-label text-ink-2">@ {s.rpe}</span>}
           {s.isDropsetOrPartial && (
-            <span className="rounded-full bg-muted px-1.5 py-0.5 t-caption text-muted-foreground">
-              drop
-            </span>
+            <span className="bg-wash px-1.5 py-0.5 t-caption text-ink-2">drop</span>
           )}
         </div>
       </div>
@@ -179,8 +177,8 @@ export function SessionView({
     const saved = session?.note;
     const savedBody = saved ? (
       <>
-        <div className="t-caption text-muted-foreground">Session note</div>
-        <div className="mt-1 whitespace-pre-wrap t-body text-foreground">{saved}</div>
+        <div className="t-caption text-ink-2">Session note</div>
+        <div className="mt-1 whitespace-pre-wrap t-body text-ink">{saved}</div>
       </>
     ) : null;
 
@@ -194,7 +192,7 @@ export function SessionView({
         // Swipe-ignored: placing the caret or dragging out a selection inside
         // the field must not read as a swipe between tabs.
         <div data-swipe-ignore className="mx-5 section-gap group-list p-4">
-          <label htmlFor={noteFieldId} className="block t-caption text-muted-foreground">
+          <label htmlFor={noteFieldId} className="block t-caption text-ink-2">
             Session note
           </label>
           <textarea
@@ -205,9 +203,9 @@ export function SessionView({
             onBlur={commitNote}
             rows={3}
             placeholder="Felt flat, shoulder tweaked, good bar speed"
-            // Placeholder at full text-muted-foreground, not /60: at 60% over the surface
+            // Placeholder at full text-ink-2, not /60: at 60% over the surface
             // it measures 3.7:1, under the 4.5:1 AA floor for text this size.
-            className="mt-1 w-full resize-none bg-transparent t-body text-foreground outline-none placeholder:text-muted-foreground"
+            className="mt-1 w-full resize-none bg-transparent t-body text-ink outline-none placeholder:text-ink-2"
           />
         </div>
       );
@@ -230,7 +228,7 @@ export function SessionView({
       <div className="mx-5 section-gap">
         <button
           onClick={() => setNoteDraft("")}
-          className="flex min-h-[44px] w-full items-center t-label text-muted-foreground"
+          className="flex min-h-[44px] w-full items-center t-label text-ink-2"
         >
           Add a note
         </button>
@@ -243,7 +241,7 @@ export function SessionView({
       <div className="pb-6">
         <div className="mx-5 my-6 group-list px-5 py-8 text-center">
           <h2 className="t-heading">No sets yet</h2>
-          <p className="mt-1 t-label text-muted-foreground">The workout starts when you log one.</p>
+          <p className="mt-1 t-label text-ink-2">The workout starts when you log one.</p>
         </div>
         {renderSessionNote()}
       </div>
@@ -261,11 +259,11 @@ export function SessionView({
             <Link
               to="/exercise/$id"
               params={{ id: exercise.id }}
-              className="flex min-h-[44px] min-w-0 items-center truncate t-heading text-foreground hover:text-accent"
+              className="flex min-h-[44px] min-w-0 items-center truncate t-heading text-ink hover:t-action"
             >
               {exercise.name}
             </Link>
-            <span className="shrink-0 t-caption text-muted-foreground">
+            <span className="shrink-0 t-caption text-ink-2">
               {exercise.type === "main"
                 ? "Main"
                 : exercise.type === "cardio"
@@ -274,9 +272,7 @@ export function SessionView({
             </span>
           </div>
           {setupNote && (
-            <div className="mx-5 mb-2 rounded-lg bg-muted px-3 py-1.5 t-label text-muted-foreground">
-              {setupNote}
-            </div>
+            <div className="mx-5 mb-2 bg-wash px-3 py-1.5 t-label text-ink-2">{setupNote}</div>
           )}
           <div className="mx-5 group-list">
             {sets.map((s, i) => (
@@ -329,12 +325,12 @@ function EditSetSheet({
       onClick={onClose}
     >
       <div
-        className="mx-auto w-full max-w-md rounded-t-3xl bg-surface p-5 anim-sheet"
+        className="bg-paper rule-heavy-t mx-auto w-full max-w-md p-5 anim-sheet rounded-md"
         onClick={(e) => e.stopPropagation()}
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
-        <h2 className="t-caption text-muted-foreground">Edit set</h2>
+        <div className="mx-auto mb-3 h-1 w-10 bg-border" />
+        <h2 className="t-caption text-ink-2">Edit set</h2>
         <div className="mt-3 grid grid-cols-3 gap-3">
           {(
             [
@@ -347,8 +343,8 @@ function EditSetSheet({
             // and lowercased because an id is matched case-sensitively.
             const fieldId = `edit-set-${s.id}-${label.toLowerCase()}`;
             return (
-              <div key={label} className="min-w-0 rounded-xl bg-muted p-3">
-                <label htmlFor={fieldId} className="block t-caption text-muted-foreground">
+              <div key={label} className="min-w-0 bg-wash p-3">
+                <label htmlFor={fieldId} className="block t-caption text-ink-2">
                   {label}
                 </label>
                 <input
@@ -365,7 +361,7 @@ function EditSetSheet({
         <div className="mt-6 flex gap-2">
           <button
             onClick={onClose}
-            className="flex min-h-[44px] flex-1 items-center justify-center rounded-full py-3 t-body text-muted-foreground"
+            className="flex min-h-[44px] flex-1 items-center justify-center py-3 t-body text-ink-2"
           >
             Cancel
           </button>
@@ -377,7 +373,7 @@ function EditSetSheet({
                 rpe: rpe ? parseFloat(rpe) : undefined,
               })
             }
-            className="flex min-h-[44px] flex-[2] items-center justify-center rounded-full bg-accent py-3 t-body font-semibold text-accent-foreground"
+            className="flex min-h-[44px] flex-[2] items-center justify-center bg-ink py-3 t-body font-semibold text-paper rounded-md"
           >
             Save
           </button>

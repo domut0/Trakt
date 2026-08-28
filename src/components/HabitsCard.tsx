@@ -2,21 +2,25 @@ import { useMemo, useState } from "react";
 import { useStore } from "../lib/store";
 import { HabitEditorSheet } from "./HabitEditorSheet";
 
-function CheckIcon() {
+/**
+ * The completion mark.
+ *
+ * A filled square against an open one, at the same footprint so a list does not
+ * reflow as items are ticked. This replaces a blue filled circle with a white
+ * tick inside it, which was carrying the state in hue and shape at once and
+ * therefore twice over in the one channel that fails first.
+ *
+ * The name beside it keeps full ink either way. The old card faded a completed
+ * habit to muted grey, which on a paper ground reads as disabled rather than as
+ * done, and it meant the four things he actually finished were the four hardest
+ * to see. The square is the whole signal; the row is just a row.
+ */
+function HabitMark({ done }: { done: boolean }) {
   return (
-    <svg
-      width={14}
-      height={14}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={3}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <span
       aria-hidden="true"
-    >
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
+      className={`h-[14px] w-[14px] shrink-0 rounded-sm ${done ? "bg-ink" : "mark-open"}`}
+    />
   );
 }
 
@@ -64,7 +68,7 @@ export function HabitsCard({ date }: { date: string }) {
             <button
               type="button"
               onClick={() => setEditorOpen(true)}
-              className="group-row w-full t-body font-medium text-accent"
+              className="group-row w-full t-action t-body"
             >
               Add your first habit
             </button>
@@ -85,21 +89,8 @@ export function HabitsCard({ date }: { date: string }) {
                     idx > 0 ? "group-row-sep" : ""
                   }`}
                 >
-                  <span
-                    aria-hidden="true"
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors ${
-                      isDone ? "bg-accent text-accent-foreground" : "border border-border bg-muted"
-                    }`}
-                  >
-                    {isDone && <CheckIcon />}
-                  </span>
-                  <span
-                    className={`flex-1 truncate t-body transition-colors ${
-                      isDone ? "text-muted-foreground font-normal" : "text-foreground font-medium"
-                    }`}
-                  >
-                    {habit.name}
-                  </span>
+                  <HabitMark done={isDone} />
+                  <span className="flex-1 truncate t-body text-ink">{habit.name}</span>
                 </button>
               </li>
             );
@@ -111,10 +102,10 @@ export function HabitsCard({ date }: { date: string }) {
               aria-label="Edit habits"
               className="group-row group-row-sep w-full text-left"
             >
-              <span className="tnum t-label text-muted-foreground">
+              <span className="tnum t-label text-ink-2">
                 {doneCount} of {totalCount} done
               </span>
-              <span className="t-body font-medium text-accent">Edit habits</span>
+              <span className="t-action t-body">Edit habits</span>
             </button>
           </li>
         </ul>

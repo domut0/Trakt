@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ArrowDown, ArrowUp } from "../components/icons";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import {
@@ -11,6 +12,7 @@ import {
 } from "../lib/chart-math";
 import type { DailyLogNumericField } from "../lib/daily-log";
 import { useStore } from "../lib/store";
+import { useEffectiveDailyLogs } from "../lib/use-day-macros";
 
 export const Route = createFileRoute("/charts")({
   head: () => ({
@@ -58,8 +60,27 @@ function formatMetricValue(metricKey: DailyLogNumericField, v: number): string {
   return (Math.round(v * 10) / 10).toLocaleString();
 }
 
+/**
+ * The angle the area under a trace is ruled at.
+ *
+ * Angle carries metric identity in this system, so the chart fills with the
+ * SELECTED metric's own hatch: the Carbs chart is ruled at the Carbs angle and
+ * matches the swatch beside "Carbs" on the day view. The first version ruled
+ * every chart at 45 regardless, which collided with hatch-carbs and quietly
+ * asserted that every metric was carbohydrate.
+ *
+ * 135 is the diagonal no macro owns, so the metrics that have no macro identity
+ * take it.
+ */
+function hatchAngleFor(metricKey: DailyLogNumericField): number {
+  if (metricKey === "protein") return 90;
+  if (metricKey === "carbs") return 45;
+  if (metricKey === "fat") return 0;
+  return 135;
+}
+
 function ChartsPage() {
-  const dailyLogs = useStore((s) => s.dailyLogs);
+  const dailyLogs = useEffectiveDailyLogs();
   const unit = useStore((s) => s.unit);
 
   const [metricKey, setMetricKey] = useState<DailyLogNumericField>("calories");
@@ -169,8 +190,11 @@ function ChartsPage() {
   const changeStr = useMemo(() => {
     if (windowChange === null) return "-";
     const sign = windowChange > 0 ? "+" : windowChange < 0 ? "-" : "";
-    const arrow = windowChange > 0 ? "↑ " : windowChange < 0 ? "↓ " : "";
-    return `${arrow}${sign}${formatMetricVal(Math.abs(windowChange))}`;
+    // The direction used to be a Unicode arrow glued to the front of this
+    // string. A character is not an icon: it takes the text metrics, it is a
+    // different shape in every font fallback, and it belongs to no system. The
+    // caller draws the mark now and this returns only the figure.
+    return `${sign}${formatMetricVal(Math.abs(windowChange))}`;
   }, [windowChange, formatMetricVal]);
 
   const rateReadoutText = useMemo(() => {
@@ -201,10 +225,8 @@ function ChartsPage() {
               onClick={() => setMetricKey(m.key)}
               aria-pressed={metricKey === m.key}
               className={
-                "flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-full px-4 py-2 t-label font-medium transition-colors duration-150 " +
-                (metricKey === m.key
-                  ? "bg-foreground text-background"
-                  : "bg-surface text-muted-foreground")
+                "flex min-h-[44px] items-center justify-center whitespace-nowrap px-4 py-2 t-label font-medium transition-colors duration-150 " +
+                (metricKey === m.key ? "rounded-md bg-ink text-paper" : "text-ink-2")
               }
             >
               {m.label}
@@ -230,10 +252,8 @@ function ChartsPage() {
               className={
                 // min-w matters as much as min-h here: the "7" chip is a single
                 // character and would otherwise be a 34px-wide tap target.
-                "flex min-h-[44px] min-w-[44px] items-center justify-center whitespace-nowrap rounded-full px-3.5 py-2 t-label font-medium transition-colors duration-150 tnum " +
-                (rangeDays === r.days
-                  ? "bg-foreground text-background"
-                  : "bg-surface text-muted-foreground")
+                "flex min-h-[44px] min-w-[44px] items-center justify-center whitespace-nowrap px-3.5 py-2 t-label font-medium transition-colors duration-150 tnum " +
+                (rangeDays === r.days ? "rounded-md bg-ink text-paper" : "text-ink-2")
               }
             >
               {r.label}
@@ -242,27 +262,26 @@ function ChartsPage() {
         </div>
       </div>
 
-      <div
-        className="mx-5 rounded-2xl bg-surface p-5 anim-fade-up"
-        style={{ animationDelay: "40ms" }}
-      >
+      <div className="mx-5 p-5 anim-fade-up" style={{ animationDelay: "40ms" }}>
         {/* Inline segmented control on chart card to toggle raw vs smoothed series */}
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="t-caption text-muted-foreground truncate">{metric.label}</h2>
+          <h2 className="t-caption text-ink-2 truncate">{metric.label}</h2>
           <div
             role="group"
             aria-label="Series"
-            className="inline-flex rounded-xl bg-muted p-1 gap-1"
+            // One ruled box split in two, not two floating chips. The selected
+            // half is inked; it used to be marked with shadow-xs, which on a
+            // page with no elevation left the two states differing only by the
+            // shade of their text.
+            className="inline-flex overflow-hidden rounded-md border-[1.5px] border-ink divide-x-[1.5px] divide-ink"
           >
             <button
               type="button"
               onClick={() => setViewMode("daily")}
               aria-pressed={viewMode === "daily"}
               className={
-                "flex min-h-[44px] min-w-[60px] items-center justify-center rounded-lg px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
-                (viewMode === "daily"
-                  ? "bg-surface text-foreground shadow-xs"
-                  : "text-muted-foreground")
+                "flex min-h-[44px] min-w-[60px] items-center justify-center px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
+                (viewMode === "daily" ? "bg-ink text-paper" : "text-ink-2")
               }
             >
               Daily
@@ -272,10 +291,8 @@ function ChartsPage() {
               onClick={() => setViewMode("avg7")}
               aria-pressed={viewMode === "avg7"}
               className={
-                "flex min-h-[44px] min-w-[76px] items-center justify-center rounded-lg px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
-                (viewMode === "avg7"
-                  ? "bg-surface text-foreground shadow-xs"
-                  : "text-muted-foreground")
+                "flex min-h-[44px] min-w-[76px] items-center justify-center px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
+                (viewMode === "avg7" ? "bg-ink text-paper" : "text-ink-2")
               }
             >
               7-day avg
@@ -296,7 +313,7 @@ function ChartsPage() {
 
         {/* Rate readout derived from linear regression slope */}
         {rateReadoutText && (
-          <div className="mt-3 text-center t-label font-medium text-muted-foreground tnum">
+          <div className="mt-3 text-center t-label font-medium text-ink-2 tnum">
             Trend: {rateReadoutText}
           </div>
         )}
@@ -304,25 +321,32 @@ function ChartsPage() {
         {/* Grouped 2x2 stats grid with hairline separators: Latest, Average, Range, Change */}
         <div className="mt-4 grid grid-cols-2 pt-4 hairline-t">
           <div className="pr-3 pb-3">
-            <div className="t-caption text-muted-foreground">Latest</div>
+            <div className="t-caption text-ink-2">Latest</div>
             <div className="t-stat mt-1">
               {latestValStr}
               {currentPoints.length > 0 && (
-                <span className="ml-1 t-label text-muted-foreground">{metricUnit}</span>
+                <span className="ml-1 t-label text-ink-2">{metricUnit}</span>
               )}
             </div>
           </div>
-          <div className="border-l border-border pl-3 pb-3">
-            <div className="t-caption text-muted-foreground">Average</div>
+          <div className="border-l border-rule pl-3 pb-3">
+            <div className="t-caption text-ink-2">Average</div>
             <div className="t-stat mt-1">{avgValStr}</div>
           </div>
           <div className="hairline-t pr-3 pt-3">
-            <div className="t-caption text-muted-foreground">Range</div>
+            <div className="t-caption text-ink-2">Range</div>
             <div className="t-stat mt-1">{rangeStr}</div>
           </div>
-          <div className="hairline-t border-l border-border pl-3 pt-3">
-            <div className="t-caption text-muted-foreground">Change</div>
-            <div className="t-stat mt-1">{changeStr}</div>
+          <div className="hairline-t border-l border-rule pl-3 pt-3">
+            <div className="t-caption text-ink-2">Change</div>
+            <div className="mt-1 flex items-center gap-1.5">
+              {windowChange !== null && windowChange !== 0 && (
+                <span className="shrink-0 text-ink">
+                  {windowChange > 0 ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
+                </span>
+              )}
+              <span className="t-stat">{changeStr}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -636,10 +660,25 @@ function Chart({
       }
     >
       <defs>
-        <linearGradient id="chart-area" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0" />
-        </linearGradient>
+        {/*
+            Hatch, not a gradient wash.
+
+            The area under the trace used to fade from 18% ink to nothing, which
+            is a gray ramp - the one thing the design system explicitly bans -
+            and it is also the stock charting-library look on a page that owns
+            three hatches built for exactly this job. A printed chart fills an
+            area by ruling it, so this one does too: 1px ink at 45 degrees on a
+            4px period, the same construction as the macro keys.
+          */}
+        <pattern
+          id="chart-area"
+          width="4"
+          height="4"
+          patternUnits="userSpaceOnUse"
+          patternTransform={`rotate(${hatchAngleFor(metricKey)})`}
+        >
+          <line x1="0" y1="0" x2="0" y2="4" stroke="var(--color-ink)" strokeWidth="0.6" />
+        </pattern>
         {/* Least-squares fitted values can fall outside the data range, so the
             trend line is clipped to the plot box instead of drawing over the X
             axis labels. */}
@@ -674,19 +713,27 @@ function Chart({
       ))}
 
       {/* X axis tick labels */}
-      {renderedXTicks.map((t, i) => (
-        <text
-          key={`x-tick-${i}`}
-          x={t.posX}
-          y={H - 6}
-          fontSize={9}
-          textAnchor="middle"
-          fill="var(--color-muted-foreground)"
-          className="tnum"
-        >
-          {t.label}
-        </text>
-      ))}
+      {renderedXTicks.map((t, i) => {
+        // A middle-anchored label on the last tick hangs half its width past
+        // the plot and gets clipped by the viewBox, which is why the right-hand
+        // date read "Aug 2C". The outermost ticks anchor inwards instead.
+        const isFirst = i === 0;
+        const isLast = i === renderedXTicks.length - 1;
+        const anchor = isLast ? "end" : isFirst ? "start" : "middle";
+        return (
+          <text
+            key={`x-tick-${i}`}
+            x={t.posX}
+            y={H - 6}
+            fontSize={9}
+            textAnchor={anchor}
+            fill="var(--color-muted-foreground)"
+            className="tnum"
+          >
+            {t.label}
+          </text>
+        );
+      })}
 
       {/* Linear regression trend line overlay */}
       {regression && !isSinglePoint && (

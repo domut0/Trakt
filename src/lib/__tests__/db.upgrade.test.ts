@@ -23,10 +23,19 @@ import { useStore } from "../store";
  * actually landed on disk and what the store hydrated to. Those are the test's
  * real subject; this constant is just the canary.
  */
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 /** Every table the app expects to exist once an old database has been upgraded. */
-const TABLES_ADDED_AFTER_V1 = ["dailyLogs", "habits", "habitEntries"] as const;
+const TABLES_ADDED_AFTER_V1 = [
+  "dailyLogs",
+  "habits",
+  "habitEntries",
+  "foods",
+  "foodEntries",
+  "meals",
+  "recipes",
+  "recipeIngredients",
+] as const;
 
 describe("Dexie v1 -> current schema upgrade", () => {
   it("opens an existing v1 database, upgrades it in place, and keeps the workout data", async () => {
@@ -100,6 +109,53 @@ describe("Dexie v1 -> current schema upgrade", () => {
     // reads a whole day at once, and deleting a habit sweeps by habitId.
     expect(await db.habitEntries.where("date").equals("2026-08-07").count()).toBe(1);
     expect(await db.habitEntries.where("habitId").equals("h1").count()).toBe(1);
+
+    // The v4 food tables, same treatment: written to, then read back through
+    // the indexes v4 declared, because a store created without its indexes
+    // still reports a count of 0.
+    expect(await db.foods.count()).toBe(0);
+    await db.foods.put({
+      id: "f1",
+      name: "Kimchi",
+      brand: "Jongga",
+      barcode: "8801052131078",
+      sourceType: "mfp",
+      createdAt: 1,
+      basisQuantity: 100,
+      basisUnit: "g",
+      calories: 35,
+    });
+    // Barcode is indexed for scan lookup, name for the catalogue listing.
+    expect(await db.foods.where("barcode").equals("8801052131078").count()).toBe(1);
+    expect(await db.foods.where("name").equals("Kimchi").count()).toBe(1);
+
+    await db.meals.put({ id: "m1", name: "Breakfast", fromMinutes: 300, toMinutes: 660, rank: 0 });
+    await db.foodEntries.put({
+      id: "fe1",
+      date: "2026-08-07",
+      mealId: "m1",
+      quantity: 100,
+      unit: "g",
+      name: "Kimchi",
+      loggedAt: 2,
+      basisQuantity: 100,
+      basisUnit: "g",
+      calories: 35,
+    });
+    // date because Today reads a whole day at once; mealId because deleting a
+    // meal has to find every entry that pointed at it.
+    expect(await db.foodEntries.where("date").equals("2026-08-07").count()).toBe(1);
+    expect(await db.foodEntries.where("mealId").equals("m1").count()).toBe(1);
+
+    await db.recipes.put({ id: "r1", name: "Overnight oats", servings: 2, createdAt: 3 });
+    await db.recipeIngredients.put({
+      id: "ri1",
+      recipeId: "r1",
+      foodId: "f1",
+      quantity: 50,
+      unit: "g",
+    });
+    expect(await db.recipeIngredients.where("recipeId").equals("r1").count()).toBe(1);
 
     // And an upgraded DB hydrates as an existing install, not a first run.
     await useStore.getState().hydrate();

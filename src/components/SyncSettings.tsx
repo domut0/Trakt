@@ -104,17 +104,17 @@ export function SyncSettings() {
           <button type="button" onClick={openSetup} className="group-row w-full text-left">
             <div>
               <div className="t-body">Set up sheet sync</div>
-              <div className="t-label text-muted-foreground">
+              <div className="t-label text-ink-2">
                 Keep a Google Sheet up to date with your log.
               </div>
             </div>
-            <span className="text-accent" aria-hidden="true">
+            <span className="t-action" aria-hidden="true">
               →
             </span>
           </button>
         ) : (
           <div className="space-y-4 p-4">
-            <ol className="space-y-2 t-label text-muted-foreground">
+            <ol className="space-y-2 t-label text-ink-2">
               <li>1. Open a Google Sheet, then Extensions, then Apps Script.</li>
               <li>2. Delete what is in the editor, then paste the script below.</li>
               <li>3. Deploy, New deployment, Web app. Execute as me, anyone with the link.</li>
@@ -124,7 +124,7 @@ export function SyncSettings() {
             <button
               type="button"
               onClick={copyScript}
-              className="min-h-11 w-full rounded-full bg-muted py-2.5 t-body font-medium"
+              className="min-h-11 w-full bg-wash py-2.5 t-body font-medium text-ink"
             >
               {copied ? "Script copied" : "Copy script"}
             </button>
@@ -134,12 +134,12 @@ export function SyncSettings() {
                 readOnly
                 aria-label="Apps Script source"
                 value={scriptWithSecret(secret)}
-                className="h-40 w-full rounded-xl bg-muted p-3 t-label text-muted-foreground"
+                className="h-40 w-full bg-wash p-3 t-label text-ink-2"
               />
             )}
 
             <div>
-              <label htmlFor="sync-url" className="t-label text-muted-foreground">
+              <label htmlFor="sync-url" className="t-label text-ink-2">
                 Web app URL
               </label>
               <input
@@ -152,17 +152,17 @@ export function SyncSettings() {
                 placeholder="https://script.google.com/macros/s/.../exec"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="mt-1 min-h-11 w-full rounded-xl bg-muted px-3 t-body"
+                className="mt-1 min-h-11 w-full bg-wash px-3 t-body"
               />
             </div>
 
-            {formError && <div className="t-label text-destructive">{formError}</div>}
+            {formError && <div className="t-label text-signal">{formError}</div>}
 
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setShowSetup(false)}
-                className="min-h-11 flex-1 rounded-full bg-muted py-2.5 t-body font-medium text-muted-foreground"
+                className="min-h-11 flex-1 bg-wash py-2.5 t-body font-medium text-ink-2"
               >
                 Cancel
               </button>
@@ -170,8 +170,7 @@ export function SyncSettings() {
                 type="button"
                 onClick={submit}
                 disabled={connecting}
-                className="min-h-11 flex-1 rounded-full py-2.5 t-body font-medium text-white"
-                style={{ backgroundColor: "var(--color-accent)" }}
+                className="min-h-11 flex-1 bg-ink py-2.5 t-body font-medium text-paper rounded-md"
               >
                 {connecting ? "Connecting" : "Connect"}
               </button>
@@ -187,7 +186,7 @@ export function SyncSettings() {
       <div className="group-row">
         <div>
           <div className="t-body">Sheet sync</div>
-          <div className="t-label text-muted-foreground">
+          <div className="t-label text-ink-2">
             {statusLine({ status, lastSyncedAt, lastError, pending })}
           </div>
         </div>
@@ -205,7 +204,7 @@ export function SyncSettings() {
         className="group-row group-row-sep w-full text-left"
       >
         <div className="t-body">Sync now</div>
-        <span className="text-accent" aria-hidden="true">
+        <span className="t-action" aria-hidden="true">
           →
         </span>
       </button>
@@ -218,7 +217,7 @@ export function SyncSettings() {
           className="group-row group-row-sep w-full text-left"
         >
           <div className="t-body">Open sheet</div>
-          <span className="text-accent" aria-hidden="true">
+          <span className="t-action" aria-hidden="true">
             →
           </span>
         </a>
@@ -226,7 +225,7 @@ export function SyncSettings() {
 
       {blockedReason === "other-device" && (
         <div className="group-row-sep space-y-3 p-4">
-          <div className="t-label text-muted-foreground">
+          <div className="t-label text-ink-2">
             This sheet belongs to another install. Each one tracks what it last pushed, so two
             writing to one sheet would overwrite each other.
           </div>
@@ -234,7 +233,7 @@ export function SyncSettings() {
             <button
               type="button"
               onClick={() => setShowTakeover(true)}
-              className="min-h-11 w-full rounded-full bg-muted py-2.5 t-body font-medium"
+              className="min-h-11 w-full bg-wash py-2.5 t-body font-medium text-ink"
             >
               Take over this sheet
             </button>
@@ -243,7 +242,7 @@ export function SyncSettings() {
               {/* The counts are the point. A fresh install taking over replaces
                   the sheet with nothing, and "0 sets" is what makes that
                   obvious before the tap rather than after. */}
-              <div className="t-label text-destructive">
+              <div className="t-label text-signal">
                 This replaces the sheet's contents with this device's data:{" "}
                 {setCount.toLocaleString()} {setCount === 1 ? "set" : "sets"} and{" "}
                 {dayCount.toLocaleString()} {dayCount === 1 ? "day" : "days"} logged. The other
@@ -253,7 +252,7 @@ export function SyncSettings() {
                 <button
                   type="button"
                   onClick={() => setShowTakeover(false)}
-                  className="min-h-11 flex-1 rounded-full bg-muted py-2.5 t-body font-medium text-muted-foreground"
+                  className="min-h-11 flex-1 bg-wash py-2.5 t-body font-medium text-ink-2"
                 >
                   Cancel
                 </button>
@@ -263,7 +262,7 @@ export function SyncSettings() {
                     void takeOverSheet();
                     setShowTakeover(false);
                   }}
-                  className="min-h-11 flex-1 rounded-full bg-destructive py-2.5 t-body font-medium text-white"
+                  className="min-h-11 flex-1 bg-signal py-2.5 t-body font-medium text-white rounded-md"
                 >
                   Take over
                 </button>
@@ -275,14 +274,14 @@ export function SyncSettings() {
 
       {collisions.length > 0 && (
         <div className="group-row-sep space-y-3 p-4">
-          <div className="t-label text-muted-foreground">
+          <div className="t-label text-ink-2">
             These sheet edits were not applied, because the same value had also changed on this
             device. The app's value was kept.
           </div>
           <ul className="space-y-1">
             {collisions.slice(-5).map((c, i) => (
-              <li key={`${c.tab}-${c.key}-${c.field}-${i}`} className="t-label">
-                <span className="text-muted-foreground">
+              <li key={`${c.tab}-${c.key}-${c.field}-${i}`} className="t-label text-ink">
+                <span className="text-ink-2">
                   {c.tab} · {c.field}:{" "}
                 </span>
                 sheet had {formatValue(c.sheetValue)}, app kept {formatValue(c.appValue)}
@@ -292,7 +291,7 @@ export function SyncSettings() {
           <button
             type="button"
             onClick={dismissCollisions}
-            className="min-h-11 w-full rounded-full bg-muted py-2.5 t-body font-medium text-muted-foreground"
+            className="min-h-11 w-full bg-wash py-2.5 t-body font-medium text-ink-2"
           >
             Dismiss
           </button>
@@ -305,14 +304,14 @@ export function SyncSettings() {
           onClick={() => setShowDisconnect(true)}
           className="group-row group-row-sep w-full text-left"
         >
-          <div className="t-body text-destructive">Disconnect sheet</div>
-          <span className="text-destructive" aria-hidden="true">
+          <div className="t-body text-signal">Disconnect sheet</div>
+          <span className="text-signal" aria-hidden="true">
             →
           </span>
         </button>
       ) : (
         <div className="group-row-sep space-y-3 p-4">
-          <div className="t-label text-muted-foreground">
+          <div className="t-label text-ink-2">
             This stops syncing and forgets the sheet address. Nothing is deleted, from the sheet or
             from this device.
           </div>
@@ -320,7 +319,7 @@ export function SyncSettings() {
             <button
               type="button"
               onClick={() => setShowDisconnect(false)}
-              className="min-h-11 flex-1 rounded-full bg-muted py-2.5 t-body font-medium text-muted-foreground"
+              className="min-h-11 flex-1 bg-wash py-2.5 t-body font-medium text-ink-2"
             >
               Cancel
             </button>
@@ -330,7 +329,7 @@ export function SyncSettings() {
                 void disconnect();
                 setShowDisconnect(false);
               }}
-              className="min-h-11 flex-1 rounded-full bg-destructive py-2.5 t-body font-medium text-white"
+              className="min-h-11 flex-1 bg-signal py-2.5 t-body font-medium text-white rounded-md"
             >
               Disconnect
             </button>
