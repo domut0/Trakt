@@ -325,7 +325,7 @@ function EditSetSheet({
       onClick={onClose}
     >
       <div
-        className="bg-paper rule-heavy-t mx-auto w-full max-w-md p-5 anim-sheet"
+        className="bg-paper rule-heavy-t mx-auto w-full max-w-md p-5 anim-sheet rounded-md"
         onClick={(e) => e.stopPropagation()}
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
@@ -373,7 +373,7 @@ function EditSetSheet({
                 rpe: rpe ? parseFloat(rpe) : undefined,
               })
             }
-            className="flex min-h-[44px] flex-[2] items-center justify-center bg-ink py-3 t-body font-semibold text-paper"
+            className="flex min-h-[44px] flex-[2] items-center justify-center bg-ink py-3 t-body font-semibold text-paper rounded-md"
           >
             Save
           </button>

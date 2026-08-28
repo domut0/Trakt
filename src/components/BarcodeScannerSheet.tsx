@@ -193,7 +193,7 @@ export function BarcodeScannerSheet({ open, onClose, onDetected }: BarcodeScanne
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup"
+        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup rounded-md"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-3 h-1 w-10 shrink-0 bg-border" />
@@ -233,7 +233,7 @@ export function BarcodeScannerSheet({ open, onClose, onDetected }: BarcodeScanne
               type="button"
               onClick={startScanning}
               aria-label="Retry camera permission"
-              className="mt-4 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
+              className="mt-4 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper rounded-md"
             >
               Try again
             </button>
@@ -257,7 +257,7 @@ export function BarcodeScannerSheet({ open, onClose, onDetected }: BarcodeScanne
               type="button"
               onClick={startScanning}
               aria-label="Retry barcode scanner"
-              className="mt-4 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
+              className="mt-4 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper rounded-md"
             >
               Try again
             </button>

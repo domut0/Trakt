@@ -174,7 +174,7 @@ function ToastElement({ toast, onDismiss }: { toast: ActiveToast; onDismiss: () 
       // sit ON TOP of the paper is to be printed in the ink rather than to
       // pretend it is floating above it. bg-wash was too close to the paper to
       // read as a separate object at all.
-      className="fixed left-1/2 z-[60] flex min-h-[44px] w-[calc(100%-2rem)] max-w-sm cursor-pointer touch-none items-center justify-between gap-3 bg-ink px-4 py-3 text-paper"
+      className="fixed left-1/2 z-[60] flex min-h-[44px] w-[calc(100%-2rem)] max-w-sm cursor-pointer touch-none items-center justify-between gap-3 bg-ink px-4 py-3 text-paper rounded-md"
       style={{
         bottom: "max(calc(env(safe-area-inset-bottom) + 68px), 76px)",
         transform: `translate(-50%, ${offsetY + (entered ? 0 : 18)}px)`,

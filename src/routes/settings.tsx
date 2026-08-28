@@ -246,7 +246,7 @@ function SettingsPage() {
       </header>
 
       <Section title="Units" delay={0}>
-        <div className="m-3 flex border-[1.5px] border-ink divide-x-[1.5px] divide-ink">
+        <div className="m-3 flex overflow-hidden rounded-md border-[1.5px] border-ink divide-x-[1.5px] divide-ink">
           {(["lbs", "kg"] as const).map((u) => (
             <button
               key={u}
@@ -479,7 +479,7 @@ function SettingsPage() {
             value={usdaKey}
             onChange={(e) => handleUsdaKeyChange(e.target.value)}
             placeholder="Paste your USDA API key"
-            className="min-h-[44px] w-full bg-wash px-3 t-body text-ink outline-none placeholder:text-ink-2 focus:ring-1 focus:ring-ink"
+            className="min-h-[44px] w-full rounded-md bg-wash px-3 t-body text-ink outline-none placeholder:text-ink-2 focus:ring-1 focus:ring-ink"
           />
           <div className="t-label text-ink-2">
             Stored on this device only and not included in backups. Get a free key at{" "}
@@ -519,7 +519,7 @@ function SettingsPage() {
               <button
                 type="button"
                 onClick={cancelImport}
-                className="flex-1 bg-wash py-2 t-body font-medium text-ink-2"
+                className="flex-1 rounded-md bg-wash py-2 t-body font-medium text-ink-2"
               >
                 Cancel
               </button>
@@ -575,14 +575,14 @@ function SettingsPage() {
               <button
                 type="button"
                 onClick={() => setShowClearConfirm(false)}
-                className="flex-1 bg-wash py-2 t-body font-medium text-ink-2"
+                className="flex-1 rounded-md bg-wash py-2 t-body font-medium text-ink-2"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmClear}
-                className="flex-1 bg-signal py-2 t-body font-medium text-white"
+                className="flex-1 bg-signal py-2 t-body font-medium text-white rounded-md"
               >
                 Clear all data
               </button>

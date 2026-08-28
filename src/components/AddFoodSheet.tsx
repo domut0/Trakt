@@ -519,7 +519,7 @@ export function AddFoodSheet({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup"
+        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup rounded-md"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-3 h-1 w-10 shrink-0 bg-border" />
@@ -863,7 +863,7 @@ export function AddFoodSheet({
                         <button
                           type="button"
                           onClick={() => performOffSearch(query.trim())}
-                          className="flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
+                          className="flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper rounded-md"
                         >
                           Search Open Food Facts
                         </button>
@@ -970,7 +970,7 @@ export function AddFoodSheet({
                           <button
                             type="button"
                             onClick={() => performOffSearch(query.trim())}
-                            className="mt-3 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
+                            className="mt-3 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper rounded-md"
                           >
                             Try again
                           </button>
@@ -986,7 +986,7 @@ export function AddFoodSheet({
                           <button
                             type="button"
                             onClick={() => performOffSearch(query.trim())}
-                            className="mt-3 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
+                            className="mt-3 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper rounded-md"
                           >
                             Try again
                           </button>
@@ -1014,7 +1014,7 @@ export function AddFoodSheet({
                         <button
                           type="button"
                           onClick={() => performUsdaSearch(query.trim())}
-                          className="flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
+                          className="flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper rounded-md"
                         >
                           Search USDA
                         </button>
@@ -1128,7 +1128,7 @@ export function AddFoodSheet({
                           <button
                             type="button"
                             onClick={() => performUsdaSearch(query.trim())}
-                            className="mt-3 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
+                            className="mt-3 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper rounded-md"
                           >
                             Try again
                           </button>
@@ -1144,7 +1144,7 @@ export function AddFoodSheet({
                           <button
                             type="button"
                             onClick={() => performUsdaSearch(query.trim())}
-                            className="mt-3 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper"
+                            className="mt-3 flex min-h-[44px] items-center justify-center bg-ink px-4 t-body font-semibold text-paper rounded-md"
                           >
                             Try again
                           </button>
@@ -1252,7 +1252,7 @@ export function AddFoodSheet({
           <button
             type="button"
             onClick={handleSave}
-            className="flex min-h-[44px] w-full items-center justify-center bg-ink px-4 py-3 t-body font-semibold text-paper"
+            className="flex min-h-[44px] w-full items-center justify-center bg-ink px-4 py-3 t-body font-semibold text-paper rounded-md"
           >
             Add to {meal.name}
           </button>

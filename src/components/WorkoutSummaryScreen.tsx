@@ -182,7 +182,7 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
       >
         <button
           onClick={onDone}
-          className="min-h-[44px] w-full bg-ink py-3 t-body font-semibold text-paper"
+          className="min-h-[44px] w-full bg-ink py-3 t-body font-semibold text-paper rounded-md"
         >
           Done
         </button>

@@ -10,9 +10,9 @@ import type { JSX } from "react";
  * and the text metrics, it is a different shape in every font fallback, and it
  * is not part of any system.
  *
- * Everything here is flat, mitred and square-capped, because the world these
- * live in has no radius and no round ends. That is also why none of them uses
- * an arc: a curve in this set would be the one curve in the whole app.
+ * Everything here is flat and drawn from straight segments with round ends.
+ * None of them uses an arc: the geometry stays honest to the ruled world even
+ * though the strokes are no longer cut square.
  */
 
 const BASE = {
@@ -22,8 +22,11 @@ const BASE = {
   fill: "none",
   stroke: "currentColor",
   strokeWidth: 1.6,
-  strokeLinecap: "butt" as const,
-  strokeLinejoin: "miter" as const,
+  // Round, not butt and miter. The zero-radius world justified square ends;
+  // once the corners softened, square-cut strokes were the only hard edges
+  // left and they read as the icons being angry at you.
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
   "aria-hidden": true,
 } as const;
 

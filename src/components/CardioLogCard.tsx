@@ -236,7 +236,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
         </button>
         <button
           onClick={doSave}
-          className="flex min-h-[44px] flex-[2] items-center justify-center bg-ink py-3 t-body font-semibold text-paper"
+          className="flex min-h-[44px] flex-[2] items-center justify-center bg-ink py-3 t-body font-semibold text-paper rounded-md"
         >
           Save
         </button>

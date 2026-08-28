@@ -81,7 +81,7 @@ export function WorkoutChooserSheet({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm bg-paper rule-heavy-t p-5 anim-popup"
+        className="w-full max-w-sm bg-paper rule-heavy-t p-5 anim-popup rounded-md"
         onClick={(e) => e.stopPropagation()}
       >
         {mode === "choose" ? (
@@ -95,7 +95,7 @@ export function WorkoutChooserSheet({
                 aria-label="Log strength training workout"
                 className="flex flex-col items-center gap-2"
               >
-                <span className="flex h-20 w-20 items-center justify-center bg-ink text-paper">
+                <span className="flex h-20 w-20 items-center justify-center bg-ink text-paper rounded-md">
                   <StrengthIcon />
                 </span>
                 <span className="t-label font-medium text-ink">Strength training</span>

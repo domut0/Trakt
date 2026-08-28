@@ -40,12 +40,12 @@ export function Toggle({
       // is added as an absolutely positioned overlay rather than as padding,
       // which would make every settings row taller. shrink-0 keeps long
       // descriptions from squeezing the switch out of shape at 390px.
-      className={`relative h-7 w-12 shrink-0 border-[1.5px] border-ink transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] ${
+      className={`relative h-7 w-12 shrink-0 rounded-md border-[1.5px] border-ink transition-colors after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] ${
         checked ? "bg-ink" : "bg-paper"
       }`}
     >
       <span
-        className={`absolute top-[3px] h-[19px] w-[19px] transition-all ${
+        className={`absolute top-[3px] h-[19px] w-[19px] rounded-sm transition-all ${
           checked ? "bg-paper" : "bg-ink"
         }`}
         style={{ left: checked ? 22 : 3 }}

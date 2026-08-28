@@ -1,27 +1,27 @@
 ---
 name: Workout Tracker
-description: A training day printed as a Swiss railway timetable - paper ground, one ink, rules instead of elevation.
+description: A training day printed as a Swiss railway timetable - paper ground, one slate ink, rules instead of elevation, corners gently eased.
 colors:
-  paper: "#F3F2EE"
-  ink: "#141310"
-  ink-2: "#5A574E"
-  ink-3: "#6E6B60"
-  rule: "#D8D6CE"
-  rule-strong: "#B9B6AB"
-  wash: "#E9E7E0"
-  signal: "#C8102E"
+  paper: "#F3F4F5"
+  ink: "#282D33"
+  ink-2: "#4B525B"
+  ink-3: "#616872"
+  rule: "#DDE0E3"
+  rule-strong: "#C2C7CD"
+  wash: "#E8EAEC"
+  signal: "#A8474A"
 typography:
   title:
     fontFamily: "Archivo Variable, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
     fontSize: "30px"
-    fontWeight: 800
+    fontWeight: 700
     lineHeight: 1
     letterSpacing: "-0.02em"
     fontVariation: "width 80%"
   heading:
     fontFamily: "Archivo Variable, ui-sans-serif, system-ui, sans-serif"
     fontSize: "17px"
-    fontWeight: 700
+    fontWeight: 600
     lineHeight: 1.15
     letterSpacing: "-0.005em"
     fontVariation: "width 85%"
@@ -53,7 +53,7 @@ typography:
   hero:
     fontFamily: "Archivo Variable, ui-sans-serif, system-ui, sans-serif"
     fontSize: "44px"
-    fontWeight: 800
+    fontWeight: 700
     lineHeight: 0.95
     letterSpacing: "-0.03em"
     fontVariation: "width 78%"
@@ -157,9 +157,10 @@ The app is a schedule, so it is printed like one. The whole visual world is a Sw
 
 Two rules from the dark system this replaced are deliberately inverted, and they are why the build looks the way it does. **Elevation was fill; rank now comes from rule weight and position** - on paper there is no fill step to lift with, so a hairline separates, a stronger rule divides, and a 2px ink rule announces. Nothing is raised. **"No borders" is gone**, because it was always the wrong rule here: a dashed outline already carried a fact (planned) rather than a decoration. Every rule on this page carries a fact.
 
-The one idea that survived untouched is *dashed outline = planned, solid fill = happened*. It is native to a timetable - the scheduled column against the actual one - so it is stronger here than it was, not merely preserved. The palette is two-ink by construction: black on paper, plus a single signal red spent only on the exception, the way a two-colour press spends its second plate. The app is phone-only by product decision, so there is no desktop layout and no breakpoints; the paper is `#F3F2EE` rather than white because the app is opened in a dark bedroom every night and pure white is a flashlight.
+The one idea that survived untouched is _dashed outline = planned, solid fill = happened_. It is native to a timetable - the scheduled column against the actual one - so it is stronger here than it was, not merely preserved. The palette is two-ink by construction: one slate ink on paper, plus a single signal red spent only on the exception, the way a two-colour press spends its second plate. The app is phone-only by product decision, so there is no desktop layout and no breakpoints; the paper is `#F3F4F5` rather than white because the app is opened in a dark bedroom every night and pure white is a flashlight.
 
 **Key Characteristics:**
+
 - Paper ground, one ink, one signal; no gray ramp, no opacity variants
 - Rank from rule weight (1px hairline / 1px strong / 2px ink), never from fill or shadow
 - Zero radius everywhere; butt caps and mitred joins in every icon
@@ -174,22 +175,25 @@ The one idea that survived untouched is *dashed outline = planned, solid fill = 
 Two inks on paper, and the second one is rationed: a two-colour press gets exactly one extra plate, and a timetable spends it on the exception.
 
 ### Primary
-- **Ink** (`#141310`): The one black. Body text, every figure, the heavy rules that open a table and mark the now line, the fill of the inked cell, the fill of every identity hatch. Measured 16.58:1 on paper.
+
+- **Ink** (`#282D33`): The one ink, a deep blue-slate rather than a black. Body text, every figure, the heavy rules that open a table and mark the now line, the fill of the inked cell, the fill of every identity hatch. Measured 12.60:1 on paper, 11.51:1 on wash.
 
 ### Secondary
-- **Signal Red** (`#C8102E`): The second ink, and the only chromatic value in the system. It carries the exception in two senses - *over a ceiling* and *this broke* - kept apart by mark rather than by hue: an overrun figure takes a struck rule beneath it, an error takes a filled flag. Also the text caret. 5.25:1 on paper, 4.75:1 on wash.
+
+- **Signal Red** (`#A8474A`): The second ink, and the only chromatic value in the system. It carries the exception in two senses - _over a ceiling_ and _this broke_ - kept apart by mark rather than by hue: an overrun figure takes a struck rule beneath it, an error takes a filled flag. Also the text caret. 5.20:1 on paper, 4.75:1 on wash.
 
 ### Neutral
-- **Paper** (`#F3F2EE`): The ground, and the only background. Warm by roughly 5 points across the channels, which is paper; cream is roughly 30 and is somewhere else. Deliberately not `#ffffff` because of the bedroom.
-- **Ink 2** (`#5A574E`): Secondary text - annotations, units, column headers, the footnote voice. 6.45:1.
-- **Ink 3** (`#6E6B60`): Tertiary - hour column, placeholders, inactive nav labels, the open mark's stroke, an actual band's outline. 4.76:1, still AA, still not a gray ramp.
-- **Rule** (`#D8D6CE`): The hairline. Between rows of the same table, and the default border colour for every element in the build.
-- **Rule Strong** (`#B9B6AB`): A real division. Between sections, under column headers, at column edges, and the dash of a planned outline.
-- **Wash** (`#E9E7E0`): The one filled tone. What "solid fill = happened" fills with - an actual band on the timeline, a pressed row.
+
+- **Paper** (`#F3F4F5`): The ground, and the only background. A neutral-cool paper rather than a warm one. Deliberately not `#ffffff` because of the bedroom.
+- **Ink 2** (`#4B525B`): Secondary text - annotations, units, column headers, the footnote voice. 7.18:1 on paper, 6.55:1 on wash.
+- **Ink 3** (`#616872`): Tertiary - hour column, placeholders, inactive nav labels, the open mark's stroke, an actual band's outline. 5.11:1 on paper and 4.67:1 on wash, so it is AA on BOTH grounds. The value this replaced was measured on paper only and failed at 4.31:1 wherever it sat on the wash.
+- **Rule** (`#DDE0E3`): The hairline. Between rows of the same table, and the default border colour for every element in the build.
+- **Rule Strong** (`#C2C7CD`): A real division. Between sections, under column headers, at column edges, and the dash of a planned outline.
+- **Wash** (`#E8EAEC`): The one filled tone. What "solid fill = happened" fills with - an actual band on the timeline, a pressed row.
 
 ### Named Rules
 
-**The Three Real Inks Rule.** There are exactly three text tones and each is a measured colour, not one colour at three opacities. Never write an opacity variant on text, and never introduce a fourth gray. Opacity variants are what let secondary text drift below AA in the system this replaced.
+**The Three Real Inks Rule.** There are exactly three text tones and each is a measured colour, not one colour at three opacities. Never write an opacity variant on text, and never introduce a fourth gray. Opacity variants are what let secondary text drift below AA in the system this replaced. All three are measured against BOTH the paper and the wash, because a tone that only passes on one of them fails wherever a filled row is used.
 
 **The Rules-Below-AA Rule.** `rule` and `rule-strong` sit below AA on purpose, because they never carry text. Their job is to divide, and a hairline that meets text contrast is a black bar. Never put text or a glyph in these two values.
 
@@ -204,15 +208,16 @@ Two inks on paper, and the second one is rationed: a two-colour press gets exact
 **Character:** A grotesk with a width axis, which is the lever a timetable actually wants: a column narrows without the typeface changing underneath it. Headers are set narrow and tracked; figures are set at normal width so the digits stay open at a glance. The result reads as printed matter rather than as an interface.
 
 ### Hierarchy
+
 The seven original role names are kept because 42 files use them and the names were never the problem; every value was redrawn for the new face. Two roles are new.
 
-- **Title** (800, 30px, width 80%, uppercase, line-height 1): The page's own name, set in the top margin the way a timetable names its page. One per screen. Not a title card.
-- **Heading** (700, 17px, width 85%, uppercase): A table's name. Sits on the heavy rule that opens the table.
+- **Title** (700, 30px, width 80%, uppercase, line-height 1): The page's own name, set in the top margin the way a timetable names its page. One per screen. Not a title card.
+- **Heading** (600, 17px, width 85%, uppercase): A table's name. Sits on the heavy rule that opens the table.
 - **Body** (400, 15px): Row labels, values, buttons. The workhorse.
 - **Label** (400, 13px): Annotations, units, hints, nav labels - the footnote voice. Pair with ink-2.
-- **Caption** (700, 10px, width 75%, tracking 0.1em, uppercase): A *column header*. It labels the column of data beneath it, so deleting it deletes a fact, and it always sits on a rule.
+- **Caption** (700, 10px, width 75%, tracking 0.1em, uppercase): A _column header_. It labels the column of data beneath it, so deleting it deletes a fact, and it always sits on a rule.
 - **Stat** (600, 22px, tabular): A figure compared against another figure.
-- **Hero** (800, 44px, width 78%, tabular): The one figure a screen exists to show, set at the scale a timetable sets a departure time.
+- **Hero** (700, 44px, width 78%, tabular): The one figure a screen exists to show, set at the scale a timetable sets a departure time.
 - **Action** (600, underlined 1.5px at 3px offset): A text control. Accent-as-a-colour does not exist here, so print's own answer applies: a rule under the word.
 - **Hour** (600, 11px, width 72%, tabular, ink-3): The hour column down the left edge of a schedule. Never competes with the rows it indexes.
 
@@ -234,7 +239,7 @@ The page gutter is 20px. Vertical rhythm between tables is 26px. Rows are 11px/2
 
 ### Named Rules
 
-**The Bleed-To-Trim Rule.** A table's ruling reaches the page edge and the gutter is put back on the cell's own padding. The table utility does this with `margin-inline: -20px`, which *assumes it sits inside the page's 20px gutter*. Anything rendered at the top level with no gutter must not use it, or it hangs 40px off both trims - the mistake cost two components in this build. Either wrap it (a `mx-5` table inside a `px-5` section is the settings pattern) or rule the element directly, as the week strip does.
+**The Bleed-To-Trim Rule.** A table's ruling reaches the page edge and the gutter is put back on the cell's own padding. The table utility does this with `margin-inline: -20px`, which _assumes it sits inside the page's 20px gutter_. Anything rendered at the top level with no gutter must not use it, or it hangs 40px off both trims - the mistake cost two components in this build. Either wrap it (a `mx-5` table inside a `px-5` section is the settings pattern) or rule the element directly, as the week strip does.
 
 **The Header-Does-Not-Bleed Rule.** The table header deliberately carries no negative margin. The rule below it bleeds because a printed table's ruling does; its name does not, because a label hanging off the page edge is a clipped word. The first build of the stylesheet gave the header the same -20px and every section title on every screen lost its first character.
 
@@ -245,6 +250,7 @@ The page gutter is 20px. Vertical rhythm between tables is 26px. Rows are 11px/2
 There is no elevation. No shadow token exists in this system, no surface is raised, and no fill step is used to lift anything. Depth is entirely line weight and position - three weights, each meaning something different, so a screen can be read by its rules alone.
 
 ### Rule Vocabulary
+
 - **Hairline** (`1px solid rule`, top or bottom): Between rows of the same table. The lightest mark that still divides. Also available as an inset box-shadow separator, so it can be inset from the left - a rule running the full width reads as the end of the table rather than a division inside it.
 - **Rule** (`1px solid rule-strong`): A real division - between sections, under column headers, at column edges. Also the top edge of the bottom nav.
 - **Heavy rule** (`2px solid ink`): Reserved for the two marks allowed to shout: the top of a table, and the now line. Also the top edge of every sheet and popup, and the top border of the active nav tab's cell.
@@ -257,13 +263,20 @@ There is no elevation. No shadow token exists in this system, no surface is rais
 
 ## Shapes
 
-Everything is rectangular. The `sm`, `md` and `lg` radius tokens are all `0px`; a timetable is set on a rectangular grid and nothing on it is rounded. Icons are stroked at 1.6px with `butt` caps and `miter` joins for the same reason - a rounded cap would be the one soft thing on the page - and none of them uses an arc.
+Gently eased, not sharp. `--radius-md` and `--radius-lg` are `4px` and `--radius-sm` is `2px`, the latter because 4px on a 10px state mark makes a lozenge.
 
-The recurring silhouettes are: the **ruled table** (2px ink top, 1px strong bottom, hairline-separated rows, run to the trim); the **inked cell** (a solid ink rectangle with paper knocked out of it); the **open or filled 10px square** that carries state; the **outlined measure** (a 1px ink track, hatched fill, quarter ticks hung below the rule so the fill never hides them); and the **planned/actual band** (1px dashed rule-strong on transparent, versus 1px solid ink-3 on wash).
+This is a correction, and the reasoning it replaces is worth keeping visible. The first build set every radius to `0` on the grounds that a timetable is printed on a rectangular grid. That was true of the reference and wrong for the product: knife-edged corners on every mark, cell, sheet, chip and button read as severe rather than as precise, and the user's verdict was that it looked unfriendly enough to put him off. The world does not live in the corners. It lives in the rules, the tabular figures, the hatches and the marks, all of which are untouched.
+
+What takes a radius: inked cells, filled bars, chips, buttons, sheets and popups, the toggle, the measure track, the state marks, the planned/actual bands, and filled wash panels. What does not: rules and hairlines (a line is not an object), full-bleed tables (their corners are off-screen), and table rows (a radius there breaks the ruling).
+
+Icons are stroked at 1.6px with `round` caps and joins. They were `butt` and `miter` while the radius was zero; once the corners eased, square-cut strokes were the only hard edges left. None of them uses an arc, so the geometry stays honest to the ruled world even though the ends are no longer cut square.
+
+The recurring silhouettes are: the **ruled table** (2px ink top, 1px strong bottom, hairline-separated rows, run to the trim); the **inked cell** (a solid ink rectangle, 4px corners, with paper knocked out of it); the **open or filled 10px square** that carries state, at 2px corners; the **outlined measure** (a 1px ink track, hatched fill, quarter ticks hung below the rule so the fill never hides them); and the **planned/actual band** (1px dashed rule-strong on transparent, versus 1px solid ink-3 on wash).
 
 ## Components
 
 ### Tables (the card replacement)
+
 - **Character:** A ruled table, not a container. There are no cards in this system.
 - **Corner style:** Square (0px).
 - **Background:** Transparent. The page's paper shows through.
@@ -273,6 +286,7 @@ The recurring silhouettes are: the **ruled table** (2px ink top, 1px strong bott
 - **Don't nest.** If content inside a table needs its own table, the grouping is wrong.
 
 ### Buttons
+
 - **Shape:** Square (0px), 44px minimum height, `scale(0.97)` on press, applied globally to every button.
 - **Solid:** Ink fill, paper text, semibold body - the primary commit. On the gym screen this is a full-width 72px inked bar rather than a disc.
 - **Quiet:** 1px `rule-strong` outline, ink text, transparent fill.
@@ -280,31 +294,38 @@ The recurring silhouettes are: the **ruled table** (2px ink top, 1px strong bott
 - **Focus:** `2px solid ink` outline at 2px offset, themed globally, replacing the browser's blue.
 
 ### Inputs / Fields
+
 - **Style:** Inherit the family and ink; the caret is signal red. Square, ruled, no fill of their own.
 - **Placeholder:** ink-3 at full opacity (Firefox's default dimming drops it below AA).
 - **Selection:** Ink ground, paper text. The browser's blue selection, gray scrollbar and blue focus ring are all a third colour arriving uninvited and are themed out once, globally.
 
 ### Toggle
+
 - **Style:** A printed switch. 48x28, always outlined 1.5px in ink so the control is visibly present in both states, with a 19px square knob. On = ink fill, knob right, paper knob. Off = paper fill, knob left, ink knob. Same filled-versus-open logic as a ticked habit or a met target.
 - **Tap target:** 44px via an absolutely-positioned overlay, so the 28px track stays compact without inflating row height.
 
 ### Navigation
+
 - **Style:** Bottom bar, paper, 1px `rule-strong` on top, safe-area padded. Routed tabs are a 22px outlined icon over a 13px label; two equal flex halves sit either side of a fixed-width centre, so the action button holds the axis whatever the tab count.
 - **Active tab:** A 2px ink rule across the top of its cell, the way a printed index marks the section you have your thumb in. Inactive tabs carry a transparent 2px top border so nothing shifts, and their label sits in ink-3.
 - **Workout action:** The inked cell - ink fill, paper glyph and label, a filled (not stroked) icon. It is an action, not a destination, and it states its rank with fill and weight because colour is spoken for.
 
 ### Signature: the inked cell
+
 One vocabulary for "this one", used in three places and nowhere else: the selected day in the week strip, the current lift row on the gym screen, and the nav's Workout action. Ink ground, paper knocked out. A second filled thing on the same screen would be a second selection - which is why today, when unselected, takes a 2px underscore beneath its figure instead of a fill.
 
 ### Signature: hatch
-Metric identity without hue. Angle carries identity, density carries emphasis. Protein 90 degrees (1px/3px), carbs 45 (1px/4px), fat 0 (1px/5px), any non-macro metric a solid ink field. A *measured* quantity uses 135 (`hatch-dense`) and its overrun portion the same 135 in signal (`hatch-over`); 135 is reserved precisely because it is the one diagonal no metric answers to. The Charts area fill rotates to the selected metric's own angle, so the Carbs chart is ruled at the same angle as the Carbs swatch on the day view.
+
+Metric identity without hue. Angle carries identity, density carries emphasis. Protein 90 degrees (1px/3px), carbs 45 (1px/4px), fat 0 (1px/5px), any non-macro metric a solid ink field. A _measured_ quantity uses 135 (`hatch-dense`) and its overrun portion the same 135 in signal (`hatch-over`); 135 is reserved precisely because it is the one diagonal no metric answers to. The Charts area fill rotates to the selected metric's own angle, so the Carbs chart is ruled at the same angle as the Carbs swatch on the day view.
 
 ### Signature: the flap
-The one authored motion. A committed figure rolls into place over 0.26s on `cubic-bezier(0.16, 1, 0.3, 1)`, translating and scaling in from above the way a split-flap board commits a departure. It fires on *change only, never on mount*; the wrapper is always present and always inline-block, so enabling it cannot shift layout. Every other animation in the build is navigation or entrance (sheet slide 0.3s, popup settle 0.2s, route slide 0.28s, one-shot toast 1.6s) and is not part of this vocabulary. Reduced motion is clamped globally, with animation delays zeroed so staggered entrances do not become invisible content, and the self-fading toast exempted so its confirmation is still readable. Never add per-component reduced-motion handling.
+
+The one authored motion. A committed figure rolls into place over 0.26s on `cubic-bezier(0.16, 1, 0.3, 1)`, translating and scaling in from above the way a split-flap board commits a departure. It fires on _change only, never on mount_; the wrapper is always present and always inline-block, so enabling it cannot shift layout. Every other animation in the build is navigation or entrance (sheet slide 0.3s, popup settle 0.2s, route slide 0.28s, one-shot toast 1.6s) and is not part of this vocabulary. Reduced motion is clamped globally, with animation delays zeroed so staggered entrances do not become invisible content, and the self-fading toast exempted so its confirmation is still readable. Never add per-component reduced-motion handling.
 
 ## Do's and Don'ts
 
 ### Do:
+
 - **Do** use the world's own token names in new work: paper, ink, ink-2, ink-3, rule, rule-strong, wash, signal.
 - **Do** rank things with rule weight: hairline between rows, `rule` between sections, 2px ink to open a table or mark the now line.
 - **Do** carry state with a mark - filled square for met or done, open square for not yet, struck signal rule for an overrun, filled signal flag for an error.
@@ -315,6 +336,7 @@ The one authored motion. A committed figure rolls into place over 0.26s on `cubi
 - **Do** draw new icons in the app's own icon file at 1.6px stroke, butt cap, mitre join, no arcs, and give every icon-only button an aria-label.
 
 ### Don't:
+
 - **Don't** introduce a radius, a shadow, or a raised surface. There is no elevation in this system.
 - **Don't** add a gray between the three named inks, and don't make a tone with opacity. Name the tone or use an existing one.
 - **Don't** put text or a glyph in `rule` or `rule-strong`; they are below AA by design and only divide.
@@ -328,5 +350,5 @@ The one authored motion. A committed figure rolls into place over 0.26s on `cubi
 
 ## Known open
 
-- **The timeline renders one column.** The direction contract's thesis describes a scheduled column set against an actual column, with the gap between them reading as a delay. That two-column device is *not built*: the day timeline draws a single canvas in which planned and actual are distinguished by outline versus fill. Left deliberately unresolved pending real phone use. Do not treat the two-column layout as an existing rule, and do not treat the single column as a settled one.
+- **The timeline renders one column.** The direction contract's thesis describes a scheduled column set against an actual column, with the gap between them reading as a delay. That two-column device is _not built_: the day timeline draws a single canvas in which planned and actual are distinguished by outline versus fill. Left deliberately unresolved pending real phone use. Do not treat the two-column layout as an existing rule, and do not treat the single column as a settled one.
 - **The 24-hour canvas span** is an explicit override of an adaptive window.

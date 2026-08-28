@@ -133,7 +133,7 @@ export function WeeklyView() {
         </h2>
         <button
           onClick={() => openEditor(dayKey(new Date()))}
-          className="inline-flex min-h-[44px] items-center justify-center bg-ink px-5 py-2.5 t-body font-semibold text-paper"
+          className="inline-flex min-h-[44px] items-center justify-center bg-ink px-5 py-2.5 t-body font-semibold text-paper rounded-md"
         >
           Log today's numbers
         </button>

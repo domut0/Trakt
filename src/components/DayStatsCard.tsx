@@ -50,7 +50,7 @@ function MetricKey({ hatch }: { hatch: MetricHatch }) {
   return (
     <span
       aria-hidden="true"
-      className={`h-3 w-3 shrink-0 border border-ink-3 ${HATCH_CLASS[hatch]}`}
+      className={`h-3 w-3 shrink-0 rounded-sm border border-ink-3 ${HATCH_CLASS[hatch]}`}
     />
   );
 }
@@ -59,7 +59,10 @@ function StatusMark({ status }: { status: TargetStatus }) {
   if (status === "met") {
     // Same filled square as a ticked habit. One vocabulary for "done".
     return (
-      <span aria-hidden="true" className="ml-2 inline-block h-2.5 w-2.5 bg-ink align-middle" />
+      <span
+        aria-hidden="true"
+        className="ml-2 inline-block h-2.5 w-2.5 bg-ink align-middle rounded-md"
+      />
     );
   }
   return null;
@@ -153,12 +156,12 @@ function CalorieGauge({
   return (
     <div aria-hidden="true" className="mt-3">
       <div className="flex items-stretch">
-        <div className="relative h-3 flex-1 border border-ink">
+        <div className="relative h-3 flex-1 overflow-hidden rounded-md border border-ink">
           <div className="hatch-dense h-full" style={{ width: `${pct}%` }} />
         </div>
         {overPct > 0 && (
           <div
-            className="hatch-over h-3 shrink-0 border border-l-0 border-signal"
+            className="hatch-over h-3 shrink-0 rounded-r-md border border-l-0 border-signal"
             style={{ width: `${overPct}%` }}
           />
         )}

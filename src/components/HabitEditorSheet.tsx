@@ -220,7 +220,7 @@ export function HabitEditorSheet({ open, onClose }: { open: boolean; onClose: ()
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup"
+        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup rounded-md"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-3 h-1 w-10 shrink-0 bg-border" />
@@ -257,7 +257,7 @@ export function HabitEditorSheet({ open, onClose }: { open: boolean; onClose: ()
             <button
               type="submit"
               disabled={!newHabitName.trim()}
-              className="min-h-[44px] bg-ink px-4 t-body font-semibold text-paper disabled:opacity-40"
+              className="min-h-[44px] bg-ink px-4 t-body font-semibold text-paper disabled:opacity-40 rounded-md"
             >
               Add
             </button>
@@ -291,7 +291,7 @@ export function HabitEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                             deleteHabit(habit.id);
                             setConfirmDeleteId(null);
                           }}
-                          className="min-h-[44px] flex-1 bg-signal px-3 t-label font-semibold text-white"
+                          className="min-h-[44px] flex-1 bg-signal px-3 t-label font-semibold text-white rounded-md"
                         >
                           Delete history
                         </button>
@@ -423,7 +423,7 @@ export function HabitEditorSheet({ open, onClose }: { open: boolean; onClose: ()
                                 deleteHabit(habit.id);
                                 setConfirmDeleteId(null);
                               }}
-                              className="min-h-[44px] flex-1 bg-signal px-3 t-label font-semibold text-white"
+                              className="min-h-[44px] flex-1 bg-signal px-3 t-label font-semibold text-white rounded-md"
                             >
                               Delete history
                             </button>

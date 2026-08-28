@@ -114,7 +114,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#F3F2EE" },
+      { name: "theme-color", content: "#F3F4F5" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       // "default" gives dark status-bar glyphs, which is what a paper ground
       // needs; "black" was correct only while the app was dark.
@@ -176,10 +176,10 @@ function RootShell({ children }: { children: ReactNode }) {
 THESIS: A training day is a schedule, so print it as one. Planned is the scheduled
 column, logged is the actual, and the gap between them is a delay. Refuses the stack
 of floating rounded cards every tracker ships.
-OWN-WORLD: Paper #F3F2EE, one black ink, one signal red for the exception. Archivo
+OWN-WORLD: Paper #F3F4F5, one slate ink #282D33, one signal red for the exception. Archivo
 variable on its width axis. Rank comes from rule weight, never fill: hairline divides
-rows, rule divides sections, 2px ink opens a table. No elevation, no radius, no gray
-ramp. State is carried by mark (filled square, struck rule), metric identity by hatch
+rows, rule divides sections, 2px ink opens a table. No elevation and no gray ramp;
+corners eased to 4px after the first build read as severe. State is carried by mark (filled square, struck rule), metric identity by hatch
 angle. Tables bleed to the trim; the gutter lives on the cell.
 STORY: He reads the day as scheduled against actual, logs a set in one tap, and the
 figure flaps into place like a departure board committing.

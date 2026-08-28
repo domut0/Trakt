@@ -91,7 +91,7 @@ export function WeekStrip({
               aria-pressed={isSelected}
               aria-label={format(day, "EEEE, MMMM d, yyyy")}
               className={`flex min-h-[52px] flex-col items-center justify-center gap-1 border-l border-rule focus:outline-none ${
-                isSelected ? "bg-ink text-paper" : "text-ink active:bg-wash"
+                isSelected ? "rounded-md bg-ink text-paper" : "text-ink active:bg-wash"
               }`}
             >
               <span className={`t-caption ${isSelected ? "text-paper" : "text-ink-3"}`}>

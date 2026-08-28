@@ -326,14 +326,14 @@ function WorkoutPage() {
                       row is emphasis rather than position.
                     */
                     className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""} ${
-                      isCurrent ? "bg-ink text-paper" : "text-ink"
+                      isCurrent ? "rounded-md bg-ink text-paper" : "text-ink"
                     }`}
                   >
                     <span className="flex min-w-0 items-center gap-3">
                       {/* Same filled-versus-open square as a ticked habit. */}
                       <span
                         aria-hidden="true"
-                        className={`h-[14px] w-[14px] shrink-0 ${
+                        className={`h-[14px] w-[14px] shrink-0 rounded-sm ${
                           logged > 0
                             ? isCurrent
                               ? "bg-paper"
@@ -381,7 +381,7 @@ function WorkoutPage() {
             }
           }}
           aria-label={inBlock ? "Log the next set in this block" : "Log a set"}
-          className="flex min-h-[72px] w-full items-center justify-between gap-3 bg-ink px-5 text-paper"
+          className="flex min-h-[72px] w-full items-center justify-between gap-3 bg-ink px-5 text-paper rounded-md"
         >
           <span className="min-w-0 text-left">
             <span className="block t-heading">{inBlock ? "Next set" : "Log set"}</span>

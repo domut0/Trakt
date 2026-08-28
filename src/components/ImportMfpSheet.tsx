@@ -160,7 +160,7 @@ export function ImportMfpSheet({ open, onClose }: ImportMfpSheetProps) {
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup"
+        className="flex max-h-[85vh] w-full max-w-sm flex-col bg-paper rule-heavy-t p-5 anim-popup rounded-md"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-3 h-1 w-10 shrink-0 bg-border" />
@@ -210,7 +210,7 @@ export function ImportMfpSheet({ open, onClose }: ImportMfpSheetProps) {
                   type="button"
                   onClick={() => handleParse(rawHtml)}
                   disabled={!rawHtml.trim()}
-                  className="flex min-h-[44px] w-full items-center justify-center bg-ink px-4 t-body font-semibold text-paper disabled:opacity-40"
+                  className="flex min-h-[44px] w-full items-center justify-center bg-ink px-4 t-body font-semibold text-paper disabled:opacity-40 rounded-md"
                 >
                   Preview diary
                 </button>
@@ -278,7 +278,7 @@ export function ImportMfpSheet({ open, onClose }: ImportMfpSheetProps) {
                 type="button"
                 onClick={handleConfirm}
                 disabled={newFoods.length === 0}
-                className="flex min-h-[44px] flex-1 items-center justify-center bg-ink py-2 t-body font-medium text-paper disabled:opacity-40"
+                className="flex min-h-[44px] flex-1 items-center justify-center bg-ink py-2 t-body font-medium text-paper disabled:opacity-40 rounded-md"
               >
                 {newFoods.length === 0
                   ? "No new foods"

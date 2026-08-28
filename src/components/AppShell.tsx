@@ -87,10 +87,11 @@ function Icon({ name }: { name: TabItem["icon"] }) {
     fill: "none",
     stroke,
     strokeWidth: 1.6,
-    // butt and miter, not round: this world has no round ends and no radius,
-    // and a rounded cap here was the nav being the one soft thing on the page.
-    strokeLinecap: "butt" as const,
-    strokeLinejoin: "miter" as const,
+    // Round again, matching src/components/icons.tsx. Square caps belonged to
+    // the zero-radius build; with 4px corners everywhere they were the last
+    // hard edge on the screen.
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
     // Decorative: every tab renders its own visible text label right below the
     // icon, so exposing the glyph too would just double the announcement.
     "aria-hidden": true,
@@ -116,7 +117,7 @@ function Icon({ name }: { name: TabItem["icon"] }) {
     return (
       <svg {...common}>
         <path d="M9 4.5H7.5A1.5 1.5 0 0 0 6 6v13.5A1.5 1.5 0 0 0 7.5 21h9a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H15" />
-        <rect x="9" y="3" width="6" height="3" />
+        <rect x="9" y="3" width="6" height="3" rx="1" />
         <path d="M9 11h6" />
         <path d="M9 15h4" />
       </svg>
@@ -124,7 +125,7 @@ function Icon({ name }: { name: TabItem["icon"] }) {
   if (name === "calendar")
     return (
       <svg {...common}>
-        <rect x="3.5" y="5" width="17" height="16" />
+        <rect x="3.5" y="5" width="17" height="16" rx="2.5" />
         <path d="M3.5 9.5h17" />
         <path d="M8 3v4" />
         <path d="M16 3v4" />
@@ -284,7 +285,7 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
             // and a label at exactly the routed tabs' size and geometry,
             // differing only by fill and weight, so it read as a fifth tab
             // rather than as the thing the bar exists to launch.
-            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 bg-ink px-3 py-1 text-paper"
+            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 bg-ink px-3 py-1 text-paper rounded-md"
           >
             <span className="relative flex items-center justify-center">
               <FlameIcon />
@@ -295,8 +296,8 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
                   Reduced motion is handled globally in styles.css. */}
               {activeSessionId && (
                 <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-2 w-2">
-                  <span className="absolute inset-0 animate-ping bg-ink" />
-                  <span className="relative h-2 w-2 bg-ink ring-2 ring-paper" />
+                  <span className="absolute inset-0 animate-ping bg-ink rounded-md" />
+                  <span className="relative h-2 w-2 bg-ink ring-2 ring-paper rounded-md" />
                 </span>
               )}
             </span>

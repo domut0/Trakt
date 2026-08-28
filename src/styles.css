@@ -87,10 +87,19 @@
   --color-fat: var(--ink);
   --color-protein: var(--ink);
 
-  /* A timetable is set on a rectangular grid and nothing on it is rounded. */
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
+  /* Gentle, not absent.
+
+     The first build set every radius to 0 on the grounds that a timetable is
+     printed on a rectangular grid, which was true of the reference and wrong
+     for the product: knife-edged corners on every mark, cell, sheet and button
+     read as severe rather than as precise, and the user said so. 4px takes the
+     edge off without turning the page back into a stack of cards. The rules,
+     the tabular figures and the marks are what carry the world; the corners
+     never were. 2px on the small state marks, because 4px on a 10px square is
+     a lozenge. */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
 }
 
 :root {
@@ -99,27 +108,28 @@
      paper and the wash.
 
      The paper is deliberately not #ffffff. Pure white is a flashlight in a
-     dark bedroom, and this app is opened in bed every night; #F3F2EE is the
-     softest ground that still reads as white paper rather than as cream. The
-     warm cast is 5 points across the channels, which is paper. Cream is
-     roughly 30 and is a different, much-visited place. */
-  --paper: #f3f2ee;
+     dark bedroom, and this app is opened in bed every night. #F3F4F5 is a
+     neutral-cool paper: the first build used a warm #F3F2EE against a near
+     black ink at 16.6:1, and the pairing read as severe rather than as
+     precise. Slate at 12.6:1 is the same document, printed with a softer
+     plate. */
+  --paper: #f3f4f5;
 
   /* Three inks, and they are three real colours rather than one colour at
      three opacities. Opacity variants are what let secondary text drift below
      AA in the old system, and the fix that lasts is to name the tone. */
-  --ink: #141310; /* 16.58:1 - body, figures, everything primary */
-  --ink-2: #5a574e; /*  6.45:1 - secondary text, column headers */
-  --ink-3: #6e6b60; /*  4.76:1 - tertiary; still AA, still not a gray ramp */
+  --ink: #282d33; /* 12.60:1 on paper, 11.51:1 on wash - body, figures, everything primary */
+  --ink-2: #4b525b; /*  7.18:1 on paper,  6.55:1 on wash - secondary text, column headers */
+  --ink-3: #616872; /*  5.11:1 on paper,  4.67:1 on wash - tertiary; AA on BOTH grounds */
 
   /* Rules. These never carry text, so they are free to sit below AA: their job
      is to divide, and a hairline that meets text contrast is a black bar. */
-  --rule: #d8d6ce; /* hairline: between rows */
-  --rule-strong: #b9b6ab; /* division: between sections, column edges */
+  --rule: #dde0e3; /* hairline: between rows */
+  --rule-strong: #c2c7cd; /* division: between sections, column edges */
 
   /* The one filled tone. A logged thing is printed on the page rather than
      outlined on it, and this is what "solid fill = happened" fills with. */
-  --wash: #e9e7e0;
+  --wash: #e8eaec;
 
   /* The second ink. A two-colour press gets exactly one, and a timetable spends
      it on the exception: the footnote, the service that does not run today, the
@@ -131,7 +141,7 @@
      figure takes a struck rule under it, an error takes a filled flag. Same
      ink, different mark, and the mark is the part that survives being
      colourblind. 5.25:1 on paper, 4.75:1 on wash. */
-  --signal: #c8102e;
+  --signal: #a8474a;
 }
 
 @layer base {
@@ -201,6 +211,7 @@
   :focus-visible {
     outline: 2px solid var(--color-ink);
     outline-offset: 2px;
+    border-radius: var(--radius-md);
   }
   * {
     scrollbar-width: thin;
@@ -275,7 +286,7 @@
     page. Narrow and heavy: this is a printed title, not a soft app header. */
 @utility t-title {
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 700;
   font-stretch: 80%;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -285,7 +296,7 @@
 /** A table's name. Sits on the heavy rule that opens the table. */
 @utility t-heading {
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 600;
   font-stretch: 85%;
   line-height: 1.15;
   letter-spacing: -0.005em;
@@ -334,7 +345,7 @@
     a departure time: big, narrow, and unmistakably a number. */
 @utility t-hero {
   font-size: 44px;
-  font-weight: 800;
+  font-weight: 700;
   font-stretch: 78%;
   line-height: 0.95;
   letter-spacing: -0.03em;
@@ -443,6 +454,7 @@
 @utility mark-done-box {
   width: 10px;
   height: 10px;
+  border-radius: var(--radius-sm);
   background-color: var(--color-ink);
 }
 
@@ -451,6 +463,7 @@
 @utility mark-open {
   width: 10px;
   height: 10px;
+  border-radius: var(--radius-sm);
   background-color: transparent;
   box-shadow: inset 0 0 0 1.5px var(--color-ink-3);
 }
@@ -467,6 +480,7 @@
 /** Something broke. A filled flag in the second colour. Different shape from
     mark-over on purpose; that difference is what the hue used to do. */
 @utility mark-error {
+  border-radius: var(--radius-md);
   background-color: var(--color-signal);
   color: var(--color-paper);
   padding: 1px 5px;
@@ -483,12 +497,14 @@
 @utility planned {
   background-color: transparent;
   border: 1px dashed var(--color-rule-strong);
+  border-radius: var(--radius-md);
 }
 
 /** It happened. Printed on the page: a solid hairline and the one filled tone. */
 @utility actual {
   background-color: var(--color-wash);
   border: 1px solid var(--color-ink-3);
+  border-radius: var(--radius-md);
 }
 
 /* ---------------------------------------------------------------------------

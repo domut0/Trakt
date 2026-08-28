@@ -247,7 +247,7 @@ export function PlanEditorSheet({
       onClick={onClose}
     >
       <div
-        className="bg-paper rule-heavy-t flex max-h-[85vh] w-full max-w-sm flex-col p-5 anim-popup"
+        className="bg-paper rule-heavy-t flex max-h-[85vh] w-full max-w-sm flex-col p-5 anim-popup rounded-md"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-3 h-1 w-10 shrink-0 bg-border" />

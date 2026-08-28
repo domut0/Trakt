@@ -113,7 +113,7 @@ export function TargetsEditor() {
     <div className="space-y-6">
       {showDayAssignments && (
         <>
-          <div className="bg-wash p-4">
+          <div className="rounded-md bg-wash p-4">
             <div className="t-caption text-ink-2">This week</div>
             <div className="tnum mt-1.5 space-y-1 t-label font-medium text-ink">
               {summaryLines.map((line) => (
@@ -145,18 +145,27 @@ export function TargetsEditor() {
                     type="button"
                     aria-label={`${label}, currently ${assignedName}. Tap to change.`}
                     onClick={() => handleRotateDayTarget(idx)}
-                    className="flex min-h-[52px] min-w-0 flex-col items-center justify-center bg-wash p-1 text-center transition-transform active:scale-95"
+                    className="flex min-h-[52px] min-w-0 flex-col items-center justify-center rounded-md bg-wash p-1 text-center transition-transform active:scale-95"
                   >
                     <span aria-hidden="true" className="t-caption text-ink-2">
                       {label}
                     </span>
+                    {/*
+                      The profile INITIAL, not its truncated name.
+
+                      Seven columns on a 390px screen give each chip about 45px,
+                      which turned every profile called anything into "TRA...".
+                      An ellipsis that eats the whole word is not an
+                      abbreviation, it is a word you cannot read. The panel
+                      directly above already names which profile runs on which
+                      days in full, and the accessible name on this button
+                      carries it too, so the chip only has to DISTINGUISH.
+                    */}
                     <span
                       aria-hidden="true"
-                      className={`mt-0.5 max-w-full truncate px-0.5 t-caption ${
-                        assigned ? "text-ink" : "text-ink-2"
-                      }`}
+                      className={`mt-0.5 t-caption ${assigned ? "text-ink" : "text-ink-2"}`}
                     >
-                      {assignedName}
+                      {assigned ? assignedName.trim().charAt(0).toUpperCase() : "-"}
                     </span>
                   </button>
                 );

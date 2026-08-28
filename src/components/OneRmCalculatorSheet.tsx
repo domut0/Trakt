@@ -74,7 +74,7 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-paper rule-heavy-t p-5 anim-sheet"
+        className="w-full max-w-md bg-paper rule-heavy-t p-5 anim-sheet rounded-md"
         onClick={(e) => e.stopPropagation()}
         style={{
           paddingBottom: `max(env(safe-area-inset-bottom), ${20 + keyboardOffset}px)`,
@@ -190,7 +190,7 @@ export function OneRmCalculatorSheet({ open, onClose }: { open: boolean; onClose
         <button
           type="button"
           onClick={onClose}
-          className="mt-5 min-h-[44px] h-12 w-full bg-ink py-3 t-body font-semibold text-paper"
+          className="mt-5 min-h-[44px] h-12 w-full bg-ink py-3 t-body font-semibold text-paper rounded-md"
         >
           Done
         </button>

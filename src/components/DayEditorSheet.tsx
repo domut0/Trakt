@@ -296,7 +296,7 @@ export function DayEditorSheet({
       style={{ opacity: dragY > 0 ? Math.max(0, 1 - dragY / 300) : 1 }}
     >
       <div
-        className="w-full max-w-md bg-paper rule-heavy-t anim-sheet"
+        className="w-full max-w-md bg-paper rule-heavy-t anim-sheet rounded-md"
         onClick={(e) => e.stopPropagation()}
         style={{
           paddingBottom: `max(env(safe-area-inset-bottom), ${20 + keyboardOffset}px)`,
@@ -617,7 +617,7 @@ export function DayEditorSheet({
             </button>
             <button
               onClick={save}
-              className="flex-[2] min-h-[44px] bg-ink py-3 t-body font-semibold text-paper"
+              className="flex-[2] min-h-[44px] bg-ink py-3 t-body font-semibold text-paper rounded-md"
             >
               Save
             </button>

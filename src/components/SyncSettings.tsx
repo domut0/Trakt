@@ -170,7 +170,7 @@ export function SyncSettings() {
                 type="button"
                 onClick={submit}
                 disabled={connecting}
-                className="min-h-11 flex-1 bg-ink py-2.5 t-body font-medium text-paper"
+                className="min-h-11 flex-1 bg-ink py-2.5 t-body font-medium text-paper rounded-md"
               >
                 {connecting ? "Connecting" : "Connect"}
               </button>
@@ -262,7 +262,7 @@ export function SyncSettings() {
                     void takeOverSheet();
                     setShowTakeover(false);
                   }}
-                  className="min-h-11 flex-1 bg-signal py-2.5 t-body font-medium text-white"
+                  className="min-h-11 flex-1 bg-signal py-2.5 t-body font-medium text-white rounded-md"
                 >
                   Take over
                 </button>
@@ -329,7 +329,7 @@ export function SyncSettings() {
                 void disconnect();
                 setShowDisconnect(false);
               }}
-              className="min-h-11 flex-1 bg-signal py-2.5 t-body font-medium text-white"
+              className="min-h-11 flex-1 bg-signal py-2.5 t-body font-medium text-white rounded-md"
             >
               Disconnect
             </button>

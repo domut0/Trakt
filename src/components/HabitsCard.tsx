@@ -19,7 +19,7 @@ function HabitMark({ done }: { done: boolean }) {
   return (
     <span
       aria-hidden="true"
-      className={`h-[14px] w-[14px] shrink-0 ${done ? "bg-ink" : "mark-open"}`}
+      className={`h-[14px] w-[14px] shrink-0 rounded-sm ${done ? "bg-ink" : "mark-open"}`}
     />
   );
 }

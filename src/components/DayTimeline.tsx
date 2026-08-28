@@ -257,7 +257,7 @@ export function DayTimeline(props: {
               className="pointer-events-none absolute left-0 right-0 z-30 flex items-center -translate-y-1/2"
               style={{ top: `${offsetPx(nowMinutes, PX_PER_HOUR)}px` }}
             >
-              <div className="flex shrink-0 items-center justify-center bg-ink px-1.5 py-0.5 t-caption text-paper">
+              <div className="flex shrink-0 items-center justify-center bg-ink px-1.5 py-0.5 t-caption text-paper rounded-md">
                 {formatMinutesOfDay(nowMinutes)}
               </div>
               <div className="h-0.5 flex-1 bg-ink" />

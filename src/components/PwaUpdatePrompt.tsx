@@ -15,7 +15,7 @@ function UpdateBanner() {
   return (
     <div
       role="status"
-      className="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-fit max-w-[calc(100vw-32px)] items-center gap-3 bg-ink px-4 py-2.5 t-label text-paper"
+      className="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-fit max-w-[calc(100vw-32px)] items-center gap-3 bg-ink px-4 py-2.5 t-label text-paper rounded-md"
       style={{ marginBottom: "env(safe-area-inset-bottom)" }}
     >
       <span>A new version is available.</span>

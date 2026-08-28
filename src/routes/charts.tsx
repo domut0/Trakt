@@ -226,7 +226,7 @@ function ChartsPage() {
               aria-pressed={metricKey === m.key}
               className={
                 "flex min-h-[44px] items-center justify-center whitespace-nowrap px-4 py-2 t-label font-medium transition-colors duration-150 " +
-                (metricKey === m.key ? "bg-ink text-paper" : "text-ink-2")
+                (metricKey === m.key ? "rounded-md bg-ink text-paper" : "text-ink-2")
               }
             >
               {m.label}
@@ -253,7 +253,7 @@ function ChartsPage() {
                 // min-w matters as much as min-h here: the "7" chip is a single
                 // character and would otherwise be a 34px-wide tap target.
                 "flex min-h-[44px] min-w-[44px] items-center justify-center whitespace-nowrap px-3.5 py-2 t-label font-medium transition-colors duration-150 tnum " +
-                (rangeDays === r.days ? "bg-ink text-paper" : "text-ink-2")
+                (rangeDays === r.days ? "rounded-md bg-ink text-paper" : "text-ink-2")
               }
             >
               {r.label}
@@ -273,7 +273,7 @@ function ChartsPage() {
             // half is inked; it used to be marked with shadow-xs, which on a
             // page with no elevation left the two states differing only by the
             // shade of their text.
-            className="inline-flex border-[1.5px] border-ink divide-x-[1.5px] divide-ink"
+            className="inline-flex overflow-hidden rounded-md border-[1.5px] border-ink divide-x-[1.5px] divide-ink"
           >
             <button
               type="button"

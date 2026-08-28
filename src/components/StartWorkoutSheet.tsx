@@ -96,7 +96,7 @@ export function StartWorkoutSheet({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-paper rule-heavy-t p-5 pb-8 anim-sheet"
+        className="w-full max-w-md bg-paper rule-heavy-t p-5 pb-8 anim-sheet rounded-md"
         onClick={(e) => e.stopPropagation()}
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
@@ -159,7 +159,7 @@ export function StartWorkoutSheet({
             type="button"
             onClick={() => handleStart()}
             disabled={!(trimmed || predicted)}
-            className="flex-[2] min-h-[44px] bg-ink py-3 t-body font-semibold text-paper disabled:opacity-40"
+            className="flex-[2] min-h-[44px] bg-ink py-3 t-body font-semibold text-paper disabled:opacity-40 rounded-md"
           >
             Start
           </button>
