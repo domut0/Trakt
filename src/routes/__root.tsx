@@ -119,18 +119,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // "default" gives dark status-bar glyphs, which is what a paper ground
       // needs; "black" was correct only while the app was dark.
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
-      { name: "apple-mobile-web-app-title", content: "ABTN Log" },
-      { title: "Anything But The Notes App" },
+      { name: "apple-mobile-web-app-title", content: "Trakt" },
+      { title: "Trakt" },
       {
         name: "description",
         content:
-          "A frictionless workout logger for lifters. Weight and reps, nothing else in the way.",
+          "Bodyweight, macros and training, logged once a day and mirrored to your own Google Sheet.",
       },
-      { property: "og:title", content: "Anything But The Notes App" },
+      { property: "og:title", content: "Trakt" },
       {
         property: "og:description",
         content:
-          "A frictionless workout logger for lifters. Weight and reps, nothing else in the way.",
+          "Bodyweight, macros and training, logged once a day and mirrored to your own Google Sheet.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

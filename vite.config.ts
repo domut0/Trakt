@@ -45,10 +45,10 @@ export default defineConfig(async ({ command }) => {
       outDir: ".output/public",
       includeAssets: ["favicon.ico", "icon.svg", "apple-touch-icon.png"],
       manifest: {
-        name: "Anything But The Notes App",
-        short_name: "ABTN Log",
+        name: "Trakt",
+        short_name: "Trakt",
         description:
-          "A frictionless workout logger for lifters. Weight and reps, nothing else in the way.",
+          "Bodyweight, macros and training, logged once a day and mirrored to your own Google Sheet.",
         theme_color: "#0E1217",
         background_color: "#0E1217",
         display: "standalone",

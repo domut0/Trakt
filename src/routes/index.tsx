@@ -32,17 +32,17 @@ export const Route = createFileRoute("/")({
   },
   head: () => ({
     meta: [
-      { title: "Anything But The Notes App" },
+      { title: "Trakt" },
       {
         name: "description",
         content:
-          "Your whole day on one timeline. What you planned to eat and train, against what you actually did.",
+          "Today at a glance: morning bodyweight, and the day's calories and macros.",
       },
-      { property: "og:title", content: "Anything But The Notes App" },
+      { property: "og:title", content: "Trakt" },
       {
         property: "og:description",
         content:
-          "Your whole day on one timeline. What you planned to eat and train, against what you actually did.",
+          "Today at a glance: morning bodyweight, and the day's calories and macros.",
       },
     ],
   }),

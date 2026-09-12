@@ -100,11 +100,11 @@ Terminology that is settled and must not fork:
   `WorkoutSession`.
 - **Habits**, generically. It is not a supplement tracker.
 
-Explicitly undecided:
+Settled:
 
-- **The product's name.** "Anything But The Notes App" is a placeholder from the PRD and
-  the user has asked for it to be replaced. Nothing should be built that makes a rename
-  expensive.
+- **The product's name is Trakt** (decided 2026-09-12). It replaces the "Anything But The
+  Notes App" placeholder from the PRD. Note that trakt.tv is an unrelated existing
+  product; the collision was raised and accepted.
 
 ## Brand Commitments
 
