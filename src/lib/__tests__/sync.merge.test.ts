@@ -30,13 +30,6 @@ function source(overrides: Partial<SyncSource> = {}): SyncSource {
       },
     ],
     dailyLogs: [{ date: "2026-08-12", calories: 2400, protein: 180 }],
-    habits: [],
-    habitEntries: [],
-    foods: [],
-    foodEntries: [],
-    meals: [],
-    recipes: [],
-    recipeIngredients: [],
     unit: "lbs",
     ...overrides,
   };
@@ -362,12 +355,6 @@ describe("buildSheetTabs", () => {
     expect(tabs[SHEET_TABS.daily][0][0]).toBe("Date");
   });
 
-  it("builds the Food Log tab without an ID column", () => {
-    expect(SHEET_TABS.foodLog).toBe("Food Log");
-    const tabs = buildSheetTabs(source());
-    expect(tabs[SHEET_TABS.foodLog][0][0]).toBe("Date");
-  });
-
   it("does not emit the _sync tab, which the script owns", () => {
     expect(Object.keys(buildSheetTabs(source()))).not.toContain(SHEET_TABS.meta);
   });
@@ -411,27 +398,15 @@ describe("mergeFromSheet: push-only tabs", () => {
   const local = source();
   const base = buildBase(local, 1);
 
-  it("completely ignores the Food Log tab and creates no patches or collisions from it", () => {
-    const remoteFoodLogRows: CellValue[][] = [
-      [
-        "Date",
-        "Meal",
-        "Food",
-        "Brand",
-        "Portion",
-        "Quantity",
-        "Unit",
-        "Calories",
-        "Protein (g)",
-        "Carbs (g)",
-        "Fat (g)",
-      ],
-      ["2026-08-12", "Breakfast", "Oatmeal", "Quaker", "1 cup", 1, "serving", 150, 5, 27, 3],
-      ["2026-08-12", "Lunch", "Chicken Breast", "", "200 g", 200, "g", 330, 62, 0, 7],
+  it("completely ignores the cardio tab and creates no patches or collisions from it", () => {
+    const remoteCardioRows: CellValue[][] = [
+      ["ID", "Date", "Activity", "Duration (min)", "Distance", "Unit", "Note"],
+      ["sess_c1", "2026-08-12", "Treadmill", 28, 5, "km", ""],
+      ["sess_c2", "2026-08-13", "Rower", 20, 4, "km", ""],
     ];
 
     const result = mergeFromSheet(base, local, {
-      [SHEET_TABS.foodLog]: remoteFoodLogRows,
+      [SHEET_TABS.cardio]: remoteCardioRows,
     });
 
     expect(isNoopMerge(result)).toBe(true);
@@ -440,7 +415,7 @@ describe("mergeFromSheet: push-only tabs", () => {
     expect(result.dailyPatches).toHaveLength(0);
     expect(result.report.applied).toBe(0);
     expect(result.report.collisions).toHaveLength(0);
-    expect(result.report.skippedTabs).not.toContain(SHEET_TABS.foodLog);
+    expect(result.report.skippedTabs).not.toContain(SHEET_TABS.cardio);
     expect(result.report.unknownRows).toBe(0);
   });
 });

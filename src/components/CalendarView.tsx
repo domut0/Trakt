@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { useEffectiveDailyLogs } from "../lib/use-day-macros";
 import { useMemo, useState } from "react";
 import {
   addMonths,
@@ -53,7 +52,7 @@ export function CalendarView() {
   const sets = useStore((s) => s.sets);
   // Same reason as Today: a day tracked only through food entries must not
   // render as an untracked day on the calendar.
-  const dailyLogs = useEffectiveDailyLogs();
+  const dailyLogs = useStore((s) => s.dailyLogs);
   const unit = useStore((s) => s.unit);
 
   const [viewedMonth, setViewedMonth] = useState(() => startOfMonth(new Date()));

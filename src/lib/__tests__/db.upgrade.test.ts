@@ -4,7 +4,7 @@ import { db } from "../db";
 import { useStore } from "../store";
 
 // This file deliberately has NO beforeEach that touches `db`: the whole point
-// is to create a version-1 database FIRST, before the app's current instance
+// is to create an older database FIRST, before the app's current instance
 // has ever opened it. fake-indexeddb/auto (src/test/setup.ts) gives each test
 // file its own empty IndexedDB, so this starts from nothing.
 
@@ -23,11 +23,21 @@ import { useStore } from "../store";
  * actually landed on disk and what the store hydrated to. Those are the test's
  * real subject; this constant is just the canary.
  */
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 
-/** Every table the app expects to exist once an old database has been upgraded. */
-const TABLES_ADDED_AFTER_V1 = [
-  "dailyLogs",
+/** Every table the app still expects to exist once an old database is upgraded. */
+const TABLES_ADDED_AFTER_V1 = ["dailyLogs"] as const;
+
+/**
+ * The tables v5 deletes, when the app stopped being a food tracker.
+ *
+ * Asserted against the real IDBDatabase rather than `db.tables`, because the
+ * interesting failure is the silent one: `stores({ foods: null })` that never
+ * ran leaves the store sitting on disk holding its whole index and its storage
+ * quota, on a phone, for data no screen can reach. Declarations cannot tell
+ * you that; only `objectStoreNames` can.
+ */
+const TABLES_DROPPED_BY_V5 = [
   "habits",
   "habitEntries",
   "foods",
@@ -71,9 +81,9 @@ describe("Dexie v1 -> current schema upgrade", () => {
     await v1.table("meta").put({ key: "settings", unit: "kg", chartsEnabled: false });
     v1.close();
 
-    // The app opens the same database at its current version. Every bump so far
-    // only ADDS tables, and adding a table needs no data migration, so this must
-    // not throw and must not touch existing rows.
+    // The app opens the same database at its current version. Adding a table
+    // needs no data migration, so this must not throw and must not touch
+    // existing rows.
     await db.open();
     expect(db.verno).toBe(CURRENT_SCHEMA_VERSION);
 
@@ -86,6 +96,11 @@ describe("Dexie v1 -> current schema upgrade", () => {
     for (const name of TABLES_ADDED_AFTER_V1) {
       expect(persistedStores).toContain(name);
     }
+    // A v1 database never had these, and v5 must not resurrect them on the way
+    // past v3 and v4.
+    for (const name of TABLES_DROPPED_BY_V5) {
+      expect(persistedStores).not.toContain(name);
+    }
 
     // The v1 rows survived the upgrade untouched.
     expect(await db.exercises.get("e1")).toMatchObject({ name: "Bench Press" });
@@ -94,68 +109,12 @@ describe("Dexie v1 -> current schema upgrade", () => {
     expect(await db.sets.count()).toBe(1);
     expect(await db.meta.get("settings")).toMatchObject({ unit: "kg", chartsEnabled: false });
 
-    // Each new table exists, is empty, and is writable. Writing matters as much
-    // as counting: an object store created without its declared indexes still
+    // dailyLogs exists, is empty, and is writable. Writing matters as much as
+    // counting: an object store created without its declared indexes still
     // reports a count of 0, so an empty read alone would not catch it.
     expect(await db.dailyLogs.count()).toBe(0);
     await db.dailyLogs.put({ date: "2026-08-07", calories: 2400 });
     expect(await db.dailyLogs.get("2026-08-07")).toMatchObject({ calories: 2400 });
-
-    expect(await db.habits.count()).toBe(0);
-    await db.habits.put({ id: "h1", name: "Creatine", order: 0 });
-    await db.habitEntries.put({ id: "2026-08-07|h1", date: "2026-08-07", habitId: "h1" });
-    // Queried through the indexes v3 declared on habitEntries, which is the only
-    // way to prove they were actually created rather than merely declared: Today
-    // reads a whole day at once, and deleting a habit sweeps by habitId.
-    expect(await db.habitEntries.where("date").equals("2026-08-07").count()).toBe(1);
-    expect(await db.habitEntries.where("habitId").equals("h1").count()).toBe(1);
-
-    // The v4 food tables, same treatment: written to, then read back through
-    // the indexes v4 declared, because a store created without its indexes
-    // still reports a count of 0.
-    expect(await db.foods.count()).toBe(0);
-    await db.foods.put({
-      id: "f1",
-      name: "Kimchi",
-      brand: "Jongga",
-      barcode: "8801052131078",
-      sourceType: "mfp",
-      createdAt: 1,
-      basisQuantity: 100,
-      basisUnit: "g",
-      calories: 35,
-    });
-    // Barcode is indexed for scan lookup, name for the catalogue listing.
-    expect(await db.foods.where("barcode").equals("8801052131078").count()).toBe(1);
-    expect(await db.foods.where("name").equals("Kimchi").count()).toBe(1);
-
-    await db.meals.put({ id: "m1", name: "Breakfast", fromMinutes: 300, toMinutes: 660, rank: 0 });
-    await db.foodEntries.put({
-      id: "fe1",
-      date: "2026-08-07",
-      mealId: "m1",
-      quantity: 100,
-      unit: "g",
-      name: "Kimchi",
-      loggedAt: 2,
-      basisQuantity: 100,
-      basisUnit: "g",
-      calories: 35,
-    });
-    // date because Today reads a whole day at once; mealId because deleting a
-    // meal has to find every entry that pointed at it.
-    expect(await db.foodEntries.where("date").equals("2026-08-07").count()).toBe(1);
-    expect(await db.foodEntries.where("mealId").equals("m1").count()).toBe(1);
-
-    await db.recipes.put({ id: "r1", name: "Overnight oats", servings: 2, createdAt: 3 });
-    await db.recipeIngredients.put({
-      id: "ri1",
-      recipeId: "r1",
-      foodId: "f1",
-      quantity: 50,
-      unit: "g",
-    });
-    expect(await db.recipeIngredients.where("recipeId").equals("r1").count()).toBe(1);
 
     // And an upgraded DB hydrates as an existing install, not a first run.
     await useStore.getState().hydrate();
@@ -164,20 +123,11 @@ describe("Dexie v1 -> current schema upgrade", () => {
     expect(state.unit).toBe("kg");
     expect(state.chartsEnabled).toBe(false); // the v1 settings record, not defaults
     expect(state.dailyLogs).toEqual([{ date: "2026-08-07", calories: 2400 }]);
-    expect(state.habits).toEqual([{ id: "h1", name: "Creatine", order: 0 }]);
-    expect(state.habitEntries).toEqual([
-      { id: "2026-08-07|h1", date: "2026-08-07", habitId: "h1" },
-    ]);
     // A v1 settings record predates targets entirely, so it carries no profiles.
     // loadAll backfills them on read, which is what stops an upgraded install
-    // from landing on a profile-less targets editor if the user enables it.
+    // from landing on a profile-less targets editor.
     expect(state.targetProfiles).toHaveLength(1);
     expect(state.weekdayTargets).toHaveLength(7);
     expect(new Set(state.weekdayTargets)).toEqual(new Set([state.targetProfiles[0].id]));
-    // The toggles those features hang off stay off: an upgrade must not turn on
-    // a surface the user never asked for.
-    expect(state.targetsEnabled).toBe(false);
-    expect(state.habitsEnabled).toBe(false);
-    expect(state.toolsEnabled).toBe(false);
   });
 });

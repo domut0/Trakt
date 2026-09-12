@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { useStore, type DailyLog } from "../lib/store";
-import { useDayMacros } from "../lib/use-day-macros";
 import { useToast } from "./Toast";
 
 /** Number field state while editing: the raw string the user typed, so a blank
@@ -69,8 +68,6 @@ export function DayEditorSheet({
   const dailyLogs = useStore((s) => s.dailyLogs);
   const upsertDailyLog = useStore((s) => s.upsertDailyLog);
   const showToast = useToast();
-  const dayMacros = useDayMacros(date);
-  const hasEntries = dayMacros.source === "entries";
 
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [isCheatDay, setIsCheatDay] = useState(false);
@@ -148,25 +145,17 @@ export function DayEditorSheet({
     const prevBodyweight = previousLog?.bodyweight;
     const prevIsCheatDay = previousLog?.isCheatDay;
 
-    if (hasEntries) {
-      upsertDailyLog(date, {
-        steps: toValue(draft.steps),
-        bodyweight: toValue(draft.bodyweight),
-        isCheatDay: isCheatDay ? true : undefined,
-      });
-    } else {
-      upsertDailyLog(date, {
-        calories: toValue(draft.calories),
-        protein: toValue(draft.protein),
-        carbs: toValue(draft.carbs),
-        fat: toValue(draft.fat),
-        steps: toValue(draft.steps),
-        bodyweight: toValue(draft.bodyweight),
-        // Only ever store the interesting value. Writing `false` would keep an
-        // otherwise-blank day alive as a record that means nothing.
-        isCheatDay: isCheatDay ? true : undefined,
-      });
-    }
+    upsertDailyLog(date, {
+      calories: toValue(draft.calories),
+      protein: toValue(draft.protein),
+      carbs: toValue(draft.carbs),
+      fat: toValue(draft.fat),
+      steps: toValue(draft.steps),
+      bodyweight: toValue(draft.bodyweight),
+      // Only ever store the interesting value. Writing `false` would keep an
+      // otherwise-blank day alive as a record that means nothing.
+      isCheatDay: isCheatDay ? true : undefined,
+    });
 
     onClose();
 
@@ -185,23 +174,15 @@ export function DayEditorSheet({
         // Omitting a key here instead of passing undefined would silently
         // preserve whatever the save wrote. If a field is ever added to
         // DailyLog it must be added here too.
-        if (hasEntries) {
-          upsertDailyLog(date, {
-            steps: prevSteps,
-            bodyweight: prevBodyweight,
-            isCheatDay: prevIsCheatDay,
-          });
-        } else {
-          upsertDailyLog(date, {
-            calories: prevCalories,
-            protein: prevProtein,
-            carbs: prevCarbs,
-            fat: prevFat,
-            steps: prevSteps,
-            bodyweight: prevBodyweight,
-            isCheatDay: prevIsCheatDay,
-          });
-        }
+        upsertDailyLog(date, {
+          calories: prevCalories,
+          protein: prevProtein,
+          carbs: prevCarbs,
+          fat: prevFat,
+          steps: prevSteps,
+          bodyweight: prevBodyweight,
+          isCheatDay: prevIsCheatDay,
+        });
       },
     });
   };
@@ -266,14 +247,6 @@ export function DayEditorSheet({
   };
 
   const focusNextOrSave = (index: number) => {
-    if (hasEntries) {
-      if (index === 1) {
-        inputRefs.current[5]?.focus();
-      } else {
-        save();
-      }
-      return;
-    }
     if (index < 5) {
       inputRefs.current[index + 1]?.focus();
     } else {
@@ -324,65 +297,37 @@ export function DayEditorSheet({
           {/* Grouped list of labelled numeric rows and cheat day switch */}
           <div className="mt-4 group-list bg-wash">
             {/* Macros info row when derived from entries */}
-            {hasEntries && (
-              <div className="group-row">
-                <div>
-                  <div className="t-body font-medium text-ink">Macros</div>
-                  <div className="t-label text-ink-2">Calculated from food entries</div>
-                </div>
-                <div className="text-right">
-                  {/*
-                    An absent total is not zero. If every entry on the day
-                    carries no calorie figure, "0 cal" would claim you ate
-                    nothing, which is a different statement from not knowing.
-                  */}
-                  {dayMacros.calories !== undefined ? (
-                    <>
-                      <span className="t-stat text-ink">
-                        {Math.round(dayMacros.calories).toLocaleString()}
-                      </span>
-                      <span className="ml-1 t-label text-ink-2">cal</span>
-                    </>
-                  ) : (
-                    <span className="t-label text-ink-2">Not recorded</span>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Calories - only editable when not derived from entries */}
-            {!hasEntries && (
-              <div className="group-row">
-                <label htmlFor="day-field-calories" className="t-body font-medium text-ink">
-                  Calories
-                </label>
-                <div className="flex min-w-0 items-baseline justify-end gap-1">
-                  <input
-                    id="day-field-calories"
-                    ref={(el) => {
-                      inputRefs.current[0] = el;
-                    }}
-                    inputMode="numeric"
-                    enterKeyHint="next"
-                    aria-label="Calories"
-                    value={draft.calories}
-                    onChange={(e) => setField("calories")(e.target.value)}
-                    onFocus={(e) => {
-                      selectAllOnEntry(e.currentTarget);
-                      e.currentTarget.scrollIntoView({ block: "nearest" });
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        focusNextOrSave(0);
-                      }
-                    }}
-                    placeholder="Not logged"
-                    className="t-stat w-32 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
-                  />
-                </div>
+            <div className="group-row">
+              <label htmlFor="day-field-calories" className="t-body font-medium text-ink">
+                Calories
+              </label>
+              <div className="flex min-w-0 items-baseline justify-end gap-1">
+                <input
+                  id="day-field-calories"
+                  ref={(el) => {
+                    inputRefs.current[0] = el;
+                  }}
+                  inputMode="numeric"
+                  enterKeyHint="next"
+                  aria-label="Calories"
+                  value={draft.calories}
+                  onChange={(e) => setField("calories")(e.target.value)}
+                  onFocus={(e) => {
+                    selectAllOnEntry(e.currentTarget);
+                    e.currentTarget.scrollIntoView({ block: "nearest" });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      focusNextOrSave(0);
+                    }
+                  }}
+                  placeholder="Not logged"
+                  className="t-stat w-32 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
+                />
               </div>
-            )}
+            </div>
 
             {/* Steps */}
             <div className="group-row group-row-sep">
@@ -417,108 +362,106 @@ export function DayEditorSheet({
             </div>
 
             {/* Protein, Carbs, Fat - only editable when not derived from entries */}
-            {!hasEntries && (
-              <>
-                {/* Protein */}
-                <div className="group-row group-row-sep">
-                  <label htmlFor="day-field-protein" className="t-body font-medium text-ink">
-                    Protein
-                  </label>
-                  <div className="flex min-w-0 items-baseline justify-end gap-1">
-                    <input
-                      id="day-field-protein"
-                      ref={(el) => {
-                        inputRefs.current[2] = el;
-                      }}
-                      inputMode="decimal"
-                      enterKeyHint="next"
-                      aria-label="Protein"
-                      value={draft.protein}
-                      onChange={(e) => setField("protein")(e.target.value)}
-                      onFocus={(e) => {
-                        selectAllOnEntry(e.currentTarget);
-                        e.currentTarget.scrollIntoView({ block: "nearest" });
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          focusNextOrSave(2);
-                        }
-                      }}
-                      placeholder="0"
-                      className="t-stat w-24 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
-                    />
-                    <span className="t-label text-ink-2">g</span>
-                  </div>
+            <>
+              {/* Protein */}
+              <div className="group-row group-row-sep">
+                <label htmlFor="day-field-protein" className="t-body font-medium text-ink">
+                  Protein
+                </label>
+                <div className="flex min-w-0 items-baseline justify-end gap-1">
+                  <input
+                    id="day-field-protein"
+                    ref={(el) => {
+                      inputRefs.current[2] = el;
+                    }}
+                    inputMode="decimal"
+                    enterKeyHint="next"
+                    aria-label="Protein"
+                    value={draft.protein}
+                    onChange={(e) => setField("protein")(e.target.value)}
+                    onFocus={(e) => {
+                      selectAllOnEntry(e.currentTarget);
+                      e.currentTarget.scrollIntoView({ block: "nearest" });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        focusNextOrSave(2);
+                      }
+                    }}
+                    placeholder="0"
+                    className="t-stat w-24 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
+                  />
+                  <span className="t-label text-ink-2">g</span>
                 </div>
+              </div>
 
-                {/* Carbs */}
-                <div className="group-row group-row-sep">
-                  <label htmlFor="day-field-carbs" className="t-body font-medium text-ink">
-                    Carbs
-                  </label>
-                  <div className="flex min-w-0 items-baseline justify-end gap-1">
-                    <input
-                      id="day-field-carbs"
-                      ref={(el) => {
-                        inputRefs.current[3] = el;
-                      }}
-                      inputMode="decimal"
-                      enterKeyHint="next"
-                      aria-label="Carbs"
-                      value={draft.carbs}
-                      onChange={(e) => setField("carbs")(e.target.value)}
-                      onFocus={(e) => {
-                        selectAllOnEntry(e.currentTarget);
-                        e.currentTarget.scrollIntoView({ block: "nearest" });
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          focusNextOrSave(3);
-                        }
-                      }}
-                      placeholder="0"
-                      className="t-stat w-24 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
-                    />
-                    <span className="t-label text-ink-2">g</span>
-                  </div>
+              {/* Carbs */}
+              <div className="group-row group-row-sep">
+                <label htmlFor="day-field-carbs" className="t-body font-medium text-ink">
+                  Carbs
+                </label>
+                <div className="flex min-w-0 items-baseline justify-end gap-1">
+                  <input
+                    id="day-field-carbs"
+                    ref={(el) => {
+                      inputRefs.current[3] = el;
+                    }}
+                    inputMode="decimal"
+                    enterKeyHint="next"
+                    aria-label="Carbs"
+                    value={draft.carbs}
+                    onChange={(e) => setField("carbs")(e.target.value)}
+                    onFocus={(e) => {
+                      selectAllOnEntry(e.currentTarget);
+                      e.currentTarget.scrollIntoView({ block: "nearest" });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        focusNextOrSave(3);
+                      }
+                    }}
+                    placeholder="0"
+                    className="t-stat w-24 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
+                  />
+                  <span className="t-label text-ink-2">g</span>
                 </div>
+              </div>
 
-                {/* Fat */}
-                <div className="group-row group-row-sep">
-                  <label htmlFor="day-field-fat" className="t-body font-medium text-ink">
-                    Fat
-                  </label>
-                  <div className="flex min-w-0 items-baseline justify-end gap-1">
-                    <input
-                      id="day-field-fat"
-                      ref={(el) => {
-                        inputRefs.current[4] = el;
-                      }}
-                      inputMode="decimal"
-                      enterKeyHint="next"
-                      aria-label="Fat"
-                      value={draft.fat}
-                      onChange={(e) => setField("fat")(e.target.value)}
-                      onFocus={(e) => {
-                        selectAllOnEntry(e.currentTarget);
-                        e.currentTarget.scrollIntoView({ block: "nearest" });
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          focusNextOrSave(4);
-                        }
-                      }}
-                      placeholder="0"
-                      className="t-stat w-24 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
-                    />
-                    <span className="t-label text-ink-2">g</span>
-                  </div>
+              {/* Fat */}
+              <div className="group-row group-row-sep">
+                <label htmlFor="day-field-fat" className="t-body font-medium text-ink">
+                  Fat
+                </label>
+                <div className="flex min-w-0 items-baseline justify-end gap-1">
+                  <input
+                    id="day-field-fat"
+                    ref={(el) => {
+                      inputRefs.current[4] = el;
+                    }}
+                    inputMode="decimal"
+                    enterKeyHint="next"
+                    aria-label="Fat"
+                    value={draft.fat}
+                    onChange={(e) => setField("fat")(e.target.value)}
+                    onFocus={(e) => {
+                      selectAllOnEntry(e.currentTarget);
+                      e.currentTarget.scrollIntoView({ block: "nearest" });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        focusNextOrSave(4);
+                      }
+                    }}
+                    placeholder="0"
+                    className="t-stat w-24 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
+                  />
+                  <span className="t-label text-ink-2">g</span>
                 </div>
-              </>
-            )}
+              </div>
+            </>
 
             {/* Bodyweight */}
             <div className="group-row group-row-sep">
@@ -602,10 +545,7 @@ export function DayEditorSheet({
             whether it is safe to blank a field.
           */}
           <p className="mt-3 t-label text-ink-2">
-            Leave a field blank to record nothing for it.
-            {hasEntries
-              ? " Food entries keep the day either way."
-              : " Clearing everything removes the day."}
+            Leave a field blank to record nothing for it. Clearing everything removes the day.
           </p>
 
           <div className="mt-5 flex items-center gap-2">

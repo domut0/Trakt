@@ -218,3 +218,17 @@ export function prunePlannedWorkout(
   const exerciseIds = planned.exerciseIds.filter((id) => known.has(id));
   return exerciseIds.length > 0 ? { ...planned, exerciseIds } : undefined;
 }
+
+/**
+ * A planned time as a fixed 24-hour "HH:MM" string.
+ *
+ * Not the same job as `PlanEditorSheet`'s own serialiser, which produces a value
+ * for an `<input type="time">` and is therefore contractually 24-hour
+ * zero-padded whatever this ever becomes. Keep them separate: the day this turns
+ * into a locale-aware "5:05 PM", the input would silently stop round-tripping.
+ */
+export function formatMinutesOfDay(minutes: number): string {
+  const h = Math.floor(minutes / 60) % 24;
+  const m = Math.round(minutes) % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}

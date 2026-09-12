@@ -1,13 +1,10 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { Food, FoodEntry, Meal, Recipe, RecipeIngredient } from "./food";
 import type { PlannedWeek } from "./plan";
 import type { SyncBase } from "./sync";
 import type {
   BackupData,
   DailyLog,
   Exercise,
-  Habit,
-  HabitEntry,
   SplitSlot,
   TargetProfile,
   WorkoutSession,
@@ -161,13 +158,6 @@ class WorkoutDb extends Dexie {
   sets!: EntityTable<WorkoutSet, "id">;
   meta!: EntityTable<MetaRecord, "key">;
   dailyLogs!: EntityTable<DailyLog, "date">;
-  habits!: EntityTable<Habit, "id">;
-  habitEntries!: EntityTable<HabitEntry, "id">;
-  foods!: EntityTable<Food, "id">;
-  foodEntries!: EntityTable<FoodEntry, "id">;
-  meals!: EntityTable<Meal, "id">;
-  recipes!: EntityTable<Recipe, "id">;
-  recipeIngredients!: EntityTable<RecipeIngredient, "id">;
 
   constructor() {
     super("workout-tracker");
@@ -224,6 +214,23 @@ class WorkoutDb extends Dexie {
       meals: "id",
       recipes: "id",
       recipeIngredients: "id, recipeId",
+    });
+
+    // v5 deletes the food and habit tables. The app stopped being a food
+    // tracker: calories and macros are now typed once at the end of the day
+    // onto the dailyLogs row that already held bodyweight and steps, so nothing
+    // reads a FoodEntry, a Meal or a Recipe any more. Declaring a table as null
+    // is how Dexie drops it, and dropping is right rather than merely orphaning
+    // it -- an unreferenced table keeps its whole index and its storage quota
+    // forever, on a phone, for data no screen can reach.
+    this.version(5).stores({
+      habits: null,
+      habitEntries: null,
+      foods: null,
+      foodEntries: null,
+      meals: null,
+      recipes: null,
+      recipeIngredients: null,
     });
   }
 }
@@ -284,50 +291,22 @@ export interface AllData {
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
   dailyLogs: DailyLog[];
-  habits: Habit[];
-  habitEntries: HabitEntry[];
-  foods: Food[];
-  foodEntries: FoodEntry[];
-  meals: Meal[];
-  recipes: Recipe[];
-  recipeIngredients: RecipeIngredient[];
   settings: SettingsMeta;
   activeSession: ActiveSessionMeta;
 }
 
 /** Reads every table. Client-only. */
 export async function loadAll(): Promise<AllData> {
-  const [
-    exercises,
-    slots,
-    sessions,
-    sets,
-    dailyLogs,
-    habits,
-    habitEntries,
-    foods,
-    foodEntries,
-    meals,
-    recipes,
-    recipeIngredients,
-    settingsMeta,
-    activeSessionMeta,
-  ] = await Promise.all([
-    db.exercises.toArray(),
-    db.slots.toArray(),
-    db.sessions.toArray(),
-    db.sets.toArray(),
-    db.dailyLogs.toArray(),
-    db.habits.toArray(),
-    db.habitEntries.toArray(),
-    db.foods.toArray(),
-    db.foodEntries.toArray(),
-    db.meals.toArray(),
-    db.recipes.toArray(),
-    db.recipeIngredients.toArray(),
-    db.meta.get("settings"),
-    db.meta.get("activeSession"),
-  ]);
+  const [exercises, slots, sessions, sets, dailyLogs, settingsMeta, activeSessionMeta] =
+    await Promise.all([
+      db.exercises.toArray(),
+      db.slots.toArray(),
+      db.sessions.toArray(),
+      db.sets.toArray(),
+      db.dailyLogs.toArray(),
+      db.meta.get("settings"),
+      db.meta.get("activeSession"),
+    ]);
   // A settings record written before targets existed has no profiles at all.
   // Fill them in on read so nothing downstream has to cope with the empty case,
   // and so enabling targets later never lands on a profile-less screen.
@@ -346,13 +325,6 @@ export async function loadAll(): Promise<AllData> {
     sessions,
     sets,
     dailyLogs,
-    habits,
-    habitEntries,
-    foods,
-    foodEntries,
-    meals,
-    recipes,
-    recipeIngredients,
     settings,
     activeSession: (activeSessionMeta as ActiveSessionMeta) ?? EMPTY_ACTIVE_SESSION,
   };
@@ -379,16 +351,7 @@ export async function seedDb(data: {
   // part of the same atomic unit if this is ever extended.
   await db.transaction(
     "rw",
-    [
-      db.exercises,
-      db.slots,
-      db.sessions,
-      db.sets,
-      db.dailyLogs,
-      db.habits,
-      db.habitEntries,
-      db.meta,
-    ],
+    [db.exercises, db.slots, db.sessions, db.sets, db.dailyLogs, db.meta],
     async () => {
       await db.exercises.bulkPut(data.exercises);
       await db.slots.bulkPut(data.slots);
@@ -412,31 +375,18 @@ export async function seedDb(data: {
 export async function replaceAllData(data: BackupData): Promise<void> {
   await db.transaction(
     "rw",
-    [
-      db.exercises,
-      db.slots,
-      db.sessions,
-      db.sets,
-      db.dailyLogs,
-      db.habits,
-      db.habitEntries,
-      db.meta,
-    ],
+    [db.exercises, db.slots, db.sessions, db.sets, db.dailyLogs, db.meta],
     async () => {
       await db.exercises.clear();
       await db.slots.clear();
       await db.sessions.clear();
       await db.sets.clear();
       await db.dailyLogs.clear();
-      await db.habits.clear();
-      await db.habitEntries.clear();
       await db.exercises.bulkPut(data.exercises);
       await db.slots.bulkPut(data.slots);
       await db.sessions.bulkPut(data.sessions);
       await db.sets.bulkPut(data.sets);
       await db.dailyLogs.bulkPut(data.dailyLogs);
-      await db.habits.bulkPut(data.habits);
-      await db.habitEntries.bulkPut(data.habitEntries);
       // Annotated as SettingsMeta rather than inlined: `meta` is a union table,
       // and an inline literal makes Dexie's InsertType resolve against the wrong
       // arm of the union, which is a type error even though the value is valid.
@@ -445,7 +395,6 @@ export async function replaceAllData(data: BackupData): Promise<void> {
         unit: data.unit,
         chartsEnabled: true,
         targetsEnabled: data.targetsEnabled,
-        habitsEnabled: data.habitsEnabled,
         toolsEnabled: data.toolsEnabled,
         targetProfiles: data.targetProfiles,
         weekdayTargets: data.weekdayTargets,

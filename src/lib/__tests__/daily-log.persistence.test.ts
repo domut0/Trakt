@@ -13,13 +13,6 @@ const DEFAULT_STATE = {
   sessions: [],
   sets: [],
   dailyLogs: [],
-  habits: [],
-  habitEntries: [],
-  foods: [],
-  foodEntries: [],
-  meals: [],
-  recipes: [],
-  recipeIngredients: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -37,13 +30,6 @@ async function resetDb() {
     db.sessions.clear(),
     db.sets.clear(),
     db.dailyLogs.clear(),
-    db.habits.clear(),
-    db.habitEntries.clear(),
-    db.foods.clear(),
-    db.foodEntries.clear(),
-    db.meals.clear(),
-    db.recipes.clear(),
-    db.recipeIngredients.clear(),
     db.meta.clear(),
   ]);
 }
@@ -72,25 +58,11 @@ describe("daily logs (schema + write-through)", () => {
     // db.upgrade.test.ts: Dexie sets `verno` from the version() declarations, so
     // comparing it against itself could never fail. Bump it by hand, and when
     // you do, check that a new table has not quietly started out non-empty.
-    expect(db.verno).toBe(4);
+    expect(db.verno).toBe(5);
     // The store and the DB have to agree. Checking only the store would pass if
     // hydrate had invented an empty array over a table that actually had rows.
     expect(useStore.getState().dailyLogs).toEqual([]);
     expect(await db.dailyLogs.count()).toBe(0);
-    // Same claim for the other opt-in tables a first run must leave alone: the
-    // checklist starts empty, so nothing is seeded into either.
-    expect(useStore.getState().habits).toEqual([]);
-    expect(await db.habits.count()).toBe(0);
-    expect(await db.habitEntries.count()).toBe(0);
-    // And the v4 food tables, for the same reason: a first run has eaten
-    // nothing, so nothing may be seeded into any of them. Meals are the one
-    // that could plausibly arrive pre-populated, and deliberately do not --
-    // they are seeded when food logging is switched on, not at install.
-    expect(await db.foods.count()).toBe(0);
-    expect(await db.foodEntries.count()).toBe(0);
-    expect(await db.meals.count()).toBe(0);
-    expect(await db.recipes.count()).toBe(0);
-    expect(await db.recipeIngredients.count()).toBe(0);
     // Meanwhile the tables that DO get seeded were seeded, so "empty" above is a
     // statement about dailyLogs specifically and not about a seed that failed
     // wholesale and left every table bare.

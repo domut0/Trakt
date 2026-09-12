@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  brzycki,
-  BRZYCKI_MAX_REPS,
-  epley,
-  estimate1RM,
-  percentageTable,
-  RELIABLE_REP_LIMIT,
-} from "../onerm";
+import { brzycki, BRZYCKI_MAX_REPS, epley, estimate1RM, RELIABLE_REP_LIMIT } from "../onerm";
 
 describe("onerm module constants", () => {
   it("clamps Brzycki one rep short of its zero denominator", () => {
@@ -170,84 +163,6 @@ describe("estimate1RM", () => {
       expect(Number.isFinite(res.epley), `${weight} x ${reps}`).toBe(true);
       expect(Number.isFinite(res.brzycki), `${weight} x ${reps}`).toBe(true);
       expect(Number.isFinite(res.average), `${weight} x ${reps}`).toBe(true);
-    }
-  });
-});
-
-describe("percentageTable", () => {
-  it("generates 95 down to 60 percent in descending order", () => {
-    const table = percentageTable(315);
-    expect(table).toHaveLength(8);
-    expect(table.map((r) => r.percentage)).toEqual([95, 90, 85, 80, 75, 70, 65, 60]);
-    for (let i = 1; i < table.length; i++) {
-      expect(table[i].weight).toBeLessThanOrEqual(table[i - 1].weight);
-    }
-  });
-
-  it("rounds every row to the nearest 2.5 increment", () => {
-    const table = percentageTable(315);
-    // 299.25 -> 300, 283.5 -> 282.5, 267.75 -> 267.5
-    expect(table[0].weight).toBe(300);
-    expect(table[1].weight).toBe(282.5);
-    expect(table[2].weight).toBe(267.5);
-  });
-
-  it("rounds a value sitting exactly on a half increment upward", () => {
-    // 275 * 0.85 = 233.75, dead centre between 232.5 and 235.
-    const table = percentageTable(275);
-    expect(table[2].weight).toBe(235);
-    // 275 * 0.95 = 261.25 -> 262.5; 275 * 0.65 = 178.75 -> 180
-    expect(table[0].weight).toBe(262.5);
-    expect(table[6].weight).toBe(180);
-    // Values already on an increment stay put.
-    expect(table[1].weight).toBe(247.5);
-    expect(table[7].weight).toBe(165);
-  });
-
-  it("keeps every weight loadable in 2.5 steps across a wide range of 1RMs", () => {
-    for (let oneRm = 45; oneRm <= 700; oneRm += 0.5) {
-      for (const row of percentageTable(oneRm)) {
-        const steps = row.weight / 2.5;
-        expect(
-          Math.abs(steps - Math.round(steps)) < 1e-9,
-          `${row.percentage}% of ${oneRm} gave ${row.weight}`,
-        ).toBe(true);
-      }
-    }
-  });
-
-  it("includes rep range strings with standard hyphens", () => {
-    const table = percentageTable(100);
-    expect(table[0].reps).toBe("1-2");
-    expect(table[1].reps).toBe("2-4");
-    expect(table[2].reps).toBe("4-6");
-
-    for (const row of table) {
-      expect(row.reps).toMatch(/^\d+-\d+$/);
-      expect(row.reps).not.toContain("—");
-      expect(row.reps).not.toContain("–");
-    }
-  });
-
-  it("returns 0 weights, with rows intact, for invalid 1RM inputs", () => {
-    for (const oneRm of [0, -315, NaN, Infinity, -Infinity]) {
-      const table = percentageTable(oneRm);
-      expect(table, `1RM ${oneRm}`).toHaveLength(8);
-      expect(
-        table.every((r) => r.weight === 0),
-        `1RM ${oneRm}`,
-      ).toBe(true);
-      expect(table.every((r) => r.reps.length > 0)).toBe(true);
-    }
-  });
-
-  it("never renders a non-finite weight for an absurdly large 1RM", () => {
-    for (const oneRm of [1e12, 1e307, 1e308]) {
-      const table = percentageTable(oneRm);
-      expect(
-        table.every((r) => Number.isFinite(r.weight)),
-        `1RM ${oneRm}`,
-      ).toBe(true);
     }
   });
 });

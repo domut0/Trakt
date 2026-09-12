@@ -2,10 +2,6 @@ import {
   cardioColumns,
   cardioSessionsInOrder,
   dailyLogColumns,
-  foodEntriesInOrder,
-  foodEntryColumns,
-  habitEntriesInOrder,
-  habitEntryColumns,
   sessionColumns,
   setColumns,
   sortDailyLogsByDate,
@@ -15,16 +11,7 @@ import {
   type CellValue,
   type ColumnSpec,
 } from "./csv";
-import type {
-  DailyLog,
-  Exercise,
-  Habit,
-  HabitEntry,
-  SplitSlot,
-  WorkoutSession,
-  WorkoutSet,
-} from "./store";
-import type { Food, FoodEntry, Meal, Recipe, RecipeIngredient } from "./food";
+import type { DailyLog, Exercise, SplitSlot, WorkoutSession, WorkoutSet } from "./store";
 
 /**
  * Google Sheets sync: pure logic only.
@@ -62,8 +49,6 @@ export const SHEET_TABS = {
   sessions: "sessions",
   daily: "daily",
   cardio: "cardio",
-  habits: "habits",
-  foodLog: "Food Log",
   /** Written by the Apps Script, not by the app. Leading underscore sorts it last. */
   meta: "_sync",
 } as const;
@@ -132,21 +117,7 @@ export interface SyncBase {
 }
 
 /** The store fields that reach the sheet. Anything absent here cannot dirty a sync. */
-const SYNC_SOURCE_KEYS = [
-  "exercises",
-  "slots",
-  "sessions",
-  "sets",
-  "dailyLogs",
-  "habits",
-  "habitEntries",
-  "foods",
-  "foodEntries",
-  "meals",
-  "recipes",
-  "recipeIngredients",
-  "unit",
-] as const;
+const SYNC_SOURCE_KEYS = ["exercises", "slots", "sessions", "sets", "dailyLogs", "unit"] as const;
 
 /**
  * Whether a store update changed anything the sheet would show.
@@ -172,13 +143,6 @@ export interface SyncSource {
   sessions: readonly WorkoutSession[];
   sets: readonly WorkoutSet[];
   dailyLogs: readonly DailyLog[];
-  habits: readonly Habit[];
-  habitEntries: readonly HabitEntry[];
-  foods: readonly Food[];
-  foodEntries: readonly FoodEntry[];
-  meals: readonly Meal[];
-  recipes: readonly Recipe[];
-  recipeIngredients: readonly RecipeIngredient[];
   unit: "lbs" | "kg";
 }
 
@@ -222,18 +186,7 @@ function withIdColumn<T extends { id: string }>(columns: ColumnSpec<T>[]): Colum
  * the push comes back.
  */
 export function buildSheetTabs(source: SyncSource): Record<string, CellValue[][]> {
-  const {
-    exercises,
-    slots,
-    sessions,
-    sets,
-    dailyLogs,
-    habits,
-    habitEntries,
-    foodEntries,
-    meals,
-    unit,
-  } = source;
+  const { exercises, slots, sessions, sets, dailyLogs, unit } = source;
 
   return {
     [SHEET_TABS.sets]: toRows(
@@ -250,11 +203,6 @@ export function buildSheetTabs(source: SyncSource): Record<string, CellValue[][]
       cardioSessionsInOrder(sessions),
       withIdColumn(cardioColumns(exercises, unit)),
     ),
-    [SHEET_TABS.habits]: toRows(
-      habitEntriesInOrder(habitEntries, habits),
-      habitEntryColumns(habits),
-    ),
-    [SHEET_TABS.foodLog]: toRows(foodEntriesInOrder(foodEntries, meals), foodEntryColumns(meals)),
   };
 }
 

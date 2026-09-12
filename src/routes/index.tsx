@@ -1,16 +1,12 @@
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format, isValid } from "date-fns";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { DayEditorSheet } from "../components/DayEditorSheet";
 import { DayStatsCard } from "../components/DayStatsCard";
-import { DayTimeline } from "../components/DayTimeline";
-import { HabitsCard } from "../components/HabitsCard";
-import { MealSheet } from "../components/MealSheet";
 import { WeekStrip } from "../components/WeekStrip";
 import { dayKey, isDailyLogEmpty, parseDayKey } from "../lib/daily-log";
 import { useStore, type DailyLog } from "../lib/store";
-import { useEffectiveDailyLogs } from "../lib/use-day-macros";
 
 /**
  * The day view. One date, three cards: a week strip that moves it, a stats card
@@ -35,14 +31,12 @@ export const Route = createFileRoute("/")({
       { title: "Trakt" },
       {
         name: "description",
-        content:
-          "Today at a glance: morning bodyweight, and the day's calories and macros.",
+        content: "Today at a glance: morning bodyweight, and the day's calories and macros.",
       },
       { property: "og:title", content: "Trakt" },
       {
         property: "og:description",
-        content:
-          "Today at a glance: morning bodyweight, and the day's calories and macros.",
+        content: "Today at a glance: morning bodyweight, and the day's calories and macros.",
       },
     ],
   }),
@@ -69,22 +63,19 @@ function formatPreviousSummary(log: DailyLog): string {
 function Home() {
   const { date } = Route.useSearch();
   const navigate = useNavigate({ from: "/" });
-  const router = useRouter();
 
   const [editorOpen, setEditorOpen] = useState(false);
-  const [openMealId, setOpenMealId] = useState<string | null>(null);
 
   // Recomputed per render rather than memoised: the app can sit open across
   // midnight, and a stale key would silently edit yesterday.
   const todayKey = dayKey(new Date());
   const selected = date ?? todayKey;
 
-  const habitsEnabled = useStore((s) => s.habitsEnabled);
   const upsertDailyLog = useStore((s) => s.upsertDailyLog);
   // The projection, not the raw table: a day logged purely through food entries
   // has no typed macros, so reading s.dailyLogs here would report it as
   // untracked while the stats card directly above showed its calories.
-  const dailyLogs = useEffectiveDailyLogs();
+  const dailyLogs = useStore((s) => s.dailyLogs);
 
   const selectedLog = dailyLogs.find((l) => l.date === selected);
   const previousKey = previousDayKey(selected);
@@ -213,30 +204,7 @@ function Home() {
         )}
       </section>
 
-      <section className="section-gap anim-fade-up">
-        <DayTimeline
-          date={selected}
-          onOpenMeal={setOpenMealId}
-          onOpenSession={(id) => router.navigate({ to: "/session/$id", params: { id } })}
-          onOpenPlan={() => router.navigate({ to: "/plan" })}
-        />
-      </section>
-
-      {/*
-        No HabitEditorSheet here on purpose. HabitsCard owns the sheet and its
-        open state internally, so mounting one here too would give the screen a
-        second, independent editor.
-      */}
-      {habitsEnabled && (
-        <section className="px-5 section-gap anim-fade-up">
-          <h2 className="group-header t-caption">Habits</h2>
-          <HabitsCard date={selected} />
-        </section>
-      )}
-
       <div className="pb-8" />
-
-      <MealSheet mealId={openMealId} date={selected} onClose={() => setOpenMealId(null)} />
 
       <DayEditorSheet date={selected} open={editorOpen} onClose={() => setEditorOpen(false)} />
     </AppShell>

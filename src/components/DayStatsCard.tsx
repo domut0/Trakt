@@ -3,7 +3,6 @@ import { Flap } from "./Flap";
 import { dayKey } from "../lib/daily-log";
 import { useStore } from "../lib/store";
 import { directionFor, targetStatusFor, type TargetStatus } from "../lib/targets";
-import { useDayMacros } from "../lib/use-day-macros";
 
 /**
  * The day's numbers, set as a table.
@@ -183,15 +182,14 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
   const dailyLogs = useStore((s) => s.dailyLogs);
 
   const profile = targetsEnabled ? targetProfileForDate(date) : undefined;
-  const dayMacros = useDayMacros(date);
   const dayLog = useMemo(() => dailyLogs.find((l) => l.date === date), [dailyLogs, date]);
 
   const isFuture = date > dayKey(new Date());
 
-  const calories = dayMacros.calories ?? dayLog?.calories;
-  const protein = dayMacros.protein ?? dayLog?.protein;
-  const carbs = dayMacros.carbs ?? dayLog?.carbs;
-  const fat = dayMacros.fat ?? dayLog?.fat;
+  const calories = dayLog?.calories;
+  const protein = dayLog?.protein;
+  const carbs = dayLog?.carbs;
+  const fat = dayLog?.fat;
   const steps = dayLog?.steps;
   const bodyweight = dayLog?.bodyweight;
 

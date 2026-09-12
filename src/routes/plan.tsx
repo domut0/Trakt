@@ -7,11 +7,11 @@ import {
   isEmptyPlan,
   plannedAtMinutesOf,
   plannedDurationMinutesOf,
+  formatMinutesOfDay,
   type PlannedWeek,
   type PlannedWorkout,
 } from "../lib/plan";
 import { WEEKDAY_LABELS, weekdayIndexFor } from "../lib/targets";
-import { formatMinutesOfDay } from "../lib/timeline";
 import { useStore } from "../lib/store";
 
 export const Route = createFileRoute("/plan")({

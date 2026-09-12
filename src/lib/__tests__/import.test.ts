@@ -1,13 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_TARGET_PROFILE_ID, db, defaultTargets } from "../db";
-import {
-  BACKUP_VERSION,
-  habitEntryId,
-  isCardioSession,
-  parseBackup,
-  useStore,
-  type BackupData,
-} from "../store";
+import { BACKUP_VERSION, isCardioSession, parseBackup, useStore, type BackupData } from "../store";
 
 // fake-indexeddb/auto (loaded globally in src/test/setup.ts) gives us a real
 // IndexedDB implementation backed by memory, so the round-trip test below
@@ -20,13 +13,6 @@ const DEFAULT_STATE = {
   sessions: [],
   sets: [],
   dailyLogs: [],
-  habits: [],
-  habitEntries: [],
-  foods: [],
-  foodEntries: [],
-  meals: [],
-  recipes: [],
-  recipeIngredients: [],
   // Cleared to empty/false rather than to the app's defaults, deliberately. This
   // object stands in for a fresh process that has not read IndexedDB yet, and
   // pre-filling it with the same values a correct hydrate would produce is
@@ -35,9 +21,7 @@ const DEFAULT_STATE = {
   targetProfiles: [],
   weekdayTargets: [],
   targetsEnabled: false,
-  habitsEnabled: false,
   toolsEnabled: false,
-  foodEnabled: false,
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -67,13 +51,6 @@ async function resetDb() {
     db.sessions.clear(),
     db.sets.clear(),
     db.dailyLogs.clear(),
-    db.habits.clear(),
-    db.habitEntries.clear(),
-    db.foods.clear(),
-    db.foodEntries.clear(),
-    db.meals.clear(),
-    db.recipes.clear(),
-    db.recipeIngredients.clear(),
     db.meta.clear(),
   ]);
 }
@@ -95,18 +72,9 @@ beforeEach(async () => {
  * like - which is what let `version: BACKUP_VERSION` sit in a v3 fixture.
  */
 const PRE_V4_DEFAULTS = {
-  habits: [],
-  habitEntries: [],
-  foods: undefined,
-  foodEntries: undefined,
-  meals: undefined,
-  recipes: undefined,
-  recipeIngredients: undefined,
   ...defaultTargets(),
   targetsEnabled: false,
-  habitsEnabled: false,
   toolsEnabled: false,
-  foodEnabled: false,
   // The plan rides along on v4 without a version bump, so "an old file" means
   // one with no plan keys at all. `undefined` is what parseBackup hands back
   // for exactly that file, which is why it belongs in the shared defaults
@@ -614,7 +582,7 @@ describe("importData (full backup restore)", () => {
     expect(reloaded.sessions.filter(isCardioSession)).toHaveLength(1);
   });
 
-  it("round-trips a v4 backup with every habit, target and toggle field intact", async () => {
+  it("round-trips a v4 backup, dropping the food and habit keys it still carries", async () => {
     // The reason this test earns its length: an exported file is the ONLY copy of
     // this data. There is no backend and no sync, so a v4 field that quietly
     // failed to survive export -> parse -> import is not a bug the user can work
@@ -637,19 +605,6 @@ describe("importData (full backup restore)", () => {
         { id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1500 },
       ],
       dailyLogs: [{ date: "2026-03-01", calories: 2400, steps: 0, isCheatDay: true }],
-      habits: [
-        { id: "h1", name: "Creatine", order: 0 },
-        // One archived habit, because archiving is what keeps old entries
-        // meaningful - dropping the flag on import would resurrect a habit the
-        // user retired.
-        { id: "h2", name: "Evening stretch", order: 1, archived: true },
-      ],
-      habitEntries: [
-        // Built through the same helper the app uses, so this fixture cannot
-        // drift from the real composite-key format.
-        { id: habitEntryId("2026-03-01", "h1"), date: "2026-03-01", habitId: "h1" },
-        { id: habitEntryId("2026-03-02", "h1"), date: "2026-03-02", habitId: "h1" },
-      ],
       // TWO profiles, spread unevenly across the week, deliberately. With a single
       // uniform profile this test would still pass if parseBackup discarded the
       // file's targets and fell back to defaults, because the defaults are exactly
@@ -673,41 +628,56 @@ describe("importData (full backup restore)", () => {
       // these as `=== true`, so a fixture using `false` would be identical to the
       // field having been dropped on the floor.
       targetsEnabled: true,
-      habitsEnabled: true,
       toolsEnabled: true,
-      foodEnabled: false,
       // No plan, deliberately: this fixture is a v4 file as v4 shipped, and the
       // plan's own round trip is its own test below. Keeping it plan-less here
       // is what keeps this one covering the case of a file written before
       // planning existed.
       planEnabled: false,
       plannedWeek: undefined,
-      foods: undefined,
-      foodEntries: undefined,
-      meals: undefined,
-      recipes: undefined,
-      recipeIngredients: undefined,
       // Not the default, so a settings record that failed to persist is visible.
       unit: "kg",
     };
 
-    const result = parseBackup(JSON.stringify(v4Backup));
+    // What a real v4 file on disk looks like: everything above, plus the food
+    // and habit tables this version of the app no longer has a home for. The
+    // user's own pre-overhaul export carries exactly these, so "tolerated and
+    // dropped" is the behaviour a restore depends on -- parseBackup rejecting
+    // the file, or carrying the keys through into state, are both data loss.
+    const v4FileOnDisk = {
+      ...v4Backup,
+      habits: [
+        { id: "h1", name: "Creatine", order: 0 },
+        { id: "h2", name: "Evening stretch", order: 1, archived: true },
+      ],
+      habitEntries: [
+        { id: "2026-03-01|h1", date: "2026-03-01", habitId: "h1" },
+        { id: "2026-03-02|h1", date: "2026-03-02", habitId: "h1" },
+      ],
+      habitsEnabled: true,
+      foodEnabled: true,
+      foods: [{ id: "f1", name: "Kimchi", basisQuantity: 100, basisUnit: "g" }],
+      foodEntries: [{ id: "fe1", date: "2026-03-01", mealId: "m1", name: "Kimchi" }],
+      meals: [{ id: "m1", name: "Breakfast", fromMinutes: 300, toMinutes: 660 }],
+      recipes: [{ id: "r1", name: "Overnight oats", servings: 2 }],
+      recipeIngredients: [{ id: "ri1", recipeId: "r1", foodId: "f1" }],
+    };
+
+    const result = parseBackup(JSON.stringify(v4FileOnDisk));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // Verbatim after a real trip through JSON. `toEqual` on the whole object is
-    // the point: a field added to BackupData later and forgotten in parseBackup
-    // fails here without anyone having to remember to assert it.
+    // Everything the app still has a home for survives verbatim, and nothing
+    // else rides along. `toEqual` on the whole object is the point twice over: a
+    // field added to BackupData later and forgotten in parseBackup fails here,
+    // and so does a dropped table quietly reappearing in state.
     expect(result.data).toEqual(v4Backup);
 
     await useStore.getState().hydrate();
     await useStore.getState().importData(result.data);
     const restored = useStore.getState();
-    expect(restored.habits).toEqual(v4Backup.habits);
-    expect(restored.habitEntries).toEqual(v4Backup.habitEntries);
     expect(restored.targetProfiles).toEqual(v4Backup.targetProfiles);
     expect(restored.weekdayTargets).toEqual(v4Backup.weekdayTargets);
     expect(restored.targetsEnabled).toBe(true);
-    expect(restored.habitsEnabled).toBe(true);
     expect(restored.toolsEnabled).toBe(true);
     expect(restored.sessions).toEqual(v4Backup.sessions);
 
@@ -716,20 +686,13 @@ describe("importData (full backup restore)", () => {
     useStore.setState({ ...DEFAULT_STATE, hydrated: false });
     await useStore.getState().hydrate();
     const reloaded = useStore.getState();
-    expect(sortById(reloaded.habits)).toEqual(sortById(v4Backup.habits));
-    expect(sortById(reloaded.habitEntries)).toEqual(sortById(v4Backup.habitEntries));
     expect(reloaded.targetProfiles).toEqual(v4Backup.targetProfiles);
     expect(reloaded.weekdayTargets).toEqual(v4Backup.weekdayTargets);
     expect(reloaded.targetsEnabled).toBe(true);
-    expect(reloaded.habitsEnabled).toBe(true);
     expect(reloaded.toolsEnabled).toBe(true);
     expect(reloaded.unit).toBe("kg");
     expect(sortById(reloaded.sessions)).toEqual(sortById(v4Backup.sessions));
     expect(sortByDate(reloaded.dailyLogs)).toEqual(sortByDate(v4Backup.dailyLogs));
-    // The habitEntries indexes are what Today and habit deletion query through,
-    // so a restore that landed the rows without them would read as an empty day.
-    expect(await db.habitEntries.where("date").equals("2026-03-01").count()).toBe(1);
-    expect(await db.habitEntries.where("habitId").equals("h1").count()).toBe(2);
   });
 
   it("still has 4 as the current backup format", () => {
@@ -752,7 +715,6 @@ describe("importData (full backup restore)", () => {
       "targetProfiles",
       "weekdayTargets",
       "targetsEnabled",
-      "habitsEnabled",
       "toolsEnabled",
     ]) {
       delete legacyBackup[key];
@@ -762,8 +724,6 @@ describe("importData (full backup restore)", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.version).toBe(2);
-    expect(result.data.habits).toEqual([]);
-    expect(result.data.habitEntries).toEqual([]);
     // Exactly one profile, and every weekday pointing at it. The count matters as
     // much as the contents: a weekdayTargets of any length but 7 is treated as
     // "no target at all" by targets.ts, so a sloppy fallback would silently leave
@@ -775,27 +735,18 @@ describe("importData (full backup restore)", () => {
     // And the features stay off. An old file cannot consent to a surface that did
     // not exist when it was written.
     expect(result.data.targetsEnabled).toBe(false);
-    expect(result.data.habitsEnabled).toBe(false);
     expect(result.data.toolsEnabled).toBe(false);
 
     await useStore.getState().hydrate();
     await useStore.getState().importData(result.data);
 
-    // Empty in the DB too, not just in the store: hydrate is seeded from these
-    // tables on every subsequent launch.
-    expect(await db.habits.count()).toBe(0);
-    expect(await db.habitEntries.count()).toBe(0);
-
     useStore.setState({ ...DEFAULT_STATE, hydrated: false });
     await useStore.getState().hydrate();
     const reloaded = useStore.getState();
-    expect(reloaded.habits).toEqual([]);
-    expect(reloaded.habitEntries).toEqual([]);
     expect(reloaded.targetProfiles).toEqual(defaultTargets().targetProfiles);
     expect(reloaded.weekdayTargets).toHaveLength(7);
     expect(reloaded.weekdayTargets.every((id) => id === DEFAULT_TARGET_PROFILE_ID)).toBe(true);
     expect(reloaded.targetsEnabled).toBe(false);
-    expect(reloaded.habitsEnabled).toBe(false);
     expect(reloaded.toolsEnabled).toBe(false);
     // The workout data the old file DID carry still arrived.
     expect(sortById(reloaded.exercises)).toEqual(sortById(validBackup.exercises));

@@ -44,13 +44,6 @@ async function resetAll() {
     db.sessions.clear(),
     db.sets.clear(),
     db.dailyLogs.clear(),
-    db.habits.clear(),
-    db.habitEntries.clear(),
-    db.foods.clear(),
-    db.foodEntries.clear(),
-    db.meals.clear(),
-    db.recipes.clear(),
-    db.recipeIngredients.clear(),
     db.meta.clear(),
   ]);
   useSyncStore.setState({
@@ -144,8 +137,6 @@ describe("syncNow: the push", () => {
         },
       ],
       dailyLogs: [],
-      habits: [],
-      habitEntries: [],
     });
     useSyncStore.setState({ config: CONFIG });
   });
@@ -169,14 +160,7 @@ describe("syncNow: the push", () => {
     await useSyncStore.getState().syncNow();
 
     const tabs = sent[0].body.tabs as Record<string, unknown[][]>;
-    expect(Object.keys(tabs).sort()).toEqual([
-      "Food Log",
-      "cardio",
-      "daily",
-      "habits",
-      "sessions",
-      "sets",
-    ]);
+    expect(Object.keys(tabs).sort()).toEqual(["cardio", "daily", "sessions", "sets"]);
     expect(tabs.sets[1]).toContain("Bench Press");
     expect(tabs.sets[1]).toContain("Heavy Bench");
   });
@@ -328,20 +312,11 @@ describe("the merge base and destructive actions", () => {
       sessions: [],
       sets: [],
       dailyLogs: [],
-      habits: [],
-      habitEntries: [],
-      foods: [],
-      foodEntries: [],
-      meals: [],
-      recipes: [],
-      recipeIngredients: [],
       targetProfiles: [{ id: "tp_default", name: "Default" }],
       weekdayTargets: Array(7).fill("tp_default"),
       targetsEnabled: false,
-      habitsEnabled: false,
       toolsEnabled: false,
       planEnabled: false,
-      foodEnabled: false,
       plannedWeek: undefined,
       unit: "lbs",
     });
@@ -408,8 +383,6 @@ describe("syncNow: pulling sheet edits back", () => {
         },
       ],
       dailyLogs: [],
-      habits: [],
-      habitEntries: [],
     });
     useSyncStore.setState({ config: CONFIG, collisions: [] });
     await saveSyncBase(buildBase(useStore.getState(), 4));
@@ -589,13 +562,6 @@ describe("device id", () => {
       sets: [],
       sessions: [],
       dailyLogs: [],
-      habits: [],
-      habitEntries: [],
-      foods: [],
-      foodEntries: [],
-      meals: [],
-      recipes: [],
-      recipeIngredients: [],
       slots: [],
     });
   });
@@ -664,8 +630,6 @@ describe("taking over a sheet", () => {
         },
       ],
       dailyLogs: [],
-      habits: [],
-      habitEntries: [],
     });
     useSyncStore.setState({ config: CONFIG });
   });

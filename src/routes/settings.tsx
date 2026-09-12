@@ -2,11 +2,6 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Chevron } from "../components/icons";
 import { useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { ImportMfpSheet } from "../components/ImportMfpSheet";
-import { MealsEditorSheet } from "../components/MealsEditorSheet";
-import { OneRmCalculatorSheet } from "../components/OneRmCalculatorSheet";
-import { PlateCalculatorSheet } from "../components/PlateCalculatorSheet";
-import { RecipeEditorSheet } from "../components/RecipeEditorSheet";
 import { SyncSettings } from "../components/SyncSettings";
 import { TargetsEditor } from "../components/TargetsEditor";
 import { Toggle } from "../components/Toggle";
@@ -40,23 +35,16 @@ function SettingsPage() {
   const setChartsEnabled = useStore((s) => s.setChartsEnabled);
   const targetsEnabled = useStore((s) => s.targetsEnabled);
   const setTargetsEnabled = useStore((s) => s.setTargetsEnabled);
-  const habitsEnabled = useStore((s) => s.habitsEnabled);
-  const setHabitsEnabled = useStore((s) => s.setHabitsEnabled);
   const toolsEnabled = useStore((s) => s.toolsEnabled);
   const setToolsEnabled = useStore((s) => s.setToolsEnabled);
   const planEnabled = useStore((s) => s.planEnabled);
   const setPlanEnabled = useStore((s) => s.setPlanEnabled);
-  const foodEnabled = useStore((s) => s.foodEnabled);
-  const setFoodEnabled = useStore((s) => s.setFoodEnabled);
-  const seedMealsIfEmpty = useStore((s) => s.seedMealsIfEmpty);
   const importData = useStore((s) => s.importData);
   const clearAllData = useStore((s) => s.clearAllData);
   // Read only so the import confirmation can compare the file against what is
   // already here. An import replaces each of these tables whole, so anything in
   // them that the file does not carry is deleted, not merged.
   const dailyLogs = useStore((s) => s.dailyLogs);
-  const habits = useStore((s) => s.habits);
-  const habitEntries = useStore((s) => s.habitEntries);
   const targetProfiles = useStore((s) => s.targetProfiles);
   const plannedWeek = useStore((s) => s.plannedWeek);
   const router = useRouter();
@@ -68,11 +56,6 @@ function SettingsPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [plateSheetOpen, setPlateSheetOpen] = useState(false);
-  const [oneRmSheetOpen, setOneRmSheetOpen] = useState(false);
-  const [mealsSheetOpen, setMealsSheetOpen] = useState(false);
-  const [importMfpSheetOpen, setImportMfpSheetOpen] = useState(false);
-  const [recipesSheetOpen, setRecipesSheetOpen] = useState(false);
   const [usdaKey, setUsdaKey] = useState("");
 
   useEffect(() => {
@@ -99,20 +82,11 @@ function SettingsPage() {
       sessions,
       sets,
       dailyLogs,
-      habits,
-      habitEntries,
-      foods,
-      foodEntries,
-      meals,
-      recipes,
-      recipeIngredients,
       targetProfiles,
       weekdayTargets,
       targetsEnabled,
-      habitsEnabled,
       toolsEnabled,
       planEnabled,
-      foodEnabled,
       plannedWeek,
       unit,
     } = useStore.getState();
@@ -129,20 +103,11 @@ function SettingsPage() {
       sessions,
       sets,
       dailyLogs,
-      habits,
-      habitEntries,
-      foods,
-      foodEntries,
-      meals,
-      recipes,
-      recipeIngredients,
       targetProfiles,
       weekdayTargets,
       targetsEnabled,
-      habitsEnabled,
       toolsEnabled,
       planEnabled,
-      foodEnabled,
       plannedWeek,
       unit,
     };
@@ -232,8 +197,6 @@ function SettingsPage() {
   const losses = pendingImport
     ? describeLosses(pendingImport, {
         dailyLogs,
-        habits,
-        habitEntries,
         targetProfiles,
         plannedWeek,
       })
@@ -261,153 +224,6 @@ function SettingsPage() {
             </button>
           ))}
         </div>
-      </Section>
-
-      <Section title="Tabs" delay={40}>
-        <div className="group-row">
-          <div>
-            <div className="t-body">Charts tab</div>
-            <div className="t-label text-ink-2">Show the Charts tab in the nav.</div>
-          </div>
-          <Toggle
-            checked={chartsEnabled}
-            onChange={() => setChartsEnabled(!chartsEnabled)}
-            label="Charts tab"
-          />
-        </div>
-
-        {/* Off by default, like every other opt-in surface. The subtitle says
-            what the tab IS rather than repeating "show it in the nav" from the
-            row above: the switch's own position already covers that, and a
-            reader who has never planned a week needs the other half. */}
-        <div className="group-row group-row-sep">
-          <div>
-            <div className="t-body">Plan tab</div>
-            <div className="t-label text-ink-2">A weekly template for your main lifts.</div>
-          </div>
-          <Toggle
-            checked={planEnabled}
-            onChange={() => setPlanEnabled(!planEnabled)}
-            label="Plan tab"
-          />
-        </div>
-      </Section>
-
-      <Section title="Features" delay={80}>
-        <div className="group-row">
-          <div>
-            <div className="t-body">Daily targets</div>
-            <div className="t-label text-ink-2">Show goal progress on the daily log.</div>
-          </div>
-          <Toggle
-            checked={targetsEnabled}
-            onChange={() => setTargetsEnabled(!targetsEnabled)}
-            label="Daily targets"
-          />
-        </div>
-        {/* Inline editor, not a sheet: the profiles only mean anything while
-            targets are on, so they live under the switch that turns them on. */}
-        {targetsEnabled && (
-          <div className="group-row-sep px-5 py-4">
-            <TargetsEditor />
-          </div>
-        )}
-
-        <div className="group-row group-row-sep">
-          <div>
-            <div className="t-body">Habits</div>
-            <div className="t-label text-ink-2">Adds a daily checklist to the Today tab.</div>
-          </div>
-          <Toggle
-            checked={habitsEnabled}
-            onChange={() => setHabitsEnabled(!habitsEnabled)}
-            label="Habits"
-          />
-        </div>
-
-        <div className="group-row group-row-sep">
-          <div>
-            <div className="t-body">Food logging</div>
-            <div className="t-label text-ink-2">Track meals, foods, and daily macros.</div>
-          </div>
-          <Toggle
-            checked={!!foodEnabled}
-            onChange={() => {
-              const next = !foodEnabled;
-              if (next) {
-                seedMealsIfEmpty();
-              }
-              setFoodEnabled(next);
-            }}
-            label="Food logging"
-          />
-        </div>
-        {foodEnabled && (
-          <>
-            <button
-              type="button"
-              onClick={() => setMealsSheetOpen(true)}
-              className="group-row group-row-sep w-full text-left"
-            >
-              <div>
-                <div className="t-body">Manage meals</div>
-                <div className="t-label text-ink-2">Customise meal names, order, and times.</div>
-              </div>
-              <Chevron className="shrink-0 text-ink-2" size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setRecipesSheetOpen(true)}
-              className="group-row group-row-sep w-full text-left"
-            >
-              <div>
-                <div className="t-body">Manage recipes</div>
-                <div className="t-label text-ink-2">
-                  Create and edit custom recipes and batch meals.
-                </div>
-              </div>
-              <Chevron className="shrink-0 text-ink-2" size={16} />
-            </button>
-          </>
-        )}
-
-        <div className="group-row group-row-sep">
-          <div>
-            <div className="t-body">Calculators</div>
-            <div className="t-label text-ink-2">Add plate loading and 1RM tools here.</div>
-          </div>
-          <Toggle
-            checked={toolsEnabled}
-            onChange={() => setToolsEnabled(!toolsEnabled)}
-            label="Calculators"
-          />
-        </div>
-        {toolsEnabled && (
-          <>
-            <button
-              type="button"
-              onClick={() => setPlateSheetOpen(true)}
-              className="group-row group-row-sep w-full text-left"
-            >
-              <div>
-                <div className="t-body">Plate calculator</div>
-                <div className="t-label text-ink-2">Work out what to load per side.</div>
-              </div>
-              <Chevron className="shrink-0 text-ink-2" size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setOneRmSheetOpen(true)}
-              className="group-row group-row-sep w-full text-left"
-            >
-              <div>
-                <div className="t-body">1RM estimator</div>
-                <div className="t-label text-ink-2">Estimate a max from a weight and reps.</div>
-              </div>
-              <Chevron className="shrink-0 text-ink-2" size={16} />
-            </button>
-          </>
-        )}
       </Section>
 
       <Section title="Data" delay={120}>
@@ -453,17 +269,6 @@ function SettingsPage() {
           />
           <Chevron className="shrink-0 text-ink-2" size={16} />
         </label>
-        <button
-          type="button"
-          onClick={() => setImportMfpSheetOpen(true)}
-          className="group-row group-row-sep w-full text-left"
-        >
-          <div>
-            <div className="t-body">Import MyFitnessPal diary</div>
-            <div className="t-label text-ink-2">Load foods and macros from an HTML export.</div>
-          </div>
-          <Chevron className="shrink-0 text-ink-2" size={16} />
-        </button>
 
         <div className="group-row-sep p-4 space-y-2">
           <div>
@@ -594,24 +399,6 @@ function SettingsPage() {
       <p className="px-5 pt-6 t-label text-ink-2">
         v0.1 · local first · no accounts, sync optional.
       </p>
-
-      {/* Gated on toolsEnabled as well as their own open state, so switching
-          Calculators off while a sheet is up cannot leave it stranded. */}
-      {toolsEnabled && (
-        <>
-          <PlateCalculatorSheet open={plateSheetOpen} onClose={() => setPlateSheetOpen(false)} />
-          <OneRmCalculatorSheet open={oneRmSheetOpen} onClose={() => setOneRmSheetOpen(false)} />
-        </>
-      )}
-
-      {foodEnabled && (
-        <>
-          <MealsEditorSheet open={mealsSheetOpen} onClose={() => setMealsSheetOpen(false)} />
-          <RecipeEditorSheet open={recipesSheetOpen} onClose={() => setRecipesSheetOpen(false)} />
-        </>
-      )}
-
-      <ImportMfpSheet open={importMfpSheetOpen} onClose={() => setImportMfpSheetOpen(false)} />
     </AppShell>
   );
 }
@@ -639,8 +426,6 @@ function summarizeBackup(b: BackupData): string {
     countOf(b.sessions.length, "session"),
     countOf(b.sets.length, "set"),
     countOf(b.dailyLogs.length, "logged day"),
-    countOf(b.habits.length, "habit"),
-    countOf(b.habitEntries.length, "habit check-off"),
     countOf(b.targetProfiles.length, "target profile"),
   ]);
 }
@@ -682,8 +467,6 @@ function describeLosses(
   b: BackupData,
   current: {
     dailyLogs: unknown[];
-    habits: unknown[];
-    habitEntries: unknown[];
     targetProfiles: TargetProfile[];
     plannedWeek: PlannedWeek | undefined;
   },
@@ -691,12 +474,6 @@ function describeLosses(
   const losses: string[] = [];
   if (b.dailyLogs.length === 0 && current.dailyLogs.length > 0) {
     losses.push(countOf(current.dailyLogs.length, "logged day"));
-  }
-  if (b.habits.length === 0 && current.habits.length > 0) {
-    losses.push(countOf(current.habits.length, "habit"));
-  }
-  if (b.habitEntries.length === 0 && current.habitEntries.length > 0) {
-    losses.push(countOf(current.habitEntries.length, "recorded habit check-off"));
   }
   if (!hasTargetData(b.targetProfiles) && hasTargetData(current.targetProfiles)) {
     losses.push(countOf(current.targetProfiles.length, "daily target profile"));

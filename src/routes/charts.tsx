@@ -12,7 +12,6 @@ import {
 } from "../lib/chart-math";
 import type { DailyLogNumericField } from "../lib/daily-log";
 import { useStore } from "../lib/store";
-import { useEffectiveDailyLogs } from "../lib/use-day-macros";
 
 export const Route = createFileRoute("/charts")({
   head: () => ({
@@ -80,7 +79,7 @@ function hatchAngleFor(metricKey: DailyLogNumericField): number {
 }
 
 function ChartsPage() {
-  const dailyLogs = useEffectiveDailyLogs();
+  const dailyLogs = useStore((s) => s.dailyLogs);
   const unit = useStore((s) => s.unit);
 
   const [metricKey, setMetricKey] = useState<DailyLogNumericField>("calories");

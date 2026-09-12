@@ -55,7 +55,6 @@ function seedStore({
     targetProfiles: [profile],
     weekdayTargets: Array.from({ length: 7 }, () => PROFILE_ID),
     dailyLogs,
-    foodEntries: [],
   });
 }
 

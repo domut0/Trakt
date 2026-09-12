@@ -12,13 +12,6 @@ const DEFAULT_STATE = {
   slots: [],
   sessions: [],
   sets: [],
-  habits: [],
-  habitEntries: [],
-  foods: [],
-  foodEntries: [],
-  meals: [],
-  recipes: [],
-  recipeIngredients: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -72,8 +65,6 @@ describe("Dexie persistence (hydrate + write-through)", () => {
     expect(state.sessions).toEqual([]);
     expect(state.sets).toEqual([]);
     expect(state.dailyLogs).toEqual([]);
-    expect(state.habits).toEqual([]);
-    expect(state.habitEntries).toEqual([]);
     expect(state.activeSessionId).toBeUndefined();
 
     expect(await db.slots.count()).toBe(0);

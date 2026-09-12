@@ -10,7 +10,6 @@ import {
   type DailyLogAggregates,
 } from "../lib/daily-log";
 import { isCardioSession, useStore, type DailyLog } from "../lib/store";
-import { useEffectiveDailyLogs } from "../lib/use-day-macros";
 import { DayEditorSheet } from "./DayEditorSheet";
 
 /** A workout as a day card shows it: which split/exercise, set count or cardio details. */
@@ -67,7 +66,7 @@ export function WeeklyView() {
   const slots = useStore((s) => s.slots);
   const exercises = useStore((s) => s.exercises);
   const sets = useStore((s) => s.sets);
-  const dailyLogs = useEffectiveDailyLogs();
+  const dailyLogs = useStore((s) => s.dailyLogs);
   const unit = useStore((s) => s.unit);
 
   // Which day the editor is open on. null = closed. The sheet stays mounted
