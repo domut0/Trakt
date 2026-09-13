@@ -159,13 +159,13 @@ export function CalendarView() {
               log.fat !== undefined);
           const showSteps = log?.steps !== undefined;
           const showBodyweight = log?.bodyweight !== undefined;
-          // A cheat day is a label the user put on their own day, so it counts
+          // An untracked day is a label the user put on their own day, so it counts
           // as a logged day in its own right. It used to be invisible unless
           // macros happened to be logged too, which made a day someone
           // deliberately marked look exactly like a day they never opened.
-          const isCheatDay = log?.isCheatDay === true;
+          const isUntracked = log?.isUntracked === true;
           const hasAnyDot =
-            workouts.length > 0 || showNutrition || showSteps || showBodyweight || isCheatDay;
+            workouts.length > 0 || showNutrition || showSteps || showBodyweight || isUntracked;
           const isSelected = cell.key === selectedKey;
           const todayCell = isToday(cell.date);
           // The dots are the only thing distinguishing one cell from another,
@@ -178,7 +178,7 @@ export function CalendarView() {
           if (showNutrition) logged.push("macros");
           if (showSteps) logged.push("steps");
           if (showBodyweight) logged.push("bodyweight");
-          if (isCheatDay) logged.push("cheat day");
+          if (isUntracked) logged.push("untracked day");
           return (
             <button
               key={cell.key}
@@ -213,10 +213,10 @@ export function CalendarView() {
                   ))}
                   {showNutrition && <span className="h-1.5 w-1.5 rounded-full bg-nutrition" />}
                   {/* Annotates the day, never replaces a dot: the food dot keeps
-                      its nutrition colour and the cheat day adds a hollow mark
+                      its nutrition colour and the untracked day adds a hollow mark
                       beside it. Outline against filled, so the mark is not
                       carried by hue. */}
-                  {isCheatDay && (
+                  {isUntracked && (
                     <span className="h-1.5 w-1.5 rounded-full border border-muted-foreground" />
                   )}
                   {showSteps && <span className="h-1.5 w-1.5 rounded-full bg-steps" />}
@@ -244,7 +244,7 @@ export function CalendarView() {
               selectedLog.fat !== undefined ||
               selectedLog.steps !== undefined ||
               selectedLog.bodyweight !== undefined ||
-              selectedLog.isCheatDay);
+              selectedLog.isUntracked);
 
           if (!hasSessions && !hasLog) {
             return (
@@ -271,13 +271,13 @@ export function CalendarView() {
                     <span className="t-body font-semibold tracking-tight text-ink">
                       Daily numbers
                     </span>
-                    {selectedLog.isCheatDay && (
+                    {selectedLog.isUntracked && (
                       <span className="flex shrink-0 items-center gap-1.5 bg-wash px-2 py-0.5 t-caption text-ink-2">
                         <span
                           aria-hidden="true"
                           className="h-1.5 w-1.5 rounded-full border border-muted-foreground"
                         />
-                        Cheat day
+                        Untracked
                       </span>
                     )}
                   </div>

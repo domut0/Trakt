@@ -13,10 +13,10 @@
 const SECRET = "__SECRET__";
 
 /** Bumped when this file changes in a way the app needs to know about. */
-const SCRIPT_VERSION = 2;
+const SCRIPT_VERSION = 3;
 
 /** Tabs the app writes. Anything else in the spreadsheet is left alone. */
-const APP_TABS = ["sets", "sessions", "daily", "cardio", "habits", "Food Log"];
+const APP_TABS = ["sets", "sessions", "daily", "cardio"];
 
 /** Tabs the app reads back, because they carry editable columns. */
 const TWO_WAY_TABS = ["sets", "sessions", "daily"];

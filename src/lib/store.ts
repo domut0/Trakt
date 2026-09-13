@@ -119,7 +119,7 @@ export interface DailyLog {
   steps?: number;
   /** In the app's current global lbs/kg unit; the number is stored as typed, not converted. */
   bodyweight?: number;
-  isCheatDay?: boolean;
+  isUntracked?: boolean;
 }
 
 /**
@@ -811,7 +811,7 @@ function isDailyLog(v: unknown): v is DailyLog {
   if (!isOptionalNumber(v.fat)) return false;
   if (!isOptionalNumber(v.steps)) return false;
   if (!isOptionalNumber(v.bodyweight)) return false;
-  if (v.isCheatDay !== undefined && typeof v.isCheatDay !== "boolean") return false;
+  if (v.isUntracked !== undefined && typeof v.isUntracked !== "boolean") return false;
   return true;
 }
 
@@ -867,6 +867,19 @@ export function parseBackup(text: string): ParseBackupResult {
   }
   if (!Array.isArray(sets) || !sets.every(isWorkoutSet)) {
     return { ok: false, error: "The backup's sets list is missing or malformed." };
+  }
+  // A pre-rename file carries isCheatDay where this version reads isUntracked.
+  // Mapped here rather than in isDailyLog, because a validator that silently
+  // rewrites what it validates is a trap for whoever adds the next field. An
+  // export taken before the rename is the only copy of that data the user has,
+  // so dropping the flag would lose days they deliberately marked.
+  if (Array.isArray(dailyLogs)) {
+    for (const log of dailyLogs) {
+      if (!isPlainObject(log)) continue;
+      if (log.isCheatDay === undefined) continue;
+      if (log.isCheatDay === true) log.isUntracked = true;
+      delete log.isCheatDay;
+    }
   }
   // Absent entirely = a pre-v2 backup, which simply had no daily logs. Present
   // but not a well-formed array = a corrupt file, which is a real error.

@@ -316,26 +316,26 @@ function buildFullBackup() {
       const fat = 74 + Math.round((rand() - 0.5) * 22);
       const steps = (isTrainingDay ? 10200 : 8100) + Math.round((rand() - 0.5) * 3400);
       log = { date: key, calories, protein, carbs, fat, steps, bodyweight };
-      // A couple of declared cheat days, on Saturdays. The offsets must BE
+      // A couple of declared untracked days, on Saturdays. The offsets must BE
       // Saturdays or this never fires: against the frozen Thu 20 Aug 2026, the
       // original 8 and 29 are both Wednesdays, so this branch was dead and no
-      // screenshot ever contained a cheat day with macros on it. That is
-      // precisely the case where the cheat dot used to replace the food dot.
+      // screenshot ever contained a untracked day with macros on it. That is
+      // precisely the case where the untracked dot used to replace the food dot.
       if (wd === 5 && (offset === 12 || offset === 26)) {
         log.calories = 3480;
         log.carbs = 410;
         log.fat = 118;
-        log.isCheatDay = true;
+        log.isUntracked = true;
       }
     }
-    // A cheat day carrying NO numbers, deliberately next to an untracked day so
+    // An untracked day carrying NO numbers, deliberately next to an untracked day so
     // the two cells can be compared directly in the calendar grid. This is the
-    // case that was broken: the cheat flag did not count towards hasAnyDot, so
+    // case that was broken: the untracked flag did not count towards hasAnyDot, so
     // a day the user had explicitly marked drew nothing at all and looked
     // exactly like a day they never opened. Keep it in the seed so a regression
     // shows up in a screenshot rather than in a bug report.
     if (offset === 10) {
-      log = { date: key, isCheatDay: true };
+      log = { date: key, isUntracked: true };
     }
     dailyLogs.push(log);
   }

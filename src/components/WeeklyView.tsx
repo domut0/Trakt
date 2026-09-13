@@ -3,6 +3,7 @@ import { format, isToday, isYesterday } from "date-fns";
 import { useMemo, useState } from "react";
 import {
   aggregateDailyLogs,
+  countUntrackedDays,
   countSessionsTrained,
   dayKey,
   groupDayKeysByWeek,
@@ -55,7 +56,7 @@ function fmtCardioDetails(
 /**
  * The History tab's default (Weekly) view: a continuous, newest-first scroll
  * of one card per day that has ANYTHING on it (a workout, some numbers, or a
- * cheat-day flag), broken up by a summary header for each Monday-start week.
+ * untracked-day flag), broken up by a summary header for each Monday-start week.
  *
  * Days with nothing logged are skipped rather than rendered blank, so a
  * fortnight off collapses to a gap between two week headers instead of
@@ -153,6 +154,7 @@ export function WeeklyView() {
             <WeekHeader
               weekStart={week.weekStart}
               aggregates={aggregateDailyLogs(weekLogs)}
+              untrackedDays={countUntrackedDays(weekLogs)}
               sessionCount={countSessionsTrained(endedSessions, week.weekStart)}
               unit={unit}
             />
@@ -191,6 +193,7 @@ export function WeeklyView() {
  * day cards rather than competing with them.
  */
 function WeekHeader({
+  untrackedDays,
   weekStart,
   aggregates,
   sessionCount,
@@ -198,6 +201,7 @@ function WeekHeader({
 }: {
   weekStart: string;
   aggregates: DailyLogAggregates;
+  untrackedDays: number;
   sessionCount: number;
   unit: "lbs" | "kg";
 }) {
@@ -205,18 +209,31 @@ function WeekHeader({
   // headline, so they stay on the cards.
   const stats: string[] = [];
   const { calories, steps, bodyweight } = aggregates;
+
+  /**
+   * "5 of 7 days" is ambiguous and always was: it cannot say whether the other
+   * two were days you opted out of or days you simply forgot. Naming the
+   * untracked ones separately leaves the remainder meaning something -- days
+   * that are genuinely missing, which is the only number here anyone can act
+   * on. Omitted entirely at zero, because "0 untracked" is noise on the normal
+   * week.
+   */
+  const days = (loggedDays: number) =>
+    untrackedDays > 0
+      ? `${loggedDays} of 7 days, ${untrackedDays} untracked`
+      : `${loggedDays} of 7 days`;
   if (calories) {
     stats.push(
-      `${Math.round(calories.average).toLocaleString()} avg cal · ${calories.loggedDays} of 7 days`,
+      `${Math.round(calories.average).toLocaleString()} avg cal · ${days(calories.loggedDays)}`,
     );
   }
   if (steps) {
     stats.push(
-      `${Math.round(steps.average).toLocaleString()} avg steps · ${steps.loggedDays} of 7 days`,
+      `${Math.round(steps.average).toLocaleString()} avg steps · ${days(steps.loggedDays)}`,
     );
   }
   if (bodyweight) {
-    stats.push(`${round1(bodyweight.average)} avg ${unit} · ${bodyweight.loggedDays} of 7 days`);
+    stats.push(`${round1(bodyweight.average)} avg ${unit} · ${days(bodyweight.loggedDays)}`);
   }
 
   return (
@@ -278,9 +295,9 @@ function DayCard({
         role="button"
         tabIndex={0}
         // The card's own label is its accessible name, so anything inside it,
-        // the cheat-day mark included, is announced only if it is named here.
+        // the untracked-day mark included, is announced only if it is named here.
         aria-label={`Edit ${format(parseDayKey(date), "EEEE, MMMM d")}${
-          log?.isCheatDay ? ", cheat day" : ""
+          log?.isUntracked ? ", untracked day" : ""
         }`}
         onClick={() => onOpenEditor(date)}
         // role="button" promises keyboard activation that a <div> does not
@@ -302,13 +319,13 @@ function DayCard({
           {/* A neutral note the user wrote on their own day, so it is muted and
               marked with the same hollow dot the calendar grid uses. Outline
               against filled means the mark is not carried by hue alone. */}
-          {log?.isCheatDay && (
+          {log?.isUntracked && (
             <span className="flex shrink-0 items-center gap-1.5 t-caption text-ink-2">
               <span
                 aria-hidden="true"
                 className="h-1.5 w-1.5 rounded-full border border-muted-foreground"
               />
-              Cheat day
+              Untracked
             </span>
           )}
         </div>

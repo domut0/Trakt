@@ -96,7 +96,7 @@ function ChartsPage() {
         return {
           ts,
           val: log[metricKey]!,
-          isCheatDay: log.isCheatDay,
+          isUntracked: log.isUntracked,
         };
       })
       .filter((p) => Number.isFinite(p.ts))
@@ -354,8 +354,8 @@ function Chart({
   metricLabel,
   metricKey,
 }: {
-  displayedPoints: { ts: number; val: number; isCheatDay?: boolean }[];
-  rawPoints: { ts: number; val: number; isCheatDay?: boolean }[];
+  displayedPoints: { ts: number; val: number; isUntracked?: boolean }[];
+  rawPoints: { ts: number; val: number; isUntracked?: boolean }[];
   unit: string;
   isCalories: boolean;
   viewMode: ViewMode;
@@ -614,17 +614,17 @@ function Chart({
   const yStep = yTicks.length > 1 ? Math.abs(yTicks[1] - yTicks[0]) : 1;
   const kDecimals = Math.min(2, Math.max(0, -Math.floor(Math.log10(yStep / 1000) + 1e-9)));
 
-  // Cheat days are marked on the DAILY series only. In 7-day-average mode a
+  // Untrackeds are marked on the DAILY series only. In 7-day-average mode a
   // plotted value is a mean ending on that day, not that day's intake, so
-  // marking it would attribute the cheat day to the wrong number. The faint raw
+  // marking it would attribute the untracked day to the wrong number. The faint raw
   // dots behind the smoothed line keep carrying the signal.
   //
-  // The mark is a ring around the dot, not a different fill: a cheat day is a
+  // The mark is a ring around the dot, not a different fill: an untracked day is a
   // label the user chose for their own day, so it annotates the point rather
   // than repainting it, and the ring reads without depending on hue.
-  const isCheatDot = (p: { isCheatDay?: boolean }) =>
-    isCalories && viewMode === "daily" && p.isCheatDay === true;
-  const hasCheatDots = displayedPoints.some(isCheatDot);
+  const isUntrackedDot = (p: { isUntracked?: boolean }) =>
+    isCalories && viewMode === "daily" && p.isUntracked === true;
+  const hasUntrackedDots = displayedPoints.some(isUntrackedDot);
 
   const formatYLabel = (v: number) => {
     if (v === 0) return "0";
@@ -644,8 +644,8 @@ function Chart({
       data-swipe-ignore
       role="img"
       aria-label={
-        hasCheatDots
-          ? `${metricLabel} over time. Cheat days are ringed.`
+        hasUntrackedDots
+          ? `${metricLabel} over time. Untracked days are ringed.`
           : `${metricLabel} over time`
       }
     >
@@ -743,17 +743,17 @@ function Chart({
       {/* Raw daily dots drawn faintly behind smoothed line when in 7-day average mode */}
       {viewMode === "avg7" &&
         rawPoints.map((rp, i) => {
-          // Same annotation as the daily series: a cheat day opens the dot out
+          // Same annotation as the daily series: an untracked day opens the dot out
           // into a ring instead of painting it another colour.
-          const cheat = isCalories && rp.isCheatDay === true;
+          const untracked = isCalories && rp.isUntracked === true;
           return (
             <circle
               key={`raw-dot-${i}`}
               cx={x(rp.ts)}
               cy={y(rp.val)}
-              r={cheat ? 2.5 : 1.5}
-              fill={cheat ? "none" : "var(--color-muted-foreground)"}
-              stroke={cheat ? "var(--color-muted-foreground)" : "none"}
+              r={untracked ? 2.5 : 1.5}
+              fill={untracked ? "none" : "var(--color-muted-foreground)"}
+              stroke={untracked ? "var(--color-muted-foreground)" : "none"}
               strokeWidth={1}
               opacity={0.35}
             />
@@ -816,11 +816,11 @@ function Chart({
         />
       ))}
 
-      {/* Cheat day rings, drawn around the dot they annotate */}
+      {/* Untracked rings, drawn around the dot they annotate */}
       {displayedPoints.map((p, i) =>
-        isCheatDot(p) ? (
+        isUntrackedDot(p) ? (
           <circle
-            key={`cheat-dot-${i}`}
+            key={`untracked-dot-${i}`}
             cx={x(p.ts)}
             cy={y(p.val)}
             r={isSinglePoint ? 7 : 4.5}
@@ -867,7 +867,7 @@ function Chart({
             stroke="var(--color-surface)"
             strokeWidth={2}
           />
-          {isCheatDot(activePoint) && (
+          {isUntrackedDot(activePoint) && (
             <circle
               cx={x(activePoint.ts)}
               cy={y(activePoint.val)}

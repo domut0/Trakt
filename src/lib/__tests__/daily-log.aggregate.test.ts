@@ -6,6 +6,7 @@ import {
   groupDayKeysByWeek,
   parseDayKey,
   weekStartKey,
+  countUntrackedDays,
 } from "../daily-log";
 import type { DailyLog } from "../store";
 
@@ -179,8 +180,8 @@ describe("aggregateDailyLogs", () => {
     expect(agg.bodyweight).toEqual({ average: 187.5, loggedDays: 2 });
   });
 
-  it("is unaffected by cheat-day-only records", () => {
-    const agg = aggregateDailyLogs([log(MON, { isCheatDay: true }), log(TUE, { calories: 2000 })]);
+  it("is unaffected by untracked-day-only records", () => {
+    const agg = aggregateDailyLogs([log(MON, { isUntracked: true }), log(TUE, { calories: 2000 })]);
     expect(agg.calories).toEqual({ average: 2000, loggedDays: 1 });
   });
 });
@@ -244,5 +245,33 @@ describe("countSessionsTrained", () => {
     const running = { startedAt: at(SUN, 23), endedAt: undefined };
     expect(countSessionsTrained([running], MON)).toBe(0);
     expect(countSessionsTrained([running], NEXT_MON)).toBe(0);
+  });
+});
+
+describe("countUntrackedDays", () => {
+  it("counts only days flagged untracked", () => {
+    expect(
+      countUntrackedDays([
+        { date: "2026-03-01", calories: 2400 },
+        { date: "2026-03-02", isUntracked: true },
+        { date: "2026-03-03", isUntracked: true },
+        { date: "2026-03-04" },
+      ]),
+    ).toBe(2);
+  });
+
+  it("is what separates an opted-out day from a forgotten one", () => {
+    // The two weeks below are arithmetically identical to every average in the
+    // app: one logged day out of the set, the rest absent. The only thing that
+    // tells them apart is this count, which is the whole reason the flag exists.
+    const optedOut = [
+      { date: "2026-03-01", calories: 2400 },
+      { date: "2026-03-02", isUntracked: true },
+    ];
+    const forgotten = [{ date: "2026-03-01", calories: 2400 }];
+
+    expect(aggregateDailyLogs(optedOut).calories).toEqual(aggregateDailyLogs(forgotten).calories);
+    expect(countUntrackedDays(optedOut)).toBe(1);
+    expect(countUntrackedDays(forgotten)).toBe(0);
   });
 });

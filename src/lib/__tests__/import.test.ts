@@ -88,7 +88,7 @@ const validBackup: BackupData = {
   sets: [
     { id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1500 },
   ],
-  dailyLogs: [{ date: "2026-03-01", calories: 2400, steps: 0, isCheatDay: true }],
+  dailyLogs: [{ date: "2026-03-01", calories: 2400, steps: 0, isUntracked: true }],
   unit: "kg",
 };
 
@@ -329,7 +329,7 @@ describe("parseBackup (validation)", () => {
   it("accepts a dailyLogs entry that has only a date, and one with an explicit zero", () => {
     const ok = {
       ...validBackup,
-      dailyLogs: [{ date: "2026-03-01" }, { date: "2026-03-02", steps: 0, isCheatDay: false }],
+      dailyLogs: [{ date: "2026-03-01" }, { date: "2026-03-02", steps: 0, isUntracked: false }],
     };
     const result = parseBackup(JSON.stringify(ok));
     expect(result.ok).toBe(true);
@@ -378,7 +378,7 @@ describe("importData (full backup restore)", () => {
     expect(seeded.sets).toHaveLength(2);
     // Give the seeded state a couple of daily logs so the round-trip covers them.
     useStore.getState().upsertDailyLog("2026-02-10", { calories: 2100, protein: 180 });
-    useStore.getState().upsertDailyLog("2026-02-11", { steps: 0, isCheatDay: true });
+    useStore.getState().upsertDailyLog("2026-02-11", { steps: 0, isUntracked: true });
     const exported: BackupData = {
       ...PRE_V4_DEFAULTS,
       // A v2-era export. The current format's own round-trip lives in the
@@ -470,7 +470,7 @@ describe("importData (full backup restore)", () => {
       date: "2026-03-01",
       calories: 2400,
       steps: 0,
-      isCheatDay: true,
+      isUntracked: true,
     });
   });
 
@@ -599,7 +599,7 @@ describe("importData (full backup restore)", () => {
       sets: [
         { id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1500 },
       ],
-      dailyLogs: [{ date: "2026-03-01", calories: 2400, steps: 0, isCheatDay: true }],
+      dailyLogs: [{ date: "2026-03-01", calories: 2400, steps: 0, isUntracked: true }],
       // TWO profiles, spread unevenly across the week, deliberately. With a single
       // uniform profile this test would still pass if parseBackup discarded the
       // file's targets and fell back to defaults, because the defaults are exactly
@@ -760,5 +760,49 @@ describe("importData (full backup restore)", () => {
 
     const settingsMeta = await db.meta.get("settings");
     expect(settingsMeta).toMatchObject({ unit: "kg" });
+  });
+});
+
+describe("parseBackup: the isCheatDay rename", () => {
+  /**
+   * A pre-rename export is the only copy of that data the user has. There is no
+   * backend and no sync to re-derive it from, so a flag dropped on import is a
+   * decision they made about a day that is now unrecoverable.
+   */
+  const withLogs = (dailyLogs: unknown[]) =>
+    JSON.stringify({
+      version: 2,
+      exercises: [{ id: "e1", name: "Bench Press", type: "main" }],
+      slots: [{ id: "s1", name: "Heavy Bench", rotationOrder: 0 }],
+      sessions: [],
+      sets: [],
+      dailyLogs,
+      unit: "lbs",
+    });
+
+  it("reads a legacy isCheatDay: true as isUntracked", () => {
+    const result = parseBackup(withLogs([{ date: "2026-03-01", isCheatDay: true }]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.dailyLogs).toEqual([{ date: "2026-03-01", isUntracked: true }]);
+  });
+
+  it("drops a legacy isCheatDay: false rather than storing isUntracked: false", () => {
+    // false was the default and carried no information, so keeping it would
+    // hold an otherwise-blank record alive -- the exact thing isDailyLogEmpty
+    // exists to prevent.
+    const result = parseBackup(
+      withLogs([{ date: "2026-03-01", calories: 2400, isCheatDay: false }]),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.dailyLogs).toEqual([{ date: "2026-03-01", calories: 2400 }]);
+  });
+
+  it("leaves a post-rename file alone", () => {
+    const result = parseBackup(withLogs([{ date: "2026-03-01", isUntracked: true }]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.dailyLogs).toEqual([{ date: "2026-03-01", isUntracked: true }]);
   });
 });

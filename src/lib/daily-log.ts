@@ -42,13 +42,13 @@ export type DailyLogNumericField = (typeof DAILY_LOG_NUMERIC_FIELDS)[number];
  * Deliberately strict about two cases:
  * - `0` is a real logged value (0 steps is a meaningful thing to record), so a
  *   present zero makes the record NON-empty. Only `undefined` counts as absent.
- * - `isCheatDay: false` carries no information either — it is the default — so
+ * - `isUntracked: false` carries no information either — it is the default — so
  *   it does NOT keep an otherwise-blank record alive. Only `true` does.
  *
  * `upsertDailyLog` uses this to delete rather than store an empty shell.
  */
 export function isDailyLogEmpty(log: DailyLog): boolean {
-  if (log.isCheatDay === true) return false;
+  if (log.isUntracked === true) return false;
   return DAILY_LOG_NUMERIC_FIELDS.every((f) => log[f] === undefined);
 }
 
@@ -120,6 +120,20 @@ export interface DailyLogFieldAggregate {
 
 /** Per-field aggregates. `null` means the field appears on no day at all. */
 export type DailyLogAggregates = Record<DailyLogNumericField, DailyLogFieldAggregate | null>;
+
+/**
+ * How many days in a set were deliberately left unlogged.
+ *
+ * The whole reason `isUntracked` exists. Without this, a week where you ate
+ * well on five days and opted out on a sixth is arithmetically identical to a
+ * week where you ate well on five days and forgot about the sixth: both read
+ * "5 of 7". One of those is a tracking problem to fix and the other is a
+ * decision you already made, and telling them apart is the only thing the flag
+ * can buy.
+ */
+export function countUntrackedDays(logs: readonly DailyLog[]): number {
+  return logs.filter((l) => l.isUntracked === true).length;
+}
 
 /**
  * Averages each numeric field over ONLY the days where it was actually set.

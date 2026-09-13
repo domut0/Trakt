@@ -78,7 +78,7 @@ describe("daily logs (schema + write-through)", () => {
       fat: 70,
       steps: 9421,
       bodyweight: 186.5,
-      isCheatDay: true,
+      isUntracked: true,
     });
     await flush();
 
@@ -92,7 +92,7 @@ describe("daily logs (schema + write-through)", () => {
       fat: 70,
       steps: 9421,
       bodyweight: 186.5,
-      isCheatDay: true,
+      isUntracked: true,
     });
   });
 
@@ -154,7 +154,7 @@ describe("daily logs (schema + write-through)", () => {
       fat: undefined,
       steps: undefined,
       bodyweight: undefined,
-      isCheatDay: undefined,
+      isUntracked: undefined,
     });
     await flush();
 
@@ -167,22 +167,22 @@ describe("daily logs (schema + write-through)", () => {
 
   it("does not create a record when an upsert on a fresh day is empty", async () => {
     await useStore.getState().hydrate();
-    useStore.getState().upsertDailyLog("2026-08-07", { calories: undefined, isCheatDay: false });
+    useStore.getState().upsertDailyLog("2026-08-07", { calories: undefined, isUntracked: false });
     await flush();
 
     expect(useStore.getState().dailyLogs).toEqual([]);
     expect(await db.dailyLogs.count()).toBe(0);
   });
 
-  it("keeps a cheat-day-only record alive with no numbers at all", async () => {
+  it("keeps a untracked-day-only record alive with no numbers at all", async () => {
     await useStore.getState().hydrate();
-    useStore.getState().upsertDailyLog("2026-08-07", { isCheatDay: true });
+    useStore.getState().upsertDailyLog("2026-08-07", { isUntracked: true });
     await flush();
 
     await reload();
     expect(useStore.getState().dailyLogFor("2026-08-07")).toEqual({
       date: "2026-08-07",
-      isCheatDay: true,
+      isUntracked: true,
     });
   });
 

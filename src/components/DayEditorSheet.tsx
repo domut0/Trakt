@@ -70,7 +70,7 @@ export function DayEditorSheet({
   const showToast = useToast();
 
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
-  const [isCheatDay, setIsCheatDay] = useState(false);
+  const [isUntracked, setIsUntracked] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   const [dragY, setDragY] = useState(0);
@@ -93,7 +93,7 @@ export function DayEditorSheet({
     }
     const existing = useStore.getState().dailyLogFor(date);
     setDraft(draftFrom(existing));
-    setIsCheatDay(existing?.isCheatDay === true);
+    setIsUntracked(existing?.isUntracked === true);
   }, [open, date]);
 
   // Adjust sheet bottom padding when soft keyboard appears to keep fields visible
@@ -143,7 +143,7 @@ export function DayEditorSheet({
     const prevFat = previousLog?.fat;
     const prevSteps = previousLog?.steps;
     const prevBodyweight = previousLog?.bodyweight;
-    const prevIsCheatDay = previousLog?.isCheatDay;
+    const prevIsUntracked = previousLog?.isUntracked;
 
     upsertDailyLog(date, {
       calories: toValue(draft.calories),
@@ -154,7 +154,7 @@ export function DayEditorSheet({
       bodyweight: toValue(draft.bodyweight),
       // Only ever store the interesting value. Writing `false` would keep an
       // otherwise-blank day alive as a record that means nothing.
-      isCheatDay: isCheatDay ? true : undefined,
+      isUntracked: isUntracked ? true : undefined,
     });
 
     onClose();
@@ -181,7 +181,7 @@ export function DayEditorSheet({
           fat: prevFat,
           steps: prevSteps,
           bodyweight: prevBodyweight,
-          isCheatDay: prevIsCheatDay,
+          isUntracked: prevIsUntracked,
         });
       },
     });
@@ -294,7 +294,7 @@ export function DayEditorSheet({
           <div className="t-caption text-ink-2">{existing ? "Edit day" : "Log day"}</div>
           <div className="mt-0.5 t-heading font-semibold tracking-tight">{headerLabel(date)}</div>
 
-          {/* Grouped list of labelled numeric rows and cheat day switch */}
+          {/* Grouped list of labelled numeric rows and untracked day switch */}
           <div className="mt-4 group-list bg-wash">
             {/* Macros info row when derived from entries */}
             {/* Calories - only editable when not derived from entries */}
@@ -518,19 +518,19 @@ export function DayEditorSheet({
               </div>
             </div>
 
-            {/* Cheat day */}
+            {/* Untracked */}
             <div className="group-row group-row-sep">
-              <span className="t-body font-medium text-ink">Cheat day</span>
+              <span className="t-body font-medium text-ink">Untracked</span>
               <button
                 type="button"
                 role="checkbox"
-                aria-checked={isCheatDay}
-                aria-label="Cheat day"
-                onClick={() => setIsCheatDay(!isCheatDay)}
+                aria-checked={isUntracked}
+                aria-label="Untracked"
+                onClick={() => setIsUntracked(!isUntracked)}
                 className="flex h-6 w-6 items-center justify-center t-label font-semibold transition-colors"
                 style={{
-                  backgroundColor: isCheatDay ? "var(--color-accent)" : "var(--color-border)",
-                  color: isCheatDay ? "var(--color-accent-foreground)" : "transparent",
+                  backgroundColor: isUntracked ? "var(--color-accent)" : "var(--color-border)",
+                  color: isUntracked ? "var(--color-accent-foreground)" : "transparent",
                 }}
               >
                 ✓

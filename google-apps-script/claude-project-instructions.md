@@ -63,7 +63,7 @@ daily:
     - Steps
     - Bodyweight
     - Unit # lbs | kg
-    - Cheat Day # TRUE | FALSE | blank
+    - Untracked # TRUE when the day was deliberately not logged; blank otherwise
 
 cardio:
   what: one row per cardio bout. These have no sets.
@@ -78,28 +78,6 @@ cardio:
     - Distance Unit # mi | km
     - Setup Note
     - Note
-
-habits:
-  what: one row per habit COMPLETED on a day. Presence-only.
-  columns:
-    - Date
-    - Habit # the habit's name
-    - Archived # TRUE if the user has since stopped tracking this habit
-
-Food Log:
-  what: one row per food entry, day/meal/time order. Push-only.
-  columns:
-    - Date # yyyy-MM-dd
-    - Meal # resolved meal name
-    - Food # food or quick-add name
-    - Brand # brand name, or blank
-    - Portion # human-readable portion, e.g. "3 cake"
-    - Quantity # raw numeric quantity
-    - Unit # raw unit: g | ml | oz | floz | serving | package
-    - Calories
-    - Protein (g)
-    - Carbs (g)
-    - Fat (g)
 
 _sync:
   what: bookkeeping written by the sync script. Not training data.
@@ -120,9 +98,9 @@ understate every intake figure, sometimes badly. When a day is missing, say the 
 Every set count and volume figure is working sets only, and none of it is comparable to numbers
 from apps that log warm-ups.
 
-**Habits are presence-only.** A row means the habit was done that day. There is no row meaning
-"not done", so an absent day is either genuinely missed or simply not tracked yet, and you
-cannot tell which from this sheet alone. Do not report streaks as broken without saying so.
+**A blank day and an untracked day are different.** `Untracked` TRUE means the user decided
+not to log that day. A day with neither numbers nor that flag is one they simply missed. Only
+the second is a tracking gap worth raising, and averages should say which kind they skipped.
 
 **Cardio is not in `sets` or `sessions`.** A cardio bout produces no sets at all, and the
 `sessions` tab holds strength sessions only. If you are assessing total weekly load, you have
@@ -184,9 +162,8 @@ Prefer specific, dated, checkable statements over general advice. "Protein avera
 the last 14 days against a 180g target, and the four lowest days were all Sundays" is useful.
 "Try to eat more protein" is not.
 
-Say when the data cannot answer the question. Missing days, an open session, or a habit that
-was never tracked are all common, and quietly averaging around them produces confident numbers
-that are wrong.
+Say when the data cannot answer the question. Missing days, untracked days and an open session
+are all common, and quietly averaging around them produces confident numbers that are wrong.
 
 ## About me
 

@@ -42,7 +42,7 @@ import type { DailyLog, Exercise, SplitSlot, WorkoutSession, WorkoutSet } from "
  */
 
 /** Bumped when the tab layout changes in a way a reader would notice. */
-export const SYNC_FORMAT_VERSION = 1;
+export const SYNC_FORMAT_VERSION = 2;
 
 export const SHEET_TABS = {
   sets: "sets",
@@ -93,7 +93,7 @@ const EDITABLE_DAILY_FIELDS = {
   fat: { header: "Fat (g)", kind: "optionalNumber" },
   steps: { header: "Steps", kind: "optionalNumber" },
   bodyweight: { header: "Bodyweight", kind: "optionalNumber" },
-  isCheatDay: { header: "Cheat Day", kind: "optionalBoolean" },
+  isUntracked: { header: "Untracked", kind: "optionalBoolean" },
 } as const satisfies Record<string, FieldSpec>;
 
 type EditableSet = { -readonly [K in keyof typeof EDITABLE_SET_FIELDS]?: CellValue };

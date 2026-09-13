@@ -219,15 +219,37 @@ class WorkoutDb extends Dexie {
     // is how Dexie drops it, and dropping is right rather than merely orphaning
     // it -- an unreferenced table keeps its whole index and its storage quota
     // forever, on a phone, for data no screen can reach.
-    this.version(5).stores({
-      habits: null,
-      habitEntries: null,
-      foods: null,
-      foodEntries: null,
-      meals: null,
-      recipes: null,
-      recipeIngredients: null,
-    });
+    this.version(5)
+      .stores({
+        habits: null,
+        habitEntries: null,
+        foods: null,
+        foodEntries: null,
+        meals: null,
+        recipes: null,
+        recipeIngredients: null,
+      })
+      // The same bump renames DailyLog.isCheatDay to isUntracked, because the
+      // flag stopped being a claim about food and became a claim about logging:
+      // a day you CHOSE not to record is not a day you forgot, and only the
+      // second one is a gap worth chasing. "Cheat day" was also a moralising
+      // word for a mechanical fact.
+      //
+      // A rename is a data migration even though the field is non-indexed:
+      // Dexie stores whole objects, so an untouched row keeps the old key
+      // forever and every untracked day the user has already marked would
+      // quietly revert to ordinary. This is the only place that can fix it,
+      // because there is no other pass over every row.
+      .upgrade(async (tx) => {
+        await tx
+          .table("dailyLogs")
+          .toCollection()
+          .modify((log: Record<string, unknown>) => {
+            if (log.isCheatDay === undefined) return;
+            if (log.isCheatDay === true) log.isUntracked = true;
+            delete log.isCheatDay;
+          });
+      });
   }
 }
 

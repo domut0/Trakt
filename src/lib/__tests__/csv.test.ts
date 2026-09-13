@@ -193,7 +193,7 @@ describe("dailyLogsToCsv", () => {
         calories: 2400,
         protein: 180,
         bodyweight: 185.5,
-        isCheatDay: false,
+        isUntracked: false,
       },
       {
         date: "2026-08-11",
@@ -201,7 +201,7 @@ describe("dailyLogsToCsv", () => {
       },
       {
         date: "2026-08-12",
-        isCheatDay: true,
+        isUntracked: true,
       },
     ];
 
@@ -209,7 +209,7 @@ describe("dailyLogsToCsv", () => {
     const lines = csv.split("\r\n");
 
     expect(lines[0]).toBe(
-      "Date,Calories,Protein (g),Carbs (g),Fat (g),Steps,Bodyweight,Unit,Cheat Day",
+      "Date,Calories,Protein (g),Carbs (g),Fat (g),Steps,Bodyweight,Unit,Untracked",
     );
     // Nine columns, so nine cells on every row. Asserted structurally as well
     // as literally: hand-counting commas in the literals below is exactly how
@@ -224,7 +224,7 @@ describe("dailyLogsToCsv", () => {
     expect(lines[1]).toBe("2026-08-10,2400,180,,,,185.5,lbs,false");
     // Row 2: steps is 0 (logged zero), not empty cell, while calories/protein/carbs/fat/bodyweight are empty
     expect(lines[2]).toBe("2026-08-11,,,,,0,,lbs,");
-    // Row 3: cheat day is true, numeric fields absent
+    // Row 3: untracked day is true, numeric fields absent
     expect(lines[3]).toBe("2026-08-12,,,,,,,lbs,true");
   });
 
@@ -255,7 +255,7 @@ describe("dailyLogsToCsv", () => {
         fat: 0,
         steps: 0,
         bodyweight: 0,
-        isCheatDay: false,
+        isUntracked: false,
       },
     ];
 

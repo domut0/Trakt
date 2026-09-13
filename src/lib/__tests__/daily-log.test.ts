@@ -41,17 +41,17 @@ describe("isDailyLogEmpty", () => {
         fat: undefined,
         steps: undefined,
         bodyweight: undefined,
-        isCheatDay: undefined,
+        isUntracked: undefined,
       }),
     ).toBe(true);
   });
 
-  it("treats isCheatDay: false as still empty", () => {
-    expect(isDailyLogEmpty({ ...base, isCheatDay: false })).toBe(true);
+  it("treats isUntracked: false as still empty", () => {
+    expect(isDailyLogEmpty({ ...base, isUntracked: false })).toBe(true);
   });
 
-  it("treats isCheatDay: true as NOT empty", () => {
-    expect(isDailyLogEmpty({ ...base, isCheatDay: true })).toBe(false);
+  it("treats isUntracked: true as NOT empty", () => {
+    expect(isDailyLogEmpty({ ...base, isUntracked: true })).toBe(false);
   });
 
   it.each([
@@ -65,8 +65,8 @@ describe("isDailyLogEmpty", () => {
     expect(isDailyLogEmpty({ ...base, ...patch })).toBe(false);
   });
 
-  it("treats a 0 alongside isCheatDay: false as NOT empty", () => {
-    expect(isDailyLogEmpty({ ...base, steps: 0, isCheatDay: false })).toBe(false);
+  it("treats a 0 alongside isUntracked: false as NOT empty", () => {
+    expect(isDailyLogEmpty({ ...base, steps: 0, isUntracked: false })).toBe(false);
   });
 
   it.each([

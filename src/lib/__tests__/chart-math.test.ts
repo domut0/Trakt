@@ -281,12 +281,12 @@ describe("rollingAverage", () => {
 
   it("preserves fields other than val", () => {
     const points = [
-      { ...day(2025, 6, 1, 10), isCheatDay: true },
-      { ...day(2025, 6, 2, 30), isCheatDay: false },
+      { ...day(2025, 6, 1, 10), isUntracked: true },
+      { ...day(2025, 6, 2, 30), isUntracked: false },
     ];
     const avg = rollingAverage(points, 7);
-    expect(avg[0].isCheatDay).toBe(true);
-    expect(avg[1].isCheatDay).toBe(false);
+    expect(avg[0].isUntracked).toBe(true);
+    expect(avg[1].isUntracked).toBe(false);
     expect(avg[1].ts).toBe(points[1].ts);
     expect(avg[1].val).toBe(20);
   });

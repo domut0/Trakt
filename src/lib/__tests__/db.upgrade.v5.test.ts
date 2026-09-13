@@ -62,6 +62,11 @@ describe("Dexie v4 -> v5: the food and habit tables are dropped", () => {
     // The day carries BOTH typed macros and, separately, food entries. Only the
     // typed ones are meant to survive, and they are the ones the app now reads.
     await v4.table("dailyLogs").put({ date: "2026-08-07", calories: 2400, bodyweight: 181.2 });
+    // Three shapes, because the rename has to handle all of them: a day flagged
+    // under the old name, a day carrying the old name set to false, and a day
+    // that never had the key at all.
+    await v4.table("dailyLogs").put({ date: "2026-08-08", isCheatDay: true });
+    await v4.table("dailyLogs").put({ date: "2026-08-09", calories: 2100, isCheatDay: false });
     await v4.table("habits").put({ id: "h1", name: "Creatine", order: 0 });
     await v4.table("habitEntries").put({ id: "2026-08-07|h1", date: "2026-08-07", habitId: "h1" });
     await v4.table("meals").put({ id: "m1", name: "Breakfast", fromMinutes: 300, toMinutes: 660 });
@@ -97,10 +102,33 @@ describe("Dexie v4 -> v5: the food and habit tables are dropped", () => {
       bodyweight: 181.2,
     });
 
+    // isCheatDay -> isUntracked. Dexie stores whole objects, so without the
+    // upgrade an untouched row keeps the old key forever and every day the user
+    // deliberately marked reverts to ordinary, silently.
+    const flagged = (await db.dailyLogs.get("2026-08-08")) as unknown as Record<string, unknown>;
+    expect(flagged.isUntracked).toBe(true);
+    expect("isCheatDay" in flagged).toBe(false);
+
+    // A false under the old name carried no information - it was the default -
+    // so it becomes no key at all rather than isUntracked: false. Anything else
+    // would keep an otherwise-blank record alive, which isDailyLogEmpty exists
+    // to prevent.
+    const notFlagged = (await db.dailyLogs.get("2026-08-09")) as unknown as Record<string, unknown>;
+    expect(notFlagged.isUntracked).toBeUndefined();
+    expect("isCheatDay" in notFlagged).toBe(false);
+    expect(notFlagged.calories).toBe(2100);
+
     await useStore.getState().hydrate();
     const state = useStore.getState();
     expect(state.exercises).toHaveLength(1);
     expect(state.sets).toHaveLength(1);
-    expect(state.dailyLogs).toEqual([{ date: "2026-08-07", calories: 2400, bodyweight: 181.2 }]);
+    // Sorted, because hydrate reads the table and Dexie returns primary-key
+    // order; asserting the whole array is what catches a migration that dropped
+    // or duplicated a row rather than merely mis-renaming a key.
+    expect([...state.dailyLogs].sort((a, b) => a.date.localeCompare(b.date))).toEqual([
+      { date: "2026-08-07", calories: 2400, bodyweight: 181.2 },
+      { date: "2026-08-08", isUntracked: true },
+      { date: "2026-08-09", calories: 2100 },
+    ]);
   });
 });
