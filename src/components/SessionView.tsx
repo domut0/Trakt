@@ -195,9 +195,7 @@ export function SessionView({
 
     if (isEditingNote) {
       return (
-        // Swipe-ignored: placing the caret or dragging out a selection inside
-        // the field must not read as a swipe between tabs.
-        <div data-swipe-ignore className="mx-4 section-gap group-list p-4">
+        <div className="mx-4 section-gap group-list p-4">
           <label htmlFor={noteFieldId} className="block t-caption text-ink-2">
             Session note
           </label>

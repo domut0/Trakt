@@ -1,8 +1,9 @@
 import { format } from "date-fns";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { niceCeil } from "../lib/chart-math";
 import { dayKey, parseDayKey } from "../lib/daily-log";
 import { addDaysToKey, daysBetweenKeys, isUntrackedOn, targetsForDate } from "../lib/planning";
+import { useDismissOnOutside } from "../hooks/useDismissOnOutside";
 import { useStore } from "../lib/store";
 
 /** The shortest strip drawn, so a new account gets an axis rather than a stub. */
@@ -44,7 +45,16 @@ export function TargetStrip() {
   const hydrated = useStore((s) => s.hydrated);
 
   const scroller = useRef<HTMLDivElement>(null);
+  const plot = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const clearSelected = useCallback(() => setSelected(null), []);
+
+  // The day card has no backdrop, on purpose - the page stays live and
+  // scrollable behind it - so the only thing that can notice a press meant for
+  // something else is the document. Scoped to the plot rather than the whole
+  // card, so a press on another bar still selects that bar rather than being
+  // spent closing this one.
+  useDismissOnOutside(plot, selected !== null, clearSelected);
 
   const { days, calMax, stepMax } = useMemo(() => {
     const today = dayKey(new Date());
@@ -140,7 +150,7 @@ export function TargetStrip() {
         </div>
 
         <div ref={scroller} className="min-w-0 flex-1 overflow-x-auto pr-3">
-          <div className="relative" style={{ width, height }}>
+          <div ref={plot} className="relative" style={{ width, height }}>
             {/* Gridlines at half of each axis, and the day itself between them. */}
             <Grid top={HALF / 2} />
             <Grid top={HALF} centre />

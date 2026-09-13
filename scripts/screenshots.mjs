@@ -789,7 +789,7 @@ async function capturePlan(page) {
   await scrollMain(page, 400);
   await settle(page, 300);
   const bars = page.locator('[aria-label*="calories"]');
-  await bars.nth(await bars.count() - 4).click();
+  await bars.nth((await bars.count()) - 4).click();
   await settle(page, 300);
   await shot(page, "63-plan-target-strip-day");
 }

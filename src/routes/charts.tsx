@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowDown, ArrowUp } from "../components/icons";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useDismissOnOutside } from "../hooks/useDismissOnOutside";
 import { AppShell } from "../components/AppShell";
 import {
   computeWindowChange,
@@ -189,12 +190,7 @@ function ChartsPage() {
 
       {/* Metric and date range selection cluster tightened into a single calm block */}
       <div className="mb-4 flex flex-col gap-2.5 anim-fade-up">
-        <div
-          data-swipe-ignore
-          role="group"
-          aria-label="Metric"
-          className="flex gap-2 overflow-x-auto px-4"
-        >
+        <div role="group" aria-label="Metric" className="flex gap-2 overflow-x-auto px-4">
           {METRICS.map((m) => (
             <button
               key={m.key}
@@ -211,12 +207,7 @@ function ChartsPage() {
           ))}
         </div>
 
-        <div
-          data-swipe-ignore
-          role="group"
-          aria-label="Date range"
-          className="flex gap-2 overflow-x-auto px-4"
-        >
+        <div role="group" aria-label="Date range" className="flex gap-2 overflow-x-auto px-4">
           {RANGES.map((r) => (
             <button
               key={r.label}
@@ -361,6 +352,13 @@ function Chart({
 
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const clearSelection = useCallback(() => setSelectedIndex(null), []);
+
+  // A tap on the plot leaves a point selected with its pill showing, and the
+  // SVG's own pointer handling only clears it for presses that land back inside
+  // the chart. A press anywhere else on the page never reached it.
+  useDismissOnOutside(svgRef, selectedIndex !== null, clearSelection);
   const pointerDownRef = useRef<{ x: number; y: number; index: number; isDrag: boolean } | null>(
     null,
   );
@@ -628,11 +626,9 @@ function Chart({
 
   return (
     <svg
+      ref={svgRef}
       viewBox={`0 0 ${W} ${H}`}
       className="h-[180px] w-full select-none"
-      // Scrubbing is a horizontal drag, which is exactly the gesture AppShell
-      // reads as swipe-to-next-tab. Without this the first scrub navigates away.
-      data-swipe-ignore
       role="img"
       aria-label={
         hasUntrackedDots

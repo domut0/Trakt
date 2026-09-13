@@ -207,7 +207,6 @@ export function LogSetSheet({
 
   return createPortal(
     <div
-      data-swipe-ignore
       className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end justify-center bg-black/30 anim-backdrop"
       onClick={onClose}
       style={{ opacity: dragY > 0 ? Math.max(0, 1 - dragY / 300) : 1 }}
