@@ -168,7 +168,19 @@ function SettingsPage() {
 
   return (
     <AppShell>
-      <header className="px-4 pb-4 pt-14">
+      {/* Settings has no tab any more - it is reached by the gear in the corner
+          of the four tab screens - so it needs the one thing a tab gave it for
+          free: a way back. */}
+      <div className="flex items-center px-4 pt-14 pb-2">
+        <button
+          onClick={() => router.history.back()}
+          className="-my-[11px] flex min-h-[44px] items-center t-body font-medium t-action"
+        >
+          Back
+        </button>
+      </div>
+
+      <header className="px-4 pb-4">
         <h1 className="t-title">Settings</h1>
       </header>
 

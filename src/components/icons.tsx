@@ -166,3 +166,20 @@ export function Repeat(p: IconProps): JSX.Element {
     </svg>
   );
 }
+
+/**
+ * Settings, which left the bottom bar to sit in the corner of every tab screen.
+ *
+ * The cog it replaces was lucide's - a twelve-toothed path full of arcs, drawn
+ * at a different weight from everything beside it. This is the same idea in this
+ * family's terms: a ring and six straight spokes, no arc anywhere.
+ */
+export function Gear(p: IconProps): JSX.Element {
+  return (
+    <svg {...svgProps(p)}>
+      <circle cx="12" cy="12" r="3.4" />
+      <path d="M12 3.2v2.6M12 18.2v2.6M20.8 12h-2.6M5.8 12H3.2" />
+      <path d="M18.2 5.8 16.3 7.7M7.7 16.3l-1.9 1.9M18.2 18.2l-1.9-1.9M7.7 7.7 5.8 5.8" />
+    </svg>
+  );
+}

@@ -30,7 +30,7 @@ export const Route = createFileRoute("/history")({
 function HistoryPage() {
   return (
     <AppShell>
-      <header className="px-4 pb-4 pt-14">
+      <header className="pl-4 pr-12 pb-4 pt-14">
         <h1 className="t-title text-ink">History</h1>
       </header>
       <CalendarView />

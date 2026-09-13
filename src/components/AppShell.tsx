@@ -1,34 +1,39 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useStore } from "../lib/store";
+import { Gear } from "./icons";
 import { StartWorkoutSheet } from "./StartWorkoutSheet";
 import { WorkoutChooserSheet } from "./WorkoutChooserSheet";
 
-type TabPath = "/" | "/plan" | "/history" | "/charts" | "/settings";
+type TabPath = "/" | "/plan" | "/history" | "/charts";
 type TabItem = {
   to: TabPath;
   label: string;
-  icon: "home" | "chart" | "calendar" | "settings" | "plan";
+  icon: "home" | "chart" | "calendar" | "plan";
 };
 
 /**
- * Plan sits next to Today rather than at the end because of what the two are
- * about: Today is the workout in front of you and Plan is the one after it,
- * while History and Charts are both the past and belong beside each other.
- * Order is also the swipe order, so tabs that read as neighbours have to be
- * neighbours.
+ * Four routed tabs, two either side of the Workout button.
+ *
+ * Settings is not among them. It was the fifth, and five routed tabs around a
+ * centred action button cannot be balanced - one side always carries three, and
+ * that was the lopsided bar. It is a screen visited rarely and never mid-set, so
+ * it is a gear in the corner of every tab screen now (see AppShell), and History
+ * moved into the slot it left.
+ *
+ * Order is Today, Plan | Charts, History: what you are about to do on the left
+ * of the button, what you already did on the right.
  */
 const TABS: TabItem[] = [
   { to: "/", label: "Today", icon: "home" },
   { to: "/plan", label: "Plan", icon: "plan" },
-  { to: "/history", label: "History", icon: "calendar" },
   { to: "/charts", label: "Charts", icon: "chart" },
-  { to: "/settings", label: "Settings", icon: "settings" },
+  { to: "/history", label: "History", icon: "calendar" },
 ];
 
 /**
  * Direction of the most recent tab-to-tab navigation, recorded right before
- * the navigate() call fires (bottom-nav tap or swipe) and consumed once by
+ * the navigate() call fires (a bottom-nav tap) and consumed once by
  * the next AppShell mount to pick its entrance animation. Module-level
  * because each tab page mounts a fresh AppShell instance, so this can't live
  * in component state. Never touched during SSR (only DOM event handlers
@@ -37,26 +42,6 @@ const TABS: TabItem[] = [
  */
 type NavDirection = "forward" | "back" | null;
 let lastNavDirection: NavDirection = null;
-
-/**
- * True if a swipe gesture should be left alone: it started inside an
- * explicitly-marked container (e.g. the Charts chip row), or inside any
- * element that's actually horizontally scrollable.
- */
-function shouldIgnoreSwipe(target: EventTarget | null): boolean {
-  const el = target as HTMLElement | null;
-  if (!el || typeof el.closest !== "function") return false;
-  if (el.closest("[data-swipe-ignore]")) return true;
-  let node: HTMLElement | null = el;
-  while (node && node !== document.body) {
-    if (node.scrollWidth > node.clientWidth) {
-      const overflowX = getComputedStyle(node).overflowX;
-      if (overflowX === "auto" || overflowX === "scroll") return true;
-    }
-    node = node.parentElement;
-  }
-  return false;
-}
 
 function Icon({ name }: { name: TabItem["icon"] }) {
   const stroke = "currentColor";
@@ -102,21 +87,14 @@ function Icon({ name }: { name: TabItem["icon"] }) {
         <path d="M9 15h4" />
       </svg>
     );
-  if (name === "calendar")
-    return (
-      <svg {...common}>
-        <rect x="3.5" y="5" width="17" height="16" rx="2.5" />
-        <path d="M3.5 9.5h17" />
-        <path d="M8 3v4" />
-        <path d="M16 3v4" />
-        <path d="M7.5 13.5h3" />
-        <path d="M13.5 13.5h3" />
-      </svg>
-    );
   return (
     <svg {...common}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+      <rect x="3.5" y="5" width="17" height="16" rx="2.5" />
+      <path d="M3.5 9.5h17" />
+      <path d="M8 3v4" />
+      <path d="M16 3v4" />
+      <path d="M7.5 13.5h3" />
+      <path d="M13.5 13.5h3" />
     </svg>
   );
 }
@@ -174,22 +152,13 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   const items = TABS;
   const currentIndex = items.findIndex((it) => it.to === location.pathname);
 
-  // Split the ROUTED tabs (never the Workout button) into two halves that sit
-  // either side of it.
+  // Two routed tabs either side of the Workout button.
   //
-  // The centring does NOT depend on this split being even, which is what was
-  // wrong before: an odd routed-tab count (Charts off) left the button off by
-  // half a slot. It is exact because the two <ul>s are `flex-1` - that is
-  // `flex: 1 1 0%`, so both have a zero flex basis and an equal grow factor -
-  // around a `shrink-0` centre. Whatever width the centre takes, the remaining
-  // free space is split into two equal halves, so the centre lands on the axis
-  // for 3 routed tabs (2 left, 1 right) exactly as it does for 4.
-  //
-  // The tabs themselves are then distributed WITHIN their half, so with Charts
-  // off the lone right-hand tab is centred in the right half rather than being
-  // evenly spaced against the left pair. That is a deliberate trade: the action
-  // button is the thing a thumb hunts for, and it must not move when a setting
-  // in another screen is toggled.
+  // The centring is exact because both <ul>s are `flex-1` - `flex: 1 1 0%`, a
+  // zero basis and an equal grow factor - around a `shrink-0` centre, so the
+  // free space is halved whatever width the button takes. With the tab count
+  // now even, the four cells are also equal to each other, which is what the
+  // five-tab bar could not do: it had to put three on one side.
   const splitAt = Math.ceil(items.length / 2);
   const leftItems = items.slice(0, splitAt);
   const rightItems = items.slice(splitAt);
@@ -303,6 +272,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const router = useRouter();
   const showBanner = activeSessionId && location.pathname !== "/workout";
+  const onTab = TABS.some((t) => t.to === location.pathname);
 
   // Workout chooser + strength start flow, owned here so the nav's Workout
   // button works from every tab. StartWorkoutSheet is mounted from AppShell
@@ -311,12 +281,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   // doesn't require an active session already existing.
   const [chooserOpen, setChooserOpen] = useState(false);
   const [startSheetOpen, setStartSheetOpen] = useState(false);
-
-  // Ordered enabled-tab paths, for both swipe navigation and figuring out
-  // whether the current page is a tab at all (swipes only act on tabs,
-  // e.g. never on /session/$id, which has its own row swipe gestures).
-  const tabPaths = useMemo(() => TABS.map((t) => t.to), []);
-  const tabIndex = tabPaths.findIndex((p) => p === location.pathname);
 
   // Picked once per mount from whatever direction the bottom-nav tap or
   // swipe recorded right before navigating here; null (fresh load / deep
@@ -329,53 +293,33 @@ export function AppShell({ children }: { children: ReactNode }) {
     return "anim-route-fade";
   });
 
-  const touchStartRef = useRef<{ x: number; y: number; time: number; ignore: boolean } | null>(
-    null,
-  );
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    if (tabIndex === -1) return;
-    const t = e.touches[0];
-    touchStartRef.current = {
-      x: t.clientX,
-      y: t.clientY,
-      time: Date.now(),
-      ignore: shouldIgnoreSwipe(e.target),
-    };
-  };
-
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const start = touchStartRef.current;
-    touchStartRef.current = null;
-    if (!start || start.ignore || tabIndex === -1) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - start.x;
-    const dy = t.clientY - start.y;
-    const dt = Date.now() - start.time;
-    const isDeliberateSwipe = Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.8 && dt < 600;
-    if (!isDeliberateSwipe) return;
-    if (dx < 0 && tabIndex < tabPaths.length - 1) {
-      // Swipe left -> next tab.
-      lastNavDirection = "forward";
-      router.navigate({ to: tabPaths[tabIndex + 1] });
-    } else if (dx > 0 && tabIndex > 0) {
-      // Swipe right -> previous tab.
-      lastNavDirection = "back";
-      router.navigate({ to: tabPaths[tabIndex - 1] });
-    }
-  };
-
   return (
-    <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
+    <div className="relative mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
       <ActiveSessionBanner />
+      {onTab && (
+        // Settings, in the corner of every tab screen.
+        //
+        // Positioned against the shell rather than repeated in four route
+        // headers, so it cannot drift between them - and outside <main>, so it
+        // does not scroll away. 49px puts its 44px box on the centre line of a
+        // 28px t-title sitting under pt-14, and the banner pushes it down by
+        // exactly the pt-11 the banner reserves. Every tab header carries pr-12
+        // so a long title wraps rather than running underneath it.
+        <Link
+          to="/settings"
+          aria-label="Settings"
+          className="absolute right-1.5 z-30 flex h-11 w-11 items-center justify-center text-ink-3"
+          style={{ top: showBanner ? 93 : 49 }}
+        >
+          <Gear size={22} />
+        </Link>
+      )}
       <main
         className={
           "min-h-0 flex-1 overflow-y-auto overscroll-contain " +
           (showBanner ? "pt-11 " : "") +
           routeAnimClass
         }
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
       >
         {children}
       </main>

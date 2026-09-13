@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { kindOf, type SplitCardKind } from "../lib/planning";
 import { useStore, type Exercise, type SplitSlot } from "../lib/store";
+import { Close } from "./icons";
+import { Reorder } from "./SplitCardList";
 
 /**
  * One card in the workout split.
@@ -58,22 +60,40 @@ export function SlotPlanSheet({
 
   const liftable = useMemo(() => exercises.filter((e) => e.type !== "cardio"), [exercises]);
 
-  const results = useMemo(() => {
+  /** The chosen lifts, resolved and in the order the workout will open them.
+   *  Ids whose exercise has since been deleted drop out here rather than
+   *  rendering a blank row. */
+  const chosen = useMemo(
+    () =>
+      picked
+        .map((id) => liftable.find((e) => e.id === id))
+        .filter((e): e is Exercise => e !== undefined),
+    [liftable, picked],
+  );
+
+  /** Everything not already chosen, filtered by the search box. */
+  const library = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const pool = q ? liftable.filter((e) => e.name.toLowerCase().includes(q)) : liftable;
-    // Chosen lifts first, in the order they were chosen, so the list does not
-    // reshuffle under a thumb as things are ticked.
-    const chosen = picked
-      .map((id) => pool.find((e) => e.id === id))
-      .filter((e): e is Exercise => e !== undefined);
-    const rest = pool.filter((e) => !picked.includes(e.id)).slice(0, 40);
-    return [...chosen, ...rest];
+    const pool = liftable.filter((e) => !picked.includes(e.id));
+    return (q ? pool.filter((e) => e.name.toLowerCase().includes(q)) : pool).slice(0, 40);
   }, [liftable, query, picked]);
 
   if (!open || typeof document === "undefined") return null;
 
-  const toggle = (id: string) =>
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const add = (id: string) => setPicked((p) => (p.includes(id) ? p : [...p, id]));
+  const remove = (id: string) => setPicked((p) => p.filter((x) => x !== id));
+
+  /** Same reordering the split cards get, for the same reason: the order is
+   *  meaningful - it is the order the workout opens these lifts in - so it has
+   *  to be changeable without retyping the whole list. */
+  const move = (from: number, to: number) =>
+    setPicked((p) => {
+      if (to < 0 || to >= p.length) return p;
+      const next = [...p];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
 
   /** Both toggles off means a normal workout card, so turning one on turns the
    *  other off rather than producing a card that is two things. */
@@ -142,6 +162,42 @@ export function SlotPlanSheet({
 
         {kind === "workout" && (
           <>
+            {/* Chosen first, and in ORDER, because the order is the plan: the
+                workout opens on whatever sits at the top of this list. The
+                single mixed list this replaced put chosen lifts above unchosen
+                ones with a tick each, which showed the order but gave you no
+                way to change it. */}
+            {chosen.length > 0 && (
+              <div className="mt-4 shrink-0">
+                <div className="group-header">
+                  <h3 className="t-caption">Chosen</h3>
+                </div>
+                <div className="group-list bg-wash">
+                  {chosen.map((e, i) => (
+                    <div key={e.id} className={`group-row ${i === 0 ? "" : "group-row-sep"}`}>
+                      <span className="min-w-0 truncate t-body text-ink">{e.name}</span>
+                      <span className="flex shrink-0 items-center gap-1">
+                        <Reorder
+                          label={e.name}
+                          index={i}
+                          count={chosen.length}
+                          onMove={(to) => move(i, to)}
+                        />
+                        <button
+                          type="button"
+                          aria-label={`Remove ${e.name}`}
+                          onClick={() => remove(e.id)}
+                          className="flex h-11 w-9 items-center justify-center text-ink-3"
+                        >
+                          <Close size={16} />
+                        </button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <input
               type="text"
               value={query}
@@ -152,28 +208,27 @@ export function SlotPlanSheet({
             />
 
             <div className="mt-3 min-h-0 flex-1 overflow-y-auto group-list bg-wash">
-              {results.map((e, i) => {
-                const on = picked.includes(e.id);
-                return (
+              {library.length === 0 ? (
+                <div className="group-row">
+                  <span className="t-body text-ink-2">
+                    {query.trim() ? "No match" : "Everything is chosen"}
+                  </span>
+                </div>
+              ) : (
+                library.map((e, i) => (
                   <button
                     key={e.id}
                     type="button"
-                    onClick={() => toggle(e.id)}
-                    aria-pressed={on}
+                    onClick={() => add(e.id)}
                     className={`group-row w-full text-left ${i === 0 ? "" : "group-row-sep"}`}
                   >
                     <span className="min-w-0 truncate t-body text-ink">{e.name}</span>
-                    <span
-                      aria-hidden="true"
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-sm t-label font-semibold ${
-                        on ? "bg-ink text-paper" : "text-transparent ring-1 ring-inset ring-ink-3"
-                      }`}
-                    >
-                      ✓
+                    <span aria-hidden="true" className="shrink-0 t-label font-semibold text-ink-3">
+                      +
                     </span>
                   </button>
-                );
-              })}
+                ))
+              )}
             </div>
           </>
         )}

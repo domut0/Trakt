@@ -133,7 +133,7 @@ function Home() {
 
   return (
     <AppShell>
-      <header className="px-4 pt-14 pb-2">
+      <header className="pl-4 pr-12 pt-14 pb-2">
         <h1 className="t-title">{heading}</h1>
       </header>
 
