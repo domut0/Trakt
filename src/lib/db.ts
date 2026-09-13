@@ -238,7 +238,6 @@ class WorkoutDb extends Dexie {
               carbs?: number;
               fat?: number;
               steps?: number;
-              goalMode?: string;
               name?: string;
             }[]
           | undefined;
@@ -261,7 +260,6 @@ class WorkoutDb extends Dexie {
             ...(first.carbs !== undefined ? { carbs: first.carbs } : {}),
             ...(first.fat !== undefined ? { fat: first.fat } : {}),
             ...(first.steps !== undefined ? { steps: first.steps } : {}),
-            ...(first.goalMode ? { goalMode: first.goalMode } : {}),
           });
         }
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { useStore } from "../lib/store";
-import { GOAL_MODES, TARGET_FIELDS, type GoalMode, type TargetField } from "../lib/targets";
+import { TARGET_FIELDS, type TargetField } from "../lib/targets";
 import type { NutritionPhase, NutritionPhaseKind } from "../lib/planning";
 
 const FIELD_LABELS: Record<TargetField, string> = {
@@ -18,12 +18,6 @@ const FIELD_UNITS: Partial<Record<TargetField, string>> = {
   protein: "g",
   carbs: "g",
   fat: "g",
-};
-
-const GOAL_LABELS: Record<GoalMode, string> = {
-  cut: "Cutting",
-  maintain: "Maintaining",
-  gain: "Gaining",
 };
 
 type Draft = Record<TargetField, string>;
@@ -76,7 +70,6 @@ export function PhaseEditorSheet({
   const [startsOn, setStartsOn] = useState("");
   const [name, setName] = useState("");
   const [kind, setKind] = useState<NutritionPhaseKind>("targets");
-  const [goalMode, setGoalMode] = useState<GoalMode>("maintain");
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,7 +78,6 @@ export function PhaseEditorSheet({
     setStartsOn(phase?.startsOn ?? new Date().toISOString().slice(0, 10));
     setName(phase?.name ?? "");
     setKind(phase?.kind ?? "targets");
-    setGoalMode(phase?.goalMode ?? "maintain");
     setDraft(draftFrom(phase));
     setError(null);
   }, [open, phase]);
@@ -113,7 +105,6 @@ export function PhaseEditorSheet({
       name: name.trim() || (kind === "untracked" ? "Untracked" : "Targets"),
       kind,
       ...numbers,
-      ...(kind === "targets" ? { goalMode } : { goalMode: undefined }),
     };
 
     if (phase) updatePhase(phase.id, body);
@@ -190,27 +181,6 @@ export function PhaseEditorSheet({
 
         {kind === "targets" && (
           <>
-            <div
-              role="group"
-              aria-label="Goal"
-              className="mt-3 inline-flex w-full gap-1 rounded-md bg-wash p-1"
-            >
-              {GOAL_MODES.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setGoalMode(m)}
-                  aria-pressed={goalMode === m}
-                  className={
-                    "flex min-h-[40px] flex-1 items-center justify-center rounded-sm px-2 t-label font-medium transition-colors " +
-                    (goalMode === m ? "bg-ink text-paper" : "text-ink-2")
-                  }
-                >
-                  {GOAL_LABELS[m]}
-                </button>
-              ))}
-            </div>
-
             <div className="mt-4 group-list bg-wash">
               {TARGET_FIELDS.map((f, i) => (
                 <div key={f} className={`group-row ${i === 0 ? "" : "group-row-sep"}`}>

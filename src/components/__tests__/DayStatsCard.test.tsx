@@ -4,12 +4,10 @@ import { DayStatsCard } from "../DayStatsCard";
 import { dayKey } from "../../lib/daily-log";
 import { useStore } from "../../lib/store";
 import type { NutritionPhase } from "../../lib/planning";
-import type { GoalMode } from "../../lib/targets";
 
 const PHASE_ID = "np_stats_test";
 
 function seedStore({
-  goalMode,
   calories,
   protein,
   carbs,
@@ -18,7 +16,6 @@ function seedStore({
   dailyLogs = [],
   unit = "lbs",
 }: {
-  goalMode?: GoalMode;
   calories?: number;
   protein?: number;
   carbs?: number;
@@ -43,7 +40,6 @@ function seedStore({
     startsOn: "1970-01-01",
     name: "Test phase",
     kind: "targets",
-    ...(goalMode !== undefined ? { goalMode } : {}),
     ...(calories !== undefined ? { calories } : {}),
     ...(protein !== undefined ? { protein } : {}),
     ...(carbs !== undefined ? { carbs } : {}),

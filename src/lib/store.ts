@@ -12,7 +12,6 @@ import {
   type SettingsMeta,
 } from "./db";
 import { isDailyLogEmpty } from "./daily-log";
-import type { GoalMode } from "./targets";
 import {
   isNutritionPhase,
   isPlannedDay,
@@ -152,16 +151,6 @@ export interface TargetProfile {
   carbs?: number;
   fat?: number;
   steps?: number;
-  /**
-   * Whether the user is cutting, maintaining or gaining, which is what decides
-   * per field whether going OVER is a win or a miss (see `directionFor`).
-   *
-   * Optional, and absent means `maintain`, resolved on read — never stamped
-   * onto stored data. Every profile saved before this field existed therefore
-   * behaves sensibly with no migration, and because it is a non-indexed field
-   * it needs no Dexie version bump either (see the note in db.ts).
-   */
-  goalMode?: GoalMode;
 }
 
 /** The shape produced by Settings' "Export backup" action, and the shape

@@ -706,7 +706,6 @@ describe("importData (full backup restore)", () => {
           kind: "targets",
           calories: 3400,
           steps: 20000,
-          goalMode: "maintain",
         },
         { id: "np_off", startsOn: "2026-09-19", name: "Off", kind: "untracked" },
         {
@@ -716,7 +715,6 @@ describe("importData (full backup restore)", () => {
           kind: "targets",
           calories: 3000,
           steps: 24000,
-          goalMode: "cut",
         },
       ],
       plannedDays: [{ date: "2026-09-21", splitSlotId: "s1" }],

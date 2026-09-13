@@ -1,5 +1,3 @@
-import type { GoalMode } from "./targets";
-
 /**
  * Planning, which in this app is two different shapes and not one.
  *
@@ -38,7 +36,6 @@ export interface NutritionPhase {
   carbs?: number;
   fat?: number;
   steps?: number;
-  goalMode?: GoalMode;
 }
 
 export type NutritionPhaseKind = "targets" | "untracked";

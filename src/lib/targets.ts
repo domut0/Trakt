@@ -3,19 +3,23 @@ import type { DailyLog } from "./store";
 /**
  * What a target MEANS, once you have one. No store, no IndexedDB, no DOM.
  *
- * This file used to also decide WHICH target applied, by looking the day up in
- * a seven-entry weekday table. That model is gone: targets are now a timeline
- * of dated phases (see planning.ts), because the user's actual requirement was
- * "maintenance until Friday, then cutting from Sunday onward" and a weekday
- * table cannot say that at all.
+ * TWO RULES, and there used to be nine.
  *
- * What survived is everything about INTERPRETING a target, which never depended
- * on where it came from: whether going over a number is a win or a miss, what
- * counts as met, and how to describe the gap.
+ *   Calories are a CEILING: hit them, or come in a little under.
+ *   Steps are a FLOOR: hit them, or go past.
  *
- * The shape it reads is structural rather than nominal - anything carrying the
- * optional numeric fields and a goalMode works - so a NutritionPhase drops
- * straight in where a TargetProfile used to go.
+ * Protein, carbs and fat have no rule at all, and that is the substantive
+ * change rather than a simplification. This file used to carry a cut / maintain
+ * / gain dial that flipped each macro between floor, ceiling and band, on the
+ * theory that a cut wants protein high and fat low while a bulk wants the
+ * reverse. The user's answer was blunt: there is no more-or-less-is-better rule
+ * for macros, ever. A macro target is a number you are aiming at, and missing it
+ * in either direction is just missing it - so the app says nothing about it
+ * rather than inventing a verdict.
+ *
+ * That deletes the mode, the per-mode direction table, the band tolerance, and
+ * the whole class of bug where the app painted a deliberate surplus red because
+ * it had guessed the wrong phase of training.
  */
 
 /** A thing that can carry targets. `NutritionPhase` satisfies this. */
@@ -25,7 +29,6 @@ export interface TargetBearing {
   carbs?: number;
   fat?: number;
   steps?: number;
-  goalMode?: GoalMode;
 }
 
 /** The numeric fields a target can constrain. Steps included; bodyweight is not
@@ -34,81 +37,33 @@ export const TARGET_FIELDS = ["calories", "protein", "carbs", "fat", "steps"] as
 
 export type TargetField = (typeof TARGET_FIELDS)[number];
 
-/**
- * Which way a target wants to be missed.
- *
- * A stored target is a bare number, and a number cannot say whether exceeding
- * it is a success or a failure. Blowing past a protein or step goal is the
- * whole point; blowing past a calorie budget on a cut is not. Without this the
- * only available rule is `fraction > 1 === bad`, which paints a red bar and an
- * "OVER" badge on the best day the user has had all week.
- *
- * - `floor`   — a minimum to reach. More is fine, and there is no "too much".
- * - `ceiling` — a budget not to break. Under is the normal state, over is the event.
- * - `band`    — a number to land ON, missable in either direction.
- */
-export type TargetDirection = "floor" | "ceiling" | "band";
-
-/** The one dial that decides every field's direction. See `directionFor`. */
-export type GoalMode = "cut" | "maintain" | "gain";
-
-export const GOAL_MODES = ["cut", "maintain", "gain"] as const;
+/** Which way a target wants to be missed. */
+export type TargetDirection = "floor" | "ceiling";
 
 /**
- * The mode assumed when a profile has none.
+ * How close to a ceiling still counts as hitting it.
  *
- * `maintain` because it is the only mode whose directions are wrong in a
- * survivable way for the other two: it never marks a real overage as fine, and
- * it never nags an intentional surplus. Guessing `cut` for a bulking user would
- * paint their calorie win red, which is the exact bug this module exists to end.
+ * "Hit them or slightly below" needs a floor under the "slightly", or a calorie
+ * ceiling could only ever read as unmet: landing exactly on it is vanishingly
+ * rare, and 200 under a 2,400 target is a day that went well, not a day that
+ * fell short.
  */
-export const DEFAULT_GOAL_MODE: GoalMode = "maintain";
-
-/** Fraction of target either side of which a "band" goal stops counting as met. */
-export const BAND_TOLERANCE = 0.05;
-
-/** How a value compares to its target, given that target's direction. */
-export type TargetStatus = "progress" | "met" | "exceeded";
+export const CEILING_TOLERANCE = 0.05;
 
 /**
- * Per-mode direction defaults.
+ * The direction a field is judged in, or undefined when it is not judged.
  *
- * Deliberately ONE mode per profile rather than five per-field pickers: the
- * user knows whether they are cutting, holding or gaining, and does not know
- * (or want to answer) whether fat should be a ceiling or a band on a bulk.
- *
- * `protein` and `steps` are floors in EVERY mode. There is no diet in which
- * hitting 220g of protein against a 200g goal is a failure, and the old
- * `fraction > 1` rule called it one.
+ * Undefined is the answer for all three macros, and it is load-bearing: a caller
+ * that gets it back must render no status mark at all, not a neutral one. The
+ * field is not passing or failing, it is simply a number beside another number.
  */
-const DIRECTIONS_BY_MODE: Record<GoalMode, Readonly<Record<TargetField, TargetDirection>>> = {
-  // Cutting: calories and fat are budgets, protein guards against muscle loss,
-  // carbs still want to land near target to keep training quality.
-  cut: { calories: "ceiling", protein: "floor", carbs: "band", fat: "ceiling", steps: "floor" },
-  // Maintaining: calories are a number to land on, not a budget to squeak under.
-  maintain: { calories: "band", protein: "floor", carbs: "band", fat: "band", steps: "floor" },
-  // Gaining: calories become a floor. Under-eating is the failure mode here,
-  // which is precisely inverted from the cut, and no single global rule can
-  // serve both.
-  gain: { calories: "floor", protein: "floor", carbs: "band", fat: "band", steps: "floor" },
-};
-
-/**
- * The direction to apply to `field`, resolved ON READ from the profile's mode.
- *
- * Absent `mode` resolves to `DEFAULT_GOAL_MODE` here rather than being written
- * onto the stored profile, so every existing saved profile is fixed with no
- * migration, no Dexie version bump and nothing for the user to do.
- *
- * Defensive about `mode` on purpose: it round-trips through user-editable
- * backup JSON, so at runtime it can be a string this table has never heard of,
- * and the type annotation cannot catch that.
- */
-export function directionFor(field: TargetField, mode: GoalMode | undefined): TargetDirection {
-  const table =
-    (mode !== undefined && DIRECTIONS_BY_MODE[mode]) || DIRECTIONS_BY_MODE[DEFAULT_GOAL_MODE];
-  return table[field] ?? DIRECTIONS_BY_MODE[DEFAULT_GOAL_MODE][field] ?? "band";
+export function directionFor(field: TargetField): TargetDirection | undefined {
+  if (field === "calories") return "ceiling";
+  if (field === "steps") return "floor";
+  return undefined;
 }
+
+export type TargetStatus = "progress" | "met" | "exceeded";
 
 /**
  * Where `logged` stands against `target` under `direction`.
@@ -134,19 +89,15 @@ export function targetStatusFor(
   logged: number,
   target: number,
 ): TargetStatus {
-  const delta = logged - target;
-  switch (direction) {
-    case "floor":
-      return logged >= target ? "met" : "progress";
-    case "ceiling":
-      return logged > target ? "exceeded" : "progress";
-    case "band": {
-      const tolerance = BAND_TOLERANCE * target;
-      if (delta > tolerance) return "exceeded";
-      if (delta < -tolerance) return "progress";
-      return "met";
-    }
+  if (direction === "floor") {
+    // Going past a floor is the point, so there is no such thing as too many
+    // steps. A floor can only be met or not yet met.
+    return logged >= target ? "met" : "progress";
   }
+  // A ceiling is met by landing on it or just under, and exceeded by passing it.
+  // Without the tolerance the met state would be unreachable in practice.
+  if (logged > target) return "exceeded";
+  return logged >= target * (1 - CEILING_TOLERANCE) ? "met" : "progress";
 }
 
 export interface TargetProgress {
@@ -160,13 +111,16 @@ export interface TargetProgress {
   status: TargetStatus;
   /** Signed distance from target, in the field's own units. Positive = above
    *  target. Only meaningful to display when status is "met" (a floor surplus)
-   *  or "exceeded" (a ceiling/band overage). */
+   *  or "exceeded" (a ceiling overage). */
   delta: number;
 }
 
 /**
- * Progress for every field the profile sets a target for and the day actually
- * logged. Fields the profile leaves unset produce no row, so a
+ * Progress for every JUDGED field the profile sets a target for and the day
+ * actually logged.
+ *
+ * The three macros are skipped entirely, because they have no direction: they
+ * are numbers to aim at, not budgets to stay under or floors to clear. Fields the profile leaves unset produce no row, so a
  * calories-and-protein-only target does not render three empty bars.
  *
  * A logged value with no target, or a target with nothing logged, both yield
@@ -188,7 +142,9 @@ export function targetProgressFor(
     // A target of 0 is not a meaningful goal, and dividing by it yields
     // Infinity, so treat it as unset rather than special-casing downstream.
     if (target === undefined || target <= 0 || logged === undefined) continue;
-    const direction = directionFor(field, profile.goalMode);
+    const direction = directionFor(field);
+    // No direction means no verdict. A macro is not passing or failing.
+    if (direction === undefined) continue;
     out.push({
       field,
       logged,

@@ -33,7 +33,6 @@ const CUT: NutritionPhase = {
   kind: "targets",
   calories: 3000,
   steps: 24000,
-  goalMode: "cut",
 };
 const PHASES = [CUT, MAINTENANCE, OFF]; // deliberately unsorted
 

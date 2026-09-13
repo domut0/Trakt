@@ -168,7 +168,11 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
     target: number | undefined,
   ): TargetStatus | null => {
     if (isFuture || logged === undefined || target === undefined) return null;
-    return targetStatusFor(directionFor(field, profile?.goalMode), logged, target);
+    const direction = directionFor(field);
+    // Macros carry no direction and so get no mark. They are a number beside a
+    // number, not a thing you passed or failed.
+    if (direction === undefined) return null;
+    return targetStatusFor(direction, logged, target);
   };
 
   const calorieStatus = statusOf("calories", calories, targetCalories);
