@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { bestSetFor, groupSetsBySession, setsForExercise, volumeFor } from "../exercise-history";
+import {
+  bestSetFor,
+  groupSetsBySession,
+  lastSessionFor,
+  setsForExercise,
+  volumeFor,
+} from "../exercise-history";
 import type { WorkoutSession, WorkoutSet } from "../store";
 
 const t0 = 1_000_000;
@@ -237,5 +243,70 @@ describe("volumeFor", () => {
     ];
 
     expect(volumeFor(sets)).toBe(2000);
+  });
+});
+
+describe("lastSessionFor", () => {
+  /**
+   * The card the workout screen reads between sets. Its whole job is to answer
+   * "what did I do last time", so the two things worth pinning are which
+   * session counts as last time and what order the sets come back in.
+   */
+  const EX = "e_bench";
+  const sess = (id: string, startedAt: number, kind?: "cardio"): WorkoutSession => ({
+    id,
+    splitSlotId: "s1",
+    startedAt,
+    ...(kind ? { kind } : {}),
+  });
+  const set = (
+    id: string,
+    sessionId: string,
+    loggedAt: number,
+    weight: number,
+    reps: number,
+    exerciseId = EX,
+  ): WorkoutSet => ({ id, sessionId, exerciseId, weight, reps, loggedAt });
+
+  const SESSIONS = [sess("old", 1_000), sess("mid", 2_000), sess("now", 3_000)];
+
+  it("returns the most recent session that trained the exercise", () => {
+    const sets = [set("a", "old", 1_100, 40, 8), set("b", "mid", 2_100, 45, 6)];
+    const found = lastSessionFor(sets, SESSIONS, EX);
+    expect(found?.session.id).toBe("mid");
+  });
+
+  it("leaves the session in progress out of its own answer", () => {
+    // Otherwise the card starts describing the workout you are standing in the
+    // moment you log a set.
+    const sets = [set("a", "mid", 2_100, 45, 6), set("b", "now", 3_100, 50, 5)];
+    expect(lastSessionFor(sets, SESSIONS, EX, "now")?.session.id).toBe("mid");
+  });
+
+  it("returns sets in the order they were logged", () => {
+    // "Set 1, set 2, set 3" is the thing being read. Sorting by weight would
+    // renumber the session.
+    const sets = [
+      set("c", "mid", 2_300, 40, 8),
+      set("a", "mid", 2_100, 50, 5),
+      set("b", "mid", 2_200, 45, 6),
+    ];
+    expect(lastSessionFor(sets, SESSIONS, EX)?.sets.map((s) => s.weight)).toEqual([50, 45, 40]);
+  });
+
+  it("ignores other exercises and cardio sessions", () => {
+    const sessions = [...SESSIONS, sess("cardio", 2_500, "cardio")];
+    const sets = [
+      set("a", "old", 1_100, 40, 8),
+      set("other", "mid", 2_100, 99, 9, "e_squat"),
+      set("treadmill", "cardio", 2_600, 0, 0),
+    ];
+    expect(lastSessionFor(sets, sessions, EX)?.session.id).toBe("old");
+  });
+
+  it("is undefined the first time you ever do a lift", () => {
+    expect(lastSessionFor([], SESSIONS, EX)).toBeUndefined();
+    const onlyNow = [set("b", "now", 3_100, 50, 5)];
+    expect(lastSessionFor(onlyNow, SESSIONS, EX, "now")).toBeUndefined();
   });
 });

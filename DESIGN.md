@@ -194,6 +194,12 @@ in this app is almost always a mistake.** Use a card, or use space.
   a dashed break inside its right edge and states its real length** — the width
   is a claim about a duration, and where the claim cannot be kept the drawing
   has to say so.
+- **Last session** (Workout): a `surface` card under the current lift. Set
+  number in `ink-3` in a fixed 16px column so the weights line up, figure in
+  `ink`, RPE quiet after it; date right-aligned in the header, "Today" and
+  "Yesterday" spelled out. Caps at six rows and says how many it kept back.
+  Renders **nothing** on a lift you have never done — an empty state here would
+  take the same space as the thing it is apologising for.
 - **Card actions** (Plan → Workout split): a tap opens a row of `wash` pills
   under the card — Edit card / Do this today / Delete — attached to it with no
   separator, because they belong to it. Never a long press: this list has twice

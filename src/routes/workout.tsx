@@ -3,6 +3,7 @@ import { Check, Plus } from "../components/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DeleteWorkoutButton } from "../components/DeleteWorkoutButton";
 import { Flap } from "../components/Flap";
+import { LastSessionCard } from "../components/LastSessionCard";
 import { LogSetSheet } from "../components/LogSetSheet";
 import { SessionView } from "../components/SessionView";
 import { WorkoutSummaryScreen } from "../components/WorkoutSummaryScreen";
@@ -228,6 +229,12 @@ function WorkoutPage() {
           {currentSetupNote}
         </div>
       )}
+
+      {/* Directly under the lift it describes, above whichever list this screen
+          is showing. The setup note comes first because it is an instruction for
+          the set you are about to do; this is a reading for the one you are
+          about to choose. */}
+      <LastSessionCard exerciseId={currentExerciseId} excludeSessionId={activeSessionId} />
 
       {/*
         The sets you have actually logged, newest first.

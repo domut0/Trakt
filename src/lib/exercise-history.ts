@@ -113,3 +113,27 @@ export function bestSetFor(sets: WorkoutSet[]): WorkoutSet | undefined {
 export function volumeFor(sets: WorkoutSet[]): number {
   return sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
 }
+
+/**
+ * The most recent OTHER session that trained this exercise.
+ *
+ * What "last session" means between sets: the last time you did this lift, not
+ * the last set you did of it. `excludeSessionId` is what keeps the workout in
+ * progress out of its own answer - without it, the moment you log a set the
+ * card would start showing the session you are standing in.
+ *
+ * Sets come back in the order they were logged, because "set 1, set 2, set 3"
+ * is the thing being read, and a list sorted by weight would renumber the
+ * session.
+ */
+export function lastSessionFor(
+  sets: WorkoutSet[],
+  sessions: WorkoutSession[],
+  exerciseId: string,
+  excludeSessionId?: string,
+): GroupedSessionSets | undefined {
+  const forExercise = setsForExercise(sets, exerciseId, sessions).filter(
+    (s) => s.sessionId !== excludeSessionId,
+  );
+  return groupSetsBySession(forExercise, sessions)[0];
+}
