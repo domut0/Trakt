@@ -181,14 +181,30 @@ export function SlotPlanSheet({
         )}
 
         {kind === "workout" && (
-          <>
+          /*
+            ONE SCROLLER FOR BOTH LISTS.
+            
+            These were two panes sharing the sheet's fixed height, and two panes
+            that both want to grow will always starve one of the other. The
+            chosen list was `shrink-0` with no ceiling, so every lift added to
+            it took height out of the library below - which is `min-h-0`, and
+            therefore shrinks all the way to nothing. By the fourth chosen lift
+            the library's rows were still being laid out but had no height to
+            occupy, so a search looked like it matched nothing and "Add ..."
+            never appeared either.
+            
+            Capping one and flooring the other just moved the starvation to the
+            other pane. Both lists live at their natural height in a single
+            scrolling region now, which cannot express the problem at all.
+          */
+          <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
             {/* Chosen first, and in ORDER, because the order is the plan: the
                 workout opens on whatever sits at the top of this list. The
                 single mixed list this replaced put chosen lifts above unchosen
                 ones with a tick each, which showed the order but gave you no
                 way to change it. */}
             {chosen.length > 0 && (
-              <div className="mt-4 shrink-0">
+              <div>
                 <div className="group-header">
                   <h3 className="t-caption">Chosen</h3>
                 </div>
@@ -224,10 +240,10 @@ export function SlotPlanSheet({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search exercises"
               aria-label="Search exercises"
-              className="mt-4 min-h-[44px] shrink-0 rounded-md bg-wash px-3 t-body text-ink outline-none placeholder:text-ink-3"
+              className="mt-4 block min-h-[44px] w-full rounded-md bg-wash px-3 t-body text-ink outline-none placeholder:text-ink-3"
             />
 
-            <div className="mt-3 min-h-0 flex-1 overflow-y-auto group-list bg-wash">
+            <div className="mt-3 group-list bg-wash">
               {library.map((e, i) => (
                 <button
                   key={e.id}
@@ -269,7 +285,7 @@ export function SlotPlanSheet({
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
 
         <div className="mt-5 flex shrink-0 items-center gap-2">
