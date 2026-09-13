@@ -40,6 +40,7 @@ export function SlotPlanSheet({
 }) {
   const exercises = useStore((s) => s.exercises);
   const setSlotExercises = useStore((s) => s.setSlotExercises);
+  const addExercise = useStore((s) => s.addExercise);
   const addSplitCard = useStore((s) => s.addSplitCard);
   const updateSplitCard = useStore((s) => s.updateSplitCard);
 
@@ -81,6 +82,25 @@ export function SlotPlanSheet({
   if (!open || typeof document === "undefined") return null;
 
   const add = (id: string) => setPicked((p) => (p.includes(id) ? p : [...p, id]));
+
+  /**
+   * Whether the typed name is worth offering to create.
+   *
+   * Checked against EVERY exercise, not against the filtered list: the library
+   * below already hides anything chosen, and cardio never appears in it at all,
+   * so matching on what is visible would offer to create a second "Incline
+   * Press" the moment the first one was ticked.
+   */
+  const typed = query.trim();
+  const canCreate =
+    typed.length > 0 && !exercises.some((e) => e.name.toLowerCase() === typed.toLowerCase());
+
+  const create = () => {
+    // Accessory, matching the log sheet's picker. It is the type that assumes
+    // least, and the exercise page is where a type gets corrected.
+    add(addExercise(typed, "accessory").id);
+    setQuery("");
+  };
   const remove = (id: string) => setPicked((p) => p.filter((x) => x !== id));
 
   /** Same reordering the split cards get, for the same reason: the order is
@@ -208,26 +228,45 @@ export function SlotPlanSheet({
             />
 
             <div className="mt-3 min-h-0 flex-1 overflow-y-auto group-list bg-wash">
-              {library.length === 0 ? (
+              {library.map((e, i) => (
+                <button
+                  key={e.id}
+                  type="button"
+                  onClick={() => add(e.id)}
+                  className={`group-row w-full text-left ${i === 0 ? "" : "group-row-sep"}`}
+                >
+                  <span className="min-w-0 truncate t-body text-ink">{e.name}</span>
+                  <span aria-hidden="true" className="shrink-0 t-label font-semibold text-ink-3">
+                    +
+                  </span>
+                </button>
+              ))}
+
+              {/* The same offer the log sheet's picker makes, which this one
+                  never had: planning a workout around a lift you have not done
+                  before is the ordinary case, and the only answer here was to
+                  abandon the card, log a set of it somewhere, and come back. */}
+              {canCreate && (
+                <button
+                  type="button"
+                  onClick={create}
+                  className={`group-row w-full text-left ${
+                    library.length > 0 ? "group-row-sep" : ""
+                  }`}
+                >
+                  <span className="min-w-0 truncate t-body font-medium t-action">
+                    Add &ldquo;{typed}&rdquo;
+                  </span>
+                  <span className="shrink-0 t-label t-action">New</span>
+                </button>
+              )}
+
+              {library.length === 0 && !canCreate && (
                 <div className="group-row">
                   <span className="t-body text-ink-2">
-                    {query.trim() ? "No match" : "Everything is chosen"}
+                    {typed ? "Already chosen" : "Everything is chosen"}
                   </span>
                 </div>
-              ) : (
-                library.map((e, i) => (
-                  <button
-                    key={e.id}
-                    type="button"
-                    onClick={() => add(e.id)}
-                    className={`group-row w-full text-left ${i === 0 ? "" : "group-row-sep"}`}
-                  >
-                    <span className="min-w-0 truncate t-body text-ink">{e.name}</span>
-                    <span aria-hidden="true" className="shrink-0 t-label font-semibold text-ink-3">
-                      +
-                    </span>
-                  </button>
-                ))
               )}
             </div>
           </>
