@@ -1,12 +1,11 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Chevron } from "../components/icons";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { SyncSettings } from "../components/SyncSettings";
 import { TargetsEditor } from "../components/TargetsEditor";
 import { Toggle } from "../components/Toggle";
 import { dailyLogsToCsv, setsToCsv } from "../lib/csv";
-import { loadUsdaKey, saveUsdaKey } from "../lib/db";
 import { isEmptyPlan, type PlannedWeek } from "../lib/plan";
 import {
   BACKUP_VERSION,
@@ -48,18 +47,6 @@ function SettingsPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [usdaKey, setUsdaKey] = useState("");
-
-  useEffect(() => {
-    loadUsdaKey().then((k) => {
-      if (k) setUsdaKey(k);
-    });
-  }, []);
-
-  const handleUsdaKeyChange = (val: string) => {
-    setUsdaKey(val);
-    saveUsdaKey(val);
-  };
 
   const confirmClear = async () => {
     await clearAllData();
@@ -259,36 +246,6 @@ function SettingsPage() {
           />
           <Chevron className="shrink-0 text-ink-2" size={16} />
         </label>
-
-        <div className="group-row-sep p-4 space-y-2">
-          <div>
-            <div className="t-body">USDA API key</div>
-            <div className="t-label text-ink-2">
-              Required for USDA FoodData Central search. The shared demo key allows only 10 requests
-              an hour.
-            </div>
-          </div>
-          <input
-            type="text"
-            aria-label="USDA API key"
-            value={usdaKey}
-            onChange={(e) => handleUsdaKeyChange(e.target.value)}
-            placeholder="Paste your USDA API key"
-            className="min-h-[44px] w-full rounded-md bg-wash px-3 t-body text-ink outline-none placeholder:text-ink-2 focus:ring-1 focus:ring-ink"
-          />
-          <div className="t-label text-ink-2">
-            Stored on this device only and not included in backups. Get a free key at{" "}
-            <a
-              href="https://fdc.nal.usda.gov/api-key-signup.html"
-              target="_blank"
-              rel="noreferrer"
-              className="t-action underline"
-            >
-              fdc.nal.usda.gov
-            </a>
-            .
-          </div>
-        </div>
 
         {importError && (
           <div className="group-row-sep px-4 py-3 t-label text-signal">{importError}</div>
