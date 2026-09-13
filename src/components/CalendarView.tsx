@@ -112,7 +112,7 @@ export function CalendarView() {
       <div className="mx-5 mb-3 flex items-center justify-between">
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(subMonths(m, 1)))}
-          className="flex h-11 w-11 shrink-0 items-center justify-center bg-wash t-heading text-ink"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-2 active:bg-wash"
           aria-label="Previous month"
         >
           <span aria-hidden="true">‹</span>
@@ -124,7 +124,7 @@ export function CalendarView() {
         </span>
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(addMonths(m, 1)))}
-          className="flex h-11 w-11 shrink-0 items-center justify-center bg-wash t-heading text-ink"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-2 active:bg-wash"
           aria-label="Next month"
         >
           <span aria-hidden="true">›</span>
@@ -145,7 +145,11 @@ export function CalendarView() {
 
       <div
         key={monthLabel}
-        className="mx-5 grid grid-cols-7 gap-px overflow-hidden bg-border anim-fade-up"
+        // A card, not a ruled lattice. This used to be a 1px grid gap over a
+        // border-coloured background, which drew a hairline between all 35
+        // cells: on paper that was the grid the month is printed on, and on a
+        // dark ground it is 70 bright lines fighting the dots they surround.
+        className="mx-4 grid grid-cols-7 gap-px overflow-hidden rounded-lg bg-surface anim-fade-up"
       >
         {cells.map((cell, i) => {
           if (!cell) return <div key={`blank-${i}`} className="min-h-[64px] " />;
@@ -189,13 +193,13 @@ export function CalendarView() {
               }`}
               className={
                 "relative flex min-h-[64px] flex-col items-center gap-1 pb-1 pt-2 transition-colors " +
-                (isSelected ? "ring-1 ring-inset ring-ink" : "")
+                (isSelected ? "bg-wash" : "")
               }
             >
               <span
                 aria-hidden="true"
                 className={
-                  "t-body tnum flex h-7 w-7 items-center justify-center font-medium " +
+                  "t-body tnum flex h-7 w-7 items-center justify-center rounded-full font-medium " +
                   (todayCell ? "bg-ink text-paper" : "text-ink")
                 }
               >
@@ -248,11 +252,11 @@ export function CalendarView() {
 
           if (!hasSessions && !hasLog) {
             return (
-              <div className="group-list mx-5 p-6 text-center space-y-3 anim-fade-up">
+              <div className="group-list mx-4 p-6 text-center space-y-3 anim-fade-up">
                 <h3 className="t-body font-semibold tracking-tight text-ink">Empty day</h3>
                 <button
                   onClick={() => setEditorOpen(true)}
-                  className="w-full min-h-[44px] bg-wash py-2.5 t-body font-semibold text-ink transition-colors active:opacity-80"
+                  className="w-full min-h-[44px] rounded-lg bg-surface py-2.5 t-body font-semibold text-ink transition-colors active:opacity-80"
                 >
                   Log daily numbers
                 </button>
@@ -261,7 +265,7 @@ export function CalendarView() {
           }
 
           return (
-            <div className="group-list mx-5 anim-fade-up">
+            <div className="group-list mx-4 anim-fade-up">
               {hasLog ? (
                 <button
                   onClick={() => setEditorOpen(true)}
@@ -272,7 +276,7 @@ export function CalendarView() {
                       Daily numbers
                     </span>
                     {selectedLog.isUntracked && (
-                      <span className="flex shrink-0 items-center gap-1.5 bg-wash px-2 py-0.5 t-caption text-ink-2">
+                      <span className="flex shrink-0 items-center gap-1.5 rounded-sm bg-wash px-2 py-0.5 t-caption text-ink-2">
                         <span
                           aria-hidden="true"
                           className="h-1.5 w-1.5 rounded-full border border-muted-foreground"

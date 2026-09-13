@@ -213,7 +213,7 @@ export function LogSetSheet({
       style={{ opacity: dragY > 0 ? Math.max(0, 1 - dragY / 300) : 1 }}
     >
       <div
-        className="w-full max-w-md bg-paper rule-heavy-t anim-sheet rounded-md"
+        className="w-full max-w-md bg-surface anim-sheet rounded-lg"
         onClick={(e) => e.stopPropagation()}
         style={{
           paddingBottom: `max(env(safe-area-inset-bottom), ${20 + keyboardOffset}px)`,
@@ -503,7 +503,7 @@ export function LogSetSheet({
               <button
                 onClick={doLog}
                 disabled={!canLog}
-                className="flex-[2] min-h-[44px] bg-ink py-3 t-body font-semibold text-paper disabled:opacity-40 rounded-md"
+                className="flex-[2] min-h-[44px] bg-ink py-3 t-body font-semibold text-paper disabled:opacity-40 rounded-lg"
               >
                 {targetSets > 1 ? `Log set 1 of ${targetSets}` : "Log set"}
               </button>

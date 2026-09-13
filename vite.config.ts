@@ -49,8 +49,12 @@ export default defineConfig(async ({ command }) => {
         short_name: "Trakt",
         description:
           "Bodyweight, macros and training, logged once a day and mirrored to your own Google Sheet.",
-        theme_color: "#0E1217",
-        background_color: "#0E1217",
+        // Both match the app ground. These sat at #0E1217 through two whole
+        // redesigns - a MyFitnessPal blue-grey that stopped being the app
+        // theme in August - because nothing in the build ever reads them back
+        // and a wrong value here only shows on a real installed splash screen.
+        theme_color: "#000000",
+        background_color: "#000000",
         display: "standalone",
         start_url: "/",
         icons: [

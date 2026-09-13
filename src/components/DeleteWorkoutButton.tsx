@@ -46,7 +46,7 @@ export function DeleteWorkoutButton({
             onClick={() => setConfirming(false)}
           >
             <div
-              className="w-full max-w-md bg-paper rule-heavy-t p-5 anim-sheet rounded-md"
+              className="w-full max-w-md bg-surface p-5 anim-sheet rounded-lg"
               onClick={(e) => e.stopPropagation()}
               style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
             >
@@ -64,7 +64,7 @@ export function DeleteWorkoutButton({
                 </button>
                 <button
                   onClick={doDelete}
-                  className="flex min-h-[44px] flex-1 items-center justify-center bg-signal py-3 t-body font-semibold text-white rounded-md"
+                  className="flex min-h-[44px] flex-1 items-center justify-center bg-signal py-3 t-body font-semibold text-white rounded-lg"
                 >
                   Delete
                 </button>

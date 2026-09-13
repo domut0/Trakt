@@ -6,23 +6,21 @@ import { dayKey, parseDayKey } from "../lib/daily-log";
 const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"] as const;
 
 /**
- * The week, as a timetable's column header.
+ * The week, as seven things you can tap.
  *
- * A schedule names its columns across the top and rules between them, and the
- * day you are reading is the column you are in. So the selected day is not a
- * circle floating in a row of circles: it is an inked column, knocked out in
- * paper, running the full height of the band. That is the same information in
- * the form the rest of the page is already speaking.
+ * This was a timetable's column header: the selected day drawn as an inked
+ * column knocked out in paper, running the full height of a band that bled to
+ * the trim, with a hairline ruled between every day. Every part of that was
+ * the old world talking - the rules, the bleed, and the idea that a selection
+ * is a filled column rather than a selected thing.
  *
- * Today, when it is not the selected day, takes a rule under its figure rather
- * than a second fill. Two filled things would be two selections.
+ * It is now what it always was: a segmented control. The selected day is a
+ * rounded fill, and nothing is ruled, because seven evenly spaced cells are
+ * already legible as seven cells.
  *
- * Layout note: this does NOT use `group-list`. That utility bleeds itself to
- * the trim with a negative inline margin on the assumption it sits inside the
- * page's `px-5`, and the strip is rendered by the day view at the top level
- * with no gutter around it, so it inherited a 40px overhang off both edges.
- * The rules here bleed because the element is already full width, and the
- * gutter is put back on the chevrons.
+ * Today, when it is NOT the selected day, takes a dot beneath its figure
+ * rather than a second fill. Two filled things would read as two selections,
+ * which is the one thing this control must never say.
  */
 export function WeekStrip({
   selectedDate,
@@ -67,17 +65,17 @@ export function WeekStrip({
     discoverable.
   */
   return (
-    <div className="rule-heavy-t rule-b flex items-stretch">
+    <div className="flex items-stretch">
       <button
         type="button"
         onClick={handlePrevWeek}
         aria-label="Previous week"
-        className="flex w-10 shrink-0 items-center justify-center text-ink-2 active:bg-wash"
+        className="flex w-8 shrink-0 items-center justify-center rounded-md text-ink-3 active:bg-wash"
       >
         <ChevronLeft size={16} />
       </button>
 
-      <div className="grid flex-1 grid-cols-7">
+      <div className="grid flex-1 grid-cols-7 gap-1">
         {days.map((day, idx) => {
           const key = dayKey(day);
           const isSelected = key === selectedDate;
@@ -90,22 +88,22 @@ export function WeekStrip({
               onClick={() => onSelectDate(key)}
               aria-pressed={isSelected}
               aria-label={format(day, "EEEE, MMMM d, yyyy")}
-              className={`flex min-h-[52px] flex-col items-center justify-center gap-1 border-l border-rule focus:outline-none ${
-                isSelected ? "rounded-md bg-ink text-paper" : "text-ink active:bg-wash"
+              className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-md focus:outline-none ${
+                isSelected ? "bg-ink text-paper" : "text-ink active:bg-wash"
               }`}
             >
-              <span className={`t-caption ${isSelected ? "text-paper" : "text-ink-3"}`}>
+              <span className={`t-label ${isSelected ? "text-paper" : "text-ink-3"}`}>
                 {WEEKDAY_INITIALS[idx]}
               </span>
+              <span className="t-body font-semibold tnum leading-none">{day.getDate()}</span>
+              {/* Always rendered, so the row cannot reflow by 4px as the dot
+                  appears and disappears while you page between weeks. */}
               <span
-                className={`t-body font-bold tnum ${
-                  // Today, unselected, is underscored rather than filled. It is
-                  // a landmark in the week, not a second selection.
-                  !isSelected && isTodayDay ? "border-b-2 border-ink leading-none" : ""
+                aria-hidden="true"
+                className={`h-1 w-1 rounded-full ${
+                  isTodayDay ? (isSelected ? "bg-paper" : "bg-ink") : "bg-transparent"
                 }`}
-              >
-                {day.getDate()}
-              </span>
+              />
             </button>
           );
         })}
@@ -115,7 +113,7 @@ export function WeekStrip({
         type="button"
         onClick={handleNextWeek}
         aria-label="Next week"
-        className="flex w-10 shrink-0 items-center justify-center border-l border-rule text-ink-2 active:bg-wash"
+        className="flex w-8 shrink-0 items-center justify-center rounded-md text-ink-3 active:bg-wash"
       >
         <Chevron size={16} />
       </button>

@@ -211,15 +211,15 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
           // 22px icon plus 11px label can never fall under 44px if either is
           // restyled later.
           //
-          // The active tab is marked the way a printed index marks the section
-          // you have your thumb in: a heavy rule across the top of its cell.
-          // It used to be a colour swap from muted to accent, which on two inks
-          // is the difference between grey text and black text and reads as
-          // emphasis rather than as position. The rule is unambiguous, and it
-          // matches the inked column in the week strip, so "where I am" looks
-          // the same in both places on this screen.
+          // The active tab is white, the rest are grey. That is all.
+          //
+          // It used to be a 2px rule across the top of the active cell, which
+          // was the printed index this app was modelled on marking the section
+          // your thumb is in. On a dark ground there is a real brightness step
+          // between ink and ink-3, so the colour swap says "you are here" on
+          // its own, and the rule was a second mark for a fact already stated.
           className={`flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 py-1 ${
-            active ? "border-t-2 border-ink text-ink" : "border-t-2 border-transparent text-ink-3"
+            active ? "text-ink" : "text-ink-3"
           }`}
           aria-current={active ? "page" : undefined}
         >
@@ -233,7 +233,7 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   return (
     <nav
       aria-label="Primary"
-      className="relative z-30 shrink-0 rule-t bg-paper"
+      className="relative z-30 shrink-0 bg-paper"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
     >
       <div className="mx-auto flex max-w-md items-stretch justify-between px-2 pt-2">

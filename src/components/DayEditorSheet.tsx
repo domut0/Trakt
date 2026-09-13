@@ -269,7 +269,7 @@ export function DayEditorSheet({
       style={{ opacity: dragY > 0 ? Math.max(0, 1 - dragY / 300) : 1 }}
     >
       <div
-        className="w-full max-w-md bg-paper rule-heavy-t anim-sheet rounded-md"
+        className="w-full max-w-md bg-surface anim-sheet rounded-lg"
         onClick={(e) => e.stopPropagation()}
         style={{
           paddingBottom: `max(env(safe-area-inset-bottom), ${20 + keyboardOffset}px)`,
@@ -518,20 +518,36 @@ export function DayEditorSheet({
               </div>
             </div>
 
-            {/* Untracked */}
+            {/* Untracked.
+
+                The unchecked box used to be filled with --color-border, which
+                on paper was a light grey square against a lighter ground. Both
+                tones moved on the way to a dark theme and landed on the same
+                value as the list behind it, so the control disappeared
+                completely - an invisible switch for the one field on this sheet
+                that is not a number.
+
+                It is drawn with a ring now rather than a fill, so "off" is a
+                shape rather than the absence of one, and it cannot vanish again
+                by two tokens drifting together. */}
             <div className="group-row group-row-sep">
-              <span className="t-body font-medium text-ink">Untracked</span>
+              <div className="min-w-0">
+                <div className="t-body font-medium text-ink">Untracked</div>
+                <div className="t-label text-ink-2">
+                  A day you chose not to log, rather than one you missed.
+                </div>
+              </div>
               <button
                 type="button"
                 role="checkbox"
                 aria-checked={isUntracked}
                 aria-label="Untracked"
                 onClick={() => setIsUntracked(!isUntracked)}
-                className="flex h-6 w-6 items-center justify-center t-label font-semibold transition-colors"
-                style={{
-                  backgroundColor: isUntracked ? "var(--color-accent)" : "var(--color-border)",
-                  color: isUntracked ? "var(--color-accent-foreground)" : "transparent",
-                }}
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-sm t-label font-semibold transition-colors ${
+                  isUntracked
+                    ? "bg-ink text-paper"
+                    : "text-transparent ring-1 ring-inset ring-ink-3"
+                }`}
               >
                 ✓
               </button>
@@ -557,7 +573,7 @@ export function DayEditorSheet({
             </button>
             <button
               onClick={save}
-              className="flex-[2] min-h-[44px] bg-ink py-3 t-body font-semibold text-paper rounded-md"
+              className="flex-[2] min-h-[44px] bg-ink py-3 t-body font-semibold text-paper rounded-lg"
             >
               Save
             </button>

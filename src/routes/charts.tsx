@@ -56,19 +56,6 @@ function formatMetricValue(metricKey: DailyLogNumericField, v: number): string {
   return (Math.round(v * 10) / 10).toLocaleString();
 }
 
-/**
- * The angle the area under a trace is ruled at.
- *
- * Angle used to carry macro identity here, because the day view drew protein,
- * carbs and fat as three differently-ruled swatches and the chart matched
- * whichever one you had selected. Charts now cover calories, steps and
- * bodyweight only, none of which owns a macro angle, so there is one angle and
- * it is the diagonal no macro ever had.
- */
-function hatchAngleFor(): number {
-  return 135;
-}
-
 function ChartsPage() {
   const dailyLogs = useStore((s) => s.dailyLogs);
   const unit = useStore((s) => s.unit);
@@ -206,7 +193,7 @@ function ChartsPage() {
           data-swipe-ignore
           role="group"
           aria-label="Metric"
-          className="scrollbar-none flex gap-2 overflow-x-auto px-5"
+          className="scrollbar-none flex gap-2 overflow-x-auto px-4"
         >
           {METRICS.map((m) => (
             <button
@@ -228,7 +215,7 @@ function ChartsPage() {
           data-swipe-ignore
           role="group"
           aria-label="Date range"
-          className="scrollbar-none flex gap-2 overflow-x-auto px-5"
+          className="scrollbar-none flex gap-2 overflow-x-auto px-4"
         >
           {RANGES.map((r) => (
             <button
@@ -252,25 +239,29 @@ function ChartsPage() {
         </div>
       </div>
 
-      <div className="mx-5 p-5 anim-fade-up" style={{ animationDelay: "40ms" }}>
+      <div
+        className="mx-4 rounded-lg bg-surface p-4 anim-fade-up"
+        style={{ animationDelay: "40ms" }}
+      >
         {/* Inline segmented control on chart card to toggle raw vs smoothed series */}
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="t-caption text-ink-2 truncate">{metric.label}</h2>
           <div
             role="group"
             aria-label="Series"
-            // One ruled box split in two, not two floating chips. The selected
-            // half is inked; it used to be marked with shadow-xs, which on a
-            // page with no elevation left the two states differing only by the
-            // shade of their text.
-            className="inline-flex overflow-hidden rounded-md border-[1.5px] border-ink divide-x-[1.5px] divide-ink"
+            // Two chips in a track, matching the Metric and Date range rows
+            // directly above. It used to be one 1.5px-ruled box split down the
+            // middle, which was correct on paper - where a rule was the only
+            // way to group two things - and is a heavy outlined object here,
+            // where the same job is done by a quiet track and a filled chip.
+            className="inline-flex gap-1 rounded-md bg-wash p-1"
           >
             <button
               type="button"
               onClick={() => setViewMode("daily")}
               aria-pressed={viewMode === "daily"}
               className={
-                "flex min-h-[44px] min-w-[60px] items-center justify-center px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
+                "flex min-h-[36px] min-w-[60px] items-center justify-center rounded-sm px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
                 (viewMode === "daily" ? "bg-ink text-paper" : "text-ink-2")
               }
             >
@@ -281,7 +272,7 @@ function ChartsPage() {
               onClick={() => setViewMode("avg7")}
               aria-pressed={viewMode === "avg7"}
               className={
-                "flex min-h-[44px] min-w-[76px] items-center justify-center px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
+                "flex min-h-[36px] min-w-[76px] items-center justify-center rounded-sm px-3 py-1.5 t-label font-medium transition-colors duration-150 " +
                 (viewMode === "avg7" ? "bg-ink text-paper" : "text-ink-2")
               }
             >
@@ -651,24 +642,23 @@ function Chart({
     >
       <defs>
         {/*
-            Hatch, not a gradient wash.
+            A flat wash, and deliberately a flat one.
 
-            The area under the trace used to fade from 18% ink to nothing, which
-            is a gray ramp - the one thing the design system explicitly bans -
-            and it is also the stock charting-library look on a page that owns
-            three hatches built for exactly this job. A printed chart fills an
-            area by ruling it, so this one does too: 1px ink at 45 degrees on a
-            4px period, the same construction as the macro keys.
+            Two previous versions are worth recording, because the obvious third
+            option is one of them. It began as a gradient fading from 18% ink to
+            nothing, which is a grey ramp and the stock charting-library look.
+            It then became a hatch - 0.6px rules at 135 degrees - because a
+            one-colour press fills an area by ruling it, which was right for a
+            printed page and is wrong here: white scratches over a black ground
+            fight the trace sitting on top of them.
+
+            Flat 16% states the area once, at one value, and gets out of the way.
+            A gradient here would be the first one in the app.
           */}
-        <pattern
-          id="chart-area"
-          width="4"
-          height="4"
-          patternUnits="userSpaceOnUse"
-          patternTransform={`rotate(${hatchAngleFor()})`}
-        >
-          <line x1="0" y1="0" x2="0" y2="4" stroke="var(--color-ink)" strokeWidth="0.6" />
-        </pattern>
+        <linearGradient id="chart-area" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--color-ink)" stopOpacity="0.16" />
+          <stop offset="100%" stopColor="var(--color-ink)" stopOpacity="0.16" />
+        </linearGradient>
         {/* Least-squares fitted values can fall outside the data range, so the
             trend line is clipped to the plot box instead of drawing over the X
             axis labels. */}

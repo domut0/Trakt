@@ -55,7 +55,7 @@ describe("WeekStrip", () => {
     expect(day24Button).not.toHaveClass("bg-ink");
   });
 
-  it("marks today with accent text and no filled disc when not selected", () => {
+  it("marks today with a dot and never with a second fill when not selected", () => {
     const onSelectDate = vi.fn();
     // Selected is Monday Aug 24, while today is Tuesday Aug 25
     render(<WeekStrip selectedDate="2026-08-24" onSelectDate={onSelectDate} />);
@@ -67,23 +67,24 @@ describe("WeekStrip", () => {
     expect(day24Button).toHaveClass("bg-ink");
     expect(day24Button).toHaveClass("text-paper");
 
-    // Day 25 is today but not selected: underscored, never a second fill.
-    // Two filled things in one strip would be two selections.
+    // Day 25 is today but not selected: a dot under its figure, never a second
+    // fill on the cell. Two filled cells in one strip would read as two
+    // selections, which is the one thing this control must never say.
     const day25Button = screen.getByRole("button", {
       name: "Tuesday, August 25, 2026",
     });
     expect(day25Button).not.toHaveClass("bg-ink");
-    expect(day25Button.querySelector(".border-ink")).not.toBeNull();
-    const num25 = day25Button.querySelector(".border-ink");
-    expect(num25).toHaveTextContent("25");
+    expect(day25Button.querySelector("span.bg-ink")).not.toBeNull();
 
-    // Day 26 is neither: text-foreground, no fill, no accent text
+    // Day 26 is neither. Its dot is still in the DOM and still occupies its
+    // 4px, which is deliberate: the marker is rendered transparent rather than
+    // omitted so the row cannot reflow as you page between weeks.
     const day26Button = screen.getByRole("button", {
       name: "Wednesday, August 26, 2026",
     });
-    // An ordinary day carries neither mark: not inked, not underscored.
     expect(day26Button).not.toHaveClass("bg-ink");
-    expect(day26Button.querySelector(".border-ink")).toBeNull();
+    expect(day26Button.querySelector("span.bg-ink")).toBeNull();
+    expect(day26Button.querySelector("span.bg-transparent")).not.toBeNull();
   });
 
   it("calls onSelectDate with that day's yyyy-MM-dd key when tapped", () => {

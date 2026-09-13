@@ -2,48 +2,70 @@
 @source "../src";
 
 /* ---------------------------------------------------------------------------
-   THE PRINTED TIMETABLE
-   Seed 95982b50 - direction contract lives in routes/__root.tsx.
+   DARK, ROUNDED, AND OUT OF THE WAY
 
-   This app is a schedule, so it is printed like one. The whole visual world is
-   a Swiss railway timetable page: paper ground, one black ink, hairline rules,
-   tabular figures, columns that do not move, and the table running to the trim
-   instead of floating inside a rounded card.
+   Three visual systems have now shipped here: a MyFitnessPal dark, a printed
+   Swiss timetable, and this. The first two were each chosen deliberately,
+   documented at length, and abandoned inside a fortnight, so this one is built
+   NOT to have a thesis. It looks like the platform it runs on.
 
-   Two rules from the old dark system are INVERTED here and they are the reason
-   most of this file looks the way it does:
+   The timetable was abandoned for a specific and slightly funny reason worth
+   recording, because it is the trap any future redesign here will walk back
+   into: condensed grotesque, plus ALL-CAPS micro-labels at 10px on 0.1em of
+   tracking, plus heavy ruling everywhere, is not a neutral Swiss style. It is
+   the single most recognisable house style of the last two years of AI design
+   tools, and it was adopted precisely to escape looking generated.
 
-   1. "Elevation is fill." Gone. On paper there is no fill step to lift with, so
-      RANK COMES FROM RULE WEIGHT AND POSITION. A hairline separates, a heavy
-      rule divides, a full-bleed rule announces. Nothing is raised.
-   2. "No borders." Gone, and it was always the wrong rule for this app: a
-      dashed outline already carried a fact (planned) rather than a decoration.
-      Here every rule carries a fact.
+   So: one rounded face, sentence case everywhere, and no uppercase type role
+   exists at all. Rows are separated by SPACE and by the edge of a card, not by
+   76 hairlines. Nothing here is a metaphor.
 
-   What survives untouched: dashed outline = planned, solid fill = happened.
-   That rule is native to a timetable, where it is the scheduled column against
-   the actual one, so it gets stronger here rather than merely surviving.
+   What did NOT change, because none of it was ever about the paint:
+     - State is carried by MARK, never by hue. A filled square against an open
+       one. This is what makes the app readable to a protanope, and it is the
+       one thing the timetable got unambiguously right.
+     - Dashed outline = planned, solid fill = happened.
+     - 44px minimum on every interactive target.
+     - Tabular figures on anything compared against anything else.
+     - Phone only. No breakpoints, no desktop layout.
+     - ONE theme. There is no light mode and no toggle to build one.
    --------------------------------------------------------------------------- */
 
-/* Self-hosted: this is an offline-first PWA and the previous build fetched
-   Inter from fonts.googleapis.com on every cold load, which is a network
-   dependency in an app whose entire pitch is that it has none. One file, both
-   axes, 88KB, precached by the service worker with everything else in public/. */
-@font-face {
-  font-family: "Archivo Variable";
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  font-stretch: 62% 125%;
-  src: url("/fonts/archivo-variable.woff2") format("woff2-variations");
-}
+/* No @font-face, and that is the point.
+
+   `ui-rounded` resolves to SF Pro Rounded on iOS, which is where this app
+   actually lives: an installed PWA on the user's phone. It costs zero bytes,
+   needs no licence, is already resident, and cannot fail to load on a cold
+   start in a gym basement.
+
+   Two consequences worth knowing before changing anything here:
+
+   1. SF cannot legally be self-hosted as a webfont, so there is no fallback
+      that looks like it. On anything that is not Apple hardware this renders
+      in the platform's own UI face, which is fine and is not a bug.
+   2. `npm run screenshots` drives Playwright on WINDOWS, where SF does not
+      exist. Every screenshot it produces is set in Segoe UI. It remains the
+      best instrument in this repo for layout, state and regressions; it is
+      simply not evidence about type. Judge the type on a phone.
+
+   The previous build self-hosted Archivo for its WIDTH axis, which five of the
+   seven type roles used. SF exposes no addressable width axis, so every
+   `font-stretch` declaration is deleted rather than left to silently do
+   nothing - which is the worse failure, since type just quietly gets wider. */
 
 @theme {
   --font-sans:
-    "Archivo Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
-  /* The world's own names. Use these in new work. */
+  /* The world's own names. Use these in new work.
+
+     The names are inherited from the build this replaced and they still mean
+     what they say: `paper` is the ground, `ink` is what is printed on it.
+     Inverting their VALUES inverts the whole app correctly, because every
+     `bg-ink text-paper` pair in the tree means "a chip printed the other way
+     round" and continues to. Reversed-out type is a real thing a press does. */
   --color-paper: var(--paper);
+  --color-surface: var(--surface);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
@@ -57,7 +79,6 @@
      palette: `bg-surface` deliberately resolves to the paper itself, because a
      timetable has no cards, and the ruling does the containing a card used to. */
   --color-background: var(--paper);
-  --color-surface: var(--paper);
   --color-foreground: var(--ink);
   --color-muted: var(--wash);
   --color-muted-foreground: var(--ink-2);
@@ -87,61 +108,67 @@
   --color-fat: var(--ink);
   --color-protein: var(--ink);
 
-  /* Gentle, not absent.
+  /* Round, and meant.
 
-     The first build set every radius to 0 on the grounds that a timetable is
-     printed on a rectangular grid, which was true of the reference and wrong
-     for the product: knife-edged corners on every mark, cell, sheet and button
-     read as severe rather than as precise, and the user said so. 4px takes the
-     edge off without turning the page back into a stack of cards. The rules,
-     the tabular figures and the marks are what carry the world; the corners
-     never were. 2px on the small state marks, because 4px on a 10px square is
-     a lozenge. */
-  --radius-sm: 2px;
-  --radius-md: 4px;
-  --radius-lg: 4px;
+     The timetable set these to 4px because a printed table has no corners to
+     speak of. A card system is the opposite: the radius IS the containment,
+     since it is the card edge rather than a rule that now says where one group
+     of rows stops and the next begins. 20px on a card, 12px on a control
+     sitting inside one, 6px on the small state marks - 20px on a 10px square
+     would be a circle. */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
 }
 
 :root {
-  /* Measured against the paper, not estimated. Ratios in the comments are
-     computed, and every value that ever carries text clears AA on both the
-     paper and the wash.
+  /* Contrast ratios are computed, not estimated, and every value that carries
+     text clears AA on BOTH grounds it can appear on - the page and a card.
 
-     The paper is deliberately not #ffffff. Pure white is a flashlight in a
-     dark bedroom, and this app is opened in bed every night. #F3F4F5 is a
-     neutral-cool paper: the first build used a warm #F3F2EE against a near
-     black ink at 16.6:1, and the pairing read as severe rather than as
-     precise. Slate at 12.6:1 is the same document, printed with a softer
-     plate. */
-  --paper: #f3f4f5;
+     The ground is true black rather than a dark grey. The app is opened in bed
+     in the dark every night, on an OLED phone where #000 is an off pixel: it
+     emits nothing, costs nothing, and lets the card edges do all the work. It
+     is the exact mirror of the reasoning that made the old paper #F3F4F5
+     rather than #ffffff. */
+  --paper: #000000;
 
-  /* Three inks, and they are three real colours rather than one colour at
+  /* A card. The one elevation step this system has, and the thing that
+     replaced 76 hairlines: a group of rows is contained by its own edge now,
+     not divided by a rule. */
+  --surface: #1c1c1e;
+
+  /* A control sitting ON a card - a segmented chip, a pressed row, a filled
+     field. Inherits the name `wash` from the build before this one, where it
+     was "the one filled tone", which is still exactly its job. */
+  --wash: #2c2c2e;
+
+  /* Three text tones, named as three real colours rather than one colour at
      three opacities. Opacity variants are what let secondary text drift below
-     AA in the old system, and the fix that lasts is to name the tone. */
-  --ink: #282d33; /* 12.60:1 on paper, 11.51:1 on wash - body, figures, everything primary */
-  --ink-2: #4b525b; /*  7.18:1 on paper,  6.55:1 on wash - secondary text, column headers */
-  --ink-3: #616872; /*  5.11:1 on paper,  4.67:1 on wash - tertiary; AA on BOTH grounds */
+     AA in the system two redesigns ago, and naming the tone is the fix that
+     lasts. */
+  --ink: #ffffff; /* 21:1 on the ground, 18.4:1 on a card - body, figures, everything primary */
+  --ink-2: #aeaeb2; /* 10.6:1 on the ground,  9.3:1 on a card - secondary text and annotations */
+  --ink-3: #8e8e93; /*  6.9:1 on the ground,  6.0:1 on a card - tertiary; AA on BOTH */
 
-  /* Rules. These never carry text, so they are free to sit below AA: their job
-     is to divide, and a hairline that meets text contrast is a black bar. */
-  --rule: #dde0e3; /* hairline: between rows */
-  --rule-strong: #c2c7cd; /* division: between sections, column edges */
+  /* Separators. These never carry text, so they are free to sit far below AA:
+     a hairline that meets text contrast is a bright bar across a dark card.
+     There are very few of these left by design - inside a card, between rows
+     of one list, and nowhere else. */
+  --rule: #2c2c2e;
+  --rule-strong: #38383a;
 
-  /* The one filled tone. A logged thing is printed on the page rather than
-     outlined on it, and this is what "solid fill = happened" fills with. */
-  --wash: #e8eaec;
+  /* The exception, and the only hue in the system.
 
-  /* The second ink. A two-colour press gets exactly one, and a timetable spends
-     it on the exception: the footnote, the service that does not run today, the
-     departure that is late. Here it means the same thing, and it means the
-     referee's red light, which is the same idea in the user's own sport.
+     Everything else here is white, grey or black on purpose: a single accent
+     spent only where something is wrong or destructive means it is never
+     decoration, and never has to compete with a second colour for attention.
+     iOS systemRed (dark), so it sits correctly beside the platform's own
+     alerts. 4.8:1 on the ground.
 
-     It carries BOTH "over a ceiling" and "this broke", which the old system
-     kept apart by hue. They are kept apart here by mark instead: an overrun
-     figure takes a struck rule under it, an error takes a filled flag. Same
-     ink, different mark, and the mark is the part that survives being
-     colourblind. 5.25:1 on paper, 4.75:1 on wash. */
-  --signal: #a8474a;
+     It carries BOTH "over a ceiling" and "this broke", which are kept apart by
+     MARK rather than by hue - an overrun figure takes a struck rule, an error
+     takes a filled flag. That difference is what survives being colourblind. */
+  --signal: #ff453a;
 }
 
 @layer base {
@@ -241,9 +268,16 @@
 }
 
 /* ---------------------------------------------------------------------------
-   RULES. The whole depth system, such as it is. A timetable has no elevation:
-   it has line weights, and they rank things. Three weights, and each one means
-   something different, so a screen can be read by its rules alone.
+   RULES. Almost all gone.
+
+   The timetable ranked things with three line weights. A card system ranks
+   with elevation and space, so there is one hairline left and it does one job:
+   divide two rows inside a single card. The heavy 2px ink rule that used to
+   open a table has nothing to open any more.
+
+   These names survive as aliases so nothing renders unstyled, and they all
+   resolve to the same quiet separator. A NEW rule in this app is almost always
+   a mistake - use a card, or use space.
    --------------------------------------------------------------------------- */
 
 /** Between rows of the same table. The lightest mark that still divides. */
@@ -265,71 +299,68 @@
 /** The heavy rule. Reserved for the top of a table and the now line: the two
     marks on a timetable page that are allowed to shout. Ink, not gray. */
 @utility rule-heavy-t {
-  border-top: 2px solid var(--color-ink);
+  border-top: 1px solid var(--color-rule-strong);
 }
 @utility rule-heavy-b {
-  border-bottom: 2px solid var(--color-ink);
+  border-bottom: 1px solid var(--color-rule-strong);
 }
 
 /* ---------------------------------------------------------------------------
-   TYPE. The seven roles are kept by name, because 42 files use them and the
-   names were never the problem, but every value is redrawn for the new face
-   and the new job.
+   TYPE. One face, one case.
 
-   Archivo carries a width axis (62-125%), which is the lever a timetable
-   actually wants: a column narrows without the typeface changing underneath
-   it. Headers are set narrow and tracked; figures are set at normal width so
-   the digits stay open at a glance.
+   Sentence case everywhere. THERE IS NO UPPERCASE TYPE ROLE, and adding one is
+   the single easiest way to make this app look generated again: the build
+   before this had three, and the smallest of them - 10px, weight 700, 0.1em of
+   tracking, set condensed - appeared 109 times. Wide-tracked all-caps
+   micro-labels are the tell.
+
+   No `font-stretch` anywhere either. SF exposes no width axis, so a stretch
+   declaration here does not narrow anything; it just sits in the file looking
+   like it works.
    --------------------------------------------------------------------------- */
 
-/** The page's own name, set in the top margin the way a timetable names its
-    page. Narrow and heavy: this is a printed title, not a soft app header. */
+/** The screen's name, in the top margin. */
 @utility t-title {
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 700;
-  font-stretch: 80%;
-  line-height: 1;
+  line-height: 1.1;
   letter-spacing: -0.02em;
-  text-transform: uppercase;
 }
 
-/** A table's name. Sits on the heavy rule that opens the table. */
+/** A card's name, or a heading inside one. */
 @utility t-heading {
   font-size: 17px;
   font-weight: 600;
-  font-stretch: 85%;
-  line-height: 1.15;
-  letter-spacing: -0.005em;
-  text-transform: uppercase;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
 /** Row labels, values, buttons. The workhorse. */
 @utility t-body {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.35;
-  letter-spacing: -0.004em;
+  letter-spacing: -0.01em;
 }
 
 /** Secondary text: annotations, hints, the footnote voice. Pair with ink-2. */
 @utility t-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 400;
   line-height: 1.35;
 }
 
-/** A COLUMN HEADER, which is the one thing on this page that looks like an
-    eyebrow and is not one: it labels the column of data beneath it, so
-    deleting it deletes a fact. Narrow, tracked, small, and it always sits on a
-    rule. If it is floating above a heading with no column under it, it is an
-    eyebrow and it should be deleted instead. */
+/** The label that names a card, sitting above it.
+
+    This used to be a column header set in tracked 10px caps. It is a plain
+    sentence-case line now, because a card's edge already says where its
+    contents begin - that was the whole job the caps and the rule beneath them
+    were doing. */
 @utility t-caption {
-  font-size: 10px;
-  font-weight: 700;
-  font-stretch: 75%;
+  font-size: 13px;
+  font-weight: 500;
   line-height: 1.2;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
 /** A figure compared against another figure. Tabular by construction. */
@@ -341,100 +372,86 @@
   font-variant-numeric: tabular-nums;
 }
 
-/** The one figure a screen exists to show. Set at the scale a timetable sets
-    a departure time: big, narrow, and unmistakably a number. */
+/** The one figure a screen exists to show. Nothing uses this today: the day
+    card deliberately has no hero, because six equal rows say what is true.
+    Kept for a screen that genuinely has one subject. */
 @utility t-hero {
-  font-size: 44px;
+  font-size: 40px;
   font-weight: 700;
-  font-stretch: 78%;
-  line-height: 0.95;
+  line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
 
 /** A text control.
 
-    The old system said "accent marks things that are actionable", and accent
-    was a blue. On a two-ink page there is no blue to spend, and colouring a
-    word black does not make it look pressable. Print has always answered this
-    with a rule under the word, so that is what a control is here. This also
-    quietly rescues every `text-accent` in the tree, which would otherwise have
-    become ordinary black text that happens to be a button. */
+    No underline, and no colour either. The system has exactly one hue and it
+    is spent on things that are wrong, so an ordinary control cannot have it.
+    What marks a control instead is WEIGHT against the ink-2 it sits among:
+    "Edit" at 600 in full white, beside labels at 400 in grey, is unambiguous
+    without spending the accent or drawing a rule. */
 @utility t-action {
   font-weight: 600;
   color: var(--color-ink);
-  text-decoration-line: underline;
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 3px;
-}
-
-/** The hour column down the left edge of a schedule. Small, narrow, ink-2,
-    and never competing with the rows it indexes. */
-@utility t-hour {
-  font-size: 11px;
-  font-weight: 600;
-  font-stretch: 72%;
-  line-height: 1;
-  letter-spacing: 0.02em;
-  font-variant-numeric: tabular-nums;
 }
 
 /* ---------------------------------------------------------------------------
-   TABLES. What `group-list` used to be. The names are kept so that no screen
-   goes unstyled, but a group is no longer a rounded box floating in a gutter:
-   it is a table ruled top and bottom and run to the trim.
+   CARDS. What `group-list` is now.
 
-   The gutter moves from the container to the CELL. That is the change that
-   makes this read as print: the ink starts at the page edge and the text is
-   inset from it, rather than the whole card being pushed inward.
+   The build before this made a group into a table: ruled top and bottom, run
+   full-bleed to the trim, with the gutter moved onto each cell. Rank came from
+   rule weight, because paper has no fill step to lift anything with.
+
+   A dark ground does. A card is a lighter rectangle on it, so containment is
+   the card's own EDGE and there is nothing left for a rule to say. That is
+   where 76 hairlines went. The few that remain live inside a single card,
+   between rows of one list, inset from the left so they read as dividing that
+   list rather than cutting the card in half.
    --------------------------------------------------------------------------- */
 
 @utility group-list {
-  background-color: transparent;
-  border-top: 2px solid var(--color-ink);
-  border-bottom: 1px solid var(--color-rule-strong);
-  /* Full-bleed: cancels the page's px-5 so the ruling reaches the trim, while
-     the rows put the gutter back on their own padding. */
-  margin-inline: -20px;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  /* So a pressed row's own background cannot square off the card's corners. */
+  overflow: hidden;
 }
 
-/** A row inside a table. */
 @utility group-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 44px;
-  padding: 11px 20px;
+  min-height: 48px;
+  padding: 12px 16px;
 }
 
-/** Separator between rows. Inset from the left, matching the old system and
-    every printed table: a rule running the full width reads as the end of the
-    table rather than a division inside it. */
+/** Separator between rows, inset from the left the way every grouped list on
+    this platform insets it.
+
+    Drawn as a background image rather than a border so the inset costs no
+    extra element and no negative margin. A border-top here would run the full
+    width of the card and read as a cut. */
 @utility group-row-sep {
-  box-shadow: inset 0 1px 0 var(--color-rule);
+  background-image: linear-gradient(var(--color-rule-strong), var(--color-rule-strong));
+  background-size: calc(100% - 16px) 1px;
+  background-position: 16px 0;
+  background-repeat: no-repeat;
 }
 
-/** The header that labels a table. Sits directly above the table's opening
-    rule, on the page's own gutter.
+/** The label that names a card, sitting above it in the page gutter.
 
-    Deliberately NO negative margin. The rule below it bleeds to the trim
-    because a printed table's ruling does; its name does not, because a label
-    hanging off the page edge is not a style, it is a clipped word. The first
-    build of this file gave the header the same -20px as the table and every
-    section title on every screen lost its first character. */
+    Deliberately NO rule under it and no negative margin: the card below is a
+    solid shape with its own edge, so a line between the two would be a third
+    thing to look at. Aligned to the card's inner padding rather than to the
+    page gutter, so the label sits over the first word of the first row. */
 @utility group-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding-bottom: 5px;
+  padding-inline: 16px;
+  padding-bottom: 8px;
   color: var(--color-ink-2);
-}
-
-/** Vertical rhythm between tables. */
-@utility section-gap {
-  margin-top: 26px;
 }
 
 /* ---------------------------------------------------------------------------
@@ -480,7 +497,7 @@
 /** Something broke. A filled flag in the second colour. Different shape from
     mark-over on purpose; that difference is what the hue used to do. */
 @utility mark-error {
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background-color: var(--color-signal);
   color: var(--color-paper);
   padding: 1px 5px;
@@ -531,24 +548,20 @@
   background-color: var(--color-ink);
 }
 
-/** A measured field: a quantity read against a ruled scale, not an identity.
+/** The area under a trace.
 
-    135 degrees, and the angle is the whole point. Protein owns 90, carbs owns
-    45 and fat owns 0, so this is the one diagonal no metric answers to. The
-    first version of this utility shipped at 45 and collided head-on with
-    hatch-carbs, which broke the single law the hatch system has: angle carries
-    identity. A field that means "amount" must not be able to be read as a
-    field that means "carbs". */
+    Hatching is a printing technique: it exists because a one-colour press
+    cannot print a tint. A screen can, and 135-degree white lines on black read
+    as scratches across the chart rather than as a filled region. A flat wash of
+    the ink at low alpha is the same statement without the texture.
+
+    The name is kept because five call sites and a chart component use it. */
 @utility hatch-dense {
-  background-image: repeating-linear-gradient(135deg, var(--color-ink) 0 1px, transparent 1px 3px);
+  background-color: color-mix(in srgb, var(--color-ink) 14%, transparent);
 }
-/** The same field in the second ink, for the part of a measure that overran. */
+/** The same field in the signal, for the part of a measure that overran. */
 @utility hatch-over {
-  background-image: repeating-linear-gradient(
-    135deg,
-    var(--color-signal) 0 1px,
-    transparent 1px 3px
-  );
+  background-color: color-mix(in srgb, var(--color-signal) 28%, transparent);
 }
 
 /* ---------------------------------------------------------------------------

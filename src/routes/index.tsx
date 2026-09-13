@@ -124,7 +124,10 @@ function Home() {
    * thing directly under it and spending the margin on nothing. A timetable
    * names its page with the date it covers.
    */
-  const heading = format(parseDayKey(selected), "EEE d MMM").toUpperCase();
+  // Sentence case, and a full weekday. The timetable set this in tracked caps
+  // as an abbreviated departure ("THU 20 AUG"); a screen you open in bed is
+  // just telling you what day it is.
+  const heading = format(parseDayKey(selected), "EEEE d MMMM");
   /** Kept spoken rather than printed: "Today" is the clearer thing to hear. */
   const spokenDay = isToday ? "today" : format(parseDayKey(selected), "EEE d MMM");
 
@@ -134,28 +137,20 @@ function Home() {
         <h1 className="t-title">{heading}</h1>
       </header>
 
-      <WeekStrip selectedDate={selected} onSelectDate={selectDate} />
+      <div className="px-4">
+        <WeekStrip selectedDate={selected} onSelectDate={selectDate} />
+      </div>
 
       {/*
-        Order: the day is named, the week picks it, the day's numbers, then the
-        day itself, then the habits.
+        The day is named, the week picks it, and the numbers for it follow.
 
-        The numbers sit above the canvas rather than below it because the
-        contract promises a ruled row of macro figures in the FIRST VIEWPORT and
-        a 420px canvas pushed them two screens down. They are compact - a hero,
-        a measure, and a few ruled rows - so both promises fit above the fold
-        with the canvas opening underneath them.
-
-        No section-gap between the strip and what follows it: the strip picks a
-        day and everything under it IS that day, so blank paper between them
-        reads as a hole rather than as rhythm.
-
-        Habits keeps the stable y-offset it was placed for. The note that put it
-        high was about the STATS card, whose height moves with how much was
-        logged; it now sits under a fixed-height canvas, which is the constant
-        offset it actually wanted.
+        Nothing else is on this screen. Workouts live on History and Plan, and
+        the 24-hour day timeline that used to sit here was the one thing the
+        user asked for by name to remove: it was a thing you looked AT rather
+        than a thing you used, in an app whose two daily visits are both
+        entry - one-handed mid-set, and half-asleep in bed.
       */}
-      <section className="px-5 anim-fade-up">
+      <section className="px-4 pt-4 anim-fade-up">
         {/*
           The card is wrapped rather than given an onEdit prop so that it stays a
           pure readout with one job. Nothing inside it is interactive, so a
@@ -191,7 +186,7 @@ function Home() {
                 fat: previousLog.fat,
               })
             }
-            className="mt-3 flex min-h-[44px] w-full items-center justify-between px-5 text-left transition-colors active:opacity-70"
+            className="mt-3 flex min-h-[44px] w-full items-center justify-between rounded-lg bg-surface px-4 text-left transition-colors active:opacity-70"
           >
             <span className="flex min-w-0 flex-1 items-center gap-3 pr-3">
               <span className="shrink-0 t-action t-label">Copy the day before</span>

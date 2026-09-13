@@ -24,8 +24,8 @@ import { ToastProvider } from "../components/Toast";
  * black-on-white for as long as they have existed. Nobody noticed because you
  * have to break the router to see them.
  *
- * Set here as a timetable's own out-of-service notice: the page number in the
- * margin, a heavy rule, and the plain fact underneath it.
+ * Styled here as an ordinary card with the plain fact on it, so a route that
+ * only appears when something is broken still looks like the rest of the app.
  */
 function NoticePage({
   code,
@@ -116,9 +116,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { name: "theme-color", content: "#F3F4F5" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
-      // "default" gives dark status-bar glyphs, which is what a paper ground
-      // needs; "black" was correct only while the app was dark.
-      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      // "default" gives DARK status-bar glyphs, which was right for a paper
+      // ground and is invisible on this one. black-translucent lets the app
+      // ground run under the status bar, which is what a true-black app wants.
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-title", content: "Trakt" },
       { title: "Trakt" },
       {
@@ -136,18 +137,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
-      // No font CDN. This is an offline-first PWA and the previous build blocked
-      // first paint on fonts.googleapis.com, which is a network dependency in an
-      // app whose whole claim is that it has none. Archivo is served from
-      // public/fonts and precached with the rest of the shell; preloading it
-      // stops the swap flash on a cold start.
-      {
-        rel: "preload",
-        href: "/fonts/archivo-variable.woff2",
-        as: "font",
-        type: "font/woff2",
-        crossOrigin: "anonymous",
-      },
+      // No font file at all, and so nothing to preload or precache. The app is
+      // set in ui-rounded, which is SF Pro Rounded on the phone this runs on:
+      // already resident, zero bytes, and no swap flash on a cold start because
+      // there is nothing to swap. The build before this self-hosted Archivo for
+      // its width axis, and the one before THAT blocked first paint on
+      // fonts.googleapis.com - a network dependency in an app whose whole claim
+      // is that it has none.
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
@@ -167,33 +163,6 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {/* Emitted into the built markup on purpose: a contract only the source
-            can see is a contract nobody can audit. Grep the build for the seed
-            key to confirm it survived. */}
-        <div
-          dangerouslySetInnerHTML={{
-            __html: `<!--
-THESIS: A training day is a schedule, so print it as one. Planned is the scheduled
-column, logged is the actual, and the gap between them is a delay. Refuses the stack
-of floating rounded cards every tracker ships.
-OWN-WORLD: Paper #F3F4F5, one slate ink #282D33, one signal red for the exception. Archivo
-variable on its width axis. Rank comes from rule weight, never fill: hairline divides
-rows, rule divides sections, 2px ink opens a table. No elevation and no gray ramp;
-corners eased to 4px after the first build read as severe. State is carried by mark (filled square, struck rule), metric identity by hatch
-angle. Tables bleed to the trim; the gutter lives on the cell.
-STORY: He reads the day as scheduled against actual, logs a set in one tap, and the
-figure flaps into place like a departure board committing.
-FIRST VIEWPORT: No title card. The date sits in the top-left margin the way a
-timetable names its page. One ruled table runs to both trims: narrow tabular hour
-column at the left, the day's rows against it. The now line is a full-bleed 2px ink
-rule with the time set into it. Macros are a ruled row of figures, not a ring. The
-primary action sits in the bottom third, at thumb height.
-FORM: The Printed Timetable. Candidate 5 of 7 on the grounded list; seed 95982b50.
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish
-review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
--->`,
-          }}
-        />
         {children}
         <Scripts />
       </body>

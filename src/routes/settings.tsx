@@ -213,9 +213,7 @@ function SettingsPage() {
       </Section>
 
       <Section title="Daily targets" delay={80}>
-        <div className="px-5 pt-1">
-          <TargetsEditor />
-        </div>
+        <TargetsEditor />
       </Section>
 
       <Section title="Data" delay={120}>
@@ -492,11 +490,12 @@ function Section({
 }) {
   return (
     <section className="section-gap anim-fade-up" style={{ animationDelay: `${delay}ms` }}>
-      {/* px-5: the list below cancels group-list's own -20px bleed with mx-5,
-          so it reaches the trim, but the heading has no gutter of its own and
-          was sitting flush against the left edge of the screen. */}
-      <h2 className="group-header t-caption px-5">{title}</h2>
-      <div className="group-list mx-5">{children}</div>
+      {/* No px-5 on the header and no mx-5 on the list. group-list used to
+          bleed itself to the trim with a -20px inline margin, so every caller
+          had to cancel it; a card does not bleed, and group-header carries its
+          own 16px so it lines up with the first word of the first row. */}
+      <h2 className="group-header t-caption">{title}</h2>
+      <div className="group-list mx-4">{children}</div>
     </section>
   );
 }

@@ -44,8 +44,11 @@ function ProfileCard({
   profile: TargetProfile;
   onUpdate: (patch: Partial<Omit<TargetProfile, "id">>) => void;
 }) {
+  // No background of its own. This sits inside the Settings card already, and a
+  // second filled rectangle in there was a panel within a panel, with square
+  // corners clipping against round ones.
   return (
-    <div className="space-y-4 bg-wash p-4">
+    <div className="space-y-4 p-4">
       <GoalModeControl profile={profile} onUpdate={onUpdate} />
 
       <div className="grid grid-cols-2 gap-3">

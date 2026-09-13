@@ -52,7 +52,13 @@ function SetRow({
         Delete
       </div>
       <div
-        className={`group-row relative ${isFirst ? "" : "group-row-sep"}`}
+        // bg-surface is load-bearing, not decoration. "Edit" and "Delete"
+        // above are swipe-reveal underlays and this row slides OVER them, so a
+        // transparent row lets both of them print through it at rest - which
+        // put the word "Edit" directly on top of the set number, since they
+        // share the same left gutter. Anything that translates or overlays in
+        // this app has to declare its own ground.
+        className={`group-row relative bg-surface ${isFirst ? "" : "group-row-sep"}`}
         style={{
           transform: `translateX(${dx}px)`,
           transition: startX.current == null ? "transform 160ms ease" : "none",
@@ -325,7 +331,7 @@ function EditSetSheet({
       onClick={onClose}
     >
       <div
-        className="bg-paper rule-heavy-t mx-auto w-full max-w-md p-5 anim-sheet rounded-md"
+        className="bg-surface mx-auto w-full max-w-md p-5 anim-sheet rounded-lg"
         onClick={(e) => e.stopPropagation()}
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
@@ -373,7 +379,7 @@ function EditSetSheet({
                 rpe: rpe ? parseFloat(rpe) : undefined,
               })
             }
-            className="flex min-h-[44px] flex-[2] items-center justify-center bg-ink py-3 t-body font-semibold text-paper rounded-md"
+            className="flex min-h-[44px] flex-[2] items-center justify-center bg-ink py-3 t-body font-semibold text-paper rounded-lg"
           >
             Save
           </button>
