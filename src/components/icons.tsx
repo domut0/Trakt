@@ -11,8 +11,8 @@ import type { JSX } from "react";
  * is not part of any system.
  *
  * Everything here is flat and drawn from straight segments with round ends.
- * None of them uses an arc: the geometry stays honest to the ruled world even
- * though the strokes are no longer cut square.
+ * The one arc in the set is the Gear's hub, because a round hole is what a cog
+ * has; its outline is still a polygon. Everything else stays ruled.
  */
 
 const BASE = {
@@ -170,16 +170,20 @@ export function Repeat(p: IconProps): JSX.Element {
 /**
  * Settings, which left the bottom bar to sit in the corner of every tab screen.
  *
- * The cog it replaces was lucide's - a twelve-toothed path full of arcs, drawn
- * at a different weight from everything beside it. This is the same idea in this
- * family's terms: a ring and six straight spokes, no arc anywhere.
+ * A cog, drawn as a cog: eight teeth on a ring around a hub. The version before
+ * it was a hub with eight straight rays radiating off it and no ring to attach
+ * them to, which is not a gear, it is a sun - and read as one.
+ *
+ * The outline is a plain polygon, 32 points alternating between an outer and an
+ * inner radius, so this stays inside the family rule: straight segments, round
+ * joins, no arc anywhere but the hub. Checked at 22px before shipping, which is
+ * the only size it is ever drawn at.
  */
 export function Gear(p: IconProps): JSX.Element {
   return (
     <svg {...svgProps(p)}>
-      <circle cx="12" cy="12" r="3.4" />
-      <path d="M12 3.2v2.6M12 18.2v2.6M20.8 12h-2.6M5.8 12H3.2" />
-      <path d="M18.2 5.8 16.3 7.7M7.7 16.3l-1.9 1.9M18.2 18.2l-1.9-1.9M7.7 7.7 5.8 5.8" />
+      <path d="M10.84 4.69L11.13 1.94L12.87 1.94L13.16 4.69L16.35 6.01L18.5 4.27L19.73 5.5L17.99 7.65L19.31 10.84L22.06 11.13L22.06 12.87L19.31 13.16L17.99 16.35L19.73 18.5L18.5 19.73L16.35 17.99L13.16 19.31L12.87 22.06L11.13 22.06L10.84 19.31L7.65 17.99L5.5 19.73L4.27 18.5L6.01 16.35L4.69 13.16L1.94 12.87L1.94 11.13L4.69 10.84L6.01 7.65L4.27 5.5L5.5 4.27L7.65 6.01Z" />
+      <circle cx="12" cy="12" r="3.2" />
     </svg>
   );
 }
