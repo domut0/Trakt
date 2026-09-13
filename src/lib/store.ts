@@ -164,9 +164,6 @@ export interface BackupData {
   dailyLogs: DailyLog[];
   targetProfiles: TargetProfile[];
   weekdayTargets: string[];
-  targetsEnabled: boolean;
-  toolsEnabled: boolean;
-  planEnabled: boolean;
   /**
    * The weekly training plan, or `undefined` for a file written before planning
    * existed and for anyone who has never planned a day.
@@ -215,13 +212,9 @@ type CurrentBlock = {
 
 interface State {
   unit: "lbs" | "kg";
-  chartsEnabled: boolean;
   /** Feature toggles for the four opt-in additions. Off by default: each one
    * adds a surface to a screen whose whole point is having nothing in the way,
    * so the user turns them on deliberately. */
-  targetsEnabled: boolean;
-  toolsEnabled: boolean;
-  planEnabled: boolean;
   exercises: Exercise[];
   slots: SplitSlot[];
   sessions: WorkoutSession[];
@@ -295,10 +288,6 @@ interface State {
   deleteDailyLog: (date: string) => void;
   dailyLogFor: (date: string) => DailyLog | undefined;
   setUnit: (u: "lbs" | "kg") => void;
-  setChartsEnabled: (v: boolean) => void;
-  setTargetsEnabled: (v: boolean) => void;
-  setToolsEnabled: (v: boolean) => void;
-  setPlanEnabled: (v: boolean) => void;
 
   /** Free-text note on a whole session. */
   updateSession: (sessionId: string, patch: Pick<WorkoutSession, "note">) => void;
@@ -925,9 +914,6 @@ export function parseBackup(text: string): ParseBackupResult {
       dailyLogs: (dailyLogs as DailyLog[] | undefined) ?? [],
       targetProfiles,
       weekdayTargets: safeWeekdays,
-      targetsEnabled: (parsed as { targetsEnabled?: unknown }).targetsEnabled === true,
-      toolsEnabled: (parsed as { toolsEnabled?: unknown }).toolsEnabled === true,
-      planEnabled: (parsed as { planEnabled?: unknown }).planEnabled === true,
       // Anything that is not a well-formed week becomes "no plan" rather than an
       // import failure, matching how the file's targets and habits degrade: a
       // hand-edited plan is not worth refusing someone their six weeks of sets
@@ -979,12 +965,8 @@ function persistSettingsFrom(s: State) {
   const settings: SettingsMeta = {
     key: "settings",
     unit: s.unit,
-    chartsEnabled: s.chartsEnabled,
-    targetsEnabled: s.targetsEnabled,
-    toolsEnabled: s.toolsEnabled,
     targetProfiles: s.targetProfiles,
     weekdayTargets: s.weekdayTargets,
-    planEnabled: s.planEnabled,
     plannedWeek: s.plannedWeek,
   };
   safeWrite(() => db.meta.put(settings));
@@ -992,10 +974,6 @@ function persistSettingsFrom(s: State) {
 
 export const useStore = create<State>((set, get) => ({
   unit: "lbs",
-  chartsEnabled: true,
-  targetsEnabled: false,
-  toolsEnabled: false,
-  planEnabled: false,
   exercises: [],
   slots: [],
   sessions: [],
@@ -1023,9 +1001,6 @@ export const useStore = create<State>((set, get) => ({
         const settings: SettingsMeta = {
           key: "settings",
           unit: "lbs",
-          chartsEnabled: true,
-          targetsEnabled: false,
-          toolsEnabled: false,
           ...targets,
         };
         // A first run seeds the exercise NAME library and nothing else. The
@@ -1047,13 +1022,9 @@ export const useStore = create<State>((set, get) => ({
           sets: [],
           dailyLogs: [],
           unit: settings.unit,
-          chartsEnabled: true,
-          targetsEnabled: false,
-          toolsEnabled: false,
           // Not written into the seeded settings record above, only into state:
           // absent already means "off, nothing planned" on read, so stamping
           // the default onto storage would buy nothing (same call as `goalMode`).
-          planEnabled: false,
           plannedWeek: undefined,
           ...targets,
           activeSessionId: undefined,
@@ -1073,15 +1044,11 @@ export const useStore = create<State>((set, get) => ({
         sets: data.sets,
         dailyLogs: data.dailyLogs,
         unit: data.settings.unit,
-        chartsEnabled: data.settings.chartsEnabled ?? true,
-        targetsEnabled: data.settings.targetsEnabled ?? false,
-        toolsEnabled: data.settings.toolsEnabled ?? false,
         targetProfiles: data.settings.targetProfiles ?? defaultTargets().targetProfiles,
         weekdayTargets: data.settings.weekdayTargets ?? defaultTargets().weekdayTargets,
         // Both default on READ. A settings record written before planning
         // existed has neither key, and no migration is needed to make it mean
         // "no plan" (see the note on `plannedWeek` in db.ts).
-        planEnabled: data.settings.planEnabled ?? false,
         plannedWeek: data.settings.plannedWeek,
         activeSessionId: data.activeSession.activeSessionId,
         currentExerciseId: data.activeSession.currentExerciseId,
@@ -1401,26 +1368,6 @@ export const useStore = create<State>((set, get) => ({
     persistSettingsFrom(get());
   },
 
-  setChartsEnabled: (v) => {
-    set({ chartsEnabled: v });
-    persistSettingsFrom(get());
-  },
-
-  setTargetsEnabled: (v) => {
-    set({ targetsEnabled: v });
-    persistSettingsFrom(get());
-  },
-
-  setToolsEnabled: (v) => {
-    set({ toolsEnabled: v });
-    persistSettingsFrom(get());
-  },
-
-  setPlanEnabled: (v) => {
-    set({ planEnabled: v });
-    persistSettingsFrom(get());
-  },
-
   updateSession: (sessionId, patch) => {
     set({ sessions: get().sessions.map((s) => (s.id === sessionId ? { ...s, ...patch } : s)) });
     const updated = get().sessions.find((s) => s.id === sessionId);
@@ -1517,16 +1464,12 @@ export const useStore = create<State>((set, get) => ({
       dailyLogs: data.dailyLogs,
       targetProfiles: data.targetProfiles,
       weekdayTargets: data.weekdayTargets,
-      targetsEnabled: data.targetsEnabled,
-      toolsEnabled: data.toolsEnabled,
       unit: data.unit,
-      chartsEnabled: true,
       // Restored from the file, not cleared. `replaceAllData` has just written
       // both of these into the settings record, so anything else here would
       // leave the store disagreeing with the DB until the next reload quietly
       // corrected it. A file with no plan carries `undefined`, which lands the
       // reader on "never planned" - the same state the file's author was in.
-      planEnabled: data.planEnabled,
       plannedWeek: data.plannedWeek,
       activeSessionId: undefined,
       currentExerciseId: undefined,
@@ -1548,9 +1491,6 @@ export const useStore = create<State>((set, get) => ({
       sets: [],
       dailyLogs: [],
       ...targets,
-      targetsEnabled: false,
-      toolsEnabled: false,
-      planEnabled: false,
       plannedWeek: undefined,
       unit: "lbs",
     });
@@ -1561,11 +1501,7 @@ export const useStore = create<State>((set, get) => ({
       sets: [],
       dailyLogs: [],
       ...targets,
-      targetsEnabled: false,
-      toolsEnabled: false,
       unit: "lbs",
-      chartsEnabled: true,
-      planEnabled: false,
       plannedWeek: undefined,
       activeSessionId: undefined,
       currentExerciseId: undefined,

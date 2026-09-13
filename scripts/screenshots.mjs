@@ -170,14 +170,6 @@ const SESSION_NOTES = {
   17: "Slept badly. Kept it easy.",
 };
 
-const HABITS = [
-  { id: "h_creatine", name: "Creatine", order: 0 },
-  { id: "h_vitd", name: "Vitamin D", order: 1 },
-  { id: "h_water", name: "3L water", order: 2 },
-  { id: "h_stretch", name: "Stretch 10 min", order: 3 },
-  { id: "h_cold", name: "Cold shower", order: 4, archived: true },
-];
-
 const TARGET_PROFILES = [
   {
     id: "tp_train",
@@ -202,7 +194,7 @@ const WEEKDAY_TARGETS = [
 ];
 
 /**
- * The populated backup: six weeks of lifting, cardio, nutrition, habits and
+ * The populated backup: six weeks of lifting, cardio, nutrition and
  * per-weekday targets, all pinned to FROZEN_NOW.
  *
  * Two days are shaped deliberately, because they are the states the redesign is
@@ -218,7 +210,6 @@ function buildFullBackup() {
   const sessions = [];
   const sets = [];
   const dailyLogs = [];
-  const habitEntries = [];
   const slotLastLogged = {};
 
   for (let offset = HISTORY_DAYS - 1; offset >= 0; offset--) {
@@ -347,21 +338,6 @@ function buildFullBackup() {
       log = { date: key, isCheatDay: true };
     }
     dailyLogs.push(log);
-
-    // --- habits ---------------------------------------------------------
-    const done = [];
-    if (offset === 0) {
-      // Today is deliberately half-finished so the checklist shows both states.
-      done.push("h_creatine", "h_vitd");
-    } else {
-      if (rand() < 0.92) done.push("h_creatine");
-      if (rand() < 0.72) done.push("h_vitd");
-      if ((log.steps ?? 0) >= 9500) done.push("h_water");
-      if (rand() < 0.48) done.push("h_stretch");
-    }
-    for (const habitId of done) {
-      habitEntries.push({ id: `${key}|${habitId}`, date: key, habitId });
-    }
   }
 
   const slots = SLOTS.map((s) => ({
@@ -370,18 +346,15 @@ function buildFullBackup() {
   }));
 
   return {
-    version: 4,
+    version: 5,
     exercises: EXERCISES,
     slots,
     sessions,
     sets,
     dailyLogs,
-    habits: HABITS,
-    habitEntries,
     targetProfiles: TARGET_PROFILES,
     weekdayTargets: WEEKDAY_TARGETS,
     targetsEnabled: true,
-    habitsEnabled: true,
     toolsEnabled: true,
     unit: "lbs",
   };
@@ -396,18 +369,15 @@ function buildFullBackup() {
  */
 function buildEmptyBackup() {
   return {
-    version: 4,
+    version: 5,
     exercises: EXERCISES,
     slots: [],
     sessions: [],
     sets: [],
     dailyLogs: [],
-    habits: [],
-    habitEntries: [],
     targetProfiles: [{ id: "tp_default", name: "Every day" }],
     weekdayTargets: Array.from({ length: 7 }, () => "tp_default"),
     targetsEnabled: false,
-    habitsEnabled: false,
     toolsEnabled: false,
     unit: "lbs",
   };
@@ -735,7 +705,7 @@ async function importBackup(page, backup, label) {
 async function captureEmptyStates(page) {
   await importBackup(page, buildEmptyBackup(), "empty / fresh install");
 
-  await gotoTab(page, "/", '[data-testid="timeline-scroll-container"]');
+  await gotoTab(page, "/", '[aria-label^="Edit daily numbers for "]');
   await shot(page, "01-empty-today");
 
   await gotoTab(page, "/history", 'h1:text("History")');
@@ -748,19 +718,15 @@ async function captureEmptyStates(page) {
   await gotoTab(page, "/charts", 'h1:text("Charts")');
   await shot(page, "04-empty-charts");
 
-  await gotoTab(page, "/", '[data-testid="timeline-scroll-container"]');
+  await gotoTab(page, "/", '[aria-label^="Edit daily numbers for "]');
   await page.getByRole("button", { name: /Edit daily numbers/ }).click();
   await settle(page, 600);
   await shot(page, "05-empty-day-editor-sheet");
 }
 
 async function captureToday(page) {
-  await gotoTab(page, "/", '[data-testid="timeline-scroll-container"]');
-  await page.waitForSelector("text=Habits", { timeout: 15_000 });
+  await gotoTab(page, "/", '[aria-label^="Edit daily numbers for "]');
   await shot(page, "10-today-populated");
-
-  await scrollMain(page, 400);
-  await shot(page, "11-today-populated-scrolled");
 
   await scrollMain(page, 0);
   // The daily-numbers card is a button wrapping the ring + macro columns.
@@ -782,17 +748,6 @@ async function captureToday(page) {
   await settle(page);
 }
 
-async function captureTargetsOff(page) {
-  await gotoTab(page, "/settings", "text=Daily targets");
-  await page.getByRole("switch", { name: "Daily targets" }).click();
-  await settle(page);
-  await gotoTab(page, "/", '[data-testid="timeline-scroll-container"]');
-  await shot(page, "14-today-targets-off-macro-ring");
-  await gotoTab(page, "/settings", "text=Daily targets");
-  await page.getByRole("switch", { name: "Daily targets" }).click();
-  await settle(page);
-}
-
 async function captureHistory(page) {
   await gotoTab(page, "/history", 'h1:text("History")');
   await shot(page, "20-history-weekly");
@@ -808,7 +763,7 @@ async function captureHistory(page) {
 }
 
 async function captureCharts(page) {
-  const metrics = ["Calories", "Protein", "Carbs", "Fat", "Steps", "Bodyweight"];
+  const metrics = ["Calories", "Steps", "Bodyweight"];
   await gotoTab(page, "/charts", 'h1:text("Charts")');
 
   for (const [i, metric] of metrics.entries()) {
@@ -859,19 +814,9 @@ async function captureSettings(page) {
   await gotoTab(page, "/settings", 'h1:text("Settings")');
   await shot(page, "40-settings-top");
 
-  // The seed uses two profiles across an uneven week, so the editor is already
-  // in its full mode: goals, the seven-day assignment strip and the profiles.
+  // One set of goals now: no assignment strip, no profile list.
   await scrollToTop(page, page.getByText("Daily targets", { exact: true }));
-  await shot(page, "41-settings-targets-editor");
-
-  const dayAssignments = page.getByText("Day assignments", { exact: true });
-  if (await dayAssignments.count()) {
-    await scrollToTop(page, dayAssignments);
-    await shot(page, "42-settings-targets-weekday-assignment");
-  }
-
-  await scrollToTop(page, page.getByText("Target profiles", { exact: true }));
-  await shot(page, "43-settings-target-profile-cards");
+  await shot(page, "41-settings-daily-targets");
 
   // Scrolling Export backup to the top also lands the page on its last screen,
   // so this doubles as the settings-bottom capture.
@@ -880,7 +825,7 @@ async function captureSettings(page) {
 }
 
 async function captureWorkoutFlow(page) {
-  await gotoTab(page, "/", '[data-testid="timeline-scroll-container"]');
+  await gotoTab(page, "/", '[aria-label^="Edit daily numbers for "]');
 
   await page.getByRole("button", { name: "Start workout" }).click();
   await settle(page, 500);
@@ -953,7 +898,7 @@ async function captureWorkoutFlow(page) {
   await settle(page, 600);
   await shot(page, "5b-workout-summary-no-records");
   await page.getByRole("button", { name: "Done" }).click();
-  await page.waitForSelector('[data-testid="timeline-scroll-container"]', { timeout: 15_000 });
+  await page.waitForSelector('[aria-label^="Edit daily numbers for "]', { timeout: 15_000 });
   await settle(page, 500);
 
   // The same screen when the workout beat something. Two records, so the
@@ -966,7 +911,7 @@ async function captureWorkoutFlow(page) {
   await settle(page, 600);
   await shot(page, "5c-workout-summary-record");
   await page.getByRole("button", { name: "Done" }).click();
-  await page.waitForSelector('[data-testid="timeline-scroll-container"]', { timeout: 15_000 });
+  await page.waitForSelector('[aria-label^="Edit daily numbers for "]', { timeout: 15_000 });
   await settle(page, 500);
 
   // An empty workout has no summary: ending one is a cancel, and it goes
@@ -974,7 +919,7 @@ async function captureWorkoutFlow(page) {
   // since the picture is just the Today screen.
   await startWorkout(page);
   await endWorkoutAt(page, 3);
-  await page.waitForSelector('[data-testid="timeline-scroll-container"]', { timeout: 15_000 });
+  await page.waitForSelector('[aria-label^="Edit daily numbers for "]', { timeout: 15_000 });
   if (await page.locator("text=Finished").count()) {
     throw new Error("Ending a workout with nothing logged should not show a summary.");
   }
@@ -1034,7 +979,7 @@ async function endWorkoutAt(page, minutes) {
 }
 
 async function captureSessionDetail(page) {
-  await gotoTab(page, "/", '[data-testid="timeline-scroll-container"]');
+  await gotoTab(page, "/", '[aria-label^="Edit daily numbers for "]');
   await scrollMain(page, 99_999);
   const sessionRow = page.locator("section", { hasText: "Workouts" }).getByRole("button").first();
   if (await sessionRow.count()) {
@@ -1104,7 +1049,6 @@ async function main() {
     await captureEmptyStates(page);
     await importBackup(page, buildFullBackup(), "six weeks of populated history");
     await captureToday(page);
-    await captureTargetsOff(page);
     await captureHistory(page);
     await captureCharts(page);
     await captureSettings(page);

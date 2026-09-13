@@ -53,7 +53,6 @@ function WorkoutPage() {
   const logNextInBlock = useStore((s) => s.logNextInBlock);
   const lastSetupNoteFor = useStore((s) => s.lastSetupNoteFor);
   const setCurrentExercise = useStore((s) => s.setCurrentExercise);
-  const planEnabled = useStore((s) => s.planEnabled);
   // Subscribed rather than read through getState() so the list below reacts to
   // the plan being edited (or the feature being switched off) mid-workout.
   const plannedWeek = useStore((s) => s.plannedWeek);
@@ -118,14 +117,14 @@ function WorkoutPage() {
    * subscription above.
    */
   const planned = useMemo(() => {
-    if (!planEnabled || !plannedWeek || !session) return null;
+    if (!plannedWeek || !session) return null;
     const workout = plannedWorkoutForDate(dayKey(new Date(session.startedAt)));
     if (!workout) return null;
     const lifts = workout.exerciseIds
       .map((id) => exercises.find((e) => e.id === id))
       .filter((e): e is Exercise => e !== undefined);
     return lifts.length > 0 ? { name: workout.name, lifts } : null;
-  }, [planEnabled, plannedWeek, plannedWorkoutForDate, session, exercises]);
+  }, [plannedWeek, plannedWorkoutForDate, session, exercises]);
   const currentSetupNote = currentExerciseId ? lastSetupNoteFor(currentExerciseId) : undefined;
   const inBlock = !!currentBlock && currentBlock.loggedInBlock < currentBlock.targetSets;
 

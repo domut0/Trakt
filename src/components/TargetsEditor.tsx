@@ -3,9 +3,7 @@ import {
   DEFAULT_GOAL_MODE,
   directionFor,
   GOAL_MODES,
-  isUniformWeek,
   TARGET_FIELDS,
-  WEEKDAY_LABELS,
   type GoalMode,
   type TargetDirection,
   type TargetField,
@@ -13,269 +11,41 @@ import {
 import { useStore, type TargetProfile } from "../lib/store";
 
 /**
- * Self-contained editor for nutrition and step target profiles and their
- * per-weekday assignments.
+ * Self-contained editor for the daily nutrition and step targets.
  *
- * Built around a progressive reveal. While the whole week resolves to one
- * profile there is nothing to assign, so the seven day chips are NOT RENDERED
- * AT ALL: the user sees one plain set of goals plus a quiet action to start
- * varying them. The chip strip appears only once the week has something to say,
- * which is either more than one profile existing or the week already being
- * non-uniform.
+ * ONE set of numbers. This used to be a profile manager with a seven-chip
+ * weekday assignment strip and a progressive reveal to open it, which is a
+ * scheduling chore wearing the clothes of a feature: a target you have to
+ * maintain across seven days goes stale the first week you do not, and a stale
+ * target is worse than none.
  *
- * `isUniformWeek` in targets.ts is the single source of truth for that rule.
- * Do not re-derive it here with an inline Set comparison.
+ * `weekdayTargets` still exists in the store and still points every weekday at
+ * this one profile, so the backup and sheet formats did not churn. Nothing in
+ * the UI can make those seven entries disagree any more.
  */
 export function TargetsEditor() {
   const targetProfiles = useStore((s) => s.targetProfiles);
-  const weekdayTargets = useStore((s) => s.weekdayTargets);
-  const addTargetProfile = useStore((s) => s.addTargetProfile);
   const updateTargetProfile = useStore((s) => s.updateTargetProfile);
-  const deleteTargetProfile = useStore((s) => s.deleteTargetProfile);
-  const assignWeekdayTarget = useStore((s) => s.assignWeekdayTarget);
 
-  /**
-   * Gate for the seven-chip strip and the summary.
-   *
-   * The `!isUniformWeek` half is not redundant with the profile count. It
-   * catches the case where a user-edited backup left the week pointing at ids
-   * that no longer resolve: the week is non-uniform, Today shows no target, and
-   * the chips are the only way to repair it. The profile-count half is what
-   * opens the strip immediately after "use different targets on some days",
-   * where a second profile exists but every day still points at the first.
-   */
-  const showDayAssignments = targetProfiles.length > 1 || !isUniformWeek(weekdayTargets);
-
-  /** deleteTargetProfile refuses to remove the last profile, so surface that as
-   * a disabled control rather than a tap that silently does nothing. */
-  const canDeleteProfiles = targetProfiles.length > 1;
-
-  /**
-   * One-tap day target rotation: advances the selected weekday to the next
-   * profile in the list.
-   *
-   * `weekdayIndex` is MONDAY FIRST (0 = Mon, 6 = Sun), matching
-   * `weekdayTargets` and `WEEKDAY_LABELS`. It comes from the position in
-   * WEEKDAY_LABELS, never from a Date, so there is no `getDay()` rotation to do
-   * here.
-   */
-  const handleRotateDayTarget = (weekdayIndex: number) => {
-    if (targetProfiles.length === 0) return;
-    const currentId = weekdayTargets[weekdayIndex];
-    const currentIdx = targetProfiles.findIndex((p) => p.id === currentId);
-    // findIndex returns -1 for a stale id, so the next index lands on the first
-    // profile, which is what repairing a broken assignment should do.
-    const nextIdx = (currentIdx + 1) % targetProfiles.length;
-    assignWeekdayTarget(weekdayIndex, targetProfiles[nextIdx].id);
-  };
-
-  /**
-   * Action for "use different targets on some days": adds a second profile,
-   * renaming the placeholder first one so the training/rest distinction reads
-   * immediately.
-   */
-  const handleSplitTargets = () => {
-    if (targetProfiles.length !== 1) return;
-    const first = targetProfiles[0];
-    if (first.name === "Every day" || first.name === "Untitled") {
-      updateTargetProfile(first.id, { name: "Training" });
-    }
-    addTargetProfile("Rest");
-  };
-
-  /**
-   * Live plain-language summary, one line per profile, so a chip assignment is
-   * legible without decoding chips: "Training: 3,200 kcal on Mon, Wed, Fri".
-   */
-  const summaryLines = targetProfiles.map((profile) => {
-    const days = WEEKDAY_LABELS.filter((_, idx) => weekdayTargets[idx] === profile.id);
-
-    let where: string;
-    if (days.length === 0) where = "not used on any day";
-    else if (days.length === 7) where = "on every day";
-    else where = `on ${days.join(", ")}`;
-
-    const calories =
-      profile.calories !== undefined && profile.calories > 0
-        ? `${profile.calories.toLocaleString()} kcal `
-        : "";
-
-    return { key: profile.id, text: `${profile.name}: ${calories}${where}` };
-  });
-
-  /** Days whose assigned id resolves to nothing, which is what a bad import
-   * looks like. Those days get no target on Today, so say so out loud. */
-  const orphanDays = WEEKDAY_LABELS.filter(
-    (_, idx) => !targetProfiles.some((p) => p.id === weekdayTargets[idx]),
-  );
+  const profile = targetProfiles[0];
+  if (!profile) return null;
 
   return (
-    <div className="space-y-6">
-      {showDayAssignments && (
-        <>
-          <div className="rounded-md bg-wash p-4">
-            <div className="t-caption text-ink-2">This week</div>
-            <div className="tnum mt-1.5 space-y-1 t-label font-medium text-ink">
-              {summaryLines.map((line) => (
-                <div key={line.key}>{line.text}</div>
-              ))}
-              {orphanDays.length > 0 && (
-                <div className="text-signal">No target on {orphanDays.join(", ")}</div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <h2 className="mb-1 t-caption text-ink-2">Day assignments</h2>
-            <p className="mb-2 t-label text-ink-2">Tap a day to cycle through your profiles.</p>
-            <div
-              role="group"
-              aria-label="Weekday target assignments"
-              className="grid grid-cols-7 gap-1.5"
-            >
-              {WEEKDAY_LABELS.map((label, idx) => {
-                const assigned = targetProfiles.find((p) => p.id === weekdayTargets[idx]);
-                // Never fall back to profiles[0] for display: claiming an
-                // assignment the resolver will not honour is how a stale id
-                // stays invisible while Today quietly shows no target.
-                const assignedName = assigned?.name ?? "Not set";
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    aria-label={`${label}, currently ${assignedName}. Tap to change.`}
-                    onClick={() => handleRotateDayTarget(idx)}
-                    className="flex min-h-[52px] min-w-0 flex-col items-center justify-center rounded-md bg-wash p-1 text-center transition-transform active:scale-95"
-                  >
-                    <span aria-hidden="true" className="t-caption text-ink-2">
-                      {label}
-                    </span>
-                    {/*
-                      The profile INITIAL, not its truncated name.
-
-                      Seven columns on a 390px screen give each chip about 45px,
-                      which turned every profile called anything into "TRA...".
-                      An ellipsis that eats the whole word is not an
-                      abbreviation, it is a word you cannot read. The panel
-                      directly above already names which profile runs on which
-                      days in full, and the accessible name on this button
-                      carries it too, so the chip only has to DISTINGUISH.
-                    */}
-                    <span
-                      aria-hidden="true"
-                      className={`mt-0.5 t-caption ${assigned ? "text-ink" : "text-ink-2"}`}
-                    >
-                      {assigned ? assignedName.trim().charAt(0).toUpperCase() : "-"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
-
-      <div className="space-y-4">
-        {showDayAssignments && (
-          <div className="flex items-center justify-between">
-            <h2 className="t-caption text-ink-2">Target profiles</h2>
-            <button
-              type="button"
-              onClick={() => addTargetProfile("New profile")}
-              className="flex min-h-[44px] items-center t-body t-action"
-            >
-              + Add profile
-            </button>
-          </div>
-        )}
-
-        {targetProfiles.map((profile) => (
-          <ProfileCard
-            key={profile.id}
-            profile={profile}
-            canDelete={canDeleteProfiles}
-            onUpdate={(patch) => updateTargetProfile(profile.id, patch)}
-            onDelete={() => deleteTargetProfile(profile.id)}
-          />
-        ))}
-
-        {!canDeleteProfiles && (
-          <p className="t-label text-ink-2">
-            At least one profile is required while targets are on. Turn targets off to remove them
-            all.
-          </p>
-        )}
-
-        {!showDayAssignments && (
-          <button
-            type="button"
-            onClick={handleSplitTargets}
-            className="flex min-h-[44px] w-full items-center t-body t-action"
-          >
-            Use different targets on some days
-          </button>
-        )}
-      </div>
+    <div className="space-y-4">
+      <ProfileCard profile={profile} onUpdate={(patch) => updateTargetProfile(profile.id, patch)} />
     </div>
   );
 }
 
 function ProfileCard({
   profile,
-  canDelete,
   onUpdate,
-  onDelete,
 }: {
   profile: TargetProfile;
-  canDelete: boolean;
   onUpdate: (patch: Partial<Omit<TargetProfile, "id">>) => void;
-  onDelete: () => void;
 }) {
   return (
     <div className="space-y-4 bg-wash p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex-1">
-          <label htmlFor={`profile-name-${profile.id}`} className="sr-only">
-            Profile name
-          </label>
-          <input
-            id={`profile-name-${profile.id}`}
-            type="text"
-            value={profile.name}
-            onChange={(e) => onUpdate({ name: e.target.value })}
-            placeholder="Profile name"
-            className="min-h-[44px] w-full border-b border-transparent bg-transparent t-heading font-semibold outline-none focus:border-rule"
-          />
-        </div>
-        <button
-          type="button"
-          aria-label={
-            canDelete
-              ? `Delete profile ${profile.name}`
-              : `Delete profile ${profile.name}, unavailable because at least one profile is required`
-          }
-          title={canDelete ? "Delete profile" : "At least one profile is required"}
-          disabled={!canDelete}
-          onClick={onDelete}
-          className="flex h-[44px] w-[44px] shrink-0 items-center justify-center text-ink-2 hover:text-signal disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-ink-2"
-        >
-          <svg
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-            />
-          </svg>
-        </button>
-      </div>
-
       <GoalModeControl profile={profile} onUpdate={onUpdate} />
 
       <div className="grid grid-cols-2 gap-3">

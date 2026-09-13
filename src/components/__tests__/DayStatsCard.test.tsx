@@ -17,7 +17,6 @@ function seedStore({
   steps,
   dailyLogs = [],
   unit = "lbs",
-  targetsEnabled = true,
 }: {
   goalMode?: GoalMode;
   calories?: number;
@@ -35,7 +34,6 @@ function seedStore({
     bodyweight?: number;
   }[];
   unit?: "lbs" | "kg";
-  targetsEnabled?: boolean;
 }) {
   const profile: TargetProfile = {
     id: PROFILE_ID,
@@ -50,7 +48,6 @@ function seedStore({
 
   useStore.setState({
     hydrated: true,
-    targetsEnabled,
     unit,
     targetProfiles: [profile],
     weekdayTargets: Array.from({ length: 7 }, () => PROFILE_ID),

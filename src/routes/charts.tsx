@@ -31,9 +31,6 @@ const METRICS: {
   unit: string | ((appUnit: string) => string);
 }[] = [
   { key: "calories", label: "Calories", unit: "kcal" },
-  { key: "protein", label: "Protein", unit: "g" },
-  { key: "carbs", label: "Carbs", unit: "g" },
-  { key: "fat", label: "Fat", unit: "g" },
   { key: "steps", label: "Steps", unit: "steps" },
   { key: "bodyweight", label: "Bodyweight", unit: (u) => u },
 ];
@@ -62,19 +59,13 @@ function formatMetricValue(metricKey: DailyLogNumericField, v: number): string {
 /**
  * The angle the area under a trace is ruled at.
  *
- * Angle carries metric identity in this system, so the chart fills with the
- * SELECTED metric's own hatch: the Carbs chart is ruled at the Carbs angle and
- * matches the swatch beside "Carbs" on the day view. The first version ruled
- * every chart at 45 regardless, which collided with hatch-carbs and quietly
- * asserted that every metric was carbohydrate.
- *
- * 135 is the diagonal no macro owns, so the metrics that have no macro identity
- * take it.
+ * Angle used to carry macro identity here, because the day view drew protein,
+ * carbs and fat as three differently-ruled swatches and the chart matched
+ * whichever one you had selected. Charts now cover calories, steps and
+ * bodyweight only, none of which owns a macro angle, so there is one angle and
+ * it is the diagonal no macro ever had.
  */
-function hatchAngleFor(metricKey: DailyLogNumericField): number {
-  if (metricKey === "protein") return 90;
-  if (metricKey === "carbs") return 45;
-  if (metricKey === "fat") return 0;
+function hatchAngleFor(): number {
   return 135;
 }
 
@@ -674,7 +665,7 @@ function Chart({
           width="4"
           height="4"
           patternUnits="userSpaceOnUse"
-          patternTransform={`rotate(${hatchAngleFor(metricKey)})`}
+          patternTransform={`rotate(${hatchAngleFor()})`}
         >
           <line x1="0" y1="0" x2="0" y2="4" stroke="var(--color-ink)" strokeWidth="0.6" />
         </pattern>

@@ -75,10 +75,10 @@ describe("Dexie v1 -> current schema upgrade", () => {
     await v1
       .table("sets")
       .put({ id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1 });
-    // chartsEnabled: false is not the default, so it doubles as a marker: if the
-    // upgrade ever replaced the settings record instead of carrying it forward,
-    // this would silently come back true.
-    await v1.table("meta").put({ key: "settings", unit: "kg", chartsEnabled: false });
+    // unit "kg" is not the default, so it doubles as a marker: if the upgrade
+    // ever replaced the settings record instead of carrying it forward, this
+    // would silently come back as lbs.
+    await v1.table("meta").put({ key: "settings", unit: "kg" });
     v1.close();
 
     // The app opens the same database at its current version. Adding a table
@@ -107,7 +107,7 @@ describe("Dexie v1 -> current schema upgrade", () => {
     expect(await db.slots.count()).toBe(1);
     expect(await db.sessions.count()).toBe(1);
     expect(await db.sets.count()).toBe(1);
-    expect(await db.meta.get("settings")).toMatchObject({ unit: "kg", chartsEnabled: false });
+    expect(await db.meta.get("settings")).toMatchObject({ unit: "kg" });
 
     // dailyLogs exists, is empty, and is writable. Writing matters as much as
     // counting: an object store created without its declared indexes still
@@ -121,7 +121,6 @@ describe("Dexie v1 -> current schema upgrade", () => {
     const state = useStore.getState();
     expect(state.exercises).toHaveLength(1); // no demo re-seed
     expect(state.unit).toBe("kg");
-    expect(state.chartsEnabled).toBe(false); // the v1 settings record, not defaults
     expect(state.dailyLogs).toEqual([{ date: "2026-08-07", calories: 2400 }]);
     // A v1 settings record predates targets entirely, so it carries no profiles.
     // loadAll backfills them on read, which is what stops an upgraded install

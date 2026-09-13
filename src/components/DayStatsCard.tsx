@@ -176,12 +176,11 @@ function CalorieGauge({
 }
 
 export function DayStatsCard({ date }: { date: string }): JSX.Element {
-  const targetsEnabled = useStore((s) => s.targetsEnabled);
   const targetProfileForDate = useStore((s) => s.targetProfileForDate);
   const unit = useStore((s) => s.unit);
   const dailyLogs = useStore((s) => s.dailyLogs);
 
-  const profile = targetsEnabled ? targetProfileForDate(date) : undefined;
+  const profile = targetProfileForDate(date);
   const dayLog = useMemo(() => dailyLogs.find((l) => l.date === date), [dailyLogs, date]);
 
   const isFuture = date > dayKey(new Date());

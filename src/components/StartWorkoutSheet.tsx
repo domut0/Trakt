@@ -18,7 +18,6 @@ export function StartWorkoutSheet({
   const startWorkout = useStore((s) => s.startWorkout);
   const exercises = useStore((s) => s.exercises);
   const setCurrentExercise = useStore((s) => s.setCurrentExercise);
-  const planEnabled = useStore((s) => s.planEnabled);
   const plannedWeek = useStore((s) => s.plannedWeek);
   const plannedWorkoutForDate = useStore((s) => s.plannedWorkoutForDate);
   const [value, setValue] = useState("");
@@ -55,14 +54,14 @@ export function StartWorkoutSheet({
    * slot for any name that does not match one, quietly bending the rotation.
    */
   const planned = useMemo(() => {
-    if (!open || !planEnabled || !plannedWeek) return null;
+    if (!open || !plannedWeek) return null;
     const workout = plannedWorkoutForDate(dayKey(new Date()));
     if (!workout) return null;
     const lifts = workout.exerciseIds
       .map((id) => exercises.find((e) => e.id === id))
       .filter((e): e is Exercise => e !== undefined);
     return lifts.length > 0 ? { name: workout.name, lifts } : null;
-  }, [open, planEnabled, plannedWeek, plannedWorkoutForDate, exercises]);
+  }, [open, plannedWeek, plannedWorkoutForDate, exercises]);
 
   if (!open || typeof document === "undefined") return null;
 

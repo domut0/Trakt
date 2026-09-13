@@ -31,14 +31,6 @@ export const Route = createFileRoute("/settings")({
 function SettingsPage() {
   const unit = useStore((s) => s.unit);
   const setUnit = useStore((s) => s.setUnit);
-  const chartsEnabled = useStore((s) => s.chartsEnabled);
-  const setChartsEnabled = useStore((s) => s.setChartsEnabled);
-  const targetsEnabled = useStore((s) => s.targetsEnabled);
-  const setTargetsEnabled = useStore((s) => s.setTargetsEnabled);
-  const toolsEnabled = useStore((s) => s.toolsEnabled);
-  const setToolsEnabled = useStore((s) => s.setToolsEnabled);
-  const planEnabled = useStore((s) => s.planEnabled);
-  const setPlanEnabled = useStore((s) => s.setPlanEnabled);
   const importData = useStore((s) => s.importData);
   const clearAllData = useStore((s) => s.clearAllData);
   // Read only so the import confirmation can compare the file against what is
@@ -84,9 +76,6 @@ function SettingsPage() {
       dailyLogs,
       targetProfiles,
       weekdayTargets,
-      targetsEnabled,
-      toolsEnabled,
-      planEnabled,
       plannedWeek,
       unit,
     } = useStore.getState();
@@ -105,9 +94,6 @@ function SettingsPage() {
       dailyLogs,
       targetProfiles,
       weekdayTargets,
-      targetsEnabled,
-      toolsEnabled,
-      planEnabled,
       plannedWeek,
       unit,
     };
@@ -223,6 +209,12 @@ function SettingsPage() {
               {u}
             </button>
           ))}
+        </div>
+      </Section>
+
+      <Section title="Daily targets" delay={80}>
+        <div className="px-5 pt-1">
+          <TargetsEditor />
         </div>
       </Section>
 

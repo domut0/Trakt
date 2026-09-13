@@ -22,9 +22,6 @@ const DEFAULT_STATE = {
   dailyLogs: [],
   targetProfiles: [],
   weekdayTargets: [],
-  targetsEnabled: false,
-  toolsEnabled: false,
-  planEnabled: false,
   plannedWeek: undefined,
   activeSessionId: undefined,
   currentExerciseId: undefined,
@@ -70,82 +67,6 @@ const SUNDAY = "2026-08-16";
 beforeEach(async () => {
   await resetDb();
   useStore.setState({ ...DEFAULT_STATE });
-});
-
-describe("planEnabled (opt-in toggle)", () => {
-  it("defaults to false on a first run without writing the default to storage", async () => {
-    await useStore.getState().hydrate();
-
-    expect(useStore.getState().planEnabled).toBe(false);
-    expect(useStore.getState().plannedWeek).toBeUndefined();
-    // The seeded settings record must carry NEITHER key. Absent already reads as
-    // "off, nothing planned", so stamping the default onto storage would be a
-    // migration nobody needs (the call `goalMode` made first). Checked with `in`
-    // rather than a falsy comparison: `planEnabled: false` would pass the latter
-    // while being exactly the write this forbids.
-    const settings = await storedSettings();
-    expect(settings).toBeDefined();
-    expect(settings && "planEnabled" in settings).toBe(false);
-    expect(settings && "plannedWeek" in settings).toBe(false);
-  });
-
-  it("reads false from a settings record written before planning existed", async () => {
-    // Exactly what an existing install has on disk: a v4-era settings row, no
-    // plan keys, and no Dexie version bump between then and now.
-    const legacy: SettingsMeta = {
-      key: "settings",
-      unit: "kg",
-      chartsEnabled: false,
-      targetsEnabled: true,
-      toolsEnabled: true,
-      targetProfiles: [{ id: "tp_default", name: "Every day" }],
-      weekdayTargets: Array.from({ length: 7 }, () => "tp_default"),
-    };
-    await db.meta.put(legacy);
-    await db.exercises.put(SQUAT); // so the DB is not empty and hydrate loads rather than seeds
-
-    await useStore.getState().hydrate();
-
-    const s = useStore.getState();
-    expect(s.planEnabled).toBe(false);
-    expect(s.plannedWeek).toBeUndefined();
-    // The rest of the record survived intact: reading a missing field must not
-    // cost the user the settings they did have.
-    expect(s.unit).toBe("kg");
-    expect(s.targetsEnabled).toBe(true);
-    expect(s.chartsEnabled).toBe(false);
-  });
-
-  it("mirrors a flip to IndexedDB and survives a reload", async () => {
-    await useStore.getState().hydrate();
-
-    useStore.getState().setPlanEnabled(true);
-    expect(useStore.getState().planEnabled).toBe(true);
-    await flush();
-    expect((await storedSettings())?.planEnabled).toBe(true);
-
-    await reload();
-    expect(useStore.getState().planEnabled).toBe(true);
-  });
-
-  it("does not discard the plan when the toggle goes off", async () => {
-    // The toggle decides whether the planning surface is shown, not whether the
-    // plan exists. Turning it off to see a cleaner Today screen and losing a
-    // week of planning would be an unrecoverable surprise.
-    await useStore.getState().hydrate();
-    useStore.getState().setPlanEnabled(true);
-    useStore.getState().setPlannedDay(0, { name: "Heavy Bench", exerciseIds: ["e_bench"] });
-
-    useStore.getState().setPlanEnabled(false);
-    await flush();
-
-    await reload();
-    expect(useStore.getState().planEnabled).toBe(false);
-    expect(useStore.getState().plannedWeek?.[0]).toEqual({
-      name: "Heavy Bench",
-      exerciseIds: ["e_bench"],
-    });
-  });
 });
 
 describe("setPlannedDay", () => {
@@ -278,13 +199,10 @@ describe("plannedWorkoutForDate", () => {
 describe("clearAllData", () => {
   it("resets the plan in both the store and IndexedDB", async () => {
     await useStore.getState().hydrate();
-    useStore.getState().setPlanEnabled(true);
     useStore.getState().setPlannedDay(0, { name: "Monday", exerciseIds: ["e_squat"] });
     await flush();
 
     await useStore.getState().clearAllData();
-
-    expect(useStore.getState().planEnabled).toBe(false);
     expect(useStore.getState().plannedWeek).toBeUndefined();
     // The DB half is the one that matters: leaving the old plan on disk while
     // the store says otherwise would resurrect it on the next reload.
@@ -292,7 +210,6 @@ describe("clearAllData", () => {
     // false, not absent: clearAllData writes the flag off explicitly, exactly
     // as it does for targetsEnabled/habitsEnabled/toolsEnabled beside it. The
     // plan itself does go away entirely, which is the half that matters.
-    expect(settings?.planEnabled).toBe(false);
     expect(settings?.plannedWeek).toBeUndefined();
     await reload();
     expect(useStore.getState().plannedWeek).toBeUndefined();

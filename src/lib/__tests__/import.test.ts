@@ -20,8 +20,6 @@ const DEFAULT_STATE = {
   // read anything at all.
   targetProfiles: [],
   weekdayTargets: [],
-  targetsEnabled: false,
-  toolsEnabled: false,
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -73,14 +71,11 @@ beforeEach(async () => {
  */
 const PRE_V4_DEFAULTS = {
   ...defaultTargets(),
-  targetsEnabled: false,
-  toolsEnabled: false,
   // The plan rides along on v4 without a version bump, so "an old file" means
   // one with no plan keys at all. `undefined` is what parseBackup hands back
   // for exactly that file, which is why it belongs in the shared defaults
   // rather than being an empty week: a week of seven rest days is a plan the
   // author of these files never made.
-  planEnabled: false,
   plannedWeek: undefined,
 };
 
@@ -627,13 +622,10 @@ describe("importData (full backup restore)", () => {
       // All three true for the same anti-false-pass reason: parseBackup reads
       // these as `=== true`, so a fixture using `false` would be identical to the
       // field having been dropped on the floor.
-      targetsEnabled: true,
-      toolsEnabled: true,
       // No plan, deliberately: this fixture is a v4 file as v4 shipped, and the
       // plan's own round trip is its own test below. Keeping it plan-less here
       // is what keeps this one covering the case of a file written before
       // planning existed.
-      planEnabled: false,
       plannedWeek: undefined,
       // Not the default, so a settings record that failed to persist is visible.
       unit: "kg",
@@ -677,8 +669,6 @@ describe("importData (full backup restore)", () => {
     const restored = useStore.getState();
     expect(restored.targetProfiles).toEqual(v4Backup.targetProfiles);
     expect(restored.weekdayTargets).toEqual(v4Backup.weekdayTargets);
-    expect(restored.targetsEnabled).toBe(true);
-    expect(restored.toolsEnabled).toBe(true);
     expect(restored.sessions).toEqual(v4Backup.sessions);
 
     // The half that actually matters for a restore: read it back out of
@@ -688,8 +678,6 @@ describe("importData (full backup restore)", () => {
     const reloaded = useStore.getState();
     expect(reloaded.targetProfiles).toEqual(v4Backup.targetProfiles);
     expect(reloaded.weekdayTargets).toEqual(v4Backup.weekdayTargets);
-    expect(reloaded.targetsEnabled).toBe(true);
-    expect(reloaded.toolsEnabled).toBe(true);
     expect(reloaded.unit).toBe("kg");
     expect(sortById(reloaded.sessions)).toEqual(sortById(v4Backup.sessions));
     expect(sortByDate(reloaded.dailyLogs)).toEqual(sortByDate(v4Backup.dailyLogs));
@@ -709,14 +697,7 @@ describe("importData (full backup restore)", () => {
     // disk genuinely does not have them, and absent takes a different branch
     // through parseBackup than present-but-empty does.
     const legacyBackup: Record<string, unknown> = { ...validBackup, version: 2 };
-    for (const key of [
-      "habits",
-      "habitEntries",
-      "targetProfiles",
-      "weekdayTargets",
-      "targetsEnabled",
-      "toolsEnabled",
-    ]) {
+    for (const key of ["habits", "habitEntries", "targetProfiles", "weekdayTargets"]) {
       delete legacyBackup[key];
     }
 
@@ -734,8 +715,6 @@ describe("importData (full backup restore)", () => {
     expect(result.data.weekdayTargets.every((id) => id === DEFAULT_TARGET_PROFILE_ID)).toBe(true);
     // And the features stay off. An old file cannot consent to a surface that did
     // not exist when it was written.
-    expect(result.data.targetsEnabled).toBe(false);
-    expect(result.data.toolsEnabled).toBe(false);
 
     await useStore.getState().hydrate();
     await useStore.getState().importData(result.data);
@@ -746,8 +725,6 @@ describe("importData (full backup restore)", () => {
     expect(reloaded.targetProfiles).toEqual(defaultTargets().targetProfiles);
     expect(reloaded.weekdayTargets).toHaveLength(7);
     expect(reloaded.weekdayTargets.every((id) => id === DEFAULT_TARGET_PROFILE_ID)).toBe(true);
-    expect(reloaded.targetsEnabled).toBe(false);
-    expect(reloaded.toolsEnabled).toBe(false);
     // The workout data the old file DID carry still arrived.
     expect(sortById(reloaded.exercises)).toEqual(sortById(validBackup.exercises));
     expect(reloaded.unit).toBe(validBackup.unit);

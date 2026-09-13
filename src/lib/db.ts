@@ -27,14 +27,11 @@ export type MetaKey =
 export interface SettingsMeta {
   key: "settings";
   unit: "lbs" | "kg";
-  chartsEnabled?: boolean;
   /** Opt-in: daily calorie/macro/step targets. Off means the Today ring shows a
    * pure macro split, exactly as it did before targets existed. */
-  targetsEnabled?: boolean;
   /** Opt-in: the habit checklist on Today. */
   habitsEnabled?: boolean;
   /** Opt-in: the plate and 1RM calculator sheets. */
-  toolsEnabled?: boolean;
   /**
    * Named target profiles. Lives on the settings record rather than in its own
    * table because it is a handful of tiny rows that are always read together
@@ -48,7 +45,6 @@ export interface SettingsMeta {
    */
   weekdayTargets?: string[];
   /** Opt-in: planning main lifts on a weekly template. */
-  planEnabled?: boolean;
   /** Opt-in: food logging, meals and the food catalogue. */
   foodEnabled?: boolean;
   /**
@@ -271,10 +267,7 @@ export function defaultSettings(): SettingsMeta {
   return {
     key: "settings",
     unit: "lbs",
-    chartsEnabled: true,
-    targetsEnabled: false,
     habitsEnabled: false,
-    toolsEnabled: false,
     ...defaultTargets(),
   };
 }
@@ -393,12 +386,8 @@ export async function replaceAllData(data: BackupData): Promise<void> {
       const settings: SettingsMeta = {
         key: "settings",
         unit: data.unit,
-        chartsEnabled: true,
-        targetsEnabled: data.targetsEnabled,
-        toolsEnabled: data.toolsEnabled,
         targetProfiles: data.targetProfiles,
         weekdayTargets: data.weekdayTargets,
-        planEnabled: data.planEnabled,
         // Written straight through, `undefined` included: Dexie stores the
         // record without the key, which is precisely the "never planned" state
         // and is what `loadAll` reads back. Substituting a week of rest days

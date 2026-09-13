@@ -9,7 +9,6 @@ type TabItem = {
   to: TabPath;
   label: string;
   icon: "home" | "chart" | "calendar" | "settings" | "plan";
-  requires?: "charts" | "plan";
 };
 
 /**
@@ -19,32 +18,13 @@ type TabItem = {
  * Order is also the swipe order, so tabs that read as neighbours have to be
  * neighbours.
  */
-const ALL_TABS: TabItem[] = [
+const TABS: TabItem[] = [
   { to: "/", label: "Today", icon: "home" },
-  { to: "/plan", label: "Plan", icon: "plan", requires: "plan" },
+  { to: "/plan", label: "Plan", icon: "plan" },
   { to: "/history", label: "History", icon: "calendar" },
-  { to: "/charts", label: "Charts", icon: "chart", requires: "charts" },
+  { to: "/charts", label: "Charts", icon: "chart" },
   { to: "/settings", label: "Settings", icon: "settings" },
 ];
-
-/**
- * Ordered list of tabs currently shown in the bottom nav, respecting the
- * Charts and Plan toggles in Settings. Shared by BottomNav (rendering) and
- * AppShell (swipe navigation + directional transitions) so both always agree
- * on tab order.
- *
- * Takes the toggles as one named object rather than two positional booleans:
- * with both switched on there are five routed tabs and a transposed pair of
- * arguments would be invisible at the call site and wrong only in the states
- * where the two differ.
- */
-function getEnabledTabs(toggles: { charts: boolean; plan: boolean }): TabItem[] {
-  return ALL_TABS.filter((t) => {
-    if (t.requires === "charts") return toggles.charts;
-    if (t.requires === "plan") return toggles.plan;
-    return true;
-  });
-}
 
 /**
  * Direction of the most recent tab-to-tab navigation, recorded right before
@@ -190,10 +170,8 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   const location = useLocation();
   const router = useRouter();
   const activeSessionId = useStore((s) => s.activeSessionId);
-  const chartsEnabled = useStore((s) => s.chartsEnabled);
-  const planEnabled = useStore((s) => s.planEnabled);
   if (location.pathname === "/workout") return null;
-  const items = getEnabledTabs({ charts: chartsEnabled, plan: planEnabled });
+  const items = TABS;
   const currentIndex = items.findIndex((it) => it.to === location.pathname);
 
   // Split the ROUTED tabs (never the Workout button) into two halves that sit
@@ -322,8 +300,6 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const activeSessionId = useStore((s) => s.activeSessionId);
-  const chartsEnabled = useStore((s) => s.chartsEnabled);
-  const planEnabled = useStore((s) => s.planEnabled);
   const location = useLocation();
   const router = useRouter();
   const showBanner = activeSessionId && location.pathname !== "/workout";
@@ -339,10 +315,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Ordered enabled-tab paths, for both swipe navigation and figuring out
   // whether the current page is a tab at all (swipes only act on tabs,
   // e.g. never on /session/$id, which has its own row swipe gestures).
-  const tabPaths = useMemo(
-    () => getEnabledTabs({ charts: chartsEnabled, plan: planEnabled }).map((t) => t.to),
-    [chartsEnabled, planEnabled],
-  );
+  const tabPaths = useMemo(() => TABS.map((t) => t.to), []);
   const tabIndex = tabPaths.findIndex((p) => p === location.pathname);
 
   // Picked once per mount from whatever direction the bottom-nav tap or

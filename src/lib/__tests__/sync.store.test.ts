@@ -314,9 +314,6 @@ describe("the merge base and destructive actions", () => {
       dailyLogs: [],
       targetProfiles: [{ id: "tp_default", name: "Default" }],
       weekdayTargets: Array(7).fill("tp_default"),
-      targetsEnabled: false,
-      toolsEnabled: false,
-      planEnabled: false,
       plannedWeek: undefined,
       unit: "lbs",
     });

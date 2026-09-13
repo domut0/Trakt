@@ -19,7 +19,6 @@ const PROFILE_ID = "tp_test";
 function seedProfile(goalMode?: "cut" | "maintain" | "gain") {
   useStore.setState({
     hydrated: true,
-    targetsEnabled: true,
     targetProfiles: [
       {
         id: PROFILE_ID,

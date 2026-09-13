@@ -110,7 +110,6 @@ describe("Dexie persistence (hydrate + write-through)", () => {
     const sessionId = useStore.getState().startWorkout("Reload Test Slot");
     useStore.getState().logSet({ exerciseId: exercise.id, weight: 135, reps: 5, targetSets: 1 });
     useStore.getState().setUnit("kg");
-    useStore.getState().setChartsEnabled(false);
     await flush();
 
     // Simulate closing and reopening the app: fresh in-memory store, same DB.
@@ -119,7 +118,6 @@ describe("Dexie persistence (hydrate + write-through)", () => {
     const reloaded = useStore.getState();
 
     expect(reloaded.unit).toBe("kg");
-    expect(reloaded.chartsEnabled).toBe(false);
     expect(reloaded.activeSessionId).toBe(sessionId);
 
     const persistedSets = reloaded.sets.filter((s) => s.sessionId === sessionId);

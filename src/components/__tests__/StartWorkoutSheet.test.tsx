@@ -22,7 +22,7 @@ const BENCH: Exercise = { id: "e_bench", name: "Bench Press", type: "main" };
 function planToday(exerciseIds: string[], name = "Heavy day") {
   const week = emptyPlannedWeek();
   week[weekdayIndexFor(new Date())] = { name, exerciseIds };
-  useStore.setState({ planEnabled: true, plannedWeek: week });
+  useStore.setState({ plannedWeek: week });
 }
 
 function renderSheet() {
@@ -47,7 +47,6 @@ describe("StartWorkoutSheet", () => {
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
-      planEnabled: false,
       plannedWeek: undefined,
     });
   });
@@ -87,18 +86,6 @@ describe("StartWorkoutSheet", () => {
     start();
 
     expect(useStore.getState().currentExerciseId).toBe("e_bench");
-  });
-
-  it("ignores the plan while the feature is switched off", () => {
-    planToday(["e_squat"]);
-    useStore.setState({ planEnabled: false });
-    renderSheet();
-
-    expect(screen.queryByText("Planned")).not.toBeInTheDocument();
-
-    start();
-
-    expect(useStore.getState().currentExerciseId).toBeUndefined();
   });
 
   it("treats a plan whose lifts have all been deleted as no plan", () => {
