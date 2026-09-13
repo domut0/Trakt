@@ -62,43 +62,8 @@ describe("DayStatsCard", () => {
     seedStore({});
   });
 
-  describe("goal mode remaining line", () => {
-    it("renders 'left' on a cut day", () => {
-      seedStore({
-        goalMode: "cut",
-        calories: 2500,
-        dailyLogs: [{ date: today, calories: 1508 }],
-      });
-
-      render(<DayStatsCard date={today} />);
-      expect(screen.getByText("992 calories left")).toBeInTheDocument();
-    });
-
-    it("renders 'left' on a maintain day", () => {
-      seedStore({
-        goalMode: "maintain",
-        calories: 2500,
-        dailyLogs: [{ date: today, calories: 1508 }],
-      });
-
-      render(<DayStatsCard date={today} />);
-      expect(screen.getByText("992 calories left")).toBeInTheDocument();
-    });
-
-    it("renders 'to go' on a gain day", () => {
-      seedStore({
-        goalMode: "gain",
-        calories: 2800,
-        dailyLogs: [{ date: today, calories: 1808 }],
-      });
-
-      render(<DayStatsCard date={today} />);
-      expect(screen.getByText("992 calories to go")).toBeInTheDocument();
-    });
-  });
-
   describe("unset targets", () => {
-    it("renders no row for an unset target", () => {
+    it("still renders the row, because the row is not about the target", () => {
       seedStore({
         calories: 2400,
         protein: 180,
@@ -110,10 +75,16 @@ describe("DayStatsCard", () => {
 
       render(<DayStatsCard date={today} />);
 
-      expect(screen.getByText("Protein")).toBeInTheDocument();
-      expect(screen.queryByText("Carbs")).not.toBeInTheDocument();
-      expect(screen.queryByText("Fat")).not.toBeInTheDocument();
-      expect(screen.queryByText("Steps")).not.toBeInTheDocument();
+      // The card used to gate each row on whether a TARGET was set, so a day
+      // with no targets configured showed a calorie figure and nothing else and
+      // no amount of logging made protein appear. The six rows are fixed now;
+      // a target only adds the "/ 180 g" beside the figure.
+      for (const label of ["Bodyweight", "Calories", "Protein", "Carbs", "Fat", "Steps"]) {
+        expect(screen.getByText(label)).toBeInTheDocument();
+      }
+      expect(screen.getByText("150")).toBeInTheDocument();
+      expect(screen.getByText("50")).toBeInTheDocument();
+      expect(screen.getByText("8,000")).toBeInTheDocument();
     });
   });
 
@@ -142,7 +113,7 @@ describe("DayStatsCard", () => {
   });
 
   describe("future day mode", () => {
-    it("renders targets alone with no logged values and no bodyweight row", () => {
+    it("prints targets as the figures, and leaves only bodyweight unrecorded", () => {
       const futureDate = "2099-01-01";
       seedStore({
         calories: 2500,
@@ -179,16 +150,14 @@ describe("DayStatsCard", () => {
       expect(screen.queryByText(/100/)).not.toBeInTheDocument();
       expect(screen.queryByText(/5,000|5000/)).not.toBeInTheDocument();
 
-      // No remaining line
-      expect(screen.queryByText(/calories left/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/calories to go/i)).not.toBeInTheDocument();
-
-      // No 'Not recorded'
-      expect(screen.queryByText(/not recorded/i)).not.toBeInTheDocument();
-
-      // No bodyweight row
-      expect(screen.queryByText(/bodyweight/i)).not.toBeInTheDocument();
+      // Bodyweight keeps its row like every other metric, but a future day
+      // cannot have been weighed, so the row is empty rather than absent. It is
+      // the ONLY "Not recorded" on a future day: the five rows above it print
+      // their target as the figure, because printing a gap against a day that
+      // has not happened reports a failure rather than a plan.
+      expect(screen.getByText("Bodyweight")).toBeInTheDocument();
       expect(screen.queryByText(/175\.5/)).not.toBeInTheDocument();
+      expect(screen.getAllByText(/not recorded/i)).toHaveLength(1);
     });
   });
 

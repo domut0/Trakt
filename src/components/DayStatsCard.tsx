@@ -75,6 +75,7 @@ function MetricRow({
   unit,
   status,
   sep,
+  strongSep,
 }: {
   label: string;
   hatch: MetricHatch;
@@ -85,6 +86,9 @@ function MetricRow({
   unit?: string;
   status: TargetStatus | null;
   sep: boolean;
+  /** A real division rather than a hairline. One row uses it: the first of the
+   * evening block, because the row above it is the morning's. */
+  strongSep?: boolean;
 }) {
   const exceeded = status === "exceeded";
 
@@ -100,7 +104,7 @@ function MetricRow({
   }
 
   return (
-    <div className={`group-row ${sep ? "group-row-sep" : ""}`}>
+    <div className={`group-row ${strongSep ? "rule-t" : sep ? "group-row-sep" : ""}`}>
       <div className="flex min-w-0 items-center gap-2.5">
         <MetricKey hatch={hatch} />
         <span className="t-body text-ink">{label}</span>
@@ -113,63 +117,12 @@ function MetricRow({
             {unit ? ` ${unit}` : ""}
           </span>
         )}
-        {target === null && unit && <span className="ml-1 t-label text-ink-2">{unit}</span>}
-        {status && <StatusMark status={status} />}
-      </div>
-    </div>
-  );
-}
-
-/**
- * The calorie measure.
- *
- * Three versions of this have now existed. It began as three 10px rounded bars
- * beside the hero encoding protein, fat and carbs in three hues nobody could
- * name: a glyph pretending to be a chart, too small to read a quantity from and
- * repeating what the rows below state exactly. It then became a solid bar in a
- * track, which was legible but was a fill meter, and this system says rank comes
- * from rule weight and never from fill.
- *
- * It is a ruled measure now. A track outlined in ink, a hatched field for what
- * has been eaten, and quarter ticks under the rule so the quantity can be read
- * against a scale rather than estimated from a length. That is how a printed
- * gauge works, and the hatch is the same device the charts use to fill an area.
- *
- * The track IS the target, so reaching its end is reaching the goal. An overrun
- * continues past the end in the second ink, saying the same thing as the struck
- * rule under the figure above it.
- */
-function CalorieGauge({
-  logged,
-  target,
-  exceeded,
-}: {
-  logged: number;
-  target: number;
-  exceeded: boolean;
-}) {
-  const pct = Math.max(0, Math.min(100, (logged / target) * 100));
-  // Capped so a mistyped entry cannot push the overrun off the page.
-  const overPct = exceeded ? Math.min(60, ((logged - target) / target) * 100) : 0;
-
-  return (
-    <div aria-hidden="true" className="mt-3">
-      <div className="flex items-stretch">
-        <div className="relative h-3 flex-1 overflow-hidden rounded-md border border-ink">
-          <div className="hatch-dense h-full" style={{ width: `${pct}%` }} />
-        </div>
-        {overPct > 0 && (
-          <div
-            className="hatch-over h-3 shrink-0 rounded-r-md border border-l-0 border-signal"
-            style={{ width: `${overPct}%` }}
-          />
+        {/* A unit needs a quantity to qualify. "Not recorded lbs" reads as a
+            broken string rather than as an empty row. */}
+        {target === null && unit && value !== null && (
+          <span className="ml-1 t-label text-ink-2">{unit}</span>
         )}
-      </div>
-      {/* Quarter ticks, hung below the rule so the hatch never hides them. */}
-      <div className="relative h-1">
-        {[25, 50, 75].map((t) => (
-          <span key={t} className="absolute top-0 h-1 w-px bg-ink-3" style={{ left: `${t}%` }} />
-        ))}
+        {status && <StatusMark status={status} />}
       </div>
     </div>
   );
@@ -199,9 +152,6 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
   const targetCarbs = positive(profile?.carbs);
   const targetSteps = positive(profile?.steps);
 
-  const calorieDirection = directionFor("calories", profile?.goalMode);
-  const isGain = calorieDirection === "floor";
-
   /** Status for one field, or null when the day is future or either half is
    * missing. Progress needs both a logged value and a target to mean anything. */
   const statusOf = (
@@ -215,176 +165,94 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
 
   const calorieStatus = statusOf("calories", calories, targetCalories);
 
-  let remainingText: string | null = null;
-  if (!isFuture && targetCalories !== undefined) {
-    const remainingSuffix = isGain ? "calories to go" : "calories left";
-    const diff = targetCalories - (calories ?? 0);
-    if (diff >= 0) {
-      remainingText = `${Math.round(diff).toLocaleString()} ${remainingSuffix}`;
-    } else {
-      const over = Math.round((calories ?? 0) - targetCalories);
-      remainingText = `${over.toLocaleString()} calories over`;
-    }
-  }
-
-  const showBodyweight = !isFuture && bodyweight !== undefined;
   const round = (n: number) => Math.round(n).toLocaleString();
 
-  /**
-   * A day with nothing logged and no targets set has no table to draw.
+  /** Every row draws, logged or not.
    *
-   * It used to render one anyway: a lone "Not recorded" over an empty ruled
-   * band. That was a table with its contents missing rather than an empty
-   * state, and once the numbers moved above the canvas it was the second thing
-   * on the screen, which made a fresh day and a full day pixel-identical for
-   * their first third. An empty state that shares the populated state's shape
-   * is not an empty state.
+   * This card used to hide a row whenever its TARGET was unset - not its value,
+   * its target - so on a day with no targets configured the screen showed a
+   * calorie figure and nothing else, and no amount of logging made protein
+   * appear. A whole-card empty state sat in front of that, so a blank day said
+   * "This day is still blank" and offered no hint of what could go on it.
    *
-   * The line below is deliberately not built from the app's usual empty-state
-   * frame. No imperative, no purpose clause, no pointing at a control: the
-   * header directly above it already says "Daily numbers" and carries the Edit
-   * that fills them in.
+   * Both are gone. The card is a fixed list of the six numbers this app is
+   * for, and an unlogged one reads "Not recorded" in its own row. The shape of
+   * the day does not change as you fill it in; only the figures do. That is
+   * what makes it usable half-asleep: the row you want is always in the same
+   * place.
    */
-  const nothingToShow =
-    !isFuture &&
-    calories === undefined &&
-    bodyweight === undefined &&
-    targetCalories === undefined &&
-    targetProtein === undefined &&
-    targetFat === undefined &&
-    targetCarbs === undefined &&
-    targetSteps === undefined;
-
-  if (nothingToShow) {
-    return (
-      // -mx-5 to match group-list: every table on this page opens with a rule
-      // that reaches the trim, and an inset one here would read as a different
-      // kind of object rather than as the same table with nothing in it.
-      <div className="-mx-5 rule-heavy-t border-b border-rule-strong px-5 py-4">
-        <p className="t-body text-ink-2">This day is still blank.</p>
-      </div>
-    );
-  }
+  const figureFor = (logged: number | undefined, target: number | undefined): string | null => {
+    // On a future day the target IS the figure. Printing "Not recorded" against
+    // every row of a day that has not happened yet reports a gap rather than a
+    // plan.
+    if (isFuture) return target !== undefined ? round(target) : null;
+    return logged !== undefined ? round(logged) : null;
+  };
 
   return (
     <div className="group-list">
-      {/* The hero: the one figure this screen exists to show, at timetable
-          scale, with its gauge directly beneath it. */}
-      <div className="px-5 pt-4 pb-4">
-        {isFuture ? (
-          targetCalories !== undefined ? (
-            <div className="flex items-baseline gap-1.5">
-              <span className="t-hero text-ink">{round(targetCalories)}</span>
-              <span className="t-label text-ink-2">kcal planned</span>
-            </div>
-          ) : (
-            <div className="t-label text-ink-2">No calorie target for this day</div>
-          )
-        ) : (
-          <>
-            <div className="flex items-baseline gap-1.5">
-              {calories !== undefined ? (
-                <Flap value={round(calories)}>
-                  <span
-                    className={`t-hero text-ink ${calorieStatus === "exceeded" ? "mark-over" : ""}`}
-                  >
-                    {round(calories)}
-                  </span>
-                </Flap>
-              ) : (
-                <span className="t-stat text-ink-3">Not recorded</span>
-              )}
-              {targetCalories !== undefined ? (
-                <span className="t-label text-ink-2">/ {round(targetCalories)} kcal</span>
-              ) : (
-                calories !== undefined && <span className="t-label text-ink-2">kcal</span>
-              )}
-            </div>
-            {remainingText && <div className="mt-1 t-label text-ink-2">{remainingText}</div>}
-            {calories !== undefined && targetCalories !== undefined && (
-              <CalorieGauge
-                logged={calories}
-                target={targetCalories}
-                exceeded={calorieStatus === "exceeded"}
-              />
-            )}
-          </>
-        )}
-      </div>
+      {/* Bodyweight first, and alone above a real division.
 
-      {targetProtein !== undefined && (
-        <MetricRow
-          sep
-          label="Protein"
-          hatch="protein"
-          // On a future day the target IS the figure: there is nothing logged
-          // to compare it against, and printing "Not recorded" against every row
-          // of a day that has not happened yet reports a gap rather than a plan.
-          value={isFuture ? round(targetProtein) : protein !== undefined ? round(protein) : null}
-          target={isFuture ? null : round(targetProtein)}
-          unit="g"
-          status={statusOf("protein", protein, targetProtein)}
-        />
-      )}
+          The app is opened twice a day and they are different visits: this is
+          the morning one, standing on a scale, and everything below is the
+          evening one, filling in the day from memory. Ordering by when a number
+          is entered rather than by what it measures is what gives each visit a
+          single obvious target. */}
+      <MetricRow
+        sep={false}
+        label="Bodyweight"
+        hatch="open"
+        value={isFuture ? null : bodyweight !== undefined ? String(bodyweight) : null}
+        target={null}
+        unit={unit}
+        status={null}
+      />
 
-      {targetFat !== undefined && (
-        <MetricRow
-          sep
-          label="Fat"
-          hatch="fat"
-          // On a future day the target IS the figure: there is nothing logged
-          // to compare it against, and printing "Not recorded" against every row
-          // of a day that has not happened yet reports a gap rather than a plan.
-          value={isFuture ? round(targetFat) : fat !== undefined ? round(fat) : null}
-          target={isFuture ? null : round(targetFat)}
-          unit="g"
-          status={statusOf("fat", fat, targetFat)}
-        />
-      )}
-
-      {targetCarbs !== undefined && (
-        <MetricRow
-          sep
-          label="Carbs"
-          hatch="carbs"
-          // On a future day the target IS the figure: there is nothing logged
-          // to compare it against, and printing "Not recorded" against every row
-          // of a day that has not happened yet reports a gap rather than a plan.
-          value={isFuture ? round(targetCarbs) : carbs !== undefined ? round(carbs) : null}
-          target={isFuture ? null : round(targetCarbs)}
-          unit="g"
-          status={statusOf("carbs", carbs, targetCarbs)}
-        />
-      )}
-
-      {targetSteps !== undefined && (
-        <MetricRow
-          sep
-          label="Steps"
-          hatch="solid"
-          value={
-            isFuture
-              ? targetSteps.toLocaleString()
-              : steps !== undefined
-                ? steps.toLocaleString()
-                : null
-          }
-          target={isFuture ? null : targetSteps.toLocaleString()}
-          status={statusOf("steps", steps, targetSteps)}
-        />
-      )}
-
-      {showBodyweight && (
-        <MetricRow
-          sep
-          label="Bodyweight"
-          hatch="open"
-          value={String(bodyweight)}
-          target={null}
-          unit={unit}
-          status={null}
-        />
-      )}
+      <MetricRow
+        sep={false}
+        strongSep
+        label="Calories"
+        hatch="solid"
+        value={figureFor(calories, targetCalories)}
+        target={isFuture || targetCalories === undefined ? null : round(targetCalories)}
+        unit="kcal"
+        status={calorieStatus}
+      />
+      <MetricRow
+        sep
+        label="Protein"
+        hatch="protein"
+        value={figureFor(protein, targetProtein)}
+        target={isFuture || targetProtein === undefined ? null : round(targetProtein)}
+        unit="g"
+        status={statusOf("protein", protein, targetProtein)}
+      />
+      <MetricRow
+        sep
+        label="Carbs"
+        hatch="carbs"
+        value={figureFor(carbs, targetCarbs)}
+        target={isFuture || targetCarbs === undefined ? null : round(targetCarbs)}
+        unit="g"
+        status={statusOf("carbs", carbs, targetCarbs)}
+      />
+      <MetricRow
+        sep
+        label="Fat"
+        hatch="fat"
+        value={figureFor(fat, targetFat)}
+        target={isFuture || targetFat === undefined ? null : round(targetFat)}
+        unit="g"
+        status={statusOf("fat", fat, targetFat)}
+      />
+      <MetricRow
+        sep
+        label="Steps"
+        hatch="solid"
+        value={figureFor(steps, targetSteps)}
+        target={isFuture || targetSteps === undefined ? null : round(targetSteps)}
+        status={statusOf("steps", steps, targetSteps)}
+      />
     </div>
   );
 }
