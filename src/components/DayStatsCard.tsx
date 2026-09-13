@@ -1,4 +1,4 @@
-import { useMemo, type JSX, type ReactNode } from "react";
+import { useState, useMemo, type JSX, type ReactNode } from "react";
 import { Flap } from "./Flap";
 import { dayKey } from "../lib/daily-log";
 import { useStore } from "../lib/store";
@@ -67,6 +67,59 @@ function StatusMark({ status }: { status: TargetStatus }) {
   return null;
 }
 
+type NumKey = "calories" | "protein" | "carbs" | "fat" | "steps" | "bodyweight";
+
+interface EditableField {
+  /** Raw text to display, which is the stored number unless this field is the
+   *  one being typed into. */
+  raw: string;
+  /** Shown in grey when nothing is entered. On a future day this is the target,
+   *  so a day that has not happened yet still shows its plan. */
+  placeholder: string;
+  decimal?: boolean;
+  onChange: (raw: string) => void;
+  onBlur: () => void;
+}
+
+/**
+ * One number, edited where it is read.
+ *
+ * There is no sheet behind this any more. The sheet held the same six fields
+ * with the same labels against the same targets, so opening it swapped a card
+ * for its own copy and asked you to press Save at the end of it.
+ *
+ * The raw string is held by the PARENT, and only for the field currently
+ * focused - see `editing` in DayStatsCard. Storing it per-field would fight a
+ * write from anywhere else (the Copy-the-day-before button, a sheet sync);
+ * storing none of it would collapse "12." to "12" under your cursor as the
+ * number went out to the store and came back.
+ */
+function FigureField({
+  raw,
+  placeholder,
+  decimal,
+  onChange,
+  onBlur,
+  exceeded,
+  label,
+}: EditableField & { exceeded: boolean; label: string }) {
+  return (
+    <input
+      type="number"
+      inputMode={decimal ? "decimal" : "numeric"}
+      aria-label={label}
+      value={raw}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
+      className={`w-[4.5ch] min-w-0 bg-transparent text-right t-stat text-ink outline-none placeholder:font-normal placeholder:text-ink-3 ${
+        exceeded ? "mark-over" : ""
+      }`}
+      style={{ width: `${Math.max(raw.length, placeholder.length, 1) + 0.5}ch` }}
+    />
+  );
+}
+
 function MetricRow({
   label,
   hatch,
@@ -76,7 +129,11 @@ function MetricRow({
   status,
   sep,
   strongSep,
+  field,
 }: {
+  /** When given, the figure is an input writing straight to the day's log
+   *  instead of a printed number. */
+  field?: EditableField;
   label: string;
   hatch: MetricHatch;
   /** Already-rounded display value, or null when nothing was logged. */
@@ -93,7 +150,9 @@ function MetricRow({
   const exceeded = status === "exceeded";
 
   let figure: ReactNode;
-  if (value === null) {
+  if (field) {
+    figure = <FigureField {...field} exceeded={exceeded} label={label} />;
+  } else if (value === null) {
     figure = <span className="t-label text-ink-3">Not recorded</span>;
   } else {
     figure = (
@@ -128,8 +187,16 @@ function MetricRow({
   );
 }
 
-export function DayStatsCard({ date }: { date: string }): JSX.Element {
+export function DayStatsCard({
+  date,
+  editable = false,
+}: {
+  date: string;
+  /** Turns every figure into an input writing straight to the log. */
+  editable?: boolean;
+}): JSX.Element {
   const targetsForDay = useStore((s) => s.targetsForDay);
+  const upsertDailyLog = useStore((s) => s.upsertDailyLog);
   const nutritionPhases = useStore((s) => s.nutritionPhases);
   const unit = useStore((s) => s.unit);
   const dailyLogs = useStore((s) => s.dailyLogs);
@@ -145,6 +212,38 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
   const dayLog = useMemo(() => dailyLogs.find((l) => l.date === date), [dailyLogs, date]);
 
   const isFuture = date > dayKey(new Date());
+
+  const round = (n: number) => Math.round(n).toLocaleString();
+
+  /** The field being typed into, and the exact text in it. Only one field can
+   *  be focused, so one slot is all this needs - and every other field stays
+   *  driven by the store, so an outside write lands immediately. */
+  const [editing, setEditing] = useState<{ field: NumKey; raw: string } | null>(null);
+
+  const fieldFor = (
+    key: NumKey,
+    target: number | undefined,
+    decimal = false,
+  ): EditableField | undefined => {
+    if (!editable) return undefined;
+    const stored = dayLog?.[key];
+    return {
+      raw: editing?.field === key ? editing.raw : stored === undefined ? "" : String(stored),
+      // On a day that has not happened yet the target IS the hint, so the plan
+      // is what an empty row shows.
+      placeholder: isFuture && target !== undefined ? round(target) : "—",
+      decimal,
+      onChange: (raw) => {
+        setEditing({ field: key, raw });
+        // "" means NOT LOGGED, so it maps to undefined, never to 0. A typed 0
+        // is kept: zero steps is a real answer.
+        const trimmed = raw.trim();
+        const n = Number(trimmed);
+        upsertDailyLog(date, { [key]: trimmed === "" || !Number.isFinite(n) ? undefined : n });
+      },
+      onBlur: () => setEditing(null),
+    };
+  };
 
   const calories = dayLog?.calories;
   const protein = dayLog?.protein;
@@ -176,8 +275,6 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
   };
 
   const calorieStatus = statusOf("calories", calories, targetCalories);
-
-  const round = (n: number) => Math.round(n).toLocaleString();
 
   /** Every row draws, logged or not.
    *
@@ -213,6 +310,7 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
       <MetricRow
         sep={false}
         label="Bodyweight"
+        field={fieldFor("bodyweight", undefined, true)}
         hatch="open"
         value={isFuture ? null : bodyweight !== undefined ? String(bodyweight) : null}
         target={null}
@@ -224,6 +322,7 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
         sep={false}
         strongSep
         label="Calories"
+        field={fieldFor("calories", targetCalories)}
         hatch="solid"
         value={figureFor(calories, targetCalories)}
         target={isFuture || targetCalories === undefined ? null : round(targetCalories)}
@@ -233,6 +332,7 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
       <MetricRow
         sep
         label="Protein"
+        field={fieldFor("protein", targetProtein)}
         hatch="protein"
         value={figureFor(protein, targetProtein)}
         target={isFuture || targetProtein === undefined ? null : round(targetProtein)}
@@ -242,6 +342,7 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
       <MetricRow
         sep
         label="Carbs"
+        field={fieldFor("carbs", targetCarbs)}
         hatch="carbs"
         value={figureFor(carbs, targetCarbs)}
         target={isFuture || targetCarbs === undefined ? null : round(targetCarbs)}
@@ -251,6 +352,7 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
       <MetricRow
         sep
         label="Fat"
+        field={fieldFor("fat", targetFat)}
         hatch="fat"
         value={figureFor(fat, targetFat)}
         target={isFuture || targetFat === undefined ? null : round(targetFat)}
@@ -260,11 +362,42 @@ export function DayStatsCard({ date }: { date: string }): JSX.Element {
       <MetricRow
         sep
         label="Steps"
+        field={fieldFor("steps", targetSteps)}
         hatch="solid"
         value={figureFor(steps, targetSteps)}
         target={isFuture || targetSteps === undefined ? null : round(targetSteps)}
         status={statusOf("steps", steps, targetSteps)}
       />
+
+      {editable && (
+        // The one row that is not a number. It came over with the fields when
+        // the sheet went: a day you chose not to log has to be sayable
+        // somewhere, and it belongs with the log it describes.
+        <div className="group-row group-row-sep">
+          <span className="t-body text-ink">Untracked</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={dayLog?.isUntracked === true}
+            aria-label="Untracked"
+            onClick={() =>
+              upsertDailyLog(date, {
+                isUntracked: dayLog?.isUntracked === true ? undefined : true,
+              })
+            }
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+              dayLog?.isUntracked ? "bg-ink" : "bg-paper ring-1 ring-inset ring-ink-3"
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className={`absolute top-1 h-5 w-5 rounded-full transition-all ${
+                dayLog?.isUntracked ? "left-6 bg-paper" : "left-1 bg-ink-3"
+              }`}
+            />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,8 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format, isValid } from "date-fns";
-import { useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { DayEditorSheet } from "../components/DayEditorSheet";
 import { DayStatsCard } from "../components/DayStatsCard";
 import { WeekStrip } from "../components/WeekStrip";
 import { dayKey, isDailyLogEmpty, parseDayKey } from "../lib/daily-log";
@@ -64,8 +62,6 @@ function Home() {
   const { date } = Route.useSearch();
   const navigate = useNavigate({ from: "/" });
 
-  const [editorOpen, setEditorOpen] = useState(false);
-
   // Recomputed per render rather than memoised: the app can sit open across
   // midnight, and a stale key would silently edit yesterday.
   const todayKey = dayKey(new Date());
@@ -114,7 +110,6 @@ function Home() {
     void navigate({ search: next === todayKey ? {} : { date: next }, replace: true });
   };
 
-  const isToday = selected === todayKey;
   /**
    * The page's own name, always the date.
    *
@@ -128,8 +123,6 @@ function Home() {
   // as an abbreviated departure ("THU 20 AUG"); a screen you open in bed is
   // just telling you what day it is.
   const heading = format(parseDayKey(selected), "EEEE d MMMM");
-  /** Kept spoken rather than printed: "Today" is the clearer thing to hear. */
-  const spokenDay = isToday ? "today" : format(parseDayKey(selected), "EEE d MMM");
 
   return (
     <AppShell>
@@ -151,29 +144,15 @@ function Home() {
         entry - one-handed mid-set, and half-asleep in bed.
       */}
       <section className="px-4 pt-4 anim-fade-up">
-        {/*
-          The card is wrapped rather than given an onEdit prop so that it stays a
-          pure readout with one job. Nothing inside it is interactive, so a
-          button around the whole thing is unambiguous and gives the 44px hit
-          area for free.
-
-          The header comes INSIDE that button so the card can carry a visible
-          "Edit". A whole card that is silently tappable is not an affordance,
-          it is a secret, and this is the control the bedtime session is
-          actually here to use.
-        */}
-        <button
-          type="button"
-          onClick={() => setEditorOpen(true)}
-          aria-label={`Edit daily numbers for ${spokenDay}`}
-          className="w-full text-left focus:outline-none"
-        >
-          <div className="group-header">
-            <h2 className="t-caption">Daily numbers</h2>
-            <span className="t-action t-label">Edit</span>
-          </div>
-          <DayStatsCard date={selected} />
-        </button>
+        {/* The card IS the editor. It used to be a readout wrapped in a button
+            that opened a sheet holding the same six fields against the same
+            targets - so the sheet's whole contribution was a Save button and a
+            second copy of the screen behind it. Typing here writes straight
+            through. */}
+        <div className="group-header">
+          <h2 className="t-caption">Daily numbers</h2>
+        </div>
+        <DayStatsCard date={selected} editable />
 
         {canCopyPrevious && (
           <button
@@ -200,8 +179,6 @@ function Home() {
       </section>
 
       <div className="pb-8" />
-
-      <DayEditorSheet date={selected} open={editorOpen} onClose={() => setEditorOpen(false)} />
     </AppShell>
   );
 }

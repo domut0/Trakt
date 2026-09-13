@@ -152,21 +152,10 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   const items = TABS;
   const currentIndex = items.findIndex((it) => it.to === location.pathname);
 
-  // Two routed tabs either side of the Workout button.
-  //
-  // The centring is exact because both <ul>s are `flex-1` - `flex: 1 1 0%`, a
-  // zero basis and an equal grow factor - around a `shrink-0` centre, so the
-  // free space is halved whatever width the button takes. With the tab count
-  // now even, the four cells are also equal to each other, which is what the
-  // five-tab bar could not do: it had to put three on one side.
-  const splitAt = Math.ceil(items.length / 2);
-  const leftItems = items.slice(0, splitAt);
-  const rightItems = items.slice(splitAt);
-
   const renderTab = (it: TabItem, i: number) => {
     const active = location.pathname === it.to;
     return (
-      <li key={it.to} className="flex-1">
+      <li key={it.to}>
         <Link
           to={it.to}
           onClick={() => {
@@ -176,7 +165,7 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
               lastNavDirection = i > currentIndex ? "forward" : "back";
             }
           }}
-          // Full width of its flex-1 <li>, with an explicit height floor so the
+          // Full width of its grid cell, with an explicit height floor so the
           // 22px icon plus 11px label can never fall under 44px if either is
           // restyled later.
           //
@@ -205,42 +194,40 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
       className="relative z-30 shrink-0 bg-paper"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
     >
-      <div className="mx-auto flex max-w-md items-stretch justify-between px-2 pt-2">
-        <ul className="flex flex-1 items-stretch justify-around">
-          {leftItems.map((it, i) => renderTab(it, i))}
-        </ul>
-        <div className="flex shrink-0 items-center justify-center px-1">
+      {/* FIVE EQUAL COLUMNS, with the button in the middle one.
+          
+          The bar this replaces put two flex-1 <ul>s either side of a shrink-0
+          button, which centred the button exactly but made the four tabs
+          unequal: each one sat in the middle of half of whatever space the
+          button left, so the gap between Today and Plan was wider than the gap
+          between Plan and the button. An even grid has no halves to be unequal
+          about - every cell is the same width, and the third of five is the
+          axis by construction. */}
+      <ul className="mx-auto grid max-w-md grid-cols-5 items-stretch px-2 pt-2">
+        {items.slice(0, 2).map((it, i) => renderTab(it, i))}
+        {/* Third of five in DOM order, not placed by grid-column: an explicitly
+            placed item still takes its own auto ROW, so a button assigned to
+            column 3 after four siblings had filled row 1 wrapped onto a second
+            row. Source order does the same job with nothing to get wrong. */}
+        <li className="flex items-center justify-center">
           <button
             onClick={() =>
               activeSessionId ? router.navigate({ to: "/workout" }) : onOpenChooser()
             }
             aria-label={activeSessionId ? "Return to active workout" : "Start workout"}
-            // Losing the old `w-full` when this moved out of a flex-1 <li> left
-            // the button as wide as its label, and "Return" is only ~36px - under
-            // the 44px minimum, in the exact state where the user most needs to
-            // hit it. The floor also keeps the button from changing width when
-            // the label swaps between "Workout" and "Return", which would
-            // otherwise shift the whole nav mid-session.
             // Foreground, not accent. Accent in this bar now means exactly one
-            // thing - the tab you are on - so the action button states its
-            // rank with fill and weight instead: a solid glyph and a semibold
-            // label against four muted outlined tabs. When it was accent too,
-            // two items lit up at once and neither one told you where you were.
-            // The inked cell, which is this app's one mark for "this one": the
-            // selected day in the week strip and the current lift in the plan
-            // list both wear it. Before this the action button was a 22px glyph
-            // and a label at exactly the routed tabs' size and geometry,
-            // differing only by fill and weight, so it read as a fifth tab
-            // rather than as the thing the bar exists to launch.
-            className="flex min-h-[44px] min-w-[56px] flex-col items-center justify-center gap-0.5 bg-ink px-3 py-1 text-paper rounded-md"
+            // thing - the tab you are on - so the action button states its rank
+            // with fill and weight instead: a solid glyph and a semibold label
+            // against four muted outlined tabs.
+            className="flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 bg-ink px-1 py-1 text-paper rounded-md"
           >
             <span className="relative flex items-center justify-center">
               <FlameIcon />
               {/* Live-session marker: a badge on the glyph, in the same
                   dot-and-pulse language as the banner at the top of the
-                  screen. Deliberately not a colour swap - the session is not
-                  a selection, so it must not borrow selection's colour.
-                  Reduced motion is handled globally in styles.css. */}
+                  screen. Deliberately not a colour swap - the session is not a
+                  selection, so it must not borrow selection's colour. Reduced
+                  motion is handled globally in styles.css. */}
               {activeSessionId && (
                 <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-2 w-2">
                   <span className="absolute inset-0 animate-ping bg-ink rounded-md" />
@@ -250,11 +237,9 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
             </span>
             <span className="t-label font-semibold">{activeSessionId ? "Return" : "Workout"}</span>
           </button>
-        </div>
-        <ul className="flex flex-1 items-stretch justify-around">
-          {rightItems.map((it, i) => renderTab(it, splitAt + i))}
-        </ul>
-      </div>
+        </li>
+        {items.slice(2).map((it, i) => renderTab(it, i + 2))}
+      </ul>
       {activeSessionId && (
         // A real rule, not ink at 40%. Opacity variants are the thing this
         // system bans outright, and one had survived here because it sits on a

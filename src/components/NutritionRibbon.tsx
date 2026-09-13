@@ -13,7 +13,13 @@ import {
   type NutritionPhase,
 } from "../lib/planning";
 import { useStore } from "../lib/store";
-import { type TargetField } from "../lib/targets";
+import {
+  MACRO_FIELDS,
+  macrosExceedCalories,
+  suggestMacroGrams,
+  type MacroField,
+  type TargetField,
+} from "../lib/targets";
 import { Trash } from "./icons";
 
 const FIELD_LABELS: Record<TargetField, string> = {
@@ -33,10 +39,7 @@ const FIELD_UNITS: Partial<Record<TargetField, string>> = {
  *  floor. Each gets a row of its own. */
 const RULED_FIELDS = ["calories", "steps"] as const;
 
-/** The three that have no rule in either direction, so they share one row. */
-const MACRO_FIELDS = ["protein", "carbs", "fat"] as const;
-
-const MACRO_INITIALS: Record<(typeof MACRO_FIELDS)[number], string> = {
+const MACRO_INITIALS: Record<MacroField, string> = {
   protein: "p",
   carbs: "c",
   fat: "f",
@@ -350,11 +353,18 @@ function NumberField({
   phase,
   onPatch,
   width,
+  suggestion,
+  wrong,
 }: {
   field: TargetField;
   phase: NutritionPhase;
   onPatch: (patch: Partial<Omit<NutritionPhase, "id">>) => void;
   width: string;
+  /** Shown as the placeholder when the field is empty. A suggestion, never a
+   *  value: nothing here writes a number the user did not type. */
+  suggestion?: number;
+  /** Whether what is in this field is in conflict with the calorie target. */
+  wrong?: boolean;
 }) {
   const unit = FIELD_UNITS[field];
   return (
@@ -371,8 +381,10 @@ function NumberField({
           // "" means not set, never 0. A typed 0 is kept.
           onPatch({ [field]: t === "" || !Number.isFinite(n) ? undefined : n });
         }}
-        placeholder="—"
-        className={`min-h-[44px] ${width} bg-transparent text-right t-body text-ink outline-none placeholder:text-ink-3`}
+        placeholder={suggestion === undefined ? "—" : String(suggestion)}
+        className={`min-h-[44px] ${width} bg-transparent text-right t-body outline-none placeholder:text-ink-3 ${
+          wrong ? "text-signal" : "text-ink"
+        }`}
       />
       {unit && <span className="t-label text-ink-3">{unit}</span>}
     </span>
@@ -398,6 +410,7 @@ function PhaseEditor({
   onDelete: () => void;
 }) {
   const untracked = phase.kind === "untracked";
+  const overspent = macrosExceedCalories(phase);
 
   return (
     <div className="mx-4 mt-3 group-list">
@@ -481,14 +494,32 @@ function PhaseEditor({
           {/* One row, because it is one decision. Calories and steps each have a
               rule - a ceiling and a floor - and get a row apiece for it. A macro
               has no rule in either direction, so three of them side by side is
-              the honest shape: three numbers you are aiming at. */}
+              the honest shape: three numbers you are aiming at.
+
+              What the three DO have is an arithmetic relationship with the
+              calorie target three rows above them. Fill two and the third is
+              suggested in grey; put in a set that spends more than the target
+              and they turn red. Neither is a rule about macros - it is the row
+              saying out loud that these numbers add up to that one. */}
           <div className="group-row group-row-sep">
-            <span className="t-body font-medium text-ink">Macros</span>
+            <span className={`t-body font-medium ${overspent ? "text-signal" : "text-ink"}`}>
+              Macros
+            </span>
             <span className="flex items-baseline gap-1">
               {MACRO_FIELDS.map((f) => (
                 <span key={f} className="flex items-baseline">
-                  <NumberField field={f} phase={phase} onPatch={onPatch} width="w-11" />
-                  <label htmlFor={`phase-${f}`} className="t-label text-ink-3">
+                  <NumberField
+                    field={f}
+                    phase={phase}
+                    onPatch={onPatch}
+                    width="w-11"
+                    suggestion={suggestMacroGrams(phase, f)}
+                    wrong={overspent && phase[f] !== undefined}
+                  />
+                  <label
+                    htmlFor={`phase-${f}`}
+                    className={`t-label ${overspent ? "text-signal" : "text-ink-3"}`}
+                  >
                     {MACRO_INITIALS[f]}
                   </label>
                 </span>

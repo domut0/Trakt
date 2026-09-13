@@ -175,6 +175,10 @@ in this app is almost always a mistake.** Use a card, or use space.
 - **Row** (`group-row`): 48px minimum, space-between, 12px/16px.
 - **Card label** (`group-header`): sentence case, `ink-2`, 16px inset, 8px below.
   No rule.
+- **Bottom bar**: five equal grid columns, the action button in the third by
+  source order. Never two flex halves around it — that centres the button but
+  makes the tabs unequal, because each sits in the middle of half of whatever
+  the button left over.
 - **Chip row**: plain `ink-2` text; the selected chip is `bg-ink text-paper` at
   12px radius. Used for the metric and range pickers and the Daily/7-day toggle,
   which all look the same on purpose.
@@ -193,12 +197,18 @@ in this app is almost always a mistake.** Use a card, or use space.
 - **Boundary handle**: a 3px `ink` bar in a 24px target, on every change-point
   after the first. Dragging it moves that date; the ribbon's layout is frozen
   for the duration of the drag and the landing date rides above the handle.
-- **Lean mark** (Plan → Last 14 days): one day as two bars off a centre line.
-  Calories rise from it in `ink-3`, steps fall from it in `ink`, each as a
-  fraction of **its own** target, capped at 1.5×. On target is symmetric; under
-  on calories and over on steps both tilt it the same way, so a good fortnight
-  leans. Nothing is converted between the two — the app has no TDEE and must not
-  imply one.
+- **Against target** (Plan): a scrolling strip, one column per day. Calories
+  rise from a centre line in `ink-3`, steps fall from it in `ink`, each as a
+  fraction of **its own** target and capped at 1.5×. **A solid `ink-2` line
+  either side is the target itself**, at exactly 1×, named in a fixed gutter
+  outside the scroller so the axis stays labelled however far back you scroll.
+  Because each half is normalised, one flat line serves every phase. Nothing is
+  converted between the two — the app has no TDEE and must not imply one.
+- **Editable figure** (Today, History → day panel): the card *is* the editor.
+  The figure is an input in `t-stat`, transparent, right-aligned, sized to its
+  own content; the target beside it and the status mark after it are unchanged.
+  The raw string lives in the parent and only for the focused field, so an
+  outside write lands immediately everywhere else.
 - **Chart area fill**: a flat 16% `ink` wash. Not a gradient — that is a grey
   ramp and the stock charting-library look. Not a hatch either: hatching exists
   because a one-colour press cannot print a tint, and white rules over black

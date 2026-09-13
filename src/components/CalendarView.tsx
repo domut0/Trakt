@@ -10,7 +10,7 @@ import {
   subMonths,
 } from "date-fns";
 import { dayKey } from "../lib/daily-log";
-import { DayEditorSheet } from "./DayEditorSheet";
+import { DayStatsCard } from "./DayStatsCard";
 import { isCardioSession, useStore, type WorkoutSession } from "../lib/store";
 
 /**
@@ -59,7 +59,6 @@ export function CalendarView() {
   // null until the user taps a day, which lets the default track newly-hydrated
   // data instead of freezing at whatever was loaded on first render.
   const [pickedKey, setPickedKey] = useState<string | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
 
   const loggedSessions = useMemo(() => sessions.filter((s) => s.endedAt != null), [sessions]);
 
@@ -237,157 +236,61 @@ export function CalendarView() {
           <h2 className="t-caption text-ink-2">{format(selectedDate, "EEEE, MMMM d")}</h2>
         </div>
 
-        {(() => {
-          const selectedLog = dailyLogs.find((l) => l.date === selectedKey);
-          const hasSessions = selectedSessions.length > 0;
-          const hasLog =
-            selectedLog &&
-            (selectedLog.calories !== undefined ||
-              selectedLog.protein !== undefined ||
-              selectedLog.carbs !== undefined ||
-              selectedLog.fat !== undefined ||
-              selectedLog.steps !== undefined ||
-              selectedLog.bodyweight !== undefined ||
-              selectedLog.isUntracked);
+        {/* The same editable card the Today screen uses, rather than a second,
+            denser copy of the same six numbers behind a sheet. The empty-day
+            state went with it: a card of six rows waiting to be typed into IS
+            the empty state, and it is the one that lets you do something. */}
+        <div className="mx-4 space-y-3 anim-fade-up">
+          <DayStatsCard date={selectedKey} editable />
 
-          if (!hasSessions && !hasLog) {
-            return (
-              <div className="group-list mx-4 p-6 text-center space-y-3 anim-fade-up">
-                <h3 className="t-body font-semibold tracking-tight text-ink">Empty day</h3>
-                <button
-                  onClick={() => setEditorOpen(true)}
-                  className="w-full min-h-[44px] rounded-lg bg-surface py-2.5 t-body font-semibold text-ink transition-colors active:opacity-80"
-                >
-                  Log daily numbers
-                </button>
-              </div>
-            );
-          }
+          {selectedSessions.length > 0 && (
+            <div className="group-list">
+              {selectedSessions.map((session, i) => {
+                const isCardio = isCardioSession(session);
+                const slot = !isCardio
+                  ? slots.find((sl) => sl.id === session.splitSlotId)
+                  : undefined;
+                const cardioEx = isCardio
+                  ? exercises.find((e) => e.id === session.cardioExerciseId)
+                  : undefined;
+                const title = isCardio ? (cardioEx?.name ?? "Cardio") : (slot?.name ?? "Untitled");
+                const cardioDetails = isCardio
+                  ? fmtCardioDetails(session.durationMinutes, session.distance, unit)
+                  : null;
+                const subtitle = isCardio
+                  ? cardioDetails
+                    ? `· ${cardioDetails}`
+                    : undefined
+                  : `· ${sets.filter((x) => x.sessionId === session.id).length} sets`;
 
-          return (
-            <div className="group-list mx-4 anim-fade-up">
-              {hasLog ? (
-                <button
-                  onClick={() => setEditorOpen(true)}
-                  className="group-row w-full flex-col !items-start gap-2 py-4 text-left cursor-pointer transition-colors active:bg-wash"
-                >
-                  <div className="flex w-full items-center justify-between gap-3">
-                    <span className="t-body font-semibold tracking-tight text-ink">
-                      Daily numbers
+                return (
+                  <Link
+                    key={session.id}
+                    to="/session/$id"
+                    params={{ id: session.id }}
+                    className="group-row group-row-sep w-full items-center justify-between py-4"
+                    style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
+                  >
+                    <div className="min-w-0 flex-1 pr-3">
+                      <div className="flex min-w-0 items-baseline gap-2">
+                        <span className="truncate t-body font-semibold tracking-tight text-ink">
+                          {title}
+                        </span>
+                        {subtitle && (
+                          <span className="t-label shrink-0 text-ink-2">{subtitle}</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="t-label shrink-0 text-ink-2">
+                      {fmtTime(session.startedAt)}
                     </span>
-                    {selectedLog.isUntracked && (
-                      <span className="flex shrink-0 items-center gap-1.5 rounded-sm bg-wash px-2 py-0.5 t-caption text-ink-2">
-                        <span
-                          aria-hidden="true"
-                          className="h-1.5 w-1.5 rounded-full border border-muted-foreground"
-                        />
-                        Untracked
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 t-label">
-                    {selectedLog.calories !== undefined && (
-                      <div>
-                        <span className="text-ink-2">Cal:</span>{" "}
-                        <span className="tnum font-medium text-ink">{selectedLog.calories}</span>
-                      </div>
-                    )}
-                    {selectedLog.protein !== undefined && (
-                      <div>
-                        <span className="text-ink-2">P:</span>{" "}
-                        <span className="tnum font-medium text-ink">{selectedLog.protein}g</span>
-                      </div>
-                    )}
-                    {selectedLog.carbs !== undefined && (
-                      <div>
-                        <span className="text-ink-2">C:</span>{" "}
-                        <span className="tnum font-medium text-ink">{selectedLog.carbs}g</span>
-                      </div>
-                    )}
-                    {selectedLog.fat !== undefined && (
-                      <div>
-                        <span className="text-ink-2">F:</span>{" "}
-                        <span className="tnum font-medium text-ink">{selectedLog.fat}g</span>
-                      </div>
-                    )}
-                    {selectedLog.steps !== undefined && (
-                      <div>
-                        <span className="text-ink-2">Steps:</span>{" "}
-                        <span className="tnum font-medium text-ink">
-                          {selectedLog.steps.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                    {selectedLog.bodyweight !== undefined && (
-                      <div>
-                        <span className="text-ink-2">BW:</span>{" "}
-                        <span className="tnum font-medium text-ink">
-                          {selectedLog.bodyweight} {unit}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </button>
-              ) : (
-                <button
-                  onClick={() => setEditorOpen(true)}
-                  className="group-row w-full justify-center py-3.5 t-body font-semibold t-action"
-                >
-                  Log daily numbers
-                </button>
-              )}
-
-              {hasSessions &&
-                selectedSessions.map((session, i) => {
-                  const isCardio = isCardioSession(session);
-                  const slot = !isCardio
-                    ? slots.find((sl) => sl.id === session.splitSlotId)
-                    : undefined;
-                  const cardioEx = isCardio
-                    ? exercises.find((e) => e.id === session.cardioExerciseId)
-                    : undefined;
-                  const title = isCardio
-                    ? (cardioEx?.name ?? "Cardio")
-                    : (slot?.name ?? "Untitled");
-                  const cardioDetails = isCardio
-                    ? fmtCardioDetails(session.durationMinutes, session.distance, unit)
-                    : null;
-                  const subtitle = isCardio
-                    ? cardioDetails
-                      ? `· ${cardioDetails}`
-                      : undefined
-                    : `· ${sets.filter((x) => x.sessionId === session.id).length} sets`;
-
-                  return (
-                    <Link
-                      key={session.id}
-                      to="/session/$id"
-                      params={{ id: session.id }}
-                      className="group-row group-row-sep w-full items-center justify-between py-4"
-                      style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
-                    >
-                      <div className="min-w-0 flex-1 pr-3">
-                        <div className="flex min-w-0 items-baseline gap-2">
-                          <span className="truncate t-body font-semibold tracking-tight text-ink">
-                            {title}
-                          </span>
-                          {subtitle && (
-                            <span className="t-label shrink-0 text-ink-2">{subtitle}</span>
-                          )}
-                        </div>
-                      </div>
-                      <span className="t-label shrink-0 text-ink-2">
-                        {fmtTime(session.startedAt)}
-                      </span>
-                    </Link>
-                  );
-                })}
+                  </Link>
+                );
+              })}
             </div>
-          );
-        })()}
+          )}
+        </div>
       </section>
-
-      <DayEditorSheet date={selectedKey} open={editorOpen} onClose={() => setEditorOpen(false)} />
     </>
   );
 }

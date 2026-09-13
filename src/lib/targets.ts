@@ -157,3 +157,67 @@ export function targetProgressFor(
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Macros against the calorie target.
+//
+// The one arithmetic relationship this app knows. It is not a rule about what
+// to eat - there is still no more-or-less-is-better direction on a macro - it
+// is the fact that three of the numbers on the phase editor add up to a fourth
+// one sitting three rows above them, and that the screen should say so.
+// ---------------------------------------------------------------------------
+
+export const MACRO_FIELDS = ["protein", "carbs", "fat"] as const;
+
+export type MacroField = (typeof MACRO_FIELDS)[number];
+
+/**
+ * Atwater factors. Approximations by nature - they are averages over food, not
+ * constants - which is exactly why what is derived from them is offered as a
+ * SUGGESTION and never written on the user's behalf.
+ */
+export const KCAL_PER_GRAM: Record<MacroField, number> = {
+  protein: 4,
+  carbs: 4,
+  fat: 9,
+};
+
+/** Calories accounted for by whichever macros carry a number. */
+export function macroKcal(t: TargetBearing): number {
+  return MACRO_FIELDS.reduce((sum, f) => sum + (t[f] ?? 0) * KCAL_PER_GRAM[f], 0);
+}
+
+/**
+ * The grams of `field` that would spend exactly what the calorie target has
+ * left, or undefined when there is nothing to derive it from.
+ *
+ * Four conditions, and every one of them is a case where a number would be a
+ * guess rather than a consequence:
+ *
+ *   the field already has a value       - it is not the app's to change
+ *   the other two are not both set      - two unknowns, one equation
+ *   there is no calorie target          - nothing to divide up
+ *   the other two already spend it all  - the honest answer is not a positive
+ *                                         number of grams
+ */
+export function suggestMacroGrams(t: TargetBearing, field: MacroField): number | undefined {
+  if (t[field] !== undefined) return undefined;
+  if (t.calories === undefined) return undefined;
+  const others = MACRO_FIELDS.filter((f) => f !== field);
+  if (others.some((f) => t[f] === undefined)) return undefined;
+  const left = t.calories - others.reduce((sum, f) => sum + t[f]! * KCAL_PER_GRAM[f], 0);
+  if (left <= 0) return undefined;
+  return Math.round(left / KCAL_PER_GRAM[field]);
+}
+
+/**
+ * Whether the macros already set spend more than the calorie target.
+ *
+ * Strictly more: landing exactly on it is the plan working, not a problem. False
+ * whenever there is no calorie target, because with nothing to exceed there is
+ * nothing to warn about.
+ */
+export function macrosExceedCalories(t: TargetBearing): boolean {
+  if (t.calories === undefined) return false;
+  return macroKcal(t) > t.calories;
+}

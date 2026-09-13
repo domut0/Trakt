@@ -1,4 +1,4 @@
-﻿import { render, screen } from "@testing-library/react";
+﻿import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { DayStatsCard } from "../DayStatsCard";
 import { dayKey } from "../../lib/daily-log";
@@ -176,5 +176,76 @@ describe("DayStatsCard", () => {
       expect(screen.getByText(/182\.4/)).toBeInTheDocument();
       expect(screen.getByText("lbs")).toBeInTheDocument();
     });
+  });
+});
+
+describe("DayStatsCard, editable", () => {
+  /**
+   * The card as the editor.
+   *
+   * There is no sheet behind this any more: the sheet held the same six fields
+   * against the same targets, so opening it swapped the card for a copy of
+   * itself and asked for a Save at the end. These tests are about what that
+   * removal has to preserve - writing through, clearing to nothing, and the
+   * raw text surviving a round trip through the store.
+   */
+  beforeEach(() => {
+    seedStore({ calories: 2400, dailyLogs: [] });
+  });
+
+  const caloriesField = () => screen.getByLabelText("Calories") as HTMLInputElement;
+
+  it("writes a typed number straight to the day's log", () => {
+    render(<DayStatsCard date={today} editable />);
+    fireEvent.change(caloriesField(), { target: { value: "2180" } });
+    expect(useStore.getState().dailyLogs.find((l) => l.date === today)?.calories).toBe(2180);
+  });
+
+  it("treats an emptied field as not logged, never as zero", () => {
+    seedStore({ calories: 2400, dailyLogs: [{ date: today, calories: 2180, steps: 9000 }] });
+    render(<DayStatsCard date={today} editable />);
+    fireEvent.change(caloriesField(), { target: { value: "" } });
+    const log = useStore.getState().dailyLogs.find((l) => l.date === today);
+    expect(log?.calories).toBeUndefined();
+    // The rest of the day survives: clearing one field is not clearing the day.
+    expect(log?.steps).toBe(9000);
+  });
+
+  it("keeps a typed zero, which is a real answer", () => {
+    render(<DayStatsCard date={today} editable />);
+    fireEvent.change(screen.getByLabelText("Steps"), { target: { value: "0" } });
+    expect(useStore.getState().dailyLogs.find((l) => l.date === today)?.steps).toBe(0);
+  });
+
+  it("drops the day when the last number is cleared", () => {
+    seedStore({ calories: 2400, dailyLogs: [{ date: today, calories: 2180 }] });
+    render(<DayStatsCard date={today} editable />);
+    fireEvent.change(caloriesField(), { target: { value: "" } });
+    expect(useStore.getState().dailyLogs.find((l) => l.date === today)).toBeUndefined();
+  });
+
+  it("shows the stored number, and an outside write lands in the field", () => {
+    seedStore({ calories: 2400, dailyLogs: [{ date: today, calories: 2180 }] });
+    render(<DayStatsCard date={today} editable />);
+    expect(caloriesField().value).toBe("2180");
+    // The Copy-the-day-before button is exactly this: a write from elsewhere,
+    // which the card has to pick up rather than sitting on stale text.
+    fireEvent.change(screen.getByLabelText("Protein"), { target: { value: "200" } });
+    expect((screen.getByLabelText("Protein") as HTMLInputElement).value).toBe("200");
+    expect(caloriesField().value).toBe("2180");
+  });
+
+  it("toggles the untracked flag", () => {
+    render(<DayStatsCard date={today} editable />);
+    fireEvent.click(screen.getByRole("switch", { name: "Untracked" }));
+    expect(useStore.getState().dailyLogs.find((l) => l.date === today)?.isUntracked).toBe(true);
+    fireEvent.click(screen.getByRole("switch", { name: "Untracked" }));
+    expect(useStore.getState().dailyLogs.find((l) => l.date === today)).toBeUndefined();
+  });
+
+  it("stays a readout when it is not editable", () => {
+    render(<DayStatsCard date={today} />);
+    expect(screen.queryByLabelText("Calories")).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Untracked" })).not.toBeInTheDocument();
   });
 });
