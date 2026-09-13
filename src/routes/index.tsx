@@ -119,10 +119,12 @@ function Home() {
    * thing directly under it and spending the margin on nothing. A timetable
    * names its page with the date it covers.
    */
-  // Sentence case, and a full weekday. The timetable set this in tracked caps
-  // as an abbreviated departure ("THU 20 AUG"); a screen you open in bed is
-  // just telling you what day it is.
-  const heading = format(parseDayKey(selected), "EEEE d MMMM");
+  // A full weekday, then the month before the day: "Sunday, September 13".
+  // The timetable this inherited from set it in tracked caps as an abbreviated
+  // departure ("THU 20 AUG"), and the first pass off that kept its day-month
+  // order. The calendar's day panel has always said "Thursday, August 20", so
+  // the two screens were naming the same date two different ways.
+  const heading = format(parseDayKey(selected), "EEEE, MMMM d");
 
   return (
     <AppShell>
