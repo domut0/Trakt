@@ -24,7 +24,10 @@
      - State is carried by MARK, never by hue. A filled square against an open
        one. This is what makes the app readable to a protanope, and it is the
        one thing the timetable got unambiguously right.
-     - Dashed outline = planned, solid fill = happened.
+     - Dashed outline = planned, solid fill = happened. Retired rather than
+       abandoned: the only surface that ever drew it was the day timeline, and
+       that is deleted, so the two utilities went with it. The rule is still the
+       right answer if a screen ever shows scheduled beside actual.
      - 44px minimum on every interactive target.
      - Tabular figures on anything compared against anything else.
      - Phone only. No breakpoints, no desktop layout.
@@ -284,25 +287,10 @@
 @utility hairline-t {
   border-top: 1px solid var(--color-rule);
 }
-@utility hairline-b {
-  border-bottom: 1px solid var(--color-rule);
-}
 
 /** Between sections, and under column headers. A real division. */
 @utility rule-t {
   border-top: 1px solid var(--color-rule-strong);
-}
-@utility rule-b {
-  border-bottom: 1px solid var(--color-rule-strong);
-}
-
-/** The heavy rule. Reserved for the top of a table and the now line: the two
-    marks on a timetable page that are allowed to shout. Ink, not gray. */
-@utility rule-heavy-t {
-  border-top: 1px solid var(--color-rule-strong);
-}
-@utility rule-heavy-b {
-  border-bottom: 1px solid var(--color-rule-strong);
 }
 
 /* ---------------------------------------------------------------------------
@@ -454,27 +442,6 @@
   color: var(--color-ink-2);
 }
 
-/* ---------------------------------------------------------------------------
-   MARKS. State, carried by shape rather than by hue.
-
-   The old system signalled "goal met" in green and "over a ceiling" in amber,
-   and its own notes recorded that a protanope reads those two as the same
-   olive. A printed page cannot use hue at all, which turns out to be the
-   accessible answer arriving by a different road.
-   --------------------------------------------------------------------------- */
-
-/** Met, done, logged. A filled square. */
-@utility mark-done {
-  position: relative;
-  padding-left: 16px;
-}
-@utility mark-done-box {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--radius-sm);
-  background-color: var(--color-ink);
-}
-
 /** Not yet. The same square, open. Same footprint, so a list of them does not
     reflow as items are completed. */
 @utility mark-open {
@@ -494,35 +461,16 @@
   padding-bottom: 1px;
 }
 
-/** Something broke. A filled flag in the second colour. Different shape from
-    mark-over on purpose; that difference is what the hue used to do. */
-@utility mark-error {
-  border-radius: var(--radius-sm);
-  background-color: var(--color-signal);
-  color: var(--color-paper);
-  padding: 1px 5px;
-  font-weight: 700;
-}
+/* The `planned` and `actual` utilities used to live here: a dashed outline for
+   a scheduled thing, a filled one for a thing that happened. They are deleted
+   because nothing draws them any more. The only surface that ever did was the
+   24-hour day timeline, and that is gone. The Plan tab lists planned workouts
+   as ordinary rows, which is honest - a list of intentions does not need to be
+   distinguished from a list of facts, because there are no facts in it.
 
-/* ---------------------------------------------------------------------------
-   PLANNED vs ACTUAL. The user's own rule, and the reason this world was
-   chosen: a timetable is a scheduled column beside an actual one, so the app's
-   central idea is native here rather than imported.
-   --------------------------------------------------------------------------- */
-
-/** Scheduled, intended, not yet done. Outline only, dashed, no fill. */
-@utility planned {
-  background-color: transparent;
-  border: 1px dashed var(--color-rule-strong);
-  border-radius: var(--radius-md);
-}
-
-/** It happened. Printed on the page: a solid hairline and the one filled tone. */
-@utility actual {
-  background-color: var(--color-wash);
-  border: 1px solid var(--color-ink-3);
-  border-radius: var(--radius-md);
-}
+   The RULE is not retired, only unused. If a screen ever shows scheduled and
+   actual side by side, dashed-versus-filled is still the right way to say it,
+   and re-adding two utilities is cheaper than keeping two dead ones. */
 
 /* ---------------------------------------------------------------------------
    HATCH. Metric identity without hue.
@@ -546,22 +494,6 @@
 /** A generic filled field for anything that is not a macro. */
 @utility hatch-solid {
   background-color: var(--color-ink);
-}
-
-/** The area under a trace.
-
-    Hatching is a printing technique: it exists because a one-colour press
-    cannot print a tint. A screen can, and 135-degree white lines on black read
-    as scratches across the chart rather than as a filled region. A flat wash of
-    the ink at low alpha is the same statement without the texture.
-
-    The name is kept because five call sites and a chart component use it. */
-@utility hatch-dense {
-  background-color: color-mix(in srgb, var(--color-ink) 14%, transparent);
-}
-/** The same field in the signal, for the part of a measure that overran. */
-@utility hatch-over {
-  background-color: color-mix(in srgb, var(--color-signal) 28%, transparent);
 }
 
 /* ---------------------------------------------------------------------------
@@ -720,9 +652,6 @@
     opacity: 0;
     transform: translate(-50%, -8px);
   }
-}
-@utility anim-toast {
-  animation: toast-up 1.6s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

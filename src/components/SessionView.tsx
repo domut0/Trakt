@@ -45,10 +45,10 @@ function SetRow({
 
   return (
     <div className="relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-5 t-label font-medium t-action">
+      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 t-label font-medium t-action">
         Edit
       </div>
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-5 t-label font-medium text-signal">
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4 t-label font-medium text-signal">
         Delete
       </div>
       <div
@@ -190,14 +190,14 @@ export function SessionView({
 
     if (!editable) {
       if (!savedBody) return null;
-      return <div className="mx-5 section-gap group-list p-4">{savedBody}</div>;
+      return <div className="mx-4 section-gap group-list p-4">{savedBody}</div>;
     }
 
     if (isEditingNote) {
       return (
         // Swipe-ignored: placing the caret or dragging out a selection inside
         // the field must not read as a swipe between tabs.
-        <div data-swipe-ignore className="mx-5 section-gap group-list p-4">
+        <div data-swipe-ignore className="mx-4 section-gap group-list p-4">
           <label htmlFor={noteFieldId} className="block t-caption text-ink-2">
             Session note
           </label>
@@ -219,7 +219,7 @@ export function SessionView({
 
     if (savedBody) {
       return (
-        <div className="mx-5 section-gap">
+        <div className="mx-4 section-gap">
           <button
             onClick={() => setNoteDraft(saved ?? "")}
             className="group-list w-full p-4 text-left"
@@ -231,7 +231,7 @@ export function SessionView({
     }
 
     return (
-      <div className="mx-5 section-gap">
+      <div className="mx-4 section-gap">
         <button
           onClick={() => setNoteDraft("")}
           className="flex min-h-[44px] w-full items-center t-label text-ink-2"
@@ -245,7 +245,7 @@ export function SessionView({
   if (grouped.length === 0) {
     return (
       <div className="pb-6">
-        <div className="mx-5 my-6 group-list px-5 py-8 text-center">
+        <div className="mx-4 my-6 group-list px-4 py-8 text-center">
           <h2 className="t-heading">No sets yet</h2>
           <p className="mt-1 t-label text-ink-2">The workout starts when you log one.</p>
         </div>
@@ -261,7 +261,7 @@ export function SessionView({
           {/* The row carries the 44px floor and the link fills it, rather than an
               inset overlay: an overlay here would hang over the first set row
               below and intercept its swipe-to-delete. */}
-          <div className="flex min-h-[44px] items-center justify-between gap-3 px-5">
+          <div className="flex min-h-[44px] items-center justify-between gap-3 px-4">
             <Link
               to="/exercise/$id"
               params={{ id: exercise.id }}
@@ -278,9 +278,9 @@ export function SessionView({
             </span>
           </div>
           {setupNote && (
-            <div className="mx-5 mb-2 bg-wash px-3 py-1.5 t-label text-ink-2">{setupNote}</div>
+            <div className="mx-4 mb-2 bg-wash px-3 py-1.5 t-label text-ink-2">{setupNote}</div>
           )}
-          <div className="mx-5 group-list">
+          <div className="mx-4 group-list">
             {sets.map((s, i) => (
               <SetRow
                 key={s.id}

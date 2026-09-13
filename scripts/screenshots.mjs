@@ -170,6 +170,23 @@ const SESSION_NOTES = {
   17: "Slept badly. Kept it easy.",
 };
 
+/**
+ * A planned week, Monday first.
+ *
+ * Two of the four carry a time and two do not, because "unscheduled" is the
+ * normal case and is a different rendering: the plan still says what to train,
+ * it just does not claim to know when.
+ */
+const PLANNED_WEEK = [
+  { name: "Heavy Bench", exerciseIds: ["e_bench", "e_close_grip_bench"], atMinutes: 7 * 60 },
+  { name: "Squat", exerciseIds: ["e_squat", "e_rdl"] },
+  null,
+  { name: "Pull", exerciseIds: ["e_dead", "e_barbell_row"], atMinutes: 18 * 60 + 30 },
+  { name: "Volume Bench", exerciseIds: ["e_incline_bench", "e_ohp"] },
+  null,
+  null,
+];
+
 const TARGET_PROFILES = [
   {
     id: "tp_train",
@@ -745,6 +762,22 @@ async function captureToday(page) {
   await settle(page);
 }
 
+async function capturePlan(page) {
+  // Its own backup, and it runs LAST, because a planned week is not just one
+  // more screen: starting a workout on a planned day preloads that day's main
+  // lifts, so seeding this into the shared backup silently changed the whole
+  // workout flow underneath captureWorkoutFlow - the exercise picker never
+  // opened, because an exercise was already chosen. Unplanned is the common
+  // case and is what the other captures should keep showing.
+  await importBackup(
+    page,
+    { ...buildFullBackup(), plannedWeek: PLANNED_WEEK },
+    "a planned training week",
+  );
+  await gotoTab(page, "/plan", 'h1:text("Plan")');
+  await shot(page, "60-plan-week");
+}
+
 async function captureHistory(page) {
   await gotoTab(page, "/history", 'h1:text("History")');
   await shot(page, "20-history-calendar");
@@ -1045,6 +1078,7 @@ async function main() {
     await captureSettings(page);
     await captureWorkoutFlow(page);
     await captureSessionDetail(page);
+    await capturePlan(page);
 
     await context.close();
     await browser.close();

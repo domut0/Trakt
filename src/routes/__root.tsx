@@ -39,10 +39,10 @@ function NoticePage({
   actions: ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col justify-center bg-paper px-5">
+    <div className="flex min-h-screen flex-col justify-center bg-paper px-4">
       <div className="mx-auto w-full max-w-md">
         <p className="t-caption text-ink-3">{code}</p>
-        <div className="mt-1.5 rule-heavy-t pt-3">
+        <div className="mt-4 rounded-lg bg-surface p-4">
           <h1 className="t-heading text-ink">{title}</h1>
           <div className="mt-2 t-body text-ink-2">{children}</div>
         </div>

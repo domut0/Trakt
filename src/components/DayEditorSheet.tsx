@@ -290,7 +290,7 @@ export function DayEditorSheet({
           <div className="mx-auto h-1 w-10 bg-border" />
         </div>
 
-        <div className="px-5 pb-5">
+        <div className="px-4 pb-5">
           <div className="t-caption text-ink-2">{existing ? "Edit day" : "Log day"}</div>
           <div className="mt-0.5 t-heading font-semibold tracking-tight">{headerLabel(date)}</div>
 

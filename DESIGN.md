@@ -51,7 +51,13 @@ None of this is about paint, and all of it carries forward unchanged:
   one; a struck rule under an overrun figure; a ringed dot rather than a
   recoloured one. This is what makes the app readable to a protanope, and it is
   the one thing the timetable got unambiguously right.
-- **Dashed outline = planned. Solid fill = happened.**
+- **Dashed outline = planned. Solid fill = happened.** Currently RETIRED, not
+  abandoned. The `planned` and `actual` utilities were deleted because nothing
+  drew them any more: the 24-hour day timeline was the only surface that ever
+  did. The Plan tab lists planned workouts as ordinary rows, which is honest -
+  a list of intentions does not need distinguishing from a list of facts when
+  there are no facts in it. Re-add the two utilities if a screen ever shows
+  scheduled beside actual.
 - **44px minimum** on every interactive target, always.
 - **Tabular figures** on anything compared against anything else. `body` sets
   `font-variant-numeric: tabular-nums` globally; `.pnum` is the escape hatch for

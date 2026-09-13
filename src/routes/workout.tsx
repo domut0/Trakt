@@ -180,7 +180,7 @@ function WorkoutPage() {
       */}
       {/* Top bar. Negative vertical margin keeps the 44px touch targets without
           making the header taller. */}
-      <div className="grid grid-cols-3 items-center px-5 pt-14 pb-2">
+      <div className="grid grid-cols-3 items-center px-4 pt-14 pb-2">
         <button
           onClick={() => router.navigate({ to: "/" })}
           className="-my-3 flex min-h-[44px] items-center justify-self-start t-action t-body"
@@ -198,8 +198,9 @@ function WorkoutPage() {
         </button>
       </div>
 
-      {/* The lift, and the clock, as two columns of one ruled block. */}
-      <div className="rule-heavy-t rule-b flex items-start gap-4 px-5 py-3">
+      {/* The lift, and the clock. A card rather than a block ruled top and
+          bottom: on a dark ground the card edge already says where it stops. */}
+      <div className="mx-4 mt-3 flex items-start gap-4 rounded-lg bg-surface px-4 py-3">
         {/*
           The lift outranks the clock, and it did not in the first cut.
 
@@ -230,7 +231,9 @@ function WorkoutPage() {
       </div>
 
       {currentSetupNote && (
-        <div className="hairline-b bg-wash px-5 py-2 t-label text-ink-2">{currentSetupNote}</div>
+        <div className="mx-4 mt-2 rounded-md bg-wash px-4 py-2 t-label text-ink-2">
+          {currentSetupNote}
+        </div>
       )}
 
       {/*
@@ -262,13 +265,13 @@ function WorkoutPage() {
       */}
       {!planned && sessSets.length > 0 && (
         <section className="flex min-h-0 flex-1 flex-col justify-end overflow-y-auto">
-          <ul className="hairline-b">
+          <ul>
             {[...sessSets].reverse().map((set, idx) => {
               const ex = exercises.find((e) => e.id === set.exerciseId);
               return (
                 <li
                   key={set.id}
-                  className={`flex items-baseline justify-between gap-3 px-5 py-2.5 ${
+                  className={`flex items-baseline justify-between gap-3 px-4 py-2.5 ${
                     idx > 0 ? "group-row-sep" : "anim-flap-row"
                   }`}
                 >
@@ -300,7 +303,7 @@ function WorkoutPage() {
         instead of pushing the bottom row off a small screen.
       */}
       {planned && (
-        <section className="section-gap min-h-0 flex-1 overflow-y-auto px-5">
+        <section className="section-gap min-h-0 flex-1 overflow-y-auto px-4">
           <div className="group-header">
             <h2 className="t-caption">Planned</h2>
             {planned.name.trim() && (
@@ -370,7 +373,7 @@ function WorkoutPage() {
         underneath it, so the button and the words describing it were two
         objects. Here the button says what it does.
       */}
-      <div className="mt-auto px-5 pb-4">
+      <div className="mt-auto px-4 pb-4">
         <button
           onClick={() => {
             if (inBlock) {
@@ -380,7 +383,7 @@ function WorkoutPage() {
             }
           }}
           aria-label={inBlock ? "Log the next set in this block" : "Log a set"}
-          className="flex min-h-[72px] w-full items-center justify-between gap-3 bg-ink px-5 text-paper rounded-md"
+          className="flex min-h-[72px] w-full items-center justify-between gap-3 bg-ink px-4 text-paper rounded-md"
         >
           <span className="min-w-0 text-left">
             <span className="block t-heading">{inBlock ? "Next set" : "Log set"}</span>
@@ -397,7 +400,7 @@ function WorkoutPage() {
       </div>
 
       <div
-        className="rule-t flex items-end justify-between gap-4 px-5 pt-3"
+        className="flex items-end justify-between gap-4 px-4 pt-3"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
         <div className="min-w-0">
@@ -436,7 +439,7 @@ function WorkoutPage() {
             className="mx-auto flex h-full max-w-md flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="rule-b flex items-center justify-between gap-3 px-5 pt-14 pb-3">
+            <div className="flex items-center justify-between gap-3 px-4 pt-14 pb-3">
               <button
                 onClick={() => setShowView(false)}
                 className="-my-3 flex min-h-[44px] shrink-0 items-center t-action t-body"

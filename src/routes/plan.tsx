@@ -120,7 +120,7 @@ function PlanPage() {
 
   return (
     <AppShell>
-      <header className="px-5 pb-4 pt-14">
+      <header className="px-4 pb-4 pt-14">
         <h1 className="t-title">Plan</h1>
         {nothingPlanned && (
           <p className="mt-2 t-label text-ink-2">
@@ -139,7 +139,7 @@ function PlanPage() {
           )}
         </div>
 
-        <div className="group-list mx-5">
+        <div className="group-list mx-4">
           {days.map(({ label, index, planned, lifts }) => {
             const isToday = index === todayIndex;
             const title = planned ? planned.name.trim() || "Untitled" : "Rest day";

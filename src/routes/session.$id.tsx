@@ -22,7 +22,7 @@ function SessionPage() {
   if (!session) {
     return (
       <AppShell>
-        <div className="px-5 py-20 text-center t-body text-ink-2">Session not found.</div>
+        <div className="px-4 py-20 text-center t-body text-ink-2">Session not found.</div>
       </AppShell>
     );
   }
@@ -34,7 +34,7 @@ function SessionPage() {
   if (!isCardio && !slot) {
     return (
       <AppShell>
-        <div className="px-5 py-20 text-center t-body text-ink-2">Session not found.</div>
+        <div className="px-4 py-20 text-center t-body text-ink-2">Session not found.</div>
       </AppShell>
     );
   }
@@ -44,7 +44,7 @@ function SessionPage() {
 
   return (
     <AppShell>
-      <div className="flex items-center justify-between px-5 pt-14 pb-2">
+      <div className="flex items-center justify-between px-4 pt-14 pb-2">
         <button
           onClick={() => router.navigate({ to: "/" })}
           className="-my-3 flex min-h-[44px] items-center t-body font-medium t-action"
@@ -56,14 +56,14 @@ function SessionPage() {
           onDeleted={() => router.navigate({ to: "/" })}
         />
       </div>
-      <header className="px-5 pb-2">
+      <header className="px-4 pb-2">
         <div className="t-caption text-ink-2">
           {d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
         </div>
         <h1 className="mt-1 text-balance break-words t-title">{title}</h1>
       </header>
       {isCardio ? (
-        <div className="section-gap px-5">
+        <div className="section-gap px-4">
           <div className="group-list">
             {session.durationMinutes != null && (
               <div className="group-row">

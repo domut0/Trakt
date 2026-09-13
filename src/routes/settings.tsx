@@ -190,7 +190,7 @@ function SettingsPage() {
 
   return (
     <AppShell>
-      <header className="px-5 pb-4 pt-14">
+      <header className="px-4 pb-4 pt-14">
         <h1 className="t-title">Settings</h1>
       </header>
 
@@ -291,7 +291,7 @@ function SettingsPage() {
         </div>
 
         {importError && (
-          <div className="group-row-sep px-5 py-3 t-label text-signal">{importError}</div>
+          <div className="group-row-sep px-4 py-3 t-label text-signal">{importError}</div>
         )}
 
         {pendingImport && (
@@ -339,7 +339,7 @@ function SettingsPage() {
         )}
 
         {importSuccess && (
-          <div className="group-row-sep px-5 py-3 t-label text-ink-2">Backup imported.</div>
+          <div className="group-row-sep px-4 py-3 t-label text-ink-2">Backup imported.</div>
         )}
       </Section>
 
@@ -386,7 +386,7 @@ function SettingsPage() {
         )}
       </Section>
 
-      <p className="px-5 pt-6 t-label text-ink-2">
+      <p className="px-4 pt-6 t-label text-ink-2">
         v0.1 · local first · no accounts, sync optional.
       </p>
     </AppShell>
@@ -490,7 +490,7 @@ function Section({
 }) {
   return (
     <section className="section-gap anim-fade-up" style={{ animationDelay: `${delay}ms` }}>
-      {/* No px-5 on the header and no mx-5 on the list. group-list used to
+      {/* No px-4 on the header and no mx-4 on the list. group-list used to
           bleed itself to the trim with a -20px inline margin, so every caller
           had to cancel it; a card does not bleed, and group-header carries its
           own 16px so it lines up with the first word of the first row. */}

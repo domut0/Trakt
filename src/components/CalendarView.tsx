@@ -109,7 +109,7 @@ export function CalendarView() {
 
   return (
     <>
-      <div className="mx-5 mb-3 flex items-center justify-between">
+      <div className="mx-4 mb-3 flex items-center justify-between">
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(subMonths(m, 1)))}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-2 active:bg-wash"
@@ -136,7 +136,7 @@ export function CalendarView() {
           cell below names its own weekday in full. */}
       <div
         aria-hidden="true"
-        className="mx-5 grid grid-cols-7 text-center t-caption text-ink-2 py-1"
+        className="mx-4 grid grid-cols-7 text-center t-caption text-ink-2 py-1"
       >
         {WEEKDAYS.map((w, i) => (
           <div key={i}>{w}</div>

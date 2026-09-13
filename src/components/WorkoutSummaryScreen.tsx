@@ -107,12 +107,12 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
       {/* The content scrolls in its own region so the way out below it is
           always on screen and never sits on top of the last record. */}
       <div className="flex-1 overflow-y-auto">
-        <header className="px-5 pt-14 text-center">
+        <header className="px-4 pt-14 text-center">
           <div className="t-caption text-ink-2">Finished</div>
           <h1 className="mt-1 text-balance break-words t-title">{data.slotName}</h1>
         </header>
 
-        <section className="section-gap flex flex-col items-center px-5 text-center anim-fade-up">
+        <section className="section-gap flex flex-col items-center px-4 text-center anim-fade-up">
           {subject.isRecord ? (
             // A record is a success, never an alert, and never a badge either: it
             // is a fact stated in the same eyebrow slot every other state uses,
@@ -137,7 +137,7 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
 
         <section className="section-gap">
           <h2 className="group-header t-caption">This workout</h2>
-          <div className="group-list mx-5">
+          <div className="group-list mx-4">
             {facts.map((fact, i) => (
               <div key={fact.label} className={`group-row ${i === 0 ? "" : "group-row-sep"}`}>
                 <span className="t-body text-ink-2">{fact.label}</span>
@@ -150,7 +150,7 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
         {otherRecords.length > 0 && (
           <section className="section-gap">
             <h2 className="group-header t-caption">Other records</h2>
-            <div className="group-list mx-5">
+            <div className="group-list mx-4">
               {otherRecords.map((record, i) => {
                 const { value, suffix } = recordValue(record, data.unit);
                 return (
@@ -177,7 +177,7 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
       {/* Outside the scroller, so it is on screen from the first frame however
           many records a long session produced. */}
       <div
-        className="px-5 pt-7"
+        className="px-4 pt-7"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
         <button

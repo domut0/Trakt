@@ -35,7 +35,7 @@ function ExercisePage() {
   if (!exercise) {
     return (
       <AppShell>
-        <div className="px-5 py-20 text-center t-body text-ink-2">Exercise not found.</div>
+        <div className="px-4 py-20 text-center t-body text-ink-2">Exercise not found.</div>
       </AppShell>
     );
   }
@@ -49,7 +49,7 @@ function ExercisePage() {
 
   return (
     <AppShell>
-      <div className="flex items-center justify-between px-5 pt-14 pb-2">
+      <div className="flex items-center justify-between px-4 pt-14 pb-2">
         <button
           onClick={goBack}
           className="-my-[11px] flex min-h-[44px] items-center t-body font-medium t-action"
@@ -58,7 +58,7 @@ function ExercisePage() {
         </button>
       </div>
 
-      <header className="px-5 pb-4">
+      <header className="px-4 pb-4">
         <div className="t-caption text-ink-2">{typeLabel}</div>
         <h1 className="mt-1 text-balance break-words t-title">{exercise.name}</h1>
         {exercise.setupNote && (
@@ -67,7 +67,7 @@ function ExercisePage() {
       </header>
 
       {/* Personal bests and set totals */}
-      <div className="px-5">
+      <div className="px-4">
         <div className="group-list">
           <div className="group-row">
             <span className="t-body text-ink-2">Best set</span>
@@ -92,7 +92,7 @@ function ExercisePage() {
       </div>
 
       {/* Chronological per-session history */}
-      <section className="section-gap px-5 pb-10">
+      <section className="section-gap px-4 pb-10">
         <h2 className="group-header px-0 t-caption">History</h2>
 
         {grouped.length === 0 ? (

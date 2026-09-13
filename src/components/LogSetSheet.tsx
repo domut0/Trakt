@@ -233,7 +233,7 @@ export function LogSetSheet({
         </div>
 
         {pickingExercise ? (
-          <div className="px-5 pb-4">
+          <div className="px-4 pb-4">
             <input
               autoFocus
               aria-label="Search or add exercise"
@@ -287,7 +287,7 @@ export function LogSetSheet({
             </div>
           </div>
         ) : (
-          <div className="px-5 pb-5">
+          <div className="px-4 pb-5">
             <div className="flex items-baseline justify-between">
               <button onClick={() => setPickingExercise(true)} className="text-left">
                 <div className="t-caption text-ink-2">Exercise</div>
@@ -578,7 +578,7 @@ export function NumField({
             aria-label={`Decrease ${label}`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onStep(-1)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center t-heading font-semibold text-ink hairline-t hairline-b active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md t-heading font-semibold text-ink active:scale-95"
           >
             −
           </button>
@@ -619,7 +619,7 @@ export function NumField({
             aria-label={`Increase ${label}`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onStep(1)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center t-heading font-semibold text-ink hairline-t hairline-b active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md t-heading font-semibold text-ink active:scale-95"
           >
             +
           </button>
