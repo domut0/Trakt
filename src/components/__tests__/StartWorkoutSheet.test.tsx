@@ -92,13 +92,12 @@ describe("StartWorkoutSheet", () => {
 
   describe("choosing between slots", () => {
     beforeEach(() => {
-      // UL×infinity, and Upper was trained most recently, so the rotation
-      // suggests Lower.
+      // UL×infinity with the split pointing at Lower. The cursor is explicit
+      // now: it moves when a card is consumed, rather than being re-derived
+      // from whichever slot was logged most recently.
       useStore.setState({
-        slots: [
-          { ...slot("Upper", ["e_bench"], 0), lastLoggedAt: 1000 },
-          slot("Lower", ["e_squat"], 1),
-        ],
+        slots: [slot("Upper", ["e_bench"], 0), slot("Lower", ["e_squat"], 1)],
+        nextSlotId: "s_lower",
       });
     });
 

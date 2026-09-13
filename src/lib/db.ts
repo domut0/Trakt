@@ -25,6 +25,14 @@ export type MetaKey = "settings" | "activeSession" | "syncConfig" | "syncBase" |
 export interface SettingsMeta {
   key: "settings";
   unit: "lbs" | "kg";
+  /**
+   * Which split card comes next.
+   *
+   * On the settings row rather than in its own table because it is exactly one
+   * short string, always read with the rest of settings and never queried. Being
+   * a non-indexed addition it needs no Dexie version bump either.
+   */
+  nextSlotId?: string;
 }
 
 export interface ActiveSessionMeta {
@@ -451,7 +459,11 @@ export async function replaceAllData(data: BackupData): Promise<void> {
       // Annotated as SettingsMeta rather than inlined: `meta` is a union table,
       // and an inline literal makes Dexie's InsertType resolve against the wrong
       // arm of the union, which is a type error even though the value is valid.
-      const settings: SettingsMeta = { key: "settings", unit: data.unit };
+      const settings: SettingsMeta = {
+        key: "settings",
+        unit: data.unit,
+        nextSlotId: data.nextSlotId,
+      };
       await db.meta.put(settings);
       await db.meta.put(EMPTY_ACTIVE_SESSION);
       // The sync base describes a dataset that no longer exists, so it MUST go

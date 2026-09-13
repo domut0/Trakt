@@ -161,7 +161,7 @@ describe("logCardio", () => {
   });
 });
 
-describe("cardio does not touch the rotation", () => {
+describe("cardio does not touch the split", () => {
   const slots = [
     { id: "slotA", name: "Heavy Bench", rotationOrder: 0, lastLoggedAt: 1000 },
     { id: "slotB", name: "Squat", rotationOrder: 1 },
@@ -175,13 +175,16 @@ describe("cardio does not touch the rotation", () => {
     expect(useStore.getState().slots).toEqual(slots);
   });
 
-  it("logging cardio does not change the predicted next slot", () => {
-    useStore.setState({ slots });
-    const before = useStore.getState().predictedNextSlotName();
-    expect(before).toBe("Squat"); // slotA was last logged -> next in rotation
+  it("logging cardio does not move the split cursor", () => {
+    // A cardio bout has no split slot, so there is no card for it to consume.
+    // The cursor is explicit now rather than derived from lastLoggedAt, which
+    // makes this a claim about endWorkout leaving it alone.
+    useStore.setState({ slots, nextSlotId: "slotB" });
+    expect(useStore.getState().predictedNextSlotName()).toBe("Squat");
 
     useStore.getState().logCardio({ exerciseId: "treadmill", durationMinutes: 45 });
 
+    expect(useStore.getState().nextSlotId).toBe("slotB");
     expect(useStore.getState().predictedNextSlotName()).toBe("Squat");
   });
 

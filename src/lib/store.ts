@@ -13,6 +13,10 @@ import {
 } from "./db";
 import { isDailyLogEmpty } from "./daily-log";
 import {
+  advanceSplit,
+  firstDayCard,
+  kindOf,
+  orderedSplit,
   isNutritionPhase,
   isPlannedDay,
   phaseForDate,
@@ -21,6 +25,7 @@ import {
   targetsForDate,
   type NutritionPhase,
   type PlannedDay,
+  type SplitCardKind,
 } from "./planning";
 import { seedExercises } from "./exercise-library";
 
@@ -38,6 +43,19 @@ export interface SplitSlot {
   name: string;
   rotationOrder: number;
   lastLoggedAt?: number;
+  /**
+   * What this card is in the split.
+   *
+   * Absent means `workout`, so every slot written before the split existed
+   * needs no migration. A `rest` is still a day - it is spent, and spending it
+   * moves the cursor on - while a `repeat` is not a day at all: reaching one
+   * sends the cursor back to the top, which is what lets five cards express
+   * "Upper, Lower, forever, with a rest when I say so".
+   *
+   * Only a `workout` can own a session. `startWorkout` never matches against a
+   * rest or a repeat, so neither can end up as a thing sets were logged into.
+   */
+  kind?: SplitCardKind;
   /**
    * The lifts this slot is for, which is where a training plan actually lives.
    *
@@ -169,19 +187,19 @@ export interface BackupData {
   nutritionPhases: NutritionPhase[];
   plannedDays: PlannedDay[];
   /**
-   * The weekly training plan, or `undefined` for a file written before planning
-   * existed and for anyone who has never planned a day.
+   * The split cursor, or `undefined` for a file written before the split
+   * existed - which reads as "start at the top", and is correct.
    *
    * REQUIRED, and spelled `| undefined` rather than `?:`, which is the whole
-   * point of it. A required key is what keeps the `const backup: BackupData`
-   * annotation in settings.tsx a compile error every time this interface
-   * widens; an optional one type-checks happily against an export that never
-   * mentions the field, so exports would keep writing plan-less files and the
-   * only symptom would be a restored backup with the plan gone. TypeScript
-   * still demands the key be written out when the type includes `undefined`,
-   * so the guard survives while the union keeps the distinction plan.ts draws
-   * between "never planned" and "seven explicit rest days".
+   * point of it. A required key keeps the `const backup: BackupData` annotation
+   * in settings.tsx a compile error every time this interface widens; an
+   * optional one type-checks happily against an export that never mentions the
+   * field, so exports would keep writing files without it and the only symptom
+   * would be a restore that silently reset your place in the split. TypeScript
+   * still demands the key be written out when the type includes `undefined`, so
+   * the guard survives while the union keeps the meaning.
    */
+  nextSlotId: string | undefined;
   unit: "lbs" | "kg";
 }
 
@@ -215,9 +233,6 @@ type CurrentBlock = {
 
 interface State {
   unit: "lbs" | "kg";
-  /** Feature toggles for the four opt-in additions. Off by default: each one
-   * adds a surface to a screen whose whole point is having nothing in the way,
-   * so the user turns them on deliberately. */
   exercises: Exercise[];
   slots: SplitSlot[];
   sessions: WorkoutSession[];
@@ -226,15 +241,19 @@ interface State {
   nutritionPhases: NutritionPhase[];
   plannedDays: PlannedDay[];
   /**
-   * The weekly training plan, 7 entries MONDAY FIRST, or undefined when the user
-   * has never planned anything. Resolve through plan.ts, never `getDay()`.
+   * The card the split is pointing at: what you do next.
    *
-   * Optional rather than seeded with a week of rest days, unlike
-   * `weekdayTargets`: targets ship pre-filled because an empty targets editor is
-   * useless, whereas an unplanned week is a real and permanent state for a user
-   * who never turns planning on, and writing seven nulls into everyone's
-   * settings row to represent it would be storage for nothing.
+   * A real stored cursor, which the rotation this replaced deliberately did not
+   * have - it derived "next" from whichever slot was logged most recently, so
+   * nothing could desynchronise. That stops working the moment the split holds
+   * cards you never log: a rest is consumed by choosing it, a repeat is never
+   * consumed at all, so something has to remember the position.
+   *
+   * It moves when a card is CONSUMED - a workout ended, a rest taken - never
+   * when the date changes. Skipping a day costs nothing: Monday's Upper is
+   * still waiting on Wednesday.
    */
+  nextSlotId: string | undefined;
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
@@ -308,6 +327,24 @@ interface State {
   /** Untracked by either route: the logged flag, or a planned untracked phase.
    * The planned half is derived and never written to a DailyLog. */
   isUntrackedDay: (date: string) => boolean;
+
+  // --- The workout split --------------------------------------------------
+  /** Appends a card. A repeat needs no name and is never a day. */
+  addSplitCard: (input: { name?: string; kind?: SplitCardKind }) => SplitSlot;
+  updateSplitCard: (id: string, patch: { name?: string; kind?: SplitCardKind }) => void;
+  /** Removes a card. If the cursor was on it, the cursor moves on rather than
+   * being left pointing at nothing. */
+  deleteSplitCard: (id: string) => void;
+  /** Moves a card to `toIndex` in cycle order, renumbering the rest. */
+  moveSplitCard: (id: string, toIndex: number) => void;
+  /** "Do this one next", straight from the split screen. */
+  setNextCard: (id: string) => void;
+  /** Spend the given rest card: the cursor moves past it, exactly as ending a
+   * workout moves past a workout card. */
+  takeRestDay: (id: string) => void;
+  /** The card the split is pointing at, resolved. Falls back to the first day
+   * card when the cursor is unset or stale. */
+  nextCard: () => SplitSlot | undefined;
 
   // --- Training plan ------------------------------------------------------
   /** The lifts a slot is for. Preloaded at Start Workout, never a constraint. */
@@ -911,6 +948,12 @@ export function parseBackup(text: string): ParseBackupResult {
       dailyLogs: (dailyLogs as DailyLog[] | undefined) ?? [],
       nutritionPhases,
       plannedDays,
+      // Tolerated, not required: a file written before the split existed has no
+      // cursor, and "start at the top" is the right reading of that.
+      nextSlotId:
+        typeof (parsed as { nextSlotId?: unknown }).nextSlotId === "string"
+          ? (parsed as { nextSlotId: string }).nextSlotId
+          : undefined,
       // Anything that is not a well-formed week becomes "no plan" rather than an
       // import failure, matching how the file's targets and habits degrade: a
       // hand-edited plan is not worth refusing someone their six weeks of sets
@@ -962,7 +1005,7 @@ function persistSettingsFrom(s: State) {
   // a pin per planned day - and rewriting one JSON blob on every edit is the
   // wrong shape for that. They have their own tables, written by their own
   // actions, exactly like dailyLogs.
-  const settings: SettingsMeta = { key: "settings", unit: s.unit };
+  const settings: SettingsMeta = { key: "settings", unit: s.unit, nextSlotId: s.nextSlotId };
   safeWrite(() => db.meta.put(settings));
 }
 
@@ -975,6 +1018,7 @@ export const useStore = create<State>((set, get) => ({
   dailyLogs: [],
   nutritionPhases: [],
   plannedDays: [],
+  nextSlotId: undefined,
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -1014,6 +1058,7 @@ export const useStore = create<State>((set, get) => ({
           unit: settings.unit,
           nutritionPhases: [],
           plannedDays: [],
+          nextSlotId: undefined,
           activeSessionId: undefined,
           currentExerciseId: undefined,
           currentBlock: undefined,
@@ -1033,6 +1078,7 @@ export const useStore = create<State>((set, get) => ({
         unit: data.settings.unit,
         nutritionPhases: data.nutritionPhases,
         plannedDays: data.plannedDays,
+        nextSlotId: data.settings.nextSlotId,
         // Both default on READ. A settings record written before planning
         // existed has neither key, and no migration is needed to make it mean
         // "no plan" (see the note on `plannedWeek` in db.ts).
@@ -1047,7 +1093,17 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  predictedNextSlotName: () => predictNextSlotName(get().slots),
+  predictedNextSlotName: () => {
+    // Reads the CURSOR, not "whichever slot was logged most recently". The old
+    // derivation could not see a rest or a repeat, so a split containing either
+    // would have suggested the wrong thing the moment one was involved.
+    //
+    // A rest is a real next card but not a workout NAME, so it is not offered
+    // here: this feeds the Start Workout field, and prefilling it with "Rest"
+    // would create a slot called Rest the first time somebody hit Start.
+    const card = get().nextCard();
+    return card && kindOf(card) === "workout" ? card.name : undefined;
+  },
 
   startWorkout: (slotName) => {
     const trimmed = slotName.trim();
@@ -1090,9 +1146,17 @@ export const useStore = create<State>((set, get) => ({
           sl.id === sess.splitSlotId ? { ...sl, lastLoggedAt: endedAt } : sl,
         )
       : get().slots;
+    // Ending a workout CONSUMES its card, which is the only thing that moves the
+    // split on for a workout. A cardio bout does not: it has no slot, so there
+    // is no card to spend. Computed off the pre-update slots because the walk
+    // only reads order and kind, neither of which endWorkout touches.
+    const consumedSplit = sess?.splitSlotId
+      ? advanceSplit(updatedSlots, sess.splitSlotId)?.id
+      : get().nextSlotId;
     set({
       sessions: updatedSessions,
       slots: updatedSlots,
+      nextSlotId: consumedSplit,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
@@ -1390,6 +1454,101 @@ export const useStore = create<State>((set, get) => ({
   isUntrackedDay: (date) =>
     isUntrackedOn(get().nutritionPhases, date, get().dailyLogFor(date)?.isUntracked),
 
+  // --- The workout split --------------------------------------------------
+
+  addSplitCard: ({ name, kind }) => {
+    const k = kind ?? "workout";
+    const orderEnd = get().slots.reduce((m, sl) => Math.max(m, sl.rotationOrder), -1) + 1;
+    const card: SplitSlot = {
+      id: `sl_${uid()}`,
+      // A repeat is a marker rather than a thing with a name, so it carries a
+      // fixed one instead of an empty string that every list would have to
+      // special-case when rendering.
+      name: k === "repeat" ? "Repeat" : (name ?? "").trim() || (k === "rest" ? "Rest" : "Untitled"),
+      rotationOrder: orderEnd,
+      ...(k === "workout" ? {} : { kind: k }),
+    };
+    set({ slots: [...get().slots, card] });
+    safeWrite(() => db.slots.put(card));
+    return card;
+  },
+
+  updateSplitCard: (id, patch) => {
+    const next = get().slots.map((sl) => {
+      if (sl.id !== id) return sl;
+      const k = patch.kind ?? kindOf(sl);
+      const merged: SplitSlot = {
+        ...sl,
+        ...(patch.name !== undefined ? { name: patch.name.trim() || sl.name } : {}),
+        ...(k === "workout" ? { kind: undefined } : { kind: k }),
+      };
+      // A card that stops being a workout stops carrying lifts: keeping them
+      // would resurrect a plan silently if it were ever switched back.
+      if (k !== "workout") merged.plannedExerciseIds = undefined;
+      if (k === "repeat") merged.name = "Repeat";
+      return merged;
+    });
+    set({ slots: next });
+    const updated = next.find((sl) => sl.id === id);
+    if (updated) safeWrite(() => db.slots.put(updated));
+  },
+
+  deleteSplitCard: (id) => {
+    const remaining = orderedSplit(get().slots.filter((sl) => sl.id !== id)).map((sl, i) => ({
+      ...sl,
+      rotationOrder: i,
+    }));
+    // Move the cursor BEFORE the card goes, so "what comes after this" is still
+    // answerable. Deleting the card the split is pointing at would otherwise
+    // leave it pointing at nothing.
+    const cursorWasHere = get().nextSlotId === id;
+    const moved = cursorWasHere ? advanceSplit(get().slots, id)?.id : get().nextSlotId;
+    const nextSlotId = moved === id ? firstDayCard(remaining)?.id : moved;
+    set({ slots: remaining, nextSlotId });
+    safeWrite(async () => {
+      await db.slots.delete(id);
+      await db.slots.bulkPut(remaining);
+    });
+    persistSettingsFrom(get());
+  },
+
+  moveSplitCard: (id, toIndex) => {
+    const ordered = orderedSplit(get().slots);
+    const from = ordered.findIndex((sl) => sl.id === id);
+    if (from < 0) return;
+    const to = Math.max(0, Math.min(ordered.length - 1, toIndex));
+    if (from === to) return;
+    const [card] = ordered.splice(from, 1);
+    ordered.splice(to, 0, card);
+    const renumbered = ordered.map((sl, i) => ({ ...sl, rotationOrder: i }));
+    set({ slots: renumbered });
+    safeWrite(() => db.slots.bulkPut(renumbered));
+  },
+
+  setNextCard: (id) => {
+    const card = get().slots.find((sl) => sl.id === id);
+    // A repeat is not a day, so it cannot be what you do next.
+    if (!card || kindOf(card) === "repeat") return;
+    set({ nextSlotId: id });
+    persistSettingsFrom(get());
+  },
+
+  takeRestDay: (id) => {
+    const card = get().slots.find((sl) => sl.id === id);
+    if (!card || kindOf(card) !== "rest") return;
+    set({ nextSlotId: advanceSplit(get().slots, id)?.id });
+    persistSettingsFrom(get());
+  },
+
+  nextCard: () => {
+    const { slots, nextSlotId } = get();
+    const pointed = nextSlotId ? slots.find((sl) => sl.id === nextSlotId) : undefined;
+    // A stale cursor - the card was deleted, or an import replaced the split -
+    // falls back to the top rather than leaving the screen with no answer.
+    if (pointed && kindOf(pointed) !== "repeat") return pointed;
+    return firstDayCard(slots);
+  },
+
   // --- Training plan ------------------------------------------------------
 
   setSlotExercises: (slotId, exerciseIds) => {
@@ -1448,6 +1607,7 @@ export const useStore = create<State>((set, get) => ({
       dailyLogs: data.dailyLogs,
       nutritionPhases: data.nutritionPhases,
       plannedDays: data.plannedDays,
+      nextSlotId: data.nextSlotId,
       unit: data.unit,
       // Restored from the file, not cleared. `replaceAllData` has just written
       // both of these into the settings record, so anything else here would
@@ -1474,6 +1634,7 @@ export const useStore = create<State>((set, get) => ({
       dailyLogs: [],
       nutritionPhases: [],
       plannedDays: [],
+      nextSlotId: undefined,
       unit: "lbs",
     });
     set({
@@ -1484,6 +1645,7 @@ export const useStore = create<State>((set, get) => ({
       dailyLogs: [],
       nutritionPhases: [],
       plannedDays: [],
+      nextSlotId: undefined,
       unit: "lbs",
       activeSessionId: undefined,
       currentExerciseId: undefined,

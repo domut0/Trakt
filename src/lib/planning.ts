@@ -154,3 +154,83 @@ export function isPlannedDay(v: unknown): v is PlannedDay {
     d.splitSlotId.length > 0
   );
 }
+
+// ---------------------------------------------------------------------------
+// The workout split: an ordered list of cards the app walks, one at a time.
+// ---------------------------------------------------------------------------
+
+/**
+ * What a card in the split is.
+ *
+ * `workout` and `rest` are both DAYS: each one is a thing you spend a day on,
+ * and each advances the cursor when you consume it. `repeat` is not a day at
+ * all - reaching it sends the cursor straight back to the top of the list, and
+ * it is never shown as what you are doing today.
+ *
+ * Absent means `workout`, so every slot that existed before this needs no
+ * migration.
+ */
+export type SplitCardKind = "workout" | "rest" | "repeat";
+
+/** The shape `advanceSplit` reads. `SplitSlot` satisfies it. */
+export interface SplitCardLike {
+  id: string;
+  rotationOrder: number;
+  kind?: SplitCardKind;
+}
+
+export function kindOf(card: SplitCardLike): SplitCardKind {
+  return card.kind ?? "workout";
+}
+
+/** Cycle order. */
+export function orderedSplit<T extends SplitCardLike>(cards: readonly T[]): T[] {
+  return [...cards].sort((a, b) => a.rotationOrder - b.rotationOrder);
+}
+
+/**
+ * The card after `fromId`, with repeats resolved.
+ *
+ * This is the whole split mechanic, and it is three rules:
+ *
+ *   1. Step forward one, wrapping at the end.
+ *   2. Landing on a `repeat` sends you back to the FIRST card.
+ *   3. A day is a `workout` or a `rest`, never a `repeat`.
+ *
+ * Which is what makes the user's UL-forever split expressible in five cards:
+ * `Upper, Lower, Repeat, Rest, Repeat`. Advancing off Lower hits the first
+ * repeat and bounces to Upper, so Rest is NEVER reached on its own - it is
+ * there to be chosen deliberately, and advancing off it hits the second repeat
+ * and bounces to Upper too.
+ *
+ * `undefined` when there is no day to land on: an empty split, or one made only
+ * of repeats. The bounded walk below is what stops that being a hang rather
+ * than a shrug.
+ */
+export function advanceSplit<T extends SplitCardLike>(
+  cards: readonly T[],
+  fromId: string | undefined,
+): T | undefined {
+  const ordered = orderedSplit(cards);
+  if (ordered.length === 0) return undefined;
+
+  const fromIdx = fromId ? ordered.findIndex((c) => c.id === fromId) : -1;
+  let idx = fromIdx < 0 ? 0 : (fromIdx + 1) % ordered.length;
+
+  // Bounded by the list length: a split of nothing but repeats would otherwise
+  // bounce to the top and back forever. Every real split terminates on its
+  // first day card, usually immediately.
+  for (let steps = 0; steps <= ordered.length; steps++) {
+    const card = ordered[idx];
+    if (kindOf(card) !== "repeat") return card;
+    // A repeat means "start again", not "skip one". If the first card is itself
+    // a repeat we keep walking forward rather than sitting on it.
+    idx = idx === 0 ? 1 % ordered.length : 0;
+  }
+  return undefined;
+}
+
+/** The first day card, for a split with no cursor yet. */
+export function firstDayCard<T extends SplitCardLike>(cards: readonly T[]): T | undefined {
+  return orderedSplit(cards).find((c) => kindOf(c) !== "repeat");
+}

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  advanceSplit,
+  firstDayCard,
   isNutritionPhase,
   isPlannedDay,
   isUntrackedOn,
@@ -145,5 +147,109 @@ describe("backup tolerance", () => {
     expect(isPlannedDay({ date: "2026-09-19", splitSlotId: "s1" })).toBe(true);
     expect(isPlannedDay({ date: "2026-09-19", splitSlotId: "" })).toBe(false);
     expect(isPlannedDay({ date: "nope", splitSlotId: "s1" })).toBe(false);
+  });
+});
+
+describe("advanceSplit: the user's UL-forever split", () => {
+  /** Upper, Lower, Repeat, Rest, Repeat - exactly the five cards the user
+   *  described, in that order. */
+  const UL = [
+    { id: "c_upper", rotationOrder: 0 },
+    { id: "c_lower", rotationOrder: 1 },
+    { id: "c_rep1", rotationOrder: 2, kind: "repeat" as const },
+    { id: "c_rest", rotationOrder: 3, kind: "rest" as const },
+    { id: "c_rep2", rotationOrder: 4, kind: "repeat" as const },
+  ];
+
+  it("alternates upper and lower forever, never reaching rest", () => {
+    // The claim the whole design rests on. Advancing off Lower lands on a
+    // repeat, which bounces to the top, so Rest is unreachable by advancing.
+    let card = firstDayCard(UL)!;
+    const walked: string[] = [card.id];
+    for (let i = 0; i < 7; i++) {
+      card = advanceSplit(UL, card.id)!;
+      walked.push(card.id);
+    }
+    expect(walked).toEqual([
+      "c_upper",
+      "c_lower",
+      "c_upper",
+      "c_lower",
+      "c_upper",
+      "c_lower",
+      "c_upper",
+      "c_lower",
+    ]);
+    expect(walked).not.toContain("c_rest");
+    expect(walked).not.toContain("c_rep1");
+  });
+
+  it("returns to upper the day after a rest was taken", () => {
+    // Rest is chosen deliberately, never landed on. Consuming it hits the
+    // SECOND repeat, which bounces to the top the same way the first does.
+    expect(advanceSplit(UL, "c_rest")?.id).toBe("c_upper");
+  });
+
+  it("never offers a repeat as a day", () => {
+    for (const c of UL) {
+      expect(advanceSplit(UL, c.id)?.kind).not.toBe("repeat");
+    }
+  });
+});
+
+describe("advanceSplit: edges", () => {
+  it("starts at the first day card with no cursor", () => {
+    const cards = [
+      { id: "a", rotationOrder: 0 },
+      { id: "b", rotationOrder: 1 },
+    ];
+    expect(advanceSplit(cards, undefined)?.id).toBe("a");
+    expect(firstDayCard(cards)?.id).toBe("a");
+  });
+
+  it("skips a leading repeat rather than sitting on it", () => {
+    // "Go back to the top" is meaningless when the top IS the repeat, so the
+    // walk steps forward instead of bouncing in place.
+    const cards = [
+      { id: "r", rotationOrder: 0, kind: "repeat" as const },
+      { id: "a", rotationOrder: 1 },
+    ];
+    expect(firstDayCard(cards)?.id).toBe("a");
+    expect(advanceSplit(cards, "a")?.id).toBe("a");
+  });
+
+  it("wraps a split with no repeats at all", () => {
+    const cards = [
+      { id: "a", rotationOrder: 0 },
+      { id: "b", rotationOrder: 1 },
+    ];
+    expect(advanceSplit(cards, "b")?.id).toBe("a");
+  });
+
+  it("gives up rather than hanging on a split of only repeats", () => {
+    // Reachable by deleting every named card, and a loop here would be a frozen
+    // screen rather than an empty one.
+    const cards = [
+      { id: "r1", rotationOrder: 0, kind: "repeat" as const },
+      { id: "r2", rotationOrder: 1, kind: "repeat" as const },
+    ];
+    expect(advanceSplit(cards, "r1")).toBeUndefined();
+    expect(firstDayCard(cards)).toBeUndefined();
+  });
+
+  it("is empty for an empty split, and recovers from an unknown cursor", () => {
+    expect(advanceSplit([], undefined)).toBeUndefined();
+    const cards = [{ id: "a", rotationOrder: 0 }];
+    // A cursor pointing at a deleted card falls back to the start rather than
+    // leaving the split stuck with no next.
+    expect(advanceSplit(cards, "gone")?.id).toBe("a");
+  });
+
+  it("reads order from rotationOrder, not array position", () => {
+    const cards = [
+      { id: "b", rotationOrder: 1 },
+      { id: "a", rotationOrder: 0 },
+    ];
+    expect(advanceSplit(cards, "a")?.id).toBe("b");
   });
 });

@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { PhaseEditorSheet } from "../components/PhaseEditorSheet";
 import { SlotPlanSheet } from "../components/SlotPlanSheet";
+import { SplitCardList } from "../components/SplitCardList";
+import { Plus } from "../components/icons";
 import { Chevron } from "../components/icons";
 import { dayKey, parseDayKey } from "../lib/daily-log";
 import { phaseForDate, sortPhases, type NutritionPhase } from "../lib/planning";
@@ -42,19 +44,22 @@ function PlanPage() {
   const slots = useStore((s) => s.slots);
   const exercises = useStore((s) => s.exercises);
   const plannedDays = useStore((s) => s.plannedDays);
-  const predicted = useStore((s) => s.predictedNextSlotName());
   const unpinDay = useStore((s) => s.unpinDay);
+  const takeRestDay = useStore((s) => s.takeRestDay);
+  const next = useStore((s) => s.nextCard());
   const hydrated = useStore((s) => s.hydrated);
 
   const [editingPhase, setEditingPhase] = useState<NutritionPhase | undefined>();
   const [phaseOpen, setPhaseOpen] = useState(false);
   const [editingSlot, setEditingSlot] = useState<SplitSlot | undefined>();
+  const [cardOpen, setCardOpen] = useState(false);
 
   const ordered = useMemo(() => sortPhases(phases).reverse(), [phases]);
   const rotation = useMemo(
     () => [...slots].sort((a, b) => a.rotationOrder - b.rotationOrder),
     [slots],
   );
+  const restCard = useMemo(() => rotation.find((s) => s.kind === "rest"), [rotation]);
 
   const today = hydrated ? dayKey(new Date()) : "";
 
@@ -163,45 +168,54 @@ function PlanPage() {
         </section>
       )}
 
-      {/* ---- Training -------------------------------------------------- */}
+      {/* ---- The workout split ----------------------------------------- */}
       <section className="px-4 section-gap anim-fade-up">
         <div className="group-header">
-          <h2 className="t-caption">Rotation</h2>
-          {predicted && <span className="t-label text-ink-2">Next: {predicted}</span>}
+          <h2 className="t-caption">Workout split</h2>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingSlot(undefined);
+              setCardOpen(true);
+            }}
+            aria-label="Add a card to the split"
+            className="flex min-h-[44px] items-center text-ink"
+          >
+            <Plus size={18} />
+          </button>
         </div>
+
+        {/* Directly under the heading, where the user asked for it: what you do
+            next is the one thing this section is read for. */}
+        {next && <p className="px-4 pb-2 t-label text-ink-2">Next: {next.name}</p>}
 
         {rotation.length === 0 ? (
           <div className="group-list px-4 py-5">
-            <p className="t-body text-ink-2">No splits yet</p>
+            <p className="t-body text-ink-2">No cards yet</p>
           </div>
         ) : (
-          <div className="group-list">
-            {rotation.map((s, i) => {
-              const lifts = (s.plannedExerciseIds ?? [])
-                .map((id) => exercises.find((e) => e.id === id)?.name)
-                .filter((n): n is string => n !== undefined);
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setEditingSlot(s)}
-                  className={`group-row w-full text-left ${i === 0 ? "" : "group-row-sep"}`}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate t-body font-medium text-ink">{s.name}</span>
-                    <span className="block truncate t-label text-ink-2">
-                      {lifts.length > 0 ? lifts.join(" · ") : "No lifts chosen"}
-                    </span>
-                  </span>
-                  <Chevron className="shrink-0 text-ink-3" size={16} />
-                </button>
-              );
-            })}
-          </div>
+          <SplitCardList
+            onEdit={(slot) => {
+              setEditingSlot(slot);
+              setCardOpen(true);
+            }}
+          />
+        )}
+
+        {restCard && next?.id === restCard.id && (
+          // Only offered when a rest is actually what is next, because taking
+          // one out of turn would silently jump the split forward.
+          <button
+            type="button"
+            onClick={() => takeRestDay(restCard.id)}
+            className="mt-3 flex min-h-[44px] w-full items-center justify-center rounded-lg bg-surface t-body font-medium text-ink"
+          >
+            Take today off
+          </button>
         )}
       </section>
 
-      {/* ---- Pinned days ----------------------------------------------- */}
+      {/* ---- Pinned ---- */}
       {futurePins.length > 0 && (
         <section className="px-4 section-gap anim-fade-up">
           <div className="group-header">
@@ -236,8 +250,11 @@ function PlanPage() {
       <PhaseEditorSheet phase={editingPhase} open={phaseOpen} onClose={() => setPhaseOpen(false)} />
       <SlotPlanSheet
         slot={editingSlot}
-        open={editingSlot !== undefined}
-        onClose={() => setEditingSlot(undefined)}
+        open={cardOpen}
+        onClose={() => {
+          setCardOpen(false);
+          setEditingSlot(undefined);
+        }}
       />
     </AppShell>
   );

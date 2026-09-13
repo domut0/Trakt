@@ -70,6 +70,7 @@ beforeEach(async () => {
 const PRE_V4_DEFAULTS = {
   nutritionPhases: [],
   plannedDays: [],
+  nextSlotId: undefined,
   // The plan rides along on v4 without a version bump, so "an old file" means
   // one with no plan keys at all. `undefined` is what parseBackup hands back
   // for exactly that file, which is why it belongs in the shared defaults
@@ -601,6 +602,7 @@ describe("importData (full backup restore)", () => {
       // A v4 file predates the planning timeline entirely.
       nutritionPhases: [],
       plannedDays: [],
+      nextSlotId: undefined,
       // Not the default, so a settings record that failed to persist is visible.
       unit: "kg",
     };
@@ -718,6 +720,7 @@ describe("importData (full backup restore)", () => {
         },
       ],
       plannedDays: [{ date: "2026-09-21", splitSlotId: "s1" }],
+      nextSlotId: undefined,
       unit: "lbs",
     };
 
@@ -752,6 +755,7 @@ describe("importData (full backup restore)", () => {
       dailyLogs: [],
       nutritionPhases: [],
       plannedDays: [{ date: "2026-09-21", splitSlotId: "s_deleted" }],
+      nextSlotId: undefined,
       unit: "lbs",
     };
     const result = parseBackup(JSON.stringify(file));

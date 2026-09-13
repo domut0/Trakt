@@ -316,6 +316,8 @@ describe("the merge base and destructive actions", () => {
       nutritionPhases: [],
 
       plannedDays: [],
+
+      nextSlotId: undefined,
       unit: "lbs",
     });
 

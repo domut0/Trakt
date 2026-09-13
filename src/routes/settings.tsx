@@ -52,8 +52,17 @@ function SettingsPage() {
   };
 
   const exportJson = () => {
-    const { exercises, slots, sessions, sets, dailyLogs, nutritionPhases, plannedDays, unit } =
-      useStore.getState();
+    const {
+      exercises,
+      slots,
+      sessions,
+      sets,
+      dailyLogs,
+      nutritionPhases,
+      plannedDays,
+      nextSlotId,
+      unit,
+    } = useStore.getState();
     // Annotated as BackupData on purpose. This object literal used to be built
     // inline inside JSON.stringify, where an excess/missing key is invisible to
     // the type checker: when BackupData grew to v4 the export quietly kept
@@ -64,6 +73,7 @@ function SettingsPage() {
       version: BACKUP_VERSION,
       nutritionPhases,
       plannedDays,
+      nextSlotId,
       exercises,
       slots,
       sessions,

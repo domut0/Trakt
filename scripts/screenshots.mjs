@@ -124,6 +124,12 @@ const SLOTS = [
   { id: "s_pull", name: "Pull", rotationOrder: 1 },
   { id: "s_vb", name: "Volume Bench", rotationOrder: 2 },
   { id: "s_sq", name: "Squat", rotationOrder: 3 },
+  // A repeat before the rest, which is the whole device: the split loops back
+  // to the top on reaching it, so Rest is never arrived at by accident and is
+  // only ever taken deliberately.
+  { id: "s_rep1", name: "Repeat", rotationOrder: 4, kind: "repeat" },
+  { id: "s_rest", name: "Rest", rotationOrder: 5, kind: "rest" },
+  { id: "s_rep2", name: "Repeat", rotationOrder: 6, kind: "repeat" },
 ];
 
 /** Which split runs on which weekday, and what is in it. Mon/Tue/Thu/Fri lift,
@@ -382,6 +388,7 @@ function buildFullBackup() {
     dailyLogs,
     nutritionPhases: NUTRITION_PHASES,
     plannedDays: PLANNED_DAYS,
+    nextSlotId: "s_pull",
     targetsEnabled: true,
     toolsEnabled: true,
     unit: "lbs",
@@ -405,6 +412,7 @@ function buildEmptyBackup() {
     dailyLogs: [],
     nutritionPhases: [],
     plannedDays: [],
+    nextSlotId: undefined,
     targetsEnabled: false,
     toolsEnabled: false,
     unit: "lbs",
