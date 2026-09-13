@@ -709,11 +709,8 @@ async function captureEmptyStates(page) {
   await shot(page, "01-empty-today");
 
   await gotoTab(page, "/history", 'h1:text("History")');
-  await shot(page, "02-empty-history-weekly");
-
-  await page.getByRole("button", { name: "Calendar" }).click();
+  await shot(page, "02-empty-history");
   await settle(page);
-  await shot(page, "03-empty-history-calendar");
 
   await gotoTab(page, "/charts", 'h1:text("Charts")');
   await shot(page, "04-empty-charts");
@@ -750,16 +747,10 @@ async function captureToday(page) {
 
 async function captureHistory(page) {
   await gotoTab(page, "/history", 'h1:text("History")');
-  await shot(page, "20-history-weekly");
-  await scrollMain(page, 700);
-  await shot(page, "21-history-weekly-scrolled");
-  await scrollMain(page, 0);
-
-  await page.getByRole("button", { name: "Calendar" }).click();
-  await settle(page, 600);
-  await shot(page, "22-history-calendar");
+  await shot(page, "20-history-calendar");
   await scrollMain(page, 500);
-  await shot(page, "23-history-calendar-scrolled");
+  await settle(page, 400);
+  await shot(page, "21-history-calendar-scrolled");
 }
 
 async function captureCharts(page) {
