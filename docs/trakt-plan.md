@@ -1,5 +1,10 @@
 # Trakt: the overhaul plan
 
+**BUILT. All six phases are done and merged to `main`.** Read section "Where the
+plan was wrong" at the bottom before trusting any specific claim in here: four
+of them turned out to be false, and two of those were false in the direction of
+"this is dangerous" when it was not.
+
 Written 2026-09-12, out of a full grilling session. Supersedes the visual half of
 `DESIGN.md` and the product half of `PRD.md`. Where this document and those
 disagree, this one wins.
@@ -98,8 +103,8 @@ background**. The row is transparent, so the underlays print through it at rest,
 and "Edit" at `pl-5` lands on the same left gutter as the set-index span at
 `w-5`. Fix: give the row an explicit ground.
 
-This is the locked lesson from the paper redesign - *deleting a fill is right
-for a panel on the page and fatal for anything over it* - and it will re-appear
+This is the locked lesson from the paper redesign - _deleting a fill is right
+for a panel on the page and fatal for anything over it_ - and it will re-appear
 across the repaint. **22 components use a portal, `fixed inset` or
 `absolute inset`** (about 13 survive Phase 1). Every one needs an explicit
 ground in Phase 4.
@@ -179,7 +184,7 @@ steps.
   drawing "Not recorded" (`DayStatsCard.tsx:93`) - the placeholder exists. The
   bug is that Protein, Fat, Carbs and Steps are each wrapped in
   `{targetX !== undefined && ...}` (lines 318, 333, 348, 363), so the row is
-  gated on whether a *target* is set, not on whether a value is logged. On a day
+  gated on whether a _target_ is set, not on whether a value is logged. On a day
   with no targets the card shows a calorie hero and bodyweight and nothing else,
   and no amount of logging makes protein appear. Deleting four conditionals is
   most of this phase.
@@ -202,3 +207,62 @@ with the app.
 
 So this one is deliberately native and deliberately boring: a look with no thesis
 to get tired of. **Ship it, then use it for a month before touching it again.**
+
+---
+
+## Where the plan was wrong
+
+Written after the build. Kept rather than corrected in place, because the
+mistakes are the useful part: each one is a thing that looked true from the
+outside and was not.
+
+**1. "The flag is read by nothing but the calendar and the CSV."** False, and it
+was a truncated `grep | head -20`. `charts.tsx` already ringed untracked calorie
+days rather than colouring them, and had since the paper redesign.
+
+**2. "Renaming the sheet header can silently clear real data through the
+three-way merge."** False, and the sync layer says so in its own comments:
+`parseTable` treats a column it cannot find as _"no opinion, not cleared"_ and
+leaves the field out of the merge entirely, while `writeTab_` rewrites the header
+row on the next push. The rename needed no Apps Script migration at all.
+
+What it DID need, which the plan did not mention, is a **data** migration. The
+field is non-indexed, so it needs no schema change and is easy to miss — but
+Dexie stores whole objects, so an untouched row keeps the old key forever and
+every day already marked would have quietly reverted to ordinary.
+
+**3. The plan asked for two incompatible things.** "Untracked days count
+separately in weekly aggregates" and "History keeps calendar only" cannot both
+hold, because the only weekly aggregate in the app lived in the view being
+deleted. The explicit instruction won and `countUntrackedDays` went with
+`WeeklyView`. The distinction survives where it is read: on the calendar cell,
+in the day panel, and as a ring on the calorie chart.
+
+**4. The file list said to delete `onerm.ts`.** It feeds `pr.ts` feeds
+`workout-summary.ts`: the 1RM _maths_ is load-bearing even though the 1RM
+_calculator_ is not. The compiler caught it; the list did not. Only
+`percentageTable` and its two helpers were actually dead.
+
+## What the plan did not anticipate
+
+**Deleting the Features section stranded four flags.** `targetsEnabled` defaults
+to FALSE, so for one commit the app shipped with daily targets permanently off
+and no UI anywhere to switch them on. `TargetsEditor` was worse: still imported
+by `settings.tsx`, rendered by nothing, because it lived _inside_ the section
+that was deleted. Neither was caught by 700 tests. Both were caught by
+`npm run screenshots` within a minute of it running again.
+
+**The repaint was mostly a token swap, and that was luck.** Eight root values
+feed everything, and `paper`/`ink` mean "ground" and "what is printed on it"
+rather than "white" and "black", so inverting the values inverted the app. Five
+components had to be genuinely rewritten because they were built on the
+_metaphor_ rather than on the system: the week strip's inked column, the
+calendar's ruled lattice, the chart's hatch fill, the Daily/avg ruled box, and
+the nav's active rule.
+
+**Two controls disappeared during the inversion**, both because two tokens
+drifted onto the same value: the Untracked checkbox (filled with
+`--color-border` against a list that became the same colour) and, in the same
+class, the swipe row that let its own underlays print through it. Neither is a
+logic error and no test can see either. The rule that prevents the whole class
+is in DESIGN.md: anything that overlays or translates declares its own ground.

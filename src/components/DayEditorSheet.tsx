@@ -296,9 +296,72 @@ export function DayEditorSheet({
 
           {/* Grouped list of labelled numeric rows and untracked day switch */}
           <div className="mt-4 group-list bg-wash">
-            {/* Macros info row when derived from entries */}
-            {/* Calories - only editable when not derived from entries */}
+            {/* Bodyweight first, matching the card that reads these back.
+
+                The app is opened twice a day and they are different visits:
+                this is the morning one, standing on a scale, and everything
+                below it is the evening one filling in the day from memory.
+                Ordering by WHEN a number is entered rather than by what it
+                measures gives each visit one obvious target, and a readout
+                whose editor lists the same six things in a different order
+                costs a beat every time - on the screen that exists to not cost
+                one. */}
+            {/* Bodyweight */}
             <div className="group-row">
+              <label htmlFor="day-field-bodyweight" className="t-body font-medium text-ink">
+                Bodyweight
+              </label>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-label="Decrease Bodyweight"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => stepBodyweight(-1)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center t-body font-semibold text-ink active:scale-95"
+                >
+                  −
+                </button>
+                <div className="flex min-w-0 items-baseline justify-end gap-1">
+                  <input
+                    id="day-field-bodyweight"
+                    ref={(el) => {
+                      inputRefs.current[0] = el;
+                    }}
+                    inputMode="decimal"
+                    enterKeyHint="done"
+                    aria-label="Bodyweight"
+                    value={draft.bodyweight}
+                    onChange={(e) => setField("bodyweight")(e.target.value)}
+                    onFocus={(e) => {
+                      selectAllOnEntry(e.currentTarget);
+                      e.currentTarget.scrollIntoView({ block: "nearest" });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        focusNextOrSave(5);
+                      }
+                    }}
+                    placeholder="Not logged"
+                    className="t-stat w-24 bg-transparent text-center outline-none placeholder:t-body placeholder:text-ink-2"
+                  />
+                  <span className="t-label text-ink-2">{unit}</span>
+                </div>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-label="Increase Bodyweight"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => stepBodyweight(1)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center t-body font-semibold text-ink active:scale-95"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            {/* Calories */}
+            <div className="group-row group-row-sep">
               <label htmlFor="day-field-calories" className="t-body font-medium text-ink">
                 Calories
               </label>
@@ -306,7 +369,7 @@ export function DayEditorSheet({
                 <input
                   id="day-field-calories"
                   ref={(el) => {
-                    inputRefs.current[0] = el;
+                    inputRefs.current[1] = el;
                   }}
                   inputMode="numeric"
                   enterKeyHint="next"
@@ -329,39 +392,7 @@ export function DayEditorSheet({
               </div>
             </div>
 
-            {/* Steps */}
-            <div className="group-row group-row-sep">
-              <label htmlFor="day-field-steps" className="t-body font-medium text-ink">
-                Steps
-              </label>
-              <div className="flex min-w-0 items-baseline justify-end gap-1">
-                <input
-                  id="day-field-steps"
-                  ref={(el) => {
-                    inputRefs.current[1] = el;
-                  }}
-                  inputMode="numeric"
-                  enterKeyHint="next"
-                  aria-label="Steps"
-                  value={draft.steps}
-                  onChange={(e) => setField("steps")(e.target.value)}
-                  onFocus={(e) => {
-                    selectAllOnEntry(e.currentTarget);
-                    e.currentTarget.scrollIntoView({ block: "nearest" });
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      focusNextOrSave(1);
-                    }
-                  }}
-                  placeholder="Not logged"
-                  className="t-stat w-32 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
-                />
-              </div>
-            </div>
-
-            {/* Protein, Carbs, Fat - only editable when not derived from entries */}
+            {/* Protein, Carbs, Fat */}
             <>
               {/* Protein */}
               <div className="group-row group-row-sep">
@@ -463,58 +494,35 @@ export function DayEditorSheet({
               </div>
             </>
 
-            {/* Bodyweight */}
+            {/* Steps */}
             <div className="group-row group-row-sep">
-              <label htmlFor="day-field-bodyweight" className="t-body font-medium text-ink">
-                Bodyweight
+              <label htmlFor="day-field-steps" className="t-body font-medium text-ink">
+                Steps
               </label>
-              <div className="flex items-center gap-1.5 min-w-0">
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  aria-label="Decrease Bodyweight"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => stepBodyweight(-1)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center t-body font-semibold text-ink active:scale-95"
-                >
-                  −
-                </button>
-                <div className="flex min-w-0 items-baseline justify-end gap-1">
-                  <input
-                    id="day-field-bodyweight"
-                    ref={(el) => {
-                      inputRefs.current[5] = el;
-                    }}
-                    inputMode="decimal"
-                    enterKeyHint="done"
-                    aria-label="Bodyweight"
-                    value={draft.bodyweight}
-                    onChange={(e) => setField("bodyweight")(e.target.value)}
-                    onFocus={(e) => {
-                      selectAllOnEntry(e.currentTarget);
-                      e.currentTarget.scrollIntoView({ block: "nearest" });
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        focusNextOrSave(5);
-                      }
-                    }}
-                    placeholder="Not logged"
-                    className="t-stat w-24 bg-transparent text-center outline-none placeholder:t-body placeholder:text-ink-2"
-                  />
-                  <span className="t-label text-ink-2">{unit}</span>
-                </div>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  aria-label="Increase Bodyweight"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => stepBodyweight(1)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center t-body font-semibold text-ink active:scale-95"
-                >
-                  +
-                </button>
+              <div className="flex min-w-0 items-baseline justify-end gap-1">
+                <input
+                  id="day-field-steps"
+                  ref={(el) => {
+                    inputRefs.current[5] = el;
+                  }}
+                  inputMode="numeric"
+                  enterKeyHint="next"
+                  aria-label="Steps"
+                  value={draft.steps}
+                  onChange={(e) => setField("steps")(e.target.value)}
+                  onFocus={(e) => {
+                    selectAllOnEntry(e.currentTarget);
+                    e.currentTarget.scrollIntoView({ block: "nearest" });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      focusNextOrSave(1);
+                    }
+                  }}
+                  placeholder="Not logged"
+                  className="t-stat w-32 bg-transparent text-right outline-none placeholder:t-body placeholder:text-ink-2"
+                />
               </div>
             </div>
 
