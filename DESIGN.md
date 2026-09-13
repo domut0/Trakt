@@ -201,13 +201,16 @@ in this app is almost always a mistake.** Use a card, or use space.
 - **Boundary handle**: a 3px `ink` bar in a 24px target, on every change-point
   after the first. Dragging it moves that date; the ribbon's layout is frozen
   for the duration of the drag and the landing date rides above the handle.
-- **Against target** (Plan): a scrolling strip, one column per day. Calories
-  rise from a centre line in `ink-3`, steps fall from it in `ink`, each as a
-  fraction of **its own** target and capped at 1.5×. **A solid `ink-2` line
-  either side is the target itself**, at exactly 1×, named in a fixed gutter
-  outside the scroller so the axis stays labelled however far back you scroll.
-  Because each half is normalised, one flat line serves every phase. Nothing is
-  converted between the two — the app has no TDEE and must not imply one.
+- **Against target** (Plan): a scrolling chart, one column per day, back to the
+  first day ever logged. Calories rise from a centre line in `ink-3`, steps
+  fall from it in `ink`, **each on its own absolute axis** — not as a fraction
+  of target, so a day with no target in force still draws. Both maxima come from
+  the data (`niceCeil`, plus one step of headroom so a goal line is never on
+  the chart's edge) and are labelled in a fixed gutter, unit under number. **The
+  target is a per-day tick, so it reads as a staircase** and steps visibly where
+  a phase changes. Tapping a column opens that day's card — date, cals, steps,
+  macros — beside the bar, flipping side near the end. Nothing is converted
+  between the halves: the app has no TDEE and must not imply one.
 - **Editable figure** (Today, History → day panel): the card *is* the editor.
   The figure is an input in `t-stat`, transparent, right-aligned, sized to its
   own content; the target beside it and the status mark after it are unchanged.
@@ -246,6 +249,8 @@ punctuation, because it is one.
 - Reach for a card or for space before reaching for a line.
 - Give every overlay, sheet, banner and translating row an explicit background.
 - Keep figures tabular.
+- Hide scrollbars. Every scroller here is dragged with a thumb; `styles.css`
+  does it once for all of them.
 - Spend `signal` only on something wrong or destructive. Not on "today" — a
   date is not a warning.
 

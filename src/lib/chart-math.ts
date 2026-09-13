@@ -279,3 +279,20 @@ export function computeWindowChange(
 
   return currentAvg - priorAvg;
 }
+
+/**
+ * The smallest multiple of `step` that is not below `value`, with a floor.
+ *
+ * What an axis maximum is for: a chart drawn to its own data's exact maximum
+ * puts one bar flush against the top edge and labels the axis with whatever
+ * that day happened to be. Rounding up to a round number gives a label anyone
+ * can read at a glance and leaves the tallest bar visibly short of the ceiling.
+ *
+ * The floor matters on a nearly-empty chart: without it, a single 300-calorie
+ * day would scale the axis to 500 and draw itself as a full-height bar, which
+ * reads as an enormous day rather than a small one.
+ */
+export function niceCeil(value: number, step: number, floor = step): number {
+  if (!Number.isFinite(value) || value <= 0) return floor;
+  return Math.max(floor, Math.ceil(value / step) * step);
+}

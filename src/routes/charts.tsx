@@ -193,7 +193,7 @@ function ChartsPage() {
           data-swipe-ignore
           role="group"
           aria-label="Metric"
-          className="scrollbar-none flex gap-2 overflow-x-auto px-4"
+          className="flex gap-2 overflow-x-auto px-4"
         >
           {METRICS.map((m) => (
             <button
@@ -215,7 +215,7 @@ function ChartsPage() {
           data-swipe-ignore
           role="group"
           aria-label="Date range"
-          className="scrollbar-none flex gap-2 overflow-x-auto px-4"
+          className="flex gap-2 overflow-x-auto px-4"
         >
           {RANGES.map((r) => (
             <button

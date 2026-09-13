@@ -2,8 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { LeanStrip } from "../components/LeanStrip";
 import { NutritionRibbon } from "../components/NutritionRibbon";
+import { TargetStrip } from "../components/TargetStrip";
 import { SlotPlanSheet } from "../components/SlotPlanSheet";
 import { SplitCardList } from "../components/SplitCardList";
 import { Plus } from "../components/icons";
@@ -67,7 +67,7 @@ function PlanPage() {
       </header>
 
       <NutritionRibbon />
-      <LeanStrip />
+      <TargetStrip />
 
       {/* ---- The workout split ----------------------------------------- */}
       <section className="px-4 section-gap anim-fade-up">

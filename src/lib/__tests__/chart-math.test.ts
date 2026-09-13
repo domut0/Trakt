@@ -5,6 +5,7 @@ import {
   niceTicks,
   rollingAverage,
   splitIntoSegments,
+  niceCeil,
   tickDecimals,
 } from "../chart-math";
 
@@ -391,5 +392,30 @@ describe("computeWindowChange", () => {
   it("returns null when either window is empty", () => {
     expect(computeWindowChange([{ val: 100 }], [])).toBeNull();
     expect(computeWindowChange([], [{ val: 100 }])).toBeNull();
+  });
+});
+
+describe("niceCeil", () => {
+  it("rounds up to the next step", () => {
+    expect(niceCeil(2180, 500)).toBe(2500);
+    expect(niceCeil(12480, 2000)).toBe(14000);
+  });
+
+  it("leaves a value already on a step alone", () => {
+    // Otherwise a 20,000-step goal would scale the axis to 22,000 and never
+    // let a bar reach its own line.
+    expect(niceCeil(20000, 2000)).toBe(20000);
+  });
+
+  it("holds the floor for a sparse chart", () => {
+    // One 300-calorie day must not scale the axis to itself and draw as a
+    // full-height bar.
+    expect(niceCeil(300, 500, 2000)).toBe(2000);
+    expect(niceCeil(0, 500)).toBe(500);
+  });
+
+  it("treats nothing-to-scale as the floor rather than as NaN", () => {
+    expect(niceCeil(Number.NaN, 500, 1500)).toBe(1500);
+    expect(niceCeil(-100, 500)).toBe(500);
   });
 });

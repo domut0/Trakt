@@ -243,19 +243,22 @@
     outline-offset: 2px;
     border-radius: var(--radius-md);
   }
+  /* No scrollbars anywhere.
+     
+     This is a phone app: every scroller in it is dragged with a thumb, and none
+     of them needs a second, thinner scrollbar drawn beside the content to say
+     so. A themed 6px bar was the compromise before, and it still put a grey rail
+     down the side of a 14px-column chart.
+
+     Three places were already trying to opt out with a `scrollbar-none` class
+     that this file never defined - an undeclared utility is a silent no-op in
+     Tailwind, so those rails were showing too. Doing it once, here, is the only
+     version that cannot drift. */
   * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-rule-strong) transparent;
+    scrollbar-width: none;
   }
   *::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  *::-webkit-scrollbar-thumb {
-    background-color: var(--color-rule-strong);
-  }
-  *::-webkit-scrollbar-track {
-    background-color: transparent;
+    display: none;
   }
   a {
     text-underline-offset: 3px;
