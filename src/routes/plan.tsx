@@ -41,7 +41,6 @@ function PlanPage() {
   const exercises = useStore((s) => s.exercises);
   const plannedDays = useStore((s) => s.plannedDays);
   const unpinDay = useStore((s) => s.unpinDay);
-  const takeRestDay = useStore((s) => s.takeRestDay);
   const next = useStore((s) => s.nextCard());
   const hydrated = useStore((s) => s.hydrated);
 
@@ -52,7 +51,6 @@ function PlanPage() {
     () => [...slots].sort((a, b) => a.rotationOrder - b.rotationOrder),
     [slots],
   );
-  const restCard = useMemo(() => rotation.find((s) => s.kind === "rest"), [rotation]);
 
   const today = hydrated ? dayKey(new Date()) : "";
 
@@ -103,18 +101,6 @@ function PlanPage() {
               setCardOpen(true);
             }}
           />
-        )}
-
-        {restCard && next?.id === restCard.id && (
-          // Only offered when a rest is actually what is next, because taking
-          // one out of turn would silently jump the split forward.
-          <button
-            type="button"
-            onClick={() => takeRestDay(restCard.id)}
-            className="mt-3 flex min-h-[44px] w-full items-center justify-center rounded-lg bg-surface t-body font-medium text-ink"
-          >
-            Take today off
-          </button>
         )}
       </section>
 

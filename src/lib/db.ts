@@ -33,6 +33,15 @@ export interface SettingsMeta {
    * a non-indexed addition it needs no Dexie version bump either.
    */
   nextSlotId?: string;
+  /**
+   * The day the current REST card became current, as a day key.
+   *
+   * Beside the cursor because it is part of the same fact: where you are in the
+   * split, and - when that is a rest - when you got there. A rest is the only
+   * card the clock can spend, so this is what makes "that rest day is over"
+   * answerable the next time the app opens. Non-indexed, so no version bump.
+   */
+  restSince?: string;
 }
 
 export interface ActiveSessionMeta {

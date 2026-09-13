@@ -779,6 +779,11 @@ async function capturePlan(page) {
   await scrollMain(page, 400);
   await settle(page, 300);
   await shot(page, "61-plan-scrolled");
+
+  // A split card's actions, which a tap opens. This replaced a long-press.
+  await page.getByText("Heavy Bench", { exact: true }).click();
+  await settle(page, 300);
+  await shot(page, "62-plan-split-card-actions");
 }
 
 async function captureHistory(page) {

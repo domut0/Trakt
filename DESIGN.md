@@ -194,6 +194,10 @@ in this app is almost always a mistake.** Use a card, or use space.
   a dashed break inside its right edge and states its real length** — the width
   is a claim about a duration, and where the claim cannot be kept the drawing
   has to say so.
+- **Card actions** (Plan → Workout split): a tap opens a row of `wash` pills
+  under the card — Edit card / Do this today / Delete — attached to it with no
+  separator, because they belong to it. Never a long press: this list has twice
+  hidden a control behind a gesture and been wrong both times.
 - **Boundary handle**: a 3px `ink` bar in a 24px target, on every change-point
   after the first. Dragging it moves that date; the ribbon's layout is frozen
   for the duration of the drag and the landing date rides above the handle.

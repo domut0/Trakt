@@ -11,7 +11,7 @@ import {
   type ActiveSessionMeta,
   type SettingsMeta,
 } from "./db";
-import { isDailyLogEmpty } from "./daily-log";
+import { dayKey, isDailyLogEmpty } from "./daily-log";
 import {
   advanceSplit,
   firstDayCard,
@@ -254,6 +254,18 @@ interface State {
    * still waiting on Wednesday.
    */
   nextSlotId: string | undefined;
+  /**
+   * The day the current REST card became current, as a day key.
+   *
+   * The one exception to the paragraph above. A rest is not consumed by doing
+   * anything - that is what a rest is - so it is the only card the CLOCK can
+   * spend, and it is spent at the first midnight after it was taken. Recording
+   * the day it started is what makes that decidable without a background task:
+   * any time the app opens, "is today later than this" is the whole question.
+   *
+   * Undefined whenever the cursor is not on a rest.
+   */
+  restSince: string | undefined;
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
@@ -341,6 +353,12 @@ interface State {
   moveSplitCard: (id: string, toIndex: number) => void;
   /** "Do this one next", straight from the split screen. */
   setNextCard: (id: string) => void;
+  /**
+   * Spend a rest that is over. Called whenever the app might have crossed
+   * midnight - on hydrate, on returning to the foreground, and on a timer while
+   * it stays open.
+   */
+  settleRestDay: () => void;
   /** Spend the given rest card: the cursor moves past it, exactly as ending a
    * workout moves past a workout card. */
   takeRestDay: (id: string) => void;
@@ -1002,12 +1020,36 @@ function persistActiveMeta(meta: {
  * inline literal makes Dexie's InsertType resolve against the wrong arm of the
  * union, which is a type error even though the value is perfectly valid.
  */
+/**
+ * Move the cursor, and start or stop the rest clock in the same breath.
+ *
+ * Every route to a new cursor goes through here - chosen by hand, advanced onto
+ * by finishing a workout, closed up after a delete - because a rest that became
+ * current without its clock starting would sit there forever, and a clock left
+ * running after the cursor moved off a rest would spend the wrong card.
+ */
+function cursorTo(
+  slots: readonly SplitSlot[],
+  id: string | undefined,
+): { nextSlotId: string | undefined; restSince: string | undefined } {
+  const card = id ? slots.find((sl) => sl.id === id) : undefined;
+  return {
+    nextSlotId: id,
+    restSince: card && kindOf(card) === "rest" ? dayKey(new Date()) : undefined,
+  };
+}
+
 function persistSettingsFrom(s: State) {
   // Phases and pins are NOT here. They grow with time - a phase per diet change,
   // a pin per planned day - and rewriting one JSON blob on every edit is the
   // wrong shape for that. They have their own tables, written by their own
   // actions, exactly like dailyLogs.
-  const settings: SettingsMeta = { key: "settings", unit: s.unit, nextSlotId: s.nextSlotId };
+  const settings: SettingsMeta = {
+    key: "settings",
+    unit: s.unit,
+    nextSlotId: s.nextSlotId,
+    restSince: s.restSince,
+  };
   safeWrite(() => db.meta.put(settings));
 }
 
@@ -1021,6 +1063,7 @@ export const useStore = create<State>((set, get) => ({
   nutritionPhases: [],
   plannedDays: [],
   nextSlotId: undefined,
+  restSince: undefined,
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -1061,6 +1104,7 @@ export const useStore = create<State>((set, get) => ({
           nutritionPhases: [],
           plannedDays: [],
           nextSlotId: undefined,
+          restSince: undefined,
           activeSessionId: undefined,
           currentExerciseId: undefined,
           currentBlock: undefined,
@@ -1081,6 +1125,7 @@ export const useStore = create<State>((set, get) => ({
         nutritionPhases: data.nutritionPhases,
         plannedDays: data.plannedDays,
         nextSlotId: data.settings.nextSlotId,
+        restSince: data.settings.restSince,
         // Both default on READ. A settings record written before planning
         // existed has neither key, and no migration is needed to make it mean
         // "no plan" (see the note on `plannedWeek` in db.ts).
@@ -1158,7 +1203,7 @@ export const useStore = create<State>((set, get) => ({
     set({
       sessions: updatedSessions,
       slots: updatedSlots,
-      nextSlotId: consumedSplit,
+      ...cursorTo(updatedSlots, consumedSplit),
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
@@ -1516,7 +1561,7 @@ export const useStore = create<State>((set, get) => ({
     const cursorWasHere = get().nextSlotId === id;
     const moved = cursorWasHere ? advanceSplit(get().slots, id)?.id : get().nextSlotId;
     const nextSlotId = moved === id ? firstDayCard(remaining)?.id : moved;
-    set({ slots: remaining, nextSlotId });
+    set({ slots: remaining, ...cursorTo(remaining, nextSlotId) });
     safeWrite(async () => {
       await db.slots.delete(id);
       await db.slots.bulkPut(remaining);
@@ -1541,14 +1586,42 @@ export const useStore = create<State>((set, get) => ({
     const card = get().slots.find((sl) => sl.id === id);
     // A repeat is not a day, so it cannot be what you do next.
     if (!card || kindOf(card) === "repeat") return;
-    set({ nextSlotId: id });
+    set(cursorTo(get().slots, id));
     persistSettingsFrom(get());
   },
 
   takeRestDay: (id) => {
     const card = get().slots.find((sl) => sl.id === id);
     if (!card || kindOf(card) !== "rest") return;
-    set({ nextSlotId: advanceSplit(get().slots, id)?.id });
+    set(cursorTo(get().slots, advanceSplit(get().slots, id)?.id));
+    persistSettingsFrom(get());
+  },
+
+  settleRestDay: () => {
+    const card = get().nextCard();
+    const today = dayKey(new Date());
+
+    if (!card || kindOf(card) !== "rest") {
+      // The cursor moved off the rest by some other route. Drop the clock
+      // rather than leaving a date behind that nothing is measuring.
+      if (get().restSince !== undefined) {
+        set({ restSince: undefined });
+        persistSettingsFrom(get());
+      }
+      return;
+    }
+
+    if (get().restSince === undefined) {
+      // A rest is current but nothing recorded when it became current: an
+      // imported backup, or a split edited into this shape. Start its clock
+      // today rather than spending it instantly on a day off nobody took.
+      set({ restSince: today });
+      persistSettingsFrom(get());
+      return;
+    }
+
+    if (today <= get().restSince!) return;
+    set(cursorTo(get().slots, advanceSplit(get().slots, card.id)?.id));
     persistSettingsFrom(get());
   },
 
@@ -1620,6 +1693,9 @@ export const useStore = create<State>((set, get) => ({
       nutritionPhases: data.nutritionPhases,
       plannedDays: data.plannedDays,
       nextSlotId: data.nextSlotId,
+      // Not in the backup: a clock reading, not a plan. settleRestDay starts a
+      // restored rest's clock from the day of the restore.
+      restSince: undefined,
       unit: data.unit,
       // Restored from the file, not cleared. `replaceAllData` has just written
       // both of these into the settings record, so anything else here would
@@ -1658,6 +1734,7 @@ export const useStore = create<State>((set, get) => ({
       nutritionPhases: [],
       plannedDays: [],
       nextSlotId: undefined,
+      restSince: undefined,
       unit: "lbs",
       activeSessionId: undefined,
       currentExerciseId: undefined,

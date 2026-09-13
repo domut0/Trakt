@@ -1,5 +1,5 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useStore } from "../lib/store";
 import { Gear } from "./icons";
 import { StartWorkoutSheet } from "./StartWorkoutSheet";
@@ -252,12 +252,66 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   );
 }
 
+/**
+ * Spends a rest day once it is over.
+ *
+ * A rest is the only card the clock can consume - there is nothing to finish -
+ * so something has to notice midnight. Three triggers, because no single one of
+ * them is enough on a phone:
+ *
+ *   ON MOUNT, which covers the ordinary case: the app was closed overnight and
+ *   is opened the next morning.
+ *
+ *   ON RETURNING TO THE FOREGROUND, because a PWA left open in a background tab
+ *   is not reloaded when you come back to it the next day.
+ *
+ *   ON A TIMER SET FOR THE NEXT LOCAL MIDNIGHT, for the app left open across
+ *   it. Scheduled to the actual boundary rather than polled, and rescheduled
+ *   each time it fires, so a device asleep through midnight still settles on
+ *   the next wake through one of the two above.
+ *
+ * The store's own check is the real guard: all three of these do nothing unless
+ * the date has genuinely moved past the day the rest was taken.
+ */
+function useRestDaySettles() {
+  const settleRestDay = useStore((s) => s.settleRestDay);
+  const hydrated = useStore((s) => s.hydrated);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    settleRestDay();
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") settleRestDay();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    let timer: ReturnType<typeof setTimeout>;
+    const atMidnight = () => {
+      const now = new Date();
+      const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+      timer = setTimeout(() => {
+        settleRestDay();
+        atMidnight();
+      }, next.getTime() - now.getTime());
+    };
+    atMidnight();
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      clearTimeout(timer);
+    };
+  }, [hydrated, settleRestDay]);
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const activeSessionId = useStore((s) => s.activeSessionId);
   const location = useLocation();
   const router = useRouter();
   const showBanner = activeSessionId && location.pathname !== "/workout";
   const onTab = TABS.some((t) => t.to === location.pathname);
+
+  useRestDaySettles();
 
   // Workout chooser + strength start flow, owned here so the nav's Workout
   // button works from every tab. StartWorkoutSheet is mounted from AppShell
