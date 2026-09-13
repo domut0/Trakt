@@ -22,16 +22,20 @@ different products**:
   arm's length, possibly sweaty hands and gym lighting. He is logging weight and reps and
   wants to be done. Speed and target size dominate everything.
 - **At night, in bed, before sleeping.** Lying down, in a dark room, one hand, no hurry.
-  He is filling in the day: food, steps, bodyweight, habits, and looking at what the day
-  came to.
+  He is filling in the day: six numbers, and looking at what the day came to.
 
 These two scenes have opposite requirements and both are first-class. Any design that
 serves one at the cost of the other has failed.
 
 ## Product Purpose
 
-Log a workout with as little friction as physically possible, and keep a day's food,
-steps, bodyweight and habits alongside it, entirely on the device.
+Log a workout with as little friction as physically possible, and keep the day's six
+numbers alongside it - morning bodyweight, then calories, protein, carbs, fat and steps -
+entirely on the device.
+
+**It is not a food tracker.** It used to be, and that was cut in September 2026: it never
+asks what you ate, only for numbers you already know. Anything that reintroduces
+per-item food entry is reintroducing the thing that was removed.
 
 Success is **habit**: the builder reaching for it without deciding to. The app is
 functionally complete and still not part of his routine, so the gap between "it works" and
@@ -76,11 +80,18 @@ Built and working today:
   entity.
 - Records across a finished workout (weight, estimated 1RM, reps at load), assembled into
   an end-of-workout summary.
-- Food logging: foods, meals, recipes, barcode scanning, MyFitnessPal import, copy-a-meal.
-- A date-parameterised day view: week strip, day stats, and a 24-hour timeline whose
-  organising idea is **intent versus actual**.
-- Daily numbers (calories, protein, carbs, fat, steps, bodyweight, cheat day), habits,
-  history with weekly and calendar views, charts, JSON export/import, clear-all-data.
+- A date-parameterised day view: a week strip and one card of the day's six numbers.
+  Every row always renders, "Not recorded" when it has nothing, so the shape of the
+  screen does not change as it fills in.
+- Daily numbers: bodyweight, calories, protein, carbs, fat, steps, and an **untracked**
+  flag meaning a day deliberately not logged rather than one missed.
+- A weekly training plan, a calendar history, charts for bodyweight, steps and calories,
+  a two-way Google Sheet mirror, JSON export/import, clear-all-data.
+
+Deleted in September 2026 and not to be rebuilt without a decision: food logging (foods,
+meals, recipes, barcode scanning, MyFitnessPal import), habits, the plate and 1RM
+calculators, the 24-hour day timeline, per-weekday target profiles, and every feature
+toggle in Settings.
 
 Technical constraints future work must respect:
 
@@ -90,15 +101,19 @@ Technical constraints future work must respect:
   from it will not resolve.
 - No push notifications, ever. They require a server, which breaks the zero-backend design.
   Feedback has to work in-app or not at all.
-- A dense, load-bearing test suite (900+ tests). Behaviour changes are expected to come
+- A dense, load-bearing test suite (677 tests). Behaviour changes are expected to come
   with tests.
+- `npm run screenshots` is the best QA instrument here and catches things the tests
+  cannot: it found four stranded feature flags and two controls that had become
+  invisible, none of which any test could see.
 
 Terminology that is settled and must not fork:
 
 - **Daily numbers**, never "daily log", "daily summary" or "today's numbers".
 - **Workout**, never "session", on any user-facing surface. The internal type stays
   `WorkoutSession`.
-- **Habits**, generically. It is not a supplement tracker.
+- **Untracked**, never "cheat day". The flag is a claim about LOGGING, not about food:
+  a day you chose not to record. The two come apart constantly.
 
 Settled:
 
@@ -129,11 +144,15 @@ Settled:
 
 - Real training and nutrition data in the builder's own IndexedDB. Seeded fixture data
   exists in one dev browser profile only; it is not in the repo and is not real.
-- `PRD.md` (draft v1, 2026-07-21) — full feature spec. **Its stack, host, font and visual
-  sections have diverged from the code; trust the code.**
-- `docs/calorie-tracker-plan.md` and `docs/home-screen-plan.md` — locked-decision records
-  from grilling sessions. The latter's section 11 records what the plan got wrong.
-- `docs/before-after/` — screenshots.
+- `docs/trakt-plan.md` — the September 2026 overhaul: 12 locked decisions from a grilling
+  session, and a closing section recording the four places the plan turned out to be
+  wrong. Read that section before trusting any specific claim in it.
+- `DESIGN.md` — the visual system, written from what shipped rather than what was intended.
+- `PRD.md` (draft v1, 2026-07-21) — historical. Its stack, host, font, visual and product
+  sections have all diverged from the code. **Trust the code.**
+- `screenshots/` — 33 deterministic captures, regenerated by `npm run screenshots` and
+  gitignored. Layout and state only: the runner is Playwright on Windows, so its type is
+  never the app's type.
 - There are **no users, no testimonials, no press, no benchmarks, no pricing and no
   deployment claims**. None of these may be invented.
 

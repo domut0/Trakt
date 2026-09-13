@@ -1,3 +1,15 @@
+> **HISTORICAL. Do not build from this document.**
+>
+> Written 2026-07-21, before the app existed. Its stack, host, font, visual
+> direction and feature list have all since diverged from the code, and the
+> September 2026 overhaul deleted a large part of what it specifies - food
+> logging above all. It is kept because it records the original reasoning, not
+> because any of it is still a plan.
+>
+> The current sources of truth are `docs/trakt-plan.md` (product), `DESIGN.md`
+> (visual) and `PRODUCT.md` (who it is for). Where any of them disagree with the
+> code, **the code is right.**
+
 # "Anything But The Notes App" — Workout Tracker PRD (Draft v1)
 
 > Working title only — literally a placeholder because the visual direction is "Apple Notes-inspired," not because anyone's attached to the name. Rename freely.
