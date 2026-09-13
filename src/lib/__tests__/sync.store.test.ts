@@ -312,9 +312,10 @@ describe("the merge base and destructive actions", () => {
       sessions: [],
       sets: [],
       dailyLogs: [],
-      targetProfiles: [{ id: "tp_default", name: "Default" }],
-      weekdayTargets: Array(7).fill("tp_default"),
-      plannedWeek: undefined,
+
+      nutritionPhases: [],
+
+      plannedDays: [],
       unit: "lbs",
     });
 

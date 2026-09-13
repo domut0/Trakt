@@ -247,7 +247,7 @@ export function SessionView({
       <div className="pb-6">
         <div className="mx-4 my-6 group-list px-4 py-8 text-center">
           <h2 className="t-heading">No sets yet</h2>
-          <p className="mt-1 t-label text-ink-2">The workout starts when you log one.</p>
+          <p className="mt-1 t-label text-ink-2">The workout starts when you log one</p>
         </div>
         {renderSessionNote()}
       </div>

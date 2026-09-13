@@ -26,7 +26,7 @@ const TABLES_DROPPED_BY_V5 = [
   "recipeIngredients",
 ] as const;
 
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 6;
 
 describe("Dexie v4 -> v5: the food and habit tables are dropped", () => {
   it("deletes the food and habit stores while leaving training data untouched", async () => {

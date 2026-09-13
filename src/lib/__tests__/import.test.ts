@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_TARGET_PROFILE_ID, db, defaultTargets } from "../db";
+import { db } from "../db";
 import { BACKUP_VERSION, isCardioSession, parseBackup, useStore, type BackupData } from "../store";
 
 // fake-indexeddb/auto (loaded globally in src/test/setup.ts) gives us a real
@@ -18,8 +18,6 @@ const DEFAULT_STATE = {
   // pre-filling it with the same values a correct hydrate would produce is
   // exactly how a "survives a reload" assertion passes without the reload having
   // read anything at all.
-  targetProfiles: [],
-  weekdayTargets: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -70,13 +68,13 @@ beforeEach(async () => {
  * like - which is what let `version: BACKUP_VERSION` sit in a v3 fixture.
  */
 const PRE_V4_DEFAULTS = {
-  ...defaultTargets(),
+  nutritionPhases: [],
+  plannedDays: [],
   // The plan rides along on v4 without a version bump, so "an old file" means
   // one with no plan keys at all. `undefined` is what parseBackup hands back
   // for exactly that file, which is why it belongs in the shared defaults
   // rather than being an empty week: a week of seven rest days is a plan the
   // author of these files never made.
-  plannedWeek: undefined,
 };
 
 const validBackup: BackupData = {
@@ -600,33 +598,9 @@ describe("importData (full backup restore)", () => {
         { id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1500 },
       ],
       dailyLogs: [{ date: "2026-03-01", calories: 2400, steps: 0, isUntracked: true }],
-      // TWO profiles, spread unevenly across the week, deliberately. With a single
-      // uniform profile this test would still pass if parseBackup discarded the
-      // file's targets and fell back to defaults, because the defaults are exactly
-      // that shape. An uneven assignment is something the fallback cannot produce,
-      // so a fallback shows up here as a failure instead of a false pass.
-      targetProfiles: [
-        { id: "tp_train", name: "Training", calories: 2800, protein: 200, steps: 10000 },
-        { id: "tp_rest", name: "Rest", calories: 2200, protein: 190 },
-      ],
-      // Monday first, matching the store's convention.
-      weekdayTargets: [
-        "tp_train",
-        "tp_rest",
-        "tp_train",
-        "tp_rest",
-        "tp_train",
-        "tp_rest",
-        "tp_rest",
-      ],
-      // All three true for the same anti-false-pass reason: parseBackup reads
-      // these as `=== true`, so a fixture using `false` would be identical to the
-      // field having been dropped on the floor.
-      // No plan, deliberately: this fixture is a v4 file as v4 shipped, and the
-      // plan's own round trip is its own test below. Keeping it plan-less here
-      // is what keeps this one covering the case of a file written before
-      // planning existed.
-      plannedWeek: undefined,
+      // A v4 file predates the planning timeline entirely.
+      nutritionPhases: [],
+      plannedDays: [],
       // Not the default, so a settings record that failed to persist is visible.
       unit: "kg",
     };
@@ -653,6 +627,33 @@ describe("importData (full backup restore)", () => {
       meals: [{ id: "m1", name: "Breakfast", fromMinutes: 300, toMinutes: 660 }],
       recipes: [{ id: "r1", name: "Overnight oats", servings: 2 }],
       recipeIngredients: [{ id: "ri1", recipeId: "r1", foodId: "f1" }],
+      // The weekly-template planning model, which v6 replaced with a dated
+      // timeline. Dropped rather than converted: the Dexie upgrade migrates a
+      // LIVE database, where one profile unambiguously meant "these are my
+      // targets", but inventing a phase timeline out of a weekday table would
+      // fabricate start dates the file never contained.
+      targetProfiles: [
+        { id: "tp_train", name: "Training", calories: 2800, protein: 200, steps: 10000 },
+        { id: "tp_rest", name: "Rest", calories: 2200, protein: 190 },
+      ],
+      weekdayTargets: [
+        "tp_train",
+        "tp_rest",
+        "tp_train",
+        "tp_rest",
+        "tp_train",
+        "tp_rest",
+        "tp_rest",
+      ],
+      plannedWeek: [
+        { name: "Heavy Bench", exerciseIds: ["e1"] },
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ],
     };
 
     const result = parseBackup(JSON.stringify(v4FileOnDisk));
@@ -667,8 +668,8 @@ describe("importData (full backup restore)", () => {
     await useStore.getState().hydrate();
     await useStore.getState().importData(result.data);
     const restored = useStore.getState();
-    expect(restored.targetProfiles).toEqual(v4Backup.targetProfiles);
-    expect(restored.weekdayTargets).toEqual(v4Backup.weekdayTargets);
+    expect(restored.nutritionPhases).toEqual([]);
+    expect(restored.plannedDays).toEqual([]);
     expect(restored.sessions).toEqual(v4Backup.sessions);
 
     // The half that actually matters for a restore: read it back out of
@@ -676,20 +677,98 @@ describe("importData (full backup restore)", () => {
     useStore.setState({ ...DEFAULT_STATE, hydrated: false });
     await useStore.getState().hydrate();
     const reloaded = useStore.getState();
-    expect(reloaded.targetProfiles).toEqual(v4Backup.targetProfiles);
-    expect(reloaded.weekdayTargets).toEqual(v4Backup.weekdayTargets);
+    expect(reloaded.nutritionPhases).toEqual([]);
     expect(reloaded.unit).toBe("kg");
     expect(sortById(reloaded.sessions)).toEqual(sortById(v4Backup.sessions));
     expect(sortByDate(reloaded.dailyLogs)).toEqual(sortByDate(v4Backup.dailyLogs));
   });
 
-  it("still has 4 as the current backup format", () => {
+  it("round-trips a v5 backup carrying a phase timeline and a pinned day", async () => {
+    // The CURRENT format. The v4 test above stopped covering it the moment the
+    // planning timeline landed, which is exactly what the tripwire below is for.
+    const v5Backup: BackupData = {
+      version: 5,
+      exercises: [{ id: "e1", name: "Bench Press", type: "main" }],
+      slots: [
+        // The lifts live on the slot now, so a backup that lost this field would
+        // lose the whole training plan while looking complete.
+        { id: "s1", name: "Upper", rotationOrder: 0, plannedExerciseIds: ["e1"] },
+      ],
+      sessions: [],
+      sets: [],
+      dailyLogs: [],
+      // The user's own stated case, which is what the model exists to express.
+      nutritionPhases: [
+        {
+          id: "np_maint",
+          startsOn: "2026-09-13",
+          name: "Maintenance",
+          kind: "targets",
+          calories: 3400,
+          steps: 20000,
+          goalMode: "maintain",
+        },
+        { id: "np_off", startsOn: "2026-09-19", name: "Off", kind: "untracked" },
+        {
+          id: "np_cut",
+          startsOn: "2026-09-20",
+          name: "Cut",
+          kind: "targets",
+          calories: 3000,
+          steps: 24000,
+          goalMode: "cut",
+        },
+      ],
+      plannedDays: [{ date: "2026-09-21", splitSlotId: "s1" }],
+      unit: "lbs",
+    };
+
+    const result = parseBackup(JSON.stringify(v5Backup));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data).toEqual(v5Backup);
+
+    await useStore.getState().hydrate();
+    await useStore.getState().importData(result.data);
+
+    // Read back out of IndexedDB rather than out of the store we just set: the
+    // phases and pins are their own tables now, so an import that only reached
+    // memory would look perfect until the next launch.
+    useStore.setState({ ...DEFAULT_STATE, hydrated: false });
+    await useStore.getState().hydrate();
+    const reloaded = useStore.getState();
+    expect(sortById(reloaded.nutritionPhases)).toEqual(sortById(v5Backup.nutritionPhases));
+    expect(reloaded.plannedDays).toEqual(v5Backup.plannedDays);
+    expect(reloaded.slots[0].plannedExerciseIds).toEqual(["e1"]);
+  });
+
+  it("drops a pin naming a slot the file does not contain", () => {
+    // A pin is only meaningful against a split that exists. One left over from a
+    // deleted slot would preload a workout from a rotation that is gone.
+    const file = {
+      version: 5,
+      exercises: [],
+      slots: [],
+      sessions: [],
+      sets: [],
+      dailyLogs: [],
+      nutritionPhases: [],
+      plannedDays: [{ date: "2026-09-21", splitSlotId: "s_deleted" }],
+      unit: "lbs",
+    };
+    const result = parseBackup(JSON.stringify(file));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.plannedDays).toEqual([]);
+  });
+
+  it("still has 5 as the current backup format", () => {
     // A tripwire, not a fact worth asserting for its own sake. The round-trip
-    // above is pinned to version 4, so it stops covering the CURRENT format the
+    // above is pinned to version 5, so it stops covering the CURRENT format the
     // moment the format moves on - and the newest format is the one whose export
-    // users are actually holding. When this fails, write the v5 fixture; do not
+    // users are actually holding. When this fails, write the v6 fixture; do not
     // just bump the number.
-    expect(BACKUP_VERSION).toBe(4);
+    expect(BACKUP_VERSION).toBe(5);
   });
 
   it("imports a v2 file that has no habit, target or toggle keys and lands on the defaults", async () => {
@@ -697,7 +776,14 @@ describe("importData (full backup restore)", () => {
     // disk genuinely does not have them, and absent takes a different branch
     // through parseBackup than present-but-empty does.
     const legacyBackup: Record<string, unknown> = { ...validBackup, version: 2 };
-    for (const key of ["habits", "habitEntries", "targetProfiles", "weekdayTargets"]) {
+    for (const key of [
+      "habits",
+      "habitEntries",
+      "targetProfiles",
+      "weekdayTargets",
+      "nutritionPhases",
+      "plannedDays",
+    ]) {
       delete legacyBackup[key];
     }
 
@@ -705,16 +791,11 @@ describe("importData (full backup restore)", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.version).toBe(2);
-    // Exactly one profile, and every weekday pointing at it. The count matters as
-    // much as the contents: a weekdayTargets of any length but 7 is treated as
-    // "no target at all" by targets.ts, so a sloppy fallback would silently leave
-    // the feature dead rather than defaulted.
-    expect(result.data.targetProfiles).toEqual(defaultTargets().targetProfiles);
-    expect(result.data.targetProfiles).toHaveLength(1);
-    expect(result.data.weekdayTargets).toHaveLength(7);
-    expect(result.data.weekdayTargets.every((id) => id === DEFAULT_TARGET_PROFILE_ID)).toBe(true);
-    // And the features stay off. An old file cannot consent to a surface that did
-    // not exist when it was written.
+    // An empty timeline, and nothing invented. A file written before planning
+    // existed has no phases, and defaulting one in would claim the user had been
+    // aiming at numbers they never set.
+    expect(result.data.nutritionPhases).toEqual([]);
+    expect(result.data.plannedDays).toEqual([]);
 
     await useStore.getState().hydrate();
     await useStore.getState().importData(result.data);
@@ -722,9 +803,7 @@ describe("importData (full backup restore)", () => {
     useStore.setState({ ...DEFAULT_STATE, hydrated: false });
     await useStore.getState().hydrate();
     const reloaded = useStore.getState();
-    expect(reloaded.targetProfiles).toEqual(defaultTargets().targetProfiles);
-    expect(reloaded.weekdayTargets).toHaveLength(7);
-    expect(reloaded.weekdayTargets.every((id) => id === DEFAULT_TARGET_PROFILE_ID)).toBe(true);
+    expect(reloaded.nutritionPhases).toEqual([]);
     // The workout data the old file DID carry still arrived.
     expect(sortById(reloaded.exercises)).toEqual(sortById(validBackup.exercises));
     expect(reloaded.unit).toBe(validBackup.unit);

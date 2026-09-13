@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import {
   db,
-  defaultTargets,
   isDbEmpty,
   isIndexedDbAvailable,
   loadAll,
@@ -13,14 +12,17 @@ import {
   type SettingsMeta,
 } from "./db";
 import { isDailyLogEmpty } from "./daily-log";
+import type { GoalMode } from "./targets";
 import {
-  plannedWorkoutFor,
-  prunePlannedWorkout,
-  emptyPlannedWeek,
-  type PlannedWeek,
-  type PlannedWorkout,
-} from "./plan";
-import { targetProfileFor, type GoalMode } from "./targets";
+  isNutritionPhase,
+  isPlannedDay,
+  phaseForDate,
+  isUntrackedOn,
+  pinnedSlotIdFor,
+  targetsForDate,
+  type NutritionPhase,
+  type PlannedDay,
+} from "./planning";
 import { seedExercises } from "./exercise-library";
 
 export type ExerciseType = "main" | "accessory" | "cardio";
@@ -37,6 +39,19 @@ export interface SplitSlot {
   name: string;
   rotationOrder: number;
   lastLoggedAt?: number;
+  /**
+   * The lifts this slot is for, which is where a training plan actually lives.
+   *
+   * It used to hang off a WEEKDAY, which cannot express UL×infinity: that split
+   * advances when you train rather than when the date changes, so there is no
+   * week to attach it to. On the slot it works for any cycle length - two slots
+   * for UL, three for PPL, six for a body-part split - and rest days need no
+   * representation at all, because the rotation has no dates in it.
+   *
+   * Preloaded by startWorkout, and never a constraint: nothing filters what else
+   * can be logged once the workout is running.
+   */
+  plannedExerciseIds?: string[];
 }
 
 /**
@@ -162,8 +177,8 @@ export interface BackupData {
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
   dailyLogs: DailyLog[];
-  targetProfiles: TargetProfile[];
-  weekdayTargets: string[];
+  nutritionPhases: NutritionPhase[];
+  plannedDays: PlannedDay[];
   /**
    * The weekly training plan, or `undefined` for a file written before planning
    * existed and for anyone who has never planned a day.
@@ -178,7 +193,6 @@ export interface BackupData {
    * so the guard survives while the union keeps the distinction plan.ts draws
    * between "never planned" and "seven explicit rest days".
    */
-  plannedWeek: PlannedWeek | undefined;
   unit: "lbs" | "kg";
 }
 
@@ -199,7 +213,7 @@ export interface BackupData {
  * written before planning existed still imports and lands with no plan, and a
  * version bump would buy nothing: no reader branches on the number, and the
  * one that reports it to the user reads it off the file. */
-export const BACKUP_VERSION = 4;
+export const BACKUP_VERSION = 5;
 
 type CurrentBlock = {
   blockGroupId: string;
@@ -220,9 +234,8 @@ interface State {
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
   dailyLogs: DailyLog[];
-  targetProfiles: TargetProfile[];
-  /** 7 profile ids, MONDAY FIRST. Resolve through targets.ts, never `getDay()`. */
-  weekdayTargets: string[];
+  nutritionPhases: NutritionPhase[];
+  plannedDays: PlannedDay[];
   /**
    * The weekly training plan, 7 entries MONDAY FIRST, or undefined when the user
    * has never planned anything. Resolve through plan.ts, never `getDay()`.
@@ -233,7 +246,6 @@ interface State {
    * who never turns planning on, and writing seven nulls into everyone's
    * settings row to represent it would be storage for nothing.
    */
-  plannedWeek?: PlannedWeek;
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
@@ -292,28 +304,33 @@ interface State {
   /** Free-text note on a whole session. */
   updateSession: (sessionId: string, patch: Pick<WorkoutSession, "note">) => void;
 
-  // --- Per-weekday nutrition targets -------------------------------------
-  addTargetProfile: (name: string) => TargetProfile;
-  updateTargetProfile: (id: string, patch: Partial<Omit<TargetProfile, "id">>) => void;
-  /** Removes a profile and repoints every weekday that used it at the first
-   * remaining profile, so no weekday is ever left dangling. Refuses to delete
-   * the last profile: zero profiles would make the targets editor unreachable
-   * with the toggle still on. */
-  deleteTargetProfile: (id: string) => void;
-  /** `weekdayIndex` is MONDAY-FIRST (0 = Monday). */
-  assignWeekdayTarget: (weekdayIndex: number, profileId: string) => void;
-  /** The profile in effect on a "yyyy-MM-dd" day key, if any. */
-  targetProfileForDate: (date: string) => TargetProfile | undefined;
+  // --- Nutrition phases ---------------------------------------------------
+  /** Adds a change-point. Returns undefined when `startsOn` is already taken:
+   * two phases beginning on one day is a contradiction, not something to settle
+   * with a tiebreak nobody would remember. Edit the existing one instead. */
+  addPhase: (phase: Omit<NutritionPhase, "id">) => NutritionPhase | undefined;
+  updatePhase: (id: string, patch: Partial<Omit<NutritionPhase, "id">>) => void;
+  deletePhase: (id: string) => void;
+  /** The phase in force on a "yyyy-MM-dd" day key, untracked ones included. */
+  phaseForDay: (date: string) => NutritionPhase | undefined;
+  /** The TARGETS in force, which is undefined on an untracked day as well as on
+   * a day before any phase existed. */
+  targetsForDay: (date: string) => NutritionPhase | undefined;
+  /** Untracked by either route: the logged flag, or a planned untracked phase.
+   * The planned half is derived and never written to a DailyLog. */
+  isUntrackedDay: (date: string) => boolean;
 
-  // --- Planned workouts --------------------------------------------------
-  /** Sets one weekday's plan, `weekdayIndex` MONDAY-FIRST (0 = Monday). `null`
-   * makes it a rest day. Creates the week on first use, so the caller never has
-   * to initialise it. */
-  setPlannedDay: (weekdayIndex: number, workout: PlannedWorkout | null) => void;
-  /** The workout planned for a "yyyy-MM-dd" day key, with any exercise that no
-   * longer exists dropped, or undefined when nothing is planned. This is what
-   * `startWorkout` preloads from; it never constrains accessories. */
-  plannedWorkoutForDate: (date: string) => PlannedWorkout | undefined;
+  // --- Training plan ------------------------------------------------------
+  /** The lifts a slot is for. Preloaded at Start Workout, never a constraint. */
+  setSlotExercises: (slotId: string, exerciseIds: string[]) => void;
+  /** Pins a slot to one date, for when you do know. Replaces any existing pin
+   * on that date, because a day trains one thing. */
+  pinDay: (date: string, splitSlotId: string) => void;
+  unpinDay: (date: string) => void;
+  /** The slot pinned to a date, or undefined. NEVER the rotation's guess: the
+   * rotation is not projected forward, because a free choice after a rest day
+   * makes the future genuinely unknowable. */
+  pinnedSlotFor: (date: string) => SplitSlot | undefined;
 
   reorderSlots: (fromId: string, toId: string) => void;
   /** Full backup restore. Assumes `data` has already been validated by
@@ -682,26 +699,6 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-/** One stored entry of a planned week: a rest day, or a workout with a name and
- * a list of exercise ids. Mirrors what plan.ts is prepared to resolve, so a week
- * that passes here cannot land in the store and then read as "no plan". Ids are
- * NOT checked against the exercise library: an id can go stale long after an
- * import, which is exactly why `prunePlannedWorkout` exists at read time. */
-function isPlannedDay(v: unknown): v is PlannedWorkout | null {
-  if (v === null) return true;
-  if (!isPlainObject(v)) return false;
-  if (typeof v.name !== "string") return false;
-  return Array.isArray(v.exerciseIds) && v.exerciseIds.every((id) => typeof id === "string");
-}
-
-/** The whole-week check, carrying the same length rule `weekdayTargets` gets and
- * for the same reason: plan.ts treats any array that is not exactly 7 long as no
- * plan at all, so a malformed one has to be replaced with "no plan" outright
- * rather than stored and then silently ignored on every screen that reads it. */
-function isPlannedWeek(v: unknown): v is PlannedWeek {
-  return Array.isArray(v) && v.length === 7 && v.every(isPlannedDay);
-}
-
 function isExercise(v: unknown): v is Exercise {
   if (!isPlainObject(v)) return false;
   if (typeof v.id !== "string" || v.id.length === 0) return false;
@@ -889,30 +886,28 @@ export function parseBackup(text: string): ParseBackupResult {
   if (unit !== "lbs" && unit !== "kg") {
     return { ok: false, error: "The backup's unit must be lbs or kg." };
   }
-  // Everything v4 added is read tolerantly rather than validated hard: a v1-v3
-  // file legitimately has none of it, and a partially-hand-edited file should
-  // land with those features empty rather than fail the whole import. The
-  // weekdayTargets length check matters because targets.ts treats any array that
-  // is not exactly 7 long as "no target", so a malformed one would silently
-  // disable targets instead of being replaced with a working default.
-  const fallbackTargets = defaultTargets();
-  const rawWeekdays = (parsed as { weekdayTargets?: unknown }).weekdayTargets;
-  const rawProfiles = (parsed as { targetProfiles?: unknown }).targetProfiles;
-  const rawPlannedWeek = (parsed as { plannedWeek?: unknown }).plannedWeek;
-  const weekdayTargets =
-    Array.isArray(rawWeekdays) && rawWeekdays.length === 7 && rawWeekdays.every(isNonEmptyString)
-      ? (rawWeekdays as string[])
-      : fallbackTargets.weekdayTargets;
-  const targetProfiles =
-    Array.isArray(rawProfiles) && rawProfiles.every(isTargetProfile) && rawProfiles.length > 0
-      ? (rawProfiles as TargetProfile[])
-      : fallbackTargets.targetProfiles;
-  // If the profiles fell back but the assignments did not, every weekday would
-  // point at an id that no longer exists. Re-derive both together in that case.
-  const profileIds = new Set(targetProfiles.map((p) => p.id));
-  const safeWeekdays = weekdayTargets.every((id) => profileIds.has(id))
-    ? weekdayTargets
-    : fallbackTargets.weekdayTargets;
+  // The planning tables are read tolerantly rather than validated hard. A file
+  // older than this model legitimately has none of them, and one bad row should
+  // cost that row rather than the whole import: this JSON is the only backup
+  // that exists, so refusing a file is more expensive than ignoring a phase.
+  //
+  // A file from the weekly-template era carries targetProfiles / weekdayTargets
+  // / plannedWeek. They are dropped rather than converted. The Dexie v6 upgrade
+  // migrates a LIVE database, where a single profile unambiguously meant "these
+  // are my targets"; a backup restore replaces everything wholesale, and
+  // inventing a phase timeline out of a weekday table would fabricate dates the
+  // file never contained.
+  const rawPhases = (parsed as { nutritionPhases?: unknown }).nutritionPhases;
+  const rawPins = (parsed as { plannedDays?: unknown }).plannedDays;
+  const nutritionPhases = Array.isArray(rawPhases)
+    ? (rawPhases.filter(isNutritionPhase) as NutritionPhase[])
+    : [];
+  // A pin naming a slot the file does not contain would preload a workout from
+  // a split that no longer exists, so those are dropped with the same tolerance.
+  const slotIds = new Set((slots as SplitSlot[]).map((sl) => sl.id));
+  const plannedDays = Array.isArray(rawPins)
+    ? (rawPins.filter(isPlannedDay).filter((d) => slotIds.has(d.splitSlotId)) as PlannedDay[])
+    : [];
 
   return {
     ok: true,
@@ -925,14 +920,13 @@ export function parseBackup(text: string): ParseBackupResult {
       sessions: sessions as WorkoutSession[],
       sets: sets as WorkoutSet[],
       dailyLogs: (dailyLogs as DailyLog[] | undefined) ?? [],
-      targetProfiles,
-      weekdayTargets: safeWeekdays,
+      nutritionPhases,
+      plannedDays,
       // Anything that is not a well-formed week becomes "no plan" rather than an
       // import failure, matching how the file's targets and habits degrade: a
       // hand-edited plan is not worth refusing someone their six weeks of sets
       // over. A file that never had the key takes this same branch, which is the
       // whole of what a pre-plan backup needs.
-      plannedWeek: isPlannedWeek(rawPlannedWeek) ? rawPlannedWeek : undefined,
       unit,
     },
   };
@@ -975,13 +969,11 @@ function persistActiveMeta(meta: {
  * union, which is a type error even though the value is perfectly valid.
  */
 function persistSettingsFrom(s: State) {
-  const settings: SettingsMeta = {
-    key: "settings",
-    unit: s.unit,
-    targetProfiles: s.targetProfiles,
-    weekdayTargets: s.weekdayTargets,
-    plannedWeek: s.plannedWeek,
-  };
+  // Phases and pins are NOT here. They grow with time - a phase per diet change,
+  // a pin per planned day - and rewriting one JSON blob on every edit is the
+  // wrong shape for that. They have their own tables, written by their own
+  // actions, exactly like dailyLogs.
+  const settings: SettingsMeta = { key: "settings", unit: s.unit };
   safeWrite(() => db.meta.put(settings));
 }
 
@@ -992,7 +984,8 @@ export const useStore = create<State>((set, get) => ({
   sessions: [],
   sets: [],
   dailyLogs: [],
-  ...defaultTargets(),
+  nutritionPhases: [],
+  plannedDays: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -1010,12 +1003,7 @@ export const useStore = create<State>((set, get) => ({
     try {
       const empty = await isDbEmpty();
       if (empty) {
-        const targets = defaultTargets();
-        const settings: SettingsMeta = {
-          key: "settings",
-          unit: "lbs",
-          ...targets,
-        };
+        const settings: SettingsMeta = { key: "settings", unit: "lbs" };
         // A first run seeds the exercise NAME library and nothing else. The
         // library is reference data the picker needs to be usable on day one;
         // slots, sessions and sets are the user's own record of what they did,
@@ -1035,11 +1023,8 @@ export const useStore = create<State>((set, get) => ({
           sets: [],
           dailyLogs: [],
           unit: settings.unit,
-          // Not written into the seeded settings record above, only into state:
-          // absent already means "off, nothing planned" on read, so stamping
-          // the default onto storage would buy nothing (same call as `goalMode`).
-          plannedWeek: undefined,
-          ...targets,
+          nutritionPhases: [],
+          plannedDays: [],
           activeSessionId: undefined,
           currentExerciseId: undefined,
           currentBlock: undefined,
@@ -1057,12 +1042,11 @@ export const useStore = create<State>((set, get) => ({
         sets: data.sets,
         dailyLogs: data.dailyLogs,
         unit: data.settings.unit,
-        targetProfiles: data.settings.targetProfiles ?? defaultTargets().targetProfiles,
-        weekdayTargets: data.settings.weekdayTargets ?? defaultTargets().weekdayTargets,
+        nutritionPhases: data.nutritionPhases,
+        plannedDays: data.plannedDays,
         // Both default on READ. A settings record written before planning
         // existed has neither key, and no migration is needed to make it mean
         // "no plan" (see the note on `plannedWeek` in db.ts).
-        plannedWeek: data.settings.plannedWeek,
         activeSessionId: data.activeSession.activeSessionId,
         currentExerciseId: data.activeSession.currentExerciseId,
         currentBlock: data.activeSession.currentBlock,
@@ -1387,69 +1371,67 @@ export const useStore = create<State>((set, get) => ({
     if (updated) safeWrite(() => db.sessions.put(updated));
   },
 
-  // --- Per-weekday nutrition targets -------------------------------------
+  // --- Nutrition phases ---------------------------------------------------
 
-  addTargetProfile: (name) => {
-    const profile: TargetProfile = { id: `tp_${uid()}`, name: name.trim() || "Untitled" };
-    set({ targetProfiles: [...get().targetProfiles, profile] });
-    persistSettingsFrom(get());
-    return profile;
+  addPhase: (phase) => {
+    if (get().nutritionPhases.some((p) => p.startsOn === phase.startsOn)) return undefined;
+    const created: NutritionPhase = { ...phase, id: `np_${uid()}`, name: phase.name.trim() };
+    const next = [...get().nutritionPhases, created];
+    set({ nutritionPhases: next });
+    safeWrite(() => db.nutritionPhases.put(created));
+    return created;
   },
 
-  updateTargetProfile: (id, patch) => {
-    set({
-      targetProfiles: get().targetProfiles.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-    });
-    persistSettingsFrom(get());
+  updatePhase: (id, patch) => {
+    const next = get().nutritionPhases.map((p) => (p.id === id ? { ...p, ...patch } : p));
+    set({ nutritionPhases: next });
+    const updated = next.find((p) => p.id === id);
+    if (updated) safeWrite(() => db.nutritionPhases.put(updated));
   },
 
-  deleteTargetProfile: (id) => {
-    const remaining = get().targetProfiles.filter((p) => p.id !== id);
-    // Deleting the last profile would leave the targets editor with nothing to
-    // edit while the feature is still switched on. Turning the feature off is
-    // the way to get rid of targets; this is not it.
-    if (remaining.length === 0) return;
-    const fallback = remaining[0].id;
-    set({
-      targetProfiles: remaining,
-      weekdayTargets: get().weekdayTargets.map((assigned) =>
-        assigned === id ? fallback : assigned,
-      ),
-    });
-    persistSettingsFrom(get());
+  deletePhase: (id) => {
+    set({ nutritionPhases: get().nutritionPhases.filter((p) => p.id !== id) });
+    safeWrite(() => db.nutritionPhases.delete(id));
   },
 
-  assignWeekdayTarget: (weekdayIndex, profileId) => {
-    if (weekdayIndex < 0 || weekdayIndex > 6) return;
-    if (!get().targetProfiles.some((p) => p.id === profileId)) return;
-    const next = [...get().weekdayTargets];
-    next[weekdayIndex] = profileId;
-    set({ weekdayTargets: next });
-    persistSettingsFrom(get());
+  phaseForDay: (date) => phaseForDate(get().nutritionPhases, date),
+
+  targetsForDay: (date) => targetsForDate(get().nutritionPhases, date),
+
+  isUntrackedDay: (date) =>
+    isUntrackedOn(get().nutritionPhases, date, get().dailyLogFor(date)?.isUntracked),
+
+  // --- Training plan ------------------------------------------------------
+
+  setSlotExercises: (slotId, exerciseIds) => {
+    // Deduped and pruned to exercises that still exist, so deleting an exercise
+    // cannot leave a slot preloading a lift the picker has never heard of.
+    const live = new Set(get().exercises.map((e) => e.id));
+    const cleaned = [...new Set(exerciseIds)].filter((id) => live.has(id));
+    const next = get().slots.map((sl) =>
+      sl.id === slotId ? { ...sl, plannedExerciseIds: cleaned } : sl,
+    );
+    set({ slots: next });
+    const updated = next.find((sl) => sl.id === slotId);
+    if (updated) safeWrite(() => db.slots.put(updated));
   },
 
-  targetProfileForDate: (date) =>
-    targetProfileFor(date, get().targetProfiles, get().weekdayTargets),
-
-  // --- Planned workouts --------------------------------------------------
-
-  setPlannedDay: (weekdayIndex, workout) => {
-    if (weekdayIndex < 0 || weekdayIndex > 6) return;
-    // Rebuilt from an empty week whenever what is stored is not a well-formed
-    // one, so a hand-edited backup with a 5-entry array is repaired by the first
-    // edit instead of being written back one day longer and still broken.
-    const current = get().plannedWeek;
-    const next = Array.isArray(current) && current.length === 7 ? [...current] : emptyPlannedWeek();
-    next[weekdayIndex] = workout;
-    set({ plannedWeek: next });
-    persistSettingsFrom(get());
+  pinDay: (date, splitSlotId) => {
+    if (!get().slots.some((sl) => sl.id === splitSlotId)) return;
+    const pin: PlannedDay = { date, splitSlotId };
+    set({ plannedDays: [...get().plannedDays.filter((d) => d.date !== date), pin] });
+    safeWrite(() => db.plannedDays.put(pin));
   },
 
-  plannedWorkoutForDate: (date) =>
-    prunePlannedWorkout(
-      plannedWorkoutFor(date, get().plannedWeek),
-      get().exercises.map((e) => e.id),
-    ),
+  unpinDay: (date) => {
+    set({ plannedDays: get().plannedDays.filter((d) => d.date !== date) });
+    safeWrite(() => db.plannedDays.delete(date));
+  },
+
+  pinnedSlotFor: (date) => {
+    const id = pinnedSlotIdFor(get().plannedDays, date);
+    return id ? get().slots.find((sl) => sl.id === id) : undefined;
+  },
 
   reorderSlots: (fromId, toId) => {
     const slots = [...get().slots].sort((a, b) => a.rotationOrder - b.rotationOrder);
@@ -1475,15 +1457,14 @@ export const useStore = create<State>((set, get) => ({
       sessions: data.sessions,
       sets: data.sets,
       dailyLogs: data.dailyLogs,
-      targetProfiles: data.targetProfiles,
-      weekdayTargets: data.weekdayTargets,
+      nutritionPhases: data.nutritionPhases,
+      plannedDays: data.plannedDays,
       unit: data.unit,
       // Restored from the file, not cleared. `replaceAllData` has just written
       // both of these into the settings record, so anything else here would
       // leave the store disagreeing with the DB until the next reload quietly
       // corrected it. A file with no plan carries `undefined`, which lands the
       // reader on "never planned" - the same state the file's author was in.
-      plannedWeek: data.plannedWeek,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
@@ -1495,7 +1476,6 @@ export const useStore = create<State>((set, get) => ({
     // exercise preset library with empty history and default settings. That is
     // exactly the state a first run lands in, so "clear data" and a fresh
     // install are the same thing rather than two subtly different starts.
-    const targets = defaultTargets();
     await replaceAllData({
       version: BACKUP_VERSION,
       exercises: seedExercises,
@@ -1503,8 +1483,8 @@ export const useStore = create<State>((set, get) => ({
       sessions: [],
       sets: [],
       dailyLogs: [],
-      ...targets,
-      plannedWeek: undefined,
+      nutritionPhases: [],
+      plannedDays: [],
       unit: "lbs",
     });
     set({
@@ -1513,9 +1493,9 @@ export const useStore = create<State>((set, get) => ({
       sessions: [],
       sets: [],
       dailyLogs: [],
-      ...targets,
+      nutritionPhases: [],
+      plannedDays: [],
       unit: "lbs",
-      plannedWeek: undefined,
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,

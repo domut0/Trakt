@@ -1,56 +1,31 @@
-import { getDay } from "date-fns";
-import { parseDayKey } from "./daily-log";
-import type { DailyLog, TargetProfile } from "./store";
+import type { DailyLog } from "./store";
 
 /**
- * Pure resolution of per-weekday nutrition targets. No store, no IndexedDB,
- * no DOM.
+ * What a target MEANS, once you have one. No store, no IndexedDB, no DOM.
  *
- * The design problem this solves: the user eats differently on training days
- * than on rest days (fewer calories resting, more carbs training), but a
- * per-DATE target would be another daily logging chore, which is exactly the
- * friction this app exists to remove.
+ * This file used to also decide WHICH target applied, by looking the day up in
+ * a seven-entry weekday table. That model is gone: targets are now a timeline
+ * of dated phases (see planning.ts), because the user's actual requirement was
+ * "maintenance until Friday, then cutting from Sunday onward" and a weekday
+ * table cannot say that at all.
  *
- * So targets are NAMED PROFILES assigned to weekdays. The user writes "Training"
- * and "Rest" once, taps which days are which, and never touches it again. With a
- * single profile assigned to all seven days it collapses into plain global
- * goals, so the simple case costs nothing.
+ * What survived is everything about INTERPRETING a target, which never depended
+ * on where it came from: whether going over a number is a win or a miss, what
+ * counts as met, and how to describe the gap.
+ *
+ * The shape it reads is structural rather than nominal - anything carrying the
+ * optional numeric fields and a goalMode works - so a NutritionPhase drops
+ * straight in where a TargetProfile used to go.
  */
 
-/**
- * Weekday index for a day key, MONDAY FIRST (Monday 0 ... Sunday 6).
- *
- * date-fns `getDay` returns Sunday 0, which does NOT match this app's
- * Monday-start week (see `weekStartKey` in daily-log.ts). Every lookup into
- * `weekdayTargets` goes through here so that rotation lives in exactly one
- * place; indexing that array with a raw `getDay()` is off by one for six days
- * out of seven and correct on Monday, which is the worst possible way for a bug
- * like this to present.
- */
-export function weekdayIndexFor(day: string | Date): number {
-  const d = typeof day === "string" ? parseDayKey(day) : day;
-  return (getDay(d) + 6) % 7;
-}
-
-/** Monday-first weekday labels, aligned with `weekdayIndexFor`. */
-export const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-
-/**
- * The profile that applies on `day`, or undefined when the assignment points at
- * a profile that no longer exists.
- *
- * Tolerant of a malformed `weekdayTargets` (wrong length, stale ids) because it
- * round-trips through user-editable backup JSON, and a bad import must degrade
- * to "no target" rather than throw on the Today screen.
- */
-export function targetProfileFor(
-  day: string | Date,
-  profiles: readonly TargetProfile[],
-  weekdayTargets: readonly string[],
-): TargetProfile | undefined {
-  if (weekdayTargets.length !== 7) return undefined;
-  const id = weekdayTargets[weekdayIndexFor(day)];
-  return profiles.find((p) => p.id === id);
+/** A thing that can carry targets. `NutritionPhase` satisfies this. */
+export interface TargetBearing {
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  steps?: number;
+  goalMode?: GoalMode;
 }
 
 /** The numeric fields a target can constrain. Steps included; bodyweight is not
@@ -203,7 +178,7 @@ export interface TargetProgress {
  */
 export function targetProgressFor(
   log: DailyLog | undefined,
-  profile: TargetProfile | undefined,
+  profile: TargetBearing | undefined,
 ): TargetProgress[] {
   if (!log || !profile) return [];
   const out: TargetProgress[] = [];
@@ -225,13 +200,4 @@ export function targetProgressFor(
     });
   }
   return out;
-}
-
-/**
- * True when every weekday resolves to the same profile, which is the signal the
- * settings UI uses to stay in its simple one-set-of-goals mode instead of
- * showing the seven-day assignment strip.
- */
-export function isUniformWeek(weekdayTargets: readonly string[]): boolean {
-  return weekdayTargets.length === 7 && new Set(weekdayTargets).size === 1;
 }

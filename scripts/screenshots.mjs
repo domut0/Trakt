@@ -171,44 +171,47 @@ const SESSION_NOTES = {
 };
 
 /**
- * A planned week, Monday first.
+ * The nutrition timeline: three change-points, which is the user's own stated
+ * case and the thing the model exists to express.
  *
- * Two of the four carry a time and two do not, because "unscheduled" is the
- * normal case and is a different rendering: the plan still says what to train,
- * it just does not claim to know when.
+ * No end dates. A phase runs until the next one starts, which is why "cutting
+ * from the Sunday onward" is one row rather than a range somebody maintains,
+ * and why the single untracked Saturday needs no special case at all.
+ *
+ * Dated relative to FROZEN_NOW (Thu 20 Aug 2026) so the captures always show a
+ * timeline with a past phase, a current one and two still ahead.
  */
-const PLANNED_WEEK = [
-  { name: "Heavy Bench", exerciseIds: ["e_bench", "e_close_grip_bench"], atMinutes: 7 * 60 },
-  { name: "Squat", exerciseIds: ["e_squat", "e_rdl"] },
-  null,
-  { name: "Pull", exerciseIds: ["e_dead", "e_barbell_row"], atMinutes: 18 * 60 + 30 },
-  { name: "Volume Bench", exerciseIds: ["e_incline_bench", "e_ohp"] },
-  null,
-  null,
-];
-
-const TARGET_PROFILES = [
+const NUTRITION_PHASES = [
   {
-    id: "tp_train",
-    name: "Training",
+    id: "np_maint",
+    startsOn: "2026-07-10",
+    name: "Maintenance",
+    kind: "targets",
     calories: 2700,
     protein: 200,
     carbs: 300,
     fat: 80,
-    steps: 10000,
+    steps: 20000,
+    goalMode: "maintain",
   },
-  { id: "tp_rest", name: "Rest", calories: 2200, protein: 190, carbs: 180, fat: 75, steps: 8000 },
+  { id: "np_off", startsOn: "2026-08-22", name: "Off", kind: "untracked" },
+  {
+    id: "np_cut",
+    startsOn: "2026-08-23",
+    name: "Cut",
+    kind: "targets",
+    calories: 2400,
+    protein: 210,
+    carbs: 210,
+    fat: 70,
+    steps: 24000,
+    goalMode: "cut",
+  },
 ];
-/** Monday first. Wed/Sat/Sun are rest days. */
-const WEEKDAY_TARGETS = [
-  "tp_train",
-  "tp_train",
-  "tp_rest",
-  "tp_train",
-  "tp_train",
-  "tp_rest",
-  "tp_rest",
-];
+
+/** One pinned day, for the case where you do know in advance. The rotation
+ *  fills everything else and is never projected forward. */
+const PLANNED_DAYS = [{ date: "2026-08-24", splitSlotId: "s_sq" }];
 
 /**
  * The populated backup: six weeks of lifting, cardio, nutrition and
@@ -357,8 +360,16 @@ function buildFullBackup() {
     dailyLogs.push(log);
   }
 
+  // The planned lifts live on the SLOT now, not on a weekday: the rotation has
+  // no weekdays in it. Two of the four carry a plan, so the captures show both a
+  // planned slot and an unplanned one.
+  const PLANNED_LIFTS = {
+    s_hb: ["e_bench", "e_close_grip_bench"],
+    s_sq: ["e_squat", "e_rdl"],
+  };
   const slots = SLOTS.map((s) => ({
     ...s,
+    ...(PLANNED_LIFTS[s.id] ? { plannedExerciseIds: PLANNED_LIFTS[s.id] } : {}),
     ...(slotLastLogged[s.id] ? { lastLoggedAt: slotLastLogged[s.id] } : {}),
   }));
 
@@ -369,8 +380,8 @@ function buildFullBackup() {
     sessions,
     sets,
     dailyLogs,
-    targetProfiles: TARGET_PROFILES,
-    weekdayTargets: WEEKDAY_TARGETS,
+    nutritionPhases: NUTRITION_PHASES,
+    plannedDays: PLANNED_DAYS,
     targetsEnabled: true,
     toolsEnabled: true,
     unit: "lbs",
@@ -392,8 +403,8 @@ function buildEmptyBackup() {
     sessions: [],
     sets: [],
     dailyLogs: [],
-    targetProfiles: [{ id: "tp_default", name: "Every day" }],
-    weekdayTargets: Array.from({ length: 7 }, () => "tp_default"),
+    nutritionPhases: [],
+    plannedDays: [],
     targetsEnabled: false,
     toolsEnabled: false,
     unit: "lbs",
@@ -707,7 +718,7 @@ async function importBackup(page, backup, label) {
   }
 
   await confirm.click();
-  await page.waitForSelector("text=Backup imported.", { timeout: 20_000 });
+  await page.waitForSelector("text=Backup imported", { timeout: 20_000 });
   // Reload so every screen that follows is rendering a real IndexedDB hydrate,
   // not the in-memory state importData happened to leave behind.
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -763,19 +774,11 @@ async function captureToday(page) {
 }
 
 async function capturePlan(page) {
-  // Its own backup, and it runs LAST, because a planned week is not just one
-  // more screen: starting a workout on a planned day preloads that day's main
-  // lifts, so seeding this into the shared backup silently changed the whole
-  // workout flow underneath captureWorkoutFlow - the exercise picker never
-  // opened, because an exercise was already chosen. Unplanned is the common
-  // case and is what the other captures should keep showing.
-  await importBackup(
-    page,
-    { ...buildFullBackup(), plannedWeek: PLANNED_WEEK },
-    "a planned training week",
-  );
   await gotoTab(page, "/plan", 'h1:text("Plan")');
-  await shot(page, "60-plan-week");
+  await shot(page, "60-plan");
+  await scrollMain(page, 400);
+  await settle(page, 300);
+  await shot(page, "61-plan-scrolled");
 }
 
 async function captureHistory(page) {
@@ -835,17 +838,12 @@ async function captureCharts(page) {
 }
 
 async function captureSettings(page) {
+  // One shot. Settings used to need a second capture for its lower half, but
+  // it lost the targets editor to the Plan tab and five helper lines to the
+  // copy pass, and now fits on one screen - the scrolled shot came back
+  // byte-identical to the top one.
   await gotoTab(page, "/settings", 'h1:text("Settings")');
-  await shot(page, "40-settings-top");
-
-  // One set of goals now: no assignment strip, no profile list.
-  await scrollToTop(page, page.getByText("Daily targets", { exact: true }));
-  await shot(page, "41-settings-daily-targets");
-
-  // Scrolling Export backup to the top also lands the page on its last screen,
-  // so this doubles as the settings-bottom capture.
-  await scrollToTop(page, page.getByText("Export backup", { exact: true }));
-  await shot(page, "44-settings-data-backup-and-reset");
+  await shot(page, "40-settings");
 }
 
 async function captureWorkoutFlow(page) {
@@ -867,6 +865,12 @@ async function captureWorkoutFlow(page) {
   await settle(page, 500);
   await shot(page, "52-start-workout-sheet");
 
+  // A slot with no planned lifts, deliberately. Pressing Start bare would take
+  // the rotation's suggestion, which in this seed HAS a plan and therefore
+  // preloads an exercise - so the picker below would never open. The unplanned
+  // path is also the more common one while a rotation is still being set up.
+  await page.getByLabel("Today's session name").fill("Arms");
+  await settle(page, 200);
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await page.waitForSelector("text=Time between sets", { timeout: 15_000 });
   await settle(page, 600);
@@ -951,11 +955,17 @@ async function captureWorkoutFlow(page) {
 }
 
 /** Start workout -> strength -> Start, landing on the live workout screen. */
-async function startWorkout(page) {
+async function startWorkout(page, name = "Arms") {
   await page.getByRole("button", { name: "Start workout" }).click();
   await settle(page, 400);
   await page.getByRole("button", { name: "Log strength training workout" }).click();
   await settle(page, 500);
+  // Named explicitly rather than taking the rotation's suggestion. The seed now
+  // has planned lifts on two of its slots, so a bare Start preloads an exercise
+  // on some runs and not others depending on where the rotation happens to be -
+  // which made every capture after this one order-dependent.
+  await page.getByLabel("Today's session name").fill(name);
+  await settle(page, 200);
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await page.waitForSelector("text=Time between sets", { timeout: 15_000 });
   await settle(page, 400);
@@ -1077,8 +1087,8 @@ async function main() {
     await captureCharts(page);
     await captureSettings(page);
     await captureWorkoutFlow(page);
-    await captureSessionDetail(page);
     await capturePlan(page);
+    await captureSessionDetail(page);
 
     await context.close();
     await browser.close();

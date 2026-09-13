@@ -539,12 +539,7 @@ export function DayEditorSheet({
                 shape rather than the absence of one, and it cannot vanish again
                 by two tokens drifting together. */}
             <div className="group-row group-row-sep">
-              <div className="min-w-0">
-                <div className="t-body font-medium text-ink">Untracked</div>
-                <div className="t-label text-ink-2">
-                  A day you chose not to log, rather than one you missed.
-                </div>
-              </div>
+              <span className="t-body font-medium text-ink">Untracked</span>
               <button
                 type="button"
                 role="checkbox"

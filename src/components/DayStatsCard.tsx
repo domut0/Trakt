@@ -129,11 +129,19 @@ function MetricRow({
 }
 
 export function DayStatsCard({ date }: { date: string }): JSX.Element {
-  const targetProfileForDate = useStore((s) => s.targetProfileForDate);
+  const targetsForDay = useStore((s) => s.targetsForDay);
+  const nutritionPhases = useStore((s) => s.nutritionPhases);
   const unit = useStore((s) => s.unit);
   const dailyLogs = useStore((s) => s.dailyLogs);
 
-  const profile = targetProfileForDate(date);
+  // Recomputed when the timeline changes, not just when the date does: editing a
+  // phase has to move every day it governs, and the resolver is a store getter
+  // that React cannot see through on its own.
+  const profile = useMemo(
+    () => targetsForDay(date),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [date, nutritionPhases, targetsForDay],
+  );
   const dayLog = useMemo(() => dailyLogs.find((l) => l.date === date), [dailyLogs, date]);
 
   const isFuture = date > dayKey(new Date());

@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DayStatsCard } from "../DayStatsCard";
 import { dayKey } from "../../lib/daily-log";
 import { useStore } from "../../lib/store";
-import type { TargetProfile } from "../../lib/store";
+import type { NutritionPhase } from "../../lib/planning";
 import type { GoalMode } from "../../lib/targets";
 
-const PROFILE_ID = "tp_stats_test";
+const PHASE_ID = "np_stats_test";
 
 function seedStore({
   goalMode,
@@ -35,9 +35,14 @@ function seedStore({
   }[];
   unit?: "lbs" | "kg";
 }) {
-  const profile: TargetProfile = {
-    id: PROFILE_ID,
-    name: "Test Profile",
+  // A phase starting at the epoch, so it is in force on every date these tests
+  // use, including the far-future one. The weekday profile this replaced could
+  // only say "Tuesdays look like this"; a phase covers every day after it.
+  const phase: NutritionPhase = {
+    id: PHASE_ID,
+    startsOn: "1970-01-01",
+    name: "Test phase",
+    kind: "targets",
     ...(goalMode !== undefined ? { goalMode } : {}),
     ...(calories !== undefined ? { calories } : {}),
     ...(protein !== undefined ? { protein } : {}),
@@ -49,9 +54,9 @@ function seedStore({
   useStore.setState({
     hydrated: true,
     unit,
-    targetProfiles: [profile],
-    weekdayTargets: Array.from({ length: 7 }, () => PROFILE_ID),
     dailyLogs,
+    nutritionPhases: [phase],
+    plannedDays: [],
   });
 }
 

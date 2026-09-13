@@ -442,6 +442,21 @@
   color: var(--color-ink-2);
 }
 
+/** Vertical rhythm between one card-and-its-label and the next.
+
+    Lost for a day: the repaint replaced the whole TABLES block with the CARDS
+    one, and this was sitting inside that range. It is a no-op class if it is not
+    declared, so nothing broke loudly - 15 usages across 8 files just quietly
+    collapsed to zero and every section header sat flush against the card above
+    it. Grep before splicing a range.
+
+    24px rather than the timetable's 26: a card has its own edge, so the gap only
+    has to separate two objects instead of standing in for the division a rule
+    would have drawn. */
+@utility section-gap {
+  margin-top: 24px;
+}
+
 /** Not yet. The same square, open. Same footprint, so a list of them does not
     reflow as items are completed. */
 @utility mark-open {

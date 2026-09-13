@@ -1,12 +1,11 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { PlannedWeek } from "./plan";
 import type { SyncBase } from "./sync";
+import type { NutritionPhase, PlannedDay } from "./planning";
 import type {
   BackupData,
   DailyLog,
   Exercise,
   SplitSlot,
-  TargetProfile,
   WorkoutSession,
   WorkoutSet,
 } from "./store";
@@ -26,40 +25,6 @@ export type MetaKey = "settings" | "activeSession" | "syncConfig" | "syncBase" |
 export interface SettingsMeta {
   key: "settings";
   unit: "lbs" | "kg";
-  /** Opt-in: daily calorie/macro/step targets. Off means the Today ring shows a
-   * pure macro split, exactly as it did before targets existed. */
-  /** Opt-in: the habit checklist on Today. */
-  habitsEnabled?: boolean;
-  /** Opt-in: the plate and 1RM calculator sheets. */
-  /**
-   * Named target profiles. Lives on the settings record rather than in its own
-   * table because it is a handful of tiny rows that are always read together
-   * with the rest of the settings, and never queried by anything but id.
-   */
-  targetProfiles?: TargetProfile[];
-  /**
-   * Which profile applies to each weekday, as 7 profile ids, MONDAY FIRST to
-   * match the app's Monday-start week convention everywhere else. Resolve it
-   * through `weekdayIndexFor` in targets.ts, never with a raw `getDay()`.
-   */
-  weekdayTargets?: string[];
-  /** Opt-in: planning main lifts on a weekly template. */
-  /** Opt-in: food logging, meals and the food catalogue. */
-  foodEnabled?: boolean;
-  /**
-   * The weekly training plan, as 7 entries, MONDAY FIRST for the same reason
-   * `weekdayTargets` is. Resolve it through plan.ts, never with a raw
-   * `getDay()`.
-   *
-   * Here on the settings record rather than in its own table, exactly like
-   * `targetProfiles`: it is one small value that is always read with the rest of
-   * settings and never queried. Being a non-indexed addition it also needs no
-   * Dexie version bump (see the note on the version() calls below).
-   *
-   * Absent means the user has never planned anything, which is a different state
-   * from a week of explicit rest days, and both must read as "no plan".
-   */
-  plannedWeek?: PlannedWeek;
 }
 
 export interface ActiveSessionMeta {
@@ -135,6 +100,8 @@ class WorkoutDb extends Dexie {
   sets!: EntityTable<WorkoutSet, "id">;
   meta!: EntityTable<MetaRecord, "key">;
   dailyLogs!: EntityTable<DailyLog, "date">;
+  nutritionPhases!: EntityTable<NutritionPhase, "id">;
+  plannedDays!: EntityTable<PlannedDay, "date">;
 
   constructor() {
     super("workout-tracker");
@@ -231,6 +198,104 @@ class WorkoutDb extends Dexie {
             delete log.isCheatDay;
           });
       });
+
+    // v6 replaces the weekly planning model with two of them, because there
+    // were always two shapes in there fighting each other.
+    //
+    // NUTRITION IS A CALENDAR: `nutritionPhases` is a timeline of change-points
+    // with no end dates, so "cutting from Sunday onward" is one row that covers
+    // every day after it. It replaces `targetProfiles` + `weekdayTargets`,
+    // which could only say "Tuesdays look like this".
+    //
+    // TRAINING IS A ROTATION: the planned lifts move onto the split slot, which
+    // is the only place they can live for a split like UL×infinity - that
+    // advances when you train, not when the date changes, so it has no weekday
+    // to hang anything on. `plannedDays` is the escape hatch for the days you
+    // genuinely do know in advance.
+    //
+    // `startsOn` is indexed because resolving any date means finding the latest
+    // phase at or before it, which is the single most-called query in the app
+    // once this ships. `plannedDays` is keyed by date: one pin per day, by
+    // construction rather than by a uniqueness check somebody has to remember.
+    this.version(6)
+      .stores({
+        nutritionPhases: "id, startsOn",
+        plannedDays: "date",
+      })
+      .upgrade(async (tx) => {
+        const meta = await tx.table("meta").get("settings");
+        if (!meta) return;
+
+        // The single surviving target profile becomes the phase that has always
+        // been in force. Dated to the epoch rather than to today on purpose: a
+        // phase starting today would leave every day of existing history
+        // resolving to "no targets", which would silently rewrite what every
+        // past day was measured against.
+        const profiles = meta.targetProfiles as
+          | {
+              calories?: number;
+              protein?: number;
+              carbs?: number;
+              fat?: number;
+              steps?: number;
+              goalMode?: string;
+              name?: string;
+            }[]
+          | undefined;
+        const first = profiles?.[0];
+        const hasNumbers =
+          first &&
+          (first.calories !== undefined ||
+            first.protein !== undefined ||
+            first.carbs !== undefined ||
+            first.fat !== undefined ||
+            first.steps !== undefined);
+        if (hasNumbers) {
+          await tx.table("nutritionPhases").put({
+            id: "np_migrated",
+            startsOn: "1970-01-01",
+            name: first.name && first.name !== "Every day" ? first.name : "Targets",
+            kind: "targets",
+            ...(first.calories !== undefined ? { calories: first.calories } : {}),
+            ...(first.protein !== undefined ? { protein: first.protein } : {}),
+            ...(first.carbs !== undefined ? { carbs: first.carbs } : {}),
+            ...(first.fat !== undefined ? { fat: first.fat } : {}),
+            ...(first.steps !== undefined ? { steps: first.steps } : {}),
+            ...(first.goalMode ? { goalMode: first.goalMode } : {}),
+          });
+        }
+
+        // Each planned weekday's lifts merge onto the slot of the same name.
+        // Matched case-insensitively and whitespace-trimmed, the same rule
+        // startWorkout uses, so a plan written as "heavy bench" still finds the
+        // slot called "Heavy Bench" instead of stranding its exercises.
+        const week = meta.plannedWeek as
+          ({ name?: string; exerciseIds?: string[] } | null)[] | undefined;
+        if (Array.isArray(week)) {
+          const slots = await tx.table("slots").toArray();
+          const byName = new Map(
+            slots.map((sl: { id: string; name: string }) => [sl.name.trim().toLowerCase(), sl]),
+          );
+          const merged = new Map<string, Set<string>>();
+          for (const day of week) {
+            if (!day?.name || !Array.isArray(day.exerciseIds)) continue;
+            const slot = byName.get(day.name.trim().toLowerCase());
+            if (!slot) continue;
+            const set = merged.get(slot.id) ?? new Set<string>();
+            for (const id of day.exerciseIds) set.add(id);
+            merged.set(slot.id, set);
+          }
+          for (const [slotId, ids] of merged) {
+            const slot = slots.find((sl: { id: string }) => sl.id === slotId);
+            if (slot) {
+              await tx.table("slots").put({ ...slot, plannedExerciseIds: [...ids] });
+            }
+          }
+        }
+
+        // The settings record keeps only what it still describes.
+        await tx.table("meta").put({ key: "settings", unit: meta.unit ?? "lbs" });
+      });
   }
 }
 
@@ -243,36 +308,8 @@ export function isIndexedDbAvailable(): boolean {
   return typeof indexedDB !== "undefined";
 }
 
-/** The id of the profile every weekday points at until the user splits them up. */
-export const DEFAULT_TARGET_PROFILE_ID = "tp_default";
-
-/**
- * A fresh set of target profiles: exactly one, applied to all seven days.
- *
- * A factory rather than a const because the result contains arrays that end up
- * in store state, and a shared frozen-by-convention literal is one careless
- * `.push` away from mutating every caller's copy.
- *
- * Targets ship pre-seeded even while `targetsEnabled` is false, so flipping the
- * toggle on lands the user in a usable editor instead of an empty screen.
- */
-export function defaultTargets(): {
-  targetProfiles: TargetProfile[];
-  weekdayTargets: string[];
-} {
-  return {
-    targetProfiles: [{ id: DEFAULT_TARGET_PROFILE_ID, name: "Every day" }],
-    weekdayTargets: Array.from({ length: 7 }, () => DEFAULT_TARGET_PROFILE_ID),
-  };
-}
-
 export function defaultSettings(): SettingsMeta {
-  return {
-    key: "settings",
-    unit: "lbs",
-    habitsEnabled: false,
-    ...defaultTargets(),
-  };
+  return { key: "settings", unit: "lbs" };
 }
 
 export const DEFAULT_SETTINGS: SettingsMeta = defaultSettings();
@@ -287,40 +324,48 @@ export interface AllData {
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
   dailyLogs: DailyLog[];
+  nutritionPhases: NutritionPhase[];
+  plannedDays: PlannedDay[];
   settings: SettingsMeta;
   activeSession: ActiveSessionMeta;
 }
 
 /** Reads every table. Client-only. */
 export async function loadAll(): Promise<AllData> {
-  const [exercises, slots, sessions, sets, dailyLogs, settingsMeta, activeSessionMeta] =
-    await Promise.all([
-      db.exercises.toArray(),
-      db.slots.toArray(),
-      db.sessions.toArray(),
-      db.sets.toArray(),
-      db.dailyLogs.toArray(),
-      db.meta.get("settings"),
-      db.meta.get("activeSession"),
-    ]);
-  // A settings record written before targets existed has no profiles at all.
-  // Fill them in on read so nothing downstream has to cope with the empty case,
-  // and so enabling targets later never lands on a profile-less screen.
+  const [
+    exercises,
+    slots,
+    sessions,
+    sets,
+    dailyLogs,
+    nutritionPhases,
+    plannedDays,
+    settingsMeta,
+    activeSessionMeta,
+  ] = await Promise.all([
+    db.exercises.toArray(),
+    db.slots.toArray(),
+    db.sessions.toArray(),
+    db.sets.toArray(),
+    db.dailyLogs.toArray(),
+    db.nutritionPhases.toArray(),
+    db.plannedDays.toArray(),
+    db.meta.get("settings"),
+    db.meta.get("activeSession"),
+  ]);
+  // Nothing to backfill. Settings is two fields now - targets moved to their
+  // own table as a timeline - so a record written before any of this simply
+  // reads as itself.
   const stored = settingsMeta as SettingsMeta | undefined;
-  const settings: SettingsMeta = stored
-    ? {
-        ...stored,
-        ...(stored.targetProfiles?.length && stored.weekdayTargets?.length === 7
-          ? {}
-          : defaultTargets()),
-      }
-    : defaultSettings();
+  const settings: SettingsMeta = stored ?? defaultSettings();
   return {
     exercises,
     slots,
     sessions,
     sets,
     dailyLogs,
+    nutritionPhases,
+    plannedDays,
     settings,
     activeSession: (activeSessionMeta as ActiveSessionMeta) ?? EMPTY_ACTIVE_SESSION,
   };
@@ -347,7 +392,16 @@ export async function seedDb(data: {
   // part of the same atomic unit if this is ever extended.
   await db.transaction(
     "rw",
-    [db.exercises, db.slots, db.sessions, db.sets, db.dailyLogs, db.meta],
+    [
+      db.exercises,
+      db.slots,
+      db.sessions,
+      db.sets,
+      db.dailyLogs,
+      db.nutritionPhases,
+      db.plannedDays,
+      db.meta,
+    ],
     async () => {
       await db.exercises.bulkPut(data.exercises);
       await db.slots.bulkPut(data.slots);
@@ -371,32 +425,35 @@ export async function seedDb(data: {
 export async function replaceAllData(data: BackupData): Promise<void> {
   await db.transaction(
     "rw",
-    [db.exercises, db.slots, db.sessions, db.sets, db.dailyLogs, db.meta],
+    [
+      db.exercises,
+      db.slots,
+      db.sessions,
+      db.sets,
+      db.dailyLogs,
+      db.nutritionPhases,
+      db.plannedDays,
+      db.meta,
+    ],
     async () => {
       await db.exercises.clear();
       await db.slots.clear();
       await db.sessions.clear();
       await db.sets.clear();
       await db.dailyLogs.clear();
+      await db.nutritionPhases.clear();
+      await db.plannedDays.clear();
       await db.exercises.bulkPut(data.exercises);
       await db.slots.bulkPut(data.slots);
       await db.sessions.bulkPut(data.sessions);
       await db.sets.bulkPut(data.sets);
       await db.dailyLogs.bulkPut(data.dailyLogs);
+      await db.nutritionPhases.bulkPut(data.nutritionPhases);
+      await db.plannedDays.bulkPut(data.plannedDays);
       // Annotated as SettingsMeta rather than inlined: `meta` is a union table,
       // and an inline literal makes Dexie's InsertType resolve against the wrong
       // arm of the union, which is a type error even though the value is valid.
-      const settings: SettingsMeta = {
-        key: "settings",
-        unit: data.unit,
-        targetProfiles: data.targetProfiles,
-        weekdayTargets: data.weekdayTargets,
-        // Written straight through, `undefined` included: Dexie stores the
-        // record without the key, which is precisely the "never planned" state
-        // and is what `loadAll` reads back. Substituting a week of rest days
-        // here would hand every importer a plan they never made.
-        plannedWeek: data.plannedWeek,
-      };
+      const settings: SettingsMeta = { key: "settings", unit: data.unit };
       await db.meta.put(settings);
       await db.meta.put(EMPTY_ACTIVE_SESSION);
       // The sync base describes a dataset that no longer exists, so it MUST go

@@ -31,10 +31,10 @@ function statusLine(state: {
 }): string {
   if (state.status === "syncing") return "Syncing now";
   if (state.status === "blocked" || state.status === "error") {
-    return state.lastError ?? "Sync failed.";
+    return state.lastError ?? "Sync failed";
   }
-  if (state.status === "offline") return "Offline. Will sync when you reconnect.";
-  if (!state.lastSyncedAt) return "Not synced yet.";
+  if (state.status === "offline") return "Offline, will sync when you reconnect";
+  if (!state.lastSyncedAt) return "Not synced yet";
   const relative = formatDistanceToNow(new Date(state.lastSyncedAt), { addSuffix: true });
   return state.pending ? `Changes waiting. Last synced ${relative}.` : `Synced ${relative}.`;
 }

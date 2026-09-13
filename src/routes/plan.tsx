@@ -1,216 +1,253 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Chevron } from "../components/icons";
+import { addDays, format } from "date-fns";
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { PlanEditorSheet } from "../components/PlanEditorSheet";
-import {
-  isEmptyPlan,
-  plannedAtMinutesOf,
-  plannedDurationMinutesOf,
-  formatMinutesOfDay,
-  type PlannedWeek,
-  type PlannedWorkout,
-} from "../lib/plan";
-import { WEEKDAY_LABELS, weekdayIndexFor } from "../lib/targets";
-import { useStore } from "../lib/store";
+import { PhaseEditorSheet } from "../components/PhaseEditorSheet";
+import { SlotPlanSheet } from "../components/SlotPlanSheet";
+import { Chevron } from "../components/icons";
+import { dayKey, parseDayKey } from "../lib/daily-log";
+import { phaseForDate, sortPhases, type NutritionPhase } from "../lib/planning";
+import { useStore, type SplitSlot } from "../lib/store";
 
 export const Route = createFileRoute("/plan")({
   head: () => ({
     meta: [
       { title: "Plan" },
-      { name: "description", content: "Your main lifts for each weekday." },
+      { name: "description", content: "What you intend to eat and train." },
       { property: "og:title", content: "Plan" },
-      { property: "og:description", content: "Your main lifts for each weekday." },
+      { property: "og:description", content: "What you intend to eat and train." },
     ],
   }),
   component: PlanPage,
 });
 
-/**
- * Full weekday names, Monday-first, aligned index-for-index with
- * WEEKDAY_LABELS and `weekdayIndexFor`.
- *
- * Only the editor uses these. The week list stays on the short labels so its
- * seven leading captions line up in one narrow column, which is what makes the
- * list scannable as a week rather than as seven unrelated rows.
- */
-const WEEKDAY_FULL = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-] as const;
+/** How far the preview strip looks ahead. A week is enough to see the next
+ *  change-point land without turning this into a second calendar. */
+const PREVIEW_DAYS = 7;
 
 /**
- * The stored entry for one weekday, read as tolerantly as plan.ts reads it.
+ * Two models, shown as what they are.
  *
- * Not `plannedWorkoutFor`, which resolves a DATE: this screen is the template
- * itself, and manufacturing seven dates to index a template would put a
- * calendar inside the one surface that is deliberately not one.
+ * NUTRITION IS A CALENDAR. A timeline of change-points with no end dates, so
+ * "cutting from Sunday onward" is one row that covers every day after it.
  *
- * Not `prunePlannedWorkout` either. That collapses a day whose lifts have all
- * been deleted from the library into "no plan", which is the right answer for a
- * resolver about to preload a workout and the wrong one here: the day still has
- * a name, and this is the only screen where the user can repair it. Individual
- * dead ids still disappear, because `nameFor` below drops what it cannot
- * resolve.
- *
- * `entry` is typed `unknown` rather than trusted, because the store loads this
- * value straight out of IndexedDB where a hand-edited backup can have left
- * anything at all, and a thrown TypeError here is a blank screen.
+ * TRAINING IS A ROTATION. It advances when you train rather than when the date
+ * changes, so it has no dates and is shown in cycle order. It is deliberately
+ * NOT projected onto future days: after a rest day the next slot is a free
+ * choice, which makes the future genuinely unknowable, and a plan that is
+ * confidently wrong is worse than none. Pin a day when you actually do know.
  */
-function plannedDayAt(week: PlannedWeek | undefined, index: number): PlannedWorkout | undefined {
-  const entry: unknown = Array.isArray(week) ? week[index] : undefined;
-  if (entry === null || typeof entry !== "object") return undefined;
-  const { name, exerciseIds, atMinutes, durationMinutes } = entry as Partial<PlannedWorkout>;
-  const workout: PlannedWorkout = {
-    name: typeof name === "string" ? name : "",
-    exerciseIds: Array.isArray(exerciseIds)
-      ? exerciseIds.filter((id): id is string => typeof id === "string")
-      : [],
-  };
-  // Through plan.ts, not re-derived here. This reader is deliberately more
-  // forgiving than `plannedWorkoutFor` about name and exercises, because the
-  // editor has to show a half-filled day. What it must not have is its own
-  // opinion about which times are valid: two copies of those bounds is one
-  // careless edit away from a plan that draws on the day view and not here.
-  const at = plannedAtMinutesOf(atMinutes);
-  if (at !== undefined) workout.atMinutes = at;
-  const duration = plannedDurationMinutesOf(durationMinutes);
-  if (duration !== undefined) workout.durationMinutes = duration;
-  return workout;
-}
-
 function PlanPage() {
-  const plannedWeek = useStore((s) => s.plannedWeek);
+  const phases = useStore((s) => s.nutritionPhases);
+  const slots = useStore((s) => s.slots);
   const exercises = useStore((s) => s.exercises);
+  const plannedDays = useStore((s) => s.plannedDays);
+  const predicted = useStore((s) => s.predictedNextSlotName());
+  const unpinDay = useStore((s) => s.unpinDay);
   const hydrated = useStore((s) => s.hydrated);
 
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingPhase, setEditingPhase] = useState<NutritionPhase | undefined>();
+  const [phaseOpen, setPhaseOpen] = useState(false);
+  const [editingSlot, setEditingSlot] = useState<SplitSlot | undefined>();
 
-  const nameById = useMemo(() => new Map(exercises.map((e) => [e.id, e.name])), [exercises]);
+  const ordered = useMemo(() => sortPhases(phases).reverse(), [phases]);
+  const rotation = useMemo(
+    () => [...slots].sort((a, b) => a.rotationOrder - b.rotationOrder),
+    [slots],
+  );
 
-  /**
-   * Which row is today, or -1 before the client has hydrated.
-   *
-   * Gated on `hydrated` rather than computed straight from the clock: the
-   * server renders in its own timezone and would pick a different row often
-   * enough to matter, and a highlight that disagrees between the two passes is
-   * a hydration mismatch. `hydrated` is false on the server and on the first
-   * client render alike, so the two always agree and the marker appears with
-   * the plan it belongs to.
-   */
-  const todayIndex = hydrated ? weekdayIndexFor(new Date()) : -1;
+  const today = hydrated ? dayKey(new Date()) : "";
 
-  const days = WEEKDAY_LABELS.map((label, index) => {
-    const planned = plannedDayAt(plannedWeek, index);
-    const lifts =
-      planned?.exerciseIds
-        .map((id) => nameById.get(id))
-        .filter((name): name is string => name !== undefined) ?? [];
-    return { label, index, planned, lifts };
-  });
+  /** The next week, each day resolved against the timeline. This is where
+   *  "individual days" is actually visible, without pretending every day is an
+   *  entry somebody has to maintain. */
+  const preview = useMemo(() => {
+    if (!hydrated) return [];
+    const start = parseDayKey(today);
+    return Array.from({ length: PREVIEW_DAYS }, (_, i) => {
+      const d = addDays(start, i);
+      const key = dayKey(d);
+      const phase = phaseForDate(phases, key);
+      const pin = plannedDays.find((p) => p.date === key);
+      return {
+        key,
+        label: i === 0 ? "Today" : format(d, "EEE d"),
+        phase,
+        pinned: pin ? slots.find((s) => s.id === pin.splitSlotId) : undefined,
+      };
+    });
+  }, [hydrated, today, phases, plannedDays, slots]);
 
-  const trainingDays = days.filter((d) => d.planned !== undefined).length;
-  const nothingPlanned = isEmptyPlan(plannedWeek);
-  const editing = editingIndex === null ? null : days[editingIndex];
+  const futurePins = useMemo(
+    () =>
+      [...plannedDays].filter((p) => p.date >= today).sort((a, b) => a.date.localeCompare(b.date)),
+    [plannedDays, today],
+  );
+
+  const openPhase = (p?: NutritionPhase) => {
+    setEditingPhase(p);
+    setPhaseOpen(true);
+  };
 
   return (
     <AppShell>
       <header className="px-4 pb-4 pt-14">
-        <h1 className="t-title">Plan</h1>
-        {nothingPlanned && (
-          <p className="mt-2 t-label text-ink-2">
-            The week is empty. Any day you tap becomes a training day.
-          </p>
-        )}
+        <h1 className="t-title text-ink">Plan</h1>
       </header>
 
-      <section className="anim-fade-up">
-        <div className="group-header flex items-baseline justify-between gap-3">
-          <h2 className="t-caption">Your week</h2>
-          {trainingDays > 0 && (
-            <span className="t-caption">
-              {trainingDays} training {trainingDays === 1 ? "day" : "days"}
-            </span>
-          )}
+      {/* ---- Nutrition ------------------------------------------------- */}
+      <section className="px-4 anim-fade-up">
+        <div className="group-header">
+          <h2 className="t-caption">Nutrition</h2>
+          <button type="button" onClick={() => openPhase(undefined)} className="t-action t-label">
+            Add
+          </button>
         </div>
 
-        <div className="group-list mx-4">
-          {days.map(({ label, index, planned, lifts }) => {
-            const isToday = index === todayIndex;
-            const title = planned ? planned.name.trim() || "Untitled" : "Rest day";
-            // The time leads the detail line when there is one. A start time you
-            // can set in the editor but cannot see anywhere in the week is a
-            // setting that appears not to have saved.
-            const detail = planned
-              ? [
-                  planned.atMinutes !== undefined
-                    ? formatMinutesOfDay(planned.atMinutes)
-                    : undefined,
-                  lifts.join(" · ") || "No lifts yet",
-                ]
-                  .filter((part): part is string => part !== undefined)
-                  .join(" · ")
-              : "";
-            return (
-              <button
-                key={label}
-                type="button"
-                onClick={() => setEditingIndex(index)}
-                // Today's row carries the one lift on this screen, one step up
-                // the palette from the group it sits in (background -> surface
-                // -> muted). A week of seven identical rows answers "what does
-                // my week look like" and never "which of these is now", and now
-                // is what the user is standing in.
-                className={
-                  "group-row w-full text-left " +
-                  (index > 0 ? "group-row-sep " : "") +
-                  (isToday ? "bg-wash" : "")
-                }
-                aria-label={`${WEEKDAY_FULL[index]}, ${
-                  planned ? `${title}${lifts.length ? `: ${lifts.join(", ")}` : ""}` : "rest day"
-                }${isToday ? ", today" : ""}. Edit.`}
-              >
-                {/* The strip cell from TargetsEditor, stood on its end: same
-                    Monday-first labels, same caption type, same muted colour.
-                    Vertical because a row has to hold three or four lift names
-                    and a seven-across grid cannot. */}
-                <span aria-hidden="true" className="w-12 shrink-0 t-caption text-ink-2">
-                  {label}
-                </span>
-                <span className="min-w-0 flex-1" aria-hidden="true">
-                  <span className={"block truncate t-body " + (planned ? "" : "text-ink-2")}>
-                    {title}
+        {ordered.length === 0 ? (
+          <div className="group-list px-4 py-5">
+            <p className="t-body text-ink-2">Nothing planned yet</p>
+          </div>
+        ) : (
+          <div className="group-list">
+            {ordered.map((p, i) => {
+              const current = hydrated && phaseForDate(phases, today)?.id === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => openPhase(p)}
+                  className={`group-row w-full text-left ${i === 0 ? "" : "group-row-sep"}`}
+                >
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate t-body font-medium text-ink">{p.name}</span>
+                      {current && <span className="shrink-0 t-label text-ink-3">now</span>}
+                    </span>
+                    <span className="block t-label text-ink-2">
+                      {format(parseDayKey(p.startsOn), "d MMM yyyy")}
+                      {p.kind === "targets" && summarise(p) ? ` · ${summarise(p)}` : ""}
+                    </span>
                   </span>
-                  {detail && (
-                    <span className="mt-0.5 block truncate t-label text-ink-2">{detail}</span>
-                  )}
-                </span>
-                {isToday && (
-                  <span aria-hidden="true" className="shrink-0 t-caption text-ink-2">
-                    Today
-                  </span>
-                )}
-                <span className="shrink-0 t-action" aria-hidden="true"></span>
-              </button>
-            );
-          })}
-        </div>
+                  <Chevron className="shrink-0 text-ink-3" size={16} />
+                </button>
+              );
+            })}
+          </div>
+        )}
       </section>
 
-      {editing && (
-        <PlanEditorSheet
-          open
-          weekdayIndex={editing.index}
-          dayName={WEEKDAY_FULL[editing.index]}
-          workout={editing.planned}
-          onClose={() => setEditingIndex(null)}
-        />
+      {/* ---- The next week, resolved ----------------------------------- */}
+      {hydrated && ordered.length > 0 && (
+        <section className="px-4 section-gap anim-fade-up">
+          <div className="group-header">
+            <h2 className="t-caption">Next 7 days</h2>
+          </div>
+          <div className="group-list">
+            {preview.map((d, i) => (
+              <div key={d.key} className={`group-row ${i === 0 ? "" : "group-row-sep"}`}>
+                <span className="t-body text-ink">{d.label}</span>
+                <span className="flex min-w-0 items-baseline gap-2 text-right">
+                  {d.pinned && <span className="shrink-0 t-label text-ink">{d.pinned.name}</span>}
+                  <span className="truncate t-label text-ink-2">
+                    {d.phase
+                      ? d.phase.kind === "untracked"
+                        ? "Untracked"
+                        : (summarise(d.phase) ?? d.phase.name)
+                      : "No targets"}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
+
+      {/* ---- Training -------------------------------------------------- */}
+      <section className="px-4 section-gap anim-fade-up">
+        <div className="group-header">
+          <h2 className="t-caption">Rotation</h2>
+          {predicted && <span className="t-label text-ink-2">Next: {predicted}</span>}
+        </div>
+
+        {rotation.length === 0 ? (
+          <div className="group-list px-4 py-5">
+            <p className="t-body text-ink-2">No splits yet</p>
+          </div>
+        ) : (
+          <div className="group-list">
+            {rotation.map((s, i) => {
+              const lifts = (s.plannedExerciseIds ?? [])
+                .map((id) => exercises.find((e) => e.id === id)?.name)
+                .filter((n): n is string => n !== undefined);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setEditingSlot(s)}
+                  className={`group-row w-full text-left ${i === 0 ? "" : "group-row-sep"}`}
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate t-body font-medium text-ink">{s.name}</span>
+                    <span className="block truncate t-label text-ink-2">
+                      {lifts.length > 0 ? lifts.join(" · ") : "No lifts chosen"}
+                    </span>
+                  </span>
+                  <Chevron className="shrink-0 text-ink-3" size={16} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ---- Pinned days ----------------------------------------------- */}
+      {futurePins.length > 0 && (
+        <section className="px-4 section-gap anim-fade-up">
+          <div className="group-header">
+            <h2 className="t-caption">Pinned</h2>
+          </div>
+          <div className="group-list">
+            {futurePins.map((p, i) => (
+              <div key={p.date} className={`group-row ${i === 0 ? "" : "group-row-sep"}`}>
+                <span className="min-w-0">
+                  <span className="block t-body text-ink">
+                    {slots.find((s) => s.id === p.splitSlotId)?.name ?? "Unknown"}
+                  </span>
+                  <span className="block t-label text-ink-2">
+                    {format(parseDayKey(p.date), "EEE d MMM")}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => unpinDay(p.date)}
+                  className="shrink-0 min-h-[44px] px-2 t-action t-label"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="pb-8" />
+
+      <PhaseEditorSheet phase={editingPhase} open={phaseOpen} onClose={() => setPhaseOpen(false)} />
+      <SlotPlanSheet
+        slot={editingSlot}
+        open={editingSlot !== undefined}
+        onClose={() => setEditingSlot(undefined)}
+      />
     </AppShell>
   );
+}
+
+/** "3,000 cal · 24,000 steps", or undefined when a phase carries no numbers. */
+function summarise(p: NutritionPhase): string | undefined {
+  const parts: string[] = [];
+  if (p.calories !== undefined) parts.push(`${p.calories.toLocaleString()} cal`);
+  if (p.protein !== undefined) parts.push(`${p.protein}p`);
+  if (p.steps !== undefined) parts.push(`${p.steps.toLocaleString()} steps`);
+  return parts.length > 0 ? parts.join(" · ") : undefined;
 }

@@ -3,10 +3,8 @@ import { Chevron } from "../components/icons";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { SyncSettings } from "../components/SyncSettings";
-import { TargetsEditor } from "../components/TargetsEditor";
 import { Toggle } from "../components/Toggle";
 import { dailyLogsToCsv, setsToCsv } from "../lib/csv";
-import { isEmptyPlan, type PlannedWeek } from "../lib/plan";
 import {
   BACKUP_VERSION,
   parseBackup,
@@ -36,8 +34,7 @@ function SettingsPage() {
   // already here. An import replaces each of these tables whole, so anything in
   // them that the file does not carry is deleted, not merged.
   const dailyLogs = useStore((s) => s.dailyLogs);
-  const targetProfiles = useStore((s) => s.targetProfiles);
-  const plannedWeek = useStore((s) => s.plannedWeek);
+  const nutritionPhases = useStore((s) => s.nutritionPhases);
   const router = useRouter();
 
   // Import flow: a selected file is parsed and fully validated (parseBackup)
@@ -55,17 +52,8 @@ function SettingsPage() {
   };
 
   const exportJson = () => {
-    const {
-      exercises,
-      slots,
-      sessions,
-      sets,
-      dailyLogs,
-      targetProfiles,
-      weekdayTargets,
-      plannedWeek,
-      unit,
-    } = useStore.getState();
+    const { exercises, slots, sessions, sets, dailyLogs, nutritionPhases, plannedDays, unit } =
+      useStore.getState();
     // Annotated as BackupData on purpose. This object literal used to be built
     // inline inside JSON.stringify, where an excess/missing key is invisible to
     // the type checker: when BackupData grew to v4 the export quietly kept
@@ -74,14 +62,13 @@ function SettingsPage() {
     // error here instead of silent data loss for whoever restores the file.
     const backup: BackupData = {
       version: BACKUP_VERSION,
+      nutritionPhases,
+      plannedDays,
       exercises,
       slots,
       sessions,
       sets,
       dailyLogs,
-      targetProfiles,
-      weekdayTargets,
-      plannedWeek,
       unit,
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], {
@@ -167,13 +154,7 @@ function SettingsPage() {
   // comparing against live state instead, which also means a user who has never
   // used habits is told nothing about them.
   const fileCounts = pendingImport ? summarizeBackup(pendingImport) : "";
-  const losses = pendingImport
-    ? describeLosses(pendingImport, {
-        dailyLogs,
-        targetProfiles,
-        plannedWeek,
-      })
-    : [];
+  const losses = pendingImport ? describeLosses(pendingImport, { dailyLogs, nutritionPhases }) : [];
 
   return (
     <AppShell>
@@ -199,16 +180,9 @@ function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="Daily targets" delay={80}>
-        <TargetsEditor />
-      </Section>
-
       <Section title="Data" delay={120}>
         <button type="button" onClick={exportJson} className="group-row w-full text-left">
-          <div>
-            <div className="t-body">Export backup</div>
-            <div className="t-label text-ink-2">Download all data as JSON.</div>
-          </div>
+          <div className="t-body">Export backup</div>
           <Chevron className="shrink-0 text-ink-2" size={16} />
         </button>
         <button
@@ -216,10 +190,7 @@ function SettingsPage() {
           onClick={exportSetsCsv}
           className="group-row group-row-sep w-full text-left"
         >
-          <div>
-            <div className="t-body">Export sets (CSV)</div>
-            <div className="t-label text-ink-2">Download set history for spreadsheets.</div>
-          </div>
+          <div className="t-body">Export sets (CSV)</div>
           <Chevron className="shrink-0 text-ink-2" size={16} />
         </button>
         <button
@@ -227,17 +198,11 @@ function SettingsPage() {
           onClick={exportDailyLogsCsv}
           className="group-row group-row-sep w-full text-left"
         >
-          <div>
-            <div className="t-body">Export daily log (CSV)</div>
-            <div className="t-label text-ink-2">Download nutrition and bodyweight history.</div>
-          </div>
+          <div className="t-body">Export daily log (CSV)</div>
           <Chevron className="shrink-0 text-ink-2" size={16} />
         </button>
         <label className="group-row group-row-sep w-full cursor-pointer text-left">
-          <div>
-            <div className="t-body">Import backup</div>
-            <div className="t-label text-ink-2">Restore from a previous export.</div>
-          </div>
+          <div className="t-body">Import backup</div>
           <input
             type="file"
             accept="application/json"
@@ -296,7 +261,7 @@ function SettingsPage() {
         )}
 
         {importSuccess && (
-          <div className="group-row-sep px-4 py-3 t-label text-ink-2">Backup imported.</div>
+          <div className="group-row-sep px-4 py-3 t-label text-ink-2">Backup imported</div>
         )}
       </Section>
 
@@ -311,10 +276,7 @@ function SettingsPage() {
             onClick={() => setShowClearConfirm(true)}
             className="group-row w-full text-left"
           >
-            <div>
-              <div className="t-body text-signal">Clear all data</div>
-              <div className="t-label text-ink-2">Wipe all workouts and start fresh.</div>
-            </div>
+            <div className="t-body text-signal">Clear all data</div>
             <span className="text-signal" aria-hidden="true"></span>
           </button>
         ) : (
@@ -344,7 +306,7 @@ function SettingsPage() {
       </Section>
 
       <p className="px-4 pt-6 t-label text-ink-2">
-        v0.1 · local first · no accounts, sync optional.
+        v0.1 · local first · no accounts, sync optional
       </p>
     </AppShell>
   );
@@ -373,37 +335,14 @@ function summarizeBackup(b: BackupData): string {
     countOf(b.sessions.length, "session"),
     countOf(b.sets.length, "set"),
     countOf(b.dailyLogs.length, "logged day"),
-    countOf(b.targetProfiles.length, "target profile"),
   ]);
-}
-
-/** True when the target setup is something the user built, as opposed to the
- * single empty "Every day" profile that `defaultTargets` seeds on first run and
- * that `parseBackup` substitutes for any file older than v4.
- *
- * Content, not version number: a v4 file exported before its author ever opened
- * the targets editor carries that same empty default, and importing it destroys
- * the reader's profiles just as thoroughly as a v1 file does. More than one
- * profile also covers a non-uniform weekday assignment, since seven days can
- * only differ if there is more than one profile to point at. */
-function hasTargetData(profiles: TargetProfile[]): boolean {
-  if (profiles.length > 1) return true;
-  return profiles.some(
-    (p) =>
-      p.calories !== undefined ||
-      p.protein !== undefined ||
-      p.carbs !== undefined ||
-      p.fat !== undefined ||
-      p.steps !== undefined,
-  );
 }
 
 /**
  * What this device has that the backup does not, phrased as the thing the user
- * loses. Each clause fires independently, because the format grew one feature at
- * a time and a file can be short of any subset: a v1 file has no daily logs, a
- * v1-v3 file has no habits and no real targets, and a hand-trimmed v4 file can
- * be missing habit history while still carrying the habits themselves.
+ * loses. Each clause fires independently, because a file can be short of any
+ * subset: one written before daily logging has none, one written before the
+ * planning timeline has no phases.
  *
  * Deliberately does NOT check exercises, splits, sessions or sets. Those four
  * exist in every format version and are validated hard by `parseBackup`, so a
@@ -412,26 +351,16 @@ function hasTargetData(profiles: TargetProfile[]): boolean {
  */
 function describeLosses(
   b: BackupData,
-  current: {
-    dailyLogs: unknown[];
-    targetProfiles: TargetProfile[];
-    plannedWeek: PlannedWeek | undefined;
-  },
+  current: { dailyLogs: unknown[]; nutritionPhases: unknown[] },
 ): string[] {
   const losses: string[] = [];
   if (b.dailyLogs.length === 0 && current.dailyLogs.length > 0) {
     losses.push(countOf(current.dailyLogs.length, "logged day"));
   }
-  if (!hasTargetData(b.targetProfiles) && hasTargetData(current.targetProfiles)) {
-    losses.push(countOf(current.targetProfiles.length, "daily target profile"));
-  }
-  // Not a count, because a plan is one thing rather than a list of them, and
-  // "7 planned days" would read as seven separate losses. `isEmptyPlan` on both
-  // sides for the same reason the target check goes through `hasTargetData`: a
-  // file whose week is seven rest days destroys a real plan exactly as
-  // thoroughly as a file written before planning existed.
-  if (isEmptyPlan(b.plannedWeek) && !isEmptyPlan(current.plannedWeek)) {
-    losses.push("your weekly plan");
+  // A count rather than "your plan", because phases genuinely are a list and
+  // losing four of them is a different sentence from losing one.
+  if (b.nutritionPhases.length === 0 && current.nutritionPhases.length > 0) {
+    losses.push(countOf(current.nutritionPhases.length, "nutrition phase"));
   }
   return losses;
 }

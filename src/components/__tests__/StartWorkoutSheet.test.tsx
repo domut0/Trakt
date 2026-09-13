@@ -1,28 +1,22 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StartWorkoutSheet } from "../StartWorkoutSheet";
-import { emptyPlannedWeek } from "../../lib/plan";
-import { useStore, type Exercise } from "../../lib/store";
-import { weekdayIndexFor } from "../../lib/targets";
+import { useStore, type Exercise, type SplitSlot } from "../../lib/store";
 
 /**
- * Starting a workout on a planned day, and - the case that matters more -
- * starting one on any other day.
+ * Choosing what to train, and preloading what it is for.
  *
- * The plan is opt-in and most days are rest days, so the unplanned path is the
- * one nearly every start takes. It is pinned here first: no planning surface in
- * the sheet, and no exercise preloaded, exactly as before plans existed.
+ * The plan used to be a weekly template, so "today's plan" meant a weekday
+ * lookup. It lives on the SPLIT SLOT now, because the rotation it plans has no
+ * weekdays in it: UL×infinity advances when you train. So these tests set up
+ * slots, not weeks, and nothing here asks what day it is.
  */
 
 const SQUAT: Exercise = { id: "e_squat", name: "Back Squat", type: "main" };
 const BENCH: Exercise = { id: "e_bench", name: "Bench Press", type: "main" };
 
-/** The plan is a weekly template, so a plan for "today" has to be written at
- * today's Monday-first weekday index rather than at a fixed one. */
-function planToday(exerciseIds: string[], name = "Heavy day") {
-  const week = emptyPlannedWeek();
-  week[weekdayIndexFor(new Date())] = { name, exerciseIds };
-  useStore.setState({ plannedWeek: week });
+function slot(name: string, plannedExerciseIds?: string[], rotationOrder = 0): SplitSlot {
+  return { id: `s_${name.toLowerCase()}`, name, rotationOrder, plannedExerciseIds };
 }
 
 function renderSheet() {
@@ -31,7 +25,7 @@ function renderSheet() {
   return onStart;
 }
 
-function start(name = "Push day") {
+function typeAndStart(name: string) {
   fireEvent.change(screen.getByLabelText("Today's session name"), { target: { value: name } });
   fireEvent.click(screen.getByRole("button", { name: "Start" }));
 }
@@ -44,35 +38,33 @@ describe("StartWorkoutSheet", () => {
       slots: [],
       sessions: [],
       sets: [],
+      plannedDays: [],
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
-      plannedWeek: undefined,
     });
   });
 
-  it("starts with nothing preloaded and no plan shown on an unplanned day", () => {
+  it("starts with nothing preloaded when the slot has no lifts", () => {
     const onStart = renderSheet();
-
     expect(screen.queryByText("Planned")).not.toBeInTheDocument();
 
-    start();
+    typeAndStart("Push day");
 
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(useStore.getState().activeSessionId).toBeDefined();
     expect(useStore.getState().currentExerciseId).toBeUndefined();
   });
 
-  it("shows the day's plan and preloads its first lift", () => {
-    planToday(["e_squat", "e_bench"]);
+  it("shows a slot's lifts and preloads the first", () => {
+    useStore.setState({ slots: [slot("Upper", ["e_squat", "e_bench"])] });
     const onStart = renderSheet();
 
     expect(screen.getByText("Planned")).toBeInTheDocument();
-    expect(screen.getByText("Heavy day")).toBeInTheDocument();
     expect(screen.getByText("Back Squat")).toBeInTheDocument();
     expect(screen.getByText("Bench Press")).toBeInTheDocument();
 
-    start();
+    fireEvent.click(screen.getByRole("button", { name: "Upper" }));
 
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(useStore.getState().currentExerciseId).toBe("e_squat");
@@ -80,32 +72,82 @@ describe("StartWorkoutSheet", () => {
     expect(useStore.getState().sets).toHaveLength(0);
   });
 
-  it("preloads the plan's first lift, not the library's", () => {
-    planToday(["e_bench", "e_squat"]);
+  it("preloads in the order the lifts were chosen, not the library's", () => {
+    useStore.setState({ slots: [slot("Upper", ["e_bench", "e_squat"])] });
     renderSheet();
-    start();
+    fireEvent.click(screen.getByRole("button", { name: "Upper" }));
 
     expect(useStore.getState().currentExerciseId).toBe("e_bench");
   });
 
-  it("treats a plan whose lifts have all been deleted as no plan", () => {
-    planToday(["e_gone"]);
+  it("treats a slot whose lifts have all been deleted as unplanned", () => {
+    useStore.setState({ slots: [slot("Upper", ["e_gone"])] });
     renderSheet();
 
     expect(screen.queryByText("Planned")).not.toBeInTheDocument();
 
-    start();
-
+    fireEvent.click(screen.getByRole("button", { name: "Upper" }));
     expect(useStore.getState().currentExerciseId).toBeUndefined();
   });
 
-  it("keeps the session name the user's own, never the plan's", () => {
-    planToday(["e_squat"], "Heavy day");
+  describe("choosing between slots", () => {
+    beforeEach(() => {
+      // UL×infinity, and Upper was trained most recently, so the rotation
+      // suggests Lower.
+      useStore.setState({
+        slots: [
+          { ...slot("Upper", ["e_bench"], 0), lastLoggedAt: 1000 },
+          slot("Lower", ["e_squat"], 1),
+        ],
+      });
+    });
+
+    it("lists every slot with an empty field", () => {
+      renderSheet();
+      // The bug this fixes: suggestions used to be gated on the input being
+      // non-empty, so an untouched sheet showed a lone grey placeholder and
+      // picking anything but the suggestion meant typing it from memory.
+      expect(screen.getByRole("button", { name: "Upper" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Lower" })).toBeInTheDocument();
+    });
+
+    it("lets you take the one the rotation did not suggest", () => {
+      // The rest-day case. After a break the next slot is a free choice, and it
+      // has to cost one tap rather than knowing what to type.
+      renderSheet();
+      fireEvent.click(screen.getByRole("button", { name: "Upper" }));
+
+      const { sessions, slots } = useStore.getState();
+      expect(slots.find((s) => s.id === sessions[0].splitSlotId)?.name).toBe("Upper");
+    });
+
+    it("defaults to the rotation's suggestion when Start is pressed bare", () => {
+      const onStart = renderSheet();
+      fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+      expect(onStart).toHaveBeenCalledTimes(1);
+      const { sessions, slots } = useStore.getState();
+      expect(slots.find((s) => s.id === sessions[0].splitSlotId)?.name).toBe("Lower");
+    });
+
+    it("prefers a pin for today over the rotation", () => {
+      // A pin is a fact the user recorded about this day, so it outranks a guess.
+      const today = new Date().toISOString().slice(0, 10);
+      useStore.setState({ plannedDays: [{ date: today, splitSlotId: "s_upper" }] });
+      renderSheet();
+      fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+      const { sessions, slots } = useStore.getState();
+      expect(slots.find((s) => s.id === sessions[0].splitSlotId)?.name).toBe("Upper");
+    });
+  });
+
+  it("keeps the session name the user's own", () => {
+    useStore.setState({ slots: [slot("Upper", ["e_squat"])] });
     renderSheet();
-    start("Push day");
+    typeAndStart("Push day");
 
     const { sessions, slots } = useStore.getState();
-    const slot = slots.find((s) => s.id === sessions[0].splitSlotId);
-    expect(slot?.name).toBe("Push day");
+    expect(slots.find((s) => s.id === sessions[0].splitSlotId)?.name).toBe("Push day");
   });
 });

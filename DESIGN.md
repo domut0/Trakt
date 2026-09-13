@@ -187,6 +187,27 @@ in this app is almost always a mistake.** Use a card, or use space.
   because a one-colour press cannot print a tint, and white rules over black
   read as scratches across the plot.
 
+## Copy
+
+**A label that explains itself gets no second line.** "Export backup / Download
+all data as JSON". "Clear all data / Wipe all workouts and start fresh".
+"Untracked / A day you chose not to log, rather than one you missed." In every
+pair the second line only restates the first, and a screen of those reads as
+machine-written even when each sentence is individually defensible. Five of them
+were deleted from Settings in one pass.
+
+Helper text earns its place only by carrying a fact you could **not** guess:
+that disconnecting the sheet deletes nothing, that a sheet already belongs to
+another install, that a reset keeps the exercise library, that an import
+replaces rather than merges. Those stay.
+
+**No trailing period on a fragment.** Labels, chips, status lines and empty
+states are not sentences: "Not synced yet", "Backup imported", "Offline, will
+sync when you reconnect". A full sentence warning about a consequence keeps its
+punctuation, because it is one.
+
+**Sentence case.** "View workout", not "View Workout". And no em dashes.
+
 ## Do's and don'ts
 
 **Do**
@@ -205,16 +226,11 @@ in this app is almost always a mistake.** Use a card, or use space.
   a reason: a product that hedges about its own feature list reads as one nobody
   made a decision about.
 - Re-propose the light theme, or a theme toggle.
+- Write a second line under a label that already says it.
+- Put a period on a fragment.
 
 ## Known open
 
-- **The editor and the readout disagree on field order.** The Today card runs
-  bodyweight, calories, protein, carbs, fat, steps — bodyweight first because it
-  is the morning visit and everything below it is the evening one. `DayEditorSheet`
-  still runs calories, steps, protein, carbs, fat, bodyweight, because its six
-  inputs are wired to positional focus indices (`inputRefs.current[0..5]`) that a
-  reorder has to renumber. Worth doing; not worth breaking the keyboard flow
-  during a repaint.
 - **No accent hue.** Interactive text is marked by weight against `ink-2`. This
   is a deliberate near-monochrome, not an oversight, but it has never been seen
   on a real phone in a real gym.

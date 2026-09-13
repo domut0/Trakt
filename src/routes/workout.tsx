@@ -53,10 +53,6 @@ function WorkoutPage() {
   const logNextInBlock = useStore((s) => s.logNextInBlock);
   const lastSetupNoteFor = useStore((s) => s.lastSetupNoteFor);
   const setCurrentExercise = useStore((s) => s.setCurrentExercise);
-  // Subscribed rather than read through getState() so the list below reacts to
-  // the plan being edited (or the feature being switched off) mid-workout.
-  const plannedWeek = useStore((s) => s.plannedWeek);
-  const plannedWorkoutForDate = useStore((s) => s.plannedWorkoutForDate);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showView, setShowView] = useState(false);
@@ -102,29 +98,26 @@ function WorkoutPage() {
   const currentExercise = exercises.find((e) => e.id === currentExerciseId);
 
   /**
-   * The main lifts planned for this workout's day, in plan order, or null when
-   * the day is unplanned. Null is the overwhelmingly common case: the feature
-   * is opt-in and most days are rest days, and this screen then renders exactly
-   * what it always has.
+   * The lifts this workout's SLOT is for, in the order they were chosen, or null
+   * when the slot has none. Null is the common case until the user plans one.
    *
-   * Keyed on the session's OWN start date, not on today: a workout begun at
-   * 11pm keeps the plan it opened with instead of losing it at midnight.
+   * Read off the slot rather than off a weekday, because the rotation this plans
+   * has no weekdays in it: UL×infinity advances when you train. That also makes
+   * the lookup independent of the date entirely, so a workout begun at 11pm
+   * cannot lose its plan at midnight - there is no date in the question any more.
    *
-   * `plannedWorkoutForDate` does the whole resolution, weekday rotation and
-   * dropping lifts whose exercise has since been deleted, so nothing here
-   * re-derives any of it. The `plannedWeek` guard is the cheap exit for a user
-   * who has never planned anything, and is also what ties this memo to the
-   * subscription above.
+   * Lifts whose exercise has since been deleted are dropped here rather than
+   * stored pruned, so deleting an exercise never has to walk every slot.
    */
   const planned = useMemo(() => {
-    if (!plannedWeek || !session) return null;
-    const workout = plannedWorkoutForDate(dayKey(new Date(session.startedAt)));
-    if (!workout) return null;
-    const lifts = workout.exerciseIds
+    if (!session?.splitSlotId) return null;
+    const slot = slots.find((sl) => sl.id === session.splitSlotId);
+    if (!slot?.plannedExerciseIds?.length) return null;
+    const lifts = slot.plannedExerciseIds
       .map((id) => exercises.find((e) => e.id === id))
       .filter((e): e is Exercise => e !== undefined);
-    return lifts.length > 0 ? { name: workout.name, lifts } : null;
-  }, [plannedWeek, plannedWorkoutForDate, session, exercises]);
+    return lifts.length > 0 ? { name: slot.name, lifts } : null;
+  }, [slots, session, exercises]);
   const currentSetupNote = currentExerciseId ? lastSetupNoteFor(currentExerciseId) : undefined;
   const inBlock = !!currentBlock && currentBlock.loggedInBlock < currentBlock.targetSets;
 

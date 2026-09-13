@@ -23,7 +23,7 @@ import { useStore } from "../store";
  * actually landed on disk and what the store hydrated to. Those are the test's
  * real subject; this constant is just the canary.
  */
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 6;
 
 /** Every table the app still expects to exist once an old database is upgraded. */
 const TABLES_ADDED_AFTER_V1 = ["dailyLogs"] as const;
@@ -122,11 +122,9 @@ describe("Dexie v1 -> current schema upgrade", () => {
     expect(state.exercises).toHaveLength(1); // no demo re-seed
     expect(state.unit).toBe("kg");
     expect(state.dailyLogs).toEqual([{ date: "2026-08-07", calories: 2400 }]);
-    // A v1 settings record predates targets entirely, so it carries no profiles.
-    // loadAll backfills them on read, which is what stops an upgraded install
-    // from landing on a profile-less targets editor.
-    expect(state.targetProfiles).toHaveLength(1);
-    expect(state.weekdayTargets).toHaveLength(7);
-    expect(new Set(state.weekdayTargets)).toEqual(new Set([state.targetProfiles[0].id]));
+    // A v1 record predates planning entirely, and nothing is invented for it:
+    // an empty timeline reads as "no targets", which is what that install was.
+    expect(state.nutritionPhases).toEqual([]);
+    expect(state.plannedDays).toEqual([]);
   });
 });
