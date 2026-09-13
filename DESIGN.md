@@ -182,6 +182,23 @@ in this app is almost always a mistake.** Use a card, or use space.
 - **Marks**: `mark-done` (filled square), `mark-open` (the same square, ringed,
   same footprint so a list does not reflow), `mark-over` (struck rule in the
   signal), `mark-error` (filled flag in the signal).
+- **Ribbon segment** (Plan → Nutrition): a phase drawn at 4.5px/day between a
+  52px floor and a 168px ceiling, on a ribbon that scrolls rather than fits. The
+  selected one is `bg-ink text-paper`; an untracked one is a dashed `ink-3`
+  outline over `paper`; the last one has no end, so it carries a dashed right
+  edge and the word "onward". **A segment drawn shorter than it really is prints
+  a dashed break inside its right edge and states its real length** — the width
+  is a claim about a duration, and where the claim cannot be kept the drawing
+  has to say so.
+- **Boundary handle**: a 3px `ink` bar in a 24px target, on every change-point
+  after the first. Dragging it moves that date; the ribbon's layout is frozen
+  for the duration of the drag and the landing date rides above the handle.
+- **Lean mark** (Plan → Last 14 days): one day as two bars off a centre line.
+  Calories rise from it in `ink-3`, steps fall from it in `ink`, each as a
+  fraction of **its own** target, capped at 1.5×. On target is symmetric; under
+  on calories and over on steps both tilt it the same way, so a good fortnight
+  leans. Nothing is converted between the two — the app has no TDEE and must not
+  imply one.
 - **Chart area fill**: a flat 16% `ink` wash. Not a gradient — that is a grey
   ramp and the stock charting-library look. Not a hatch either: hatching exists
   because a one-colour press cannot print a tint, and white rules over black
@@ -215,7 +232,8 @@ punctuation, because it is one.
 - Reach for a card or for space before reaching for a line.
 - Give every overlay, sheet, banner and translating row an explicit background.
 - Keep figures tabular.
-- Spend `signal` only on something wrong or destructive.
+- Spend `signal` only on something wrong or destructive. Not on "today" — a
+  date is not a warning.
 
 **Don't**
 

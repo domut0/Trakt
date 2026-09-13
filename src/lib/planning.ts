@@ -234,3 +234,125 @@ export function advanceSplit<T extends SplitCardLike>(
 export function firstDayCard<T extends SplitCardLike>(cards: readonly T[]): T | undefined {
   return orderedSplit(cards).find((c) => kindOf(c) !== "repeat");
 }
+
+// ---------------------------------------------------------------------------
+// Day arithmetic. Day keys are the app's date type, so this works on the keys
+// themselves through Date.UTC rather than through local Date objects: a
+// difference in local time can be 23 or 25 hours across a DST boundary, and
+// "how many days is this phase" must never be off by one because the clocks
+// changed inside it.
+// ---------------------------------------------------------------------------
+
+function toUtcMs(key: string): number {
+  const [y, m, d] = key.split("-").map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
+/** Whole days from `a` to `b`. Negative when `b` is earlier. */
+export function daysBetweenKeys(a: string, b: string): number {
+  return Math.round((toUtcMs(b) - toUtcMs(a)) / 86_400_000);
+}
+
+/** `key` moved by `n` days, as a day key. */
+export function addDaysToKey(key: string, n: number): string {
+  return new Date(toUtcMs(key) + n * 86_400_000).toISOString().slice(0, 10);
+}
+
+// ---------------------------------------------------------------------------
+// The ribbon: the nutrition timeline, laid out.
+// ---------------------------------------------------------------------------
+
+/**
+ * How wide a phase is drawn.
+ *
+ * The ribbon does NOT fit itself to the screen. A fitted timeline is unusable
+ * the moment one phase is much longer than the others - bulk for the whole of
+ * 2027 beside a twelve-day maintenance block would leave the maintenance block
+ * two pixels wide - and it is exactly the shape a real plan takes. So the
+ * ribbon scrolls, and each phase is drawn at true scale BETWEEN A FLOOR AND A
+ * CEILING:
+ *
+ *   the floor keeps a one-day untracked Saturday big enough to read and to grab
+ *   the ceiling stops any one phase from eating the ribbon
+ *
+ * A phase that hits the ceiling is drawn with a visible break and prints its
+ * real length, so the scale is broken openly rather than quietly lied about.
+ * That is the whole trick: honest where it can be, and marked where it can't.
+ */
+export const RIBBON = {
+  MIN_W: 52,
+  MAX_W: 168,
+  PX_PER_DAY: 4.5,
+  /** The last phase has no end, so it gets a fixed tail rather than a length. */
+  TAIL_W: 128,
+  /** What the tail counts as when a drag needs a days-per-pixel for it. */
+  TAIL_DAYS: 28,
+} as const;
+
+export interface RibbonSegment {
+  phase: NutritionPhase;
+  /** Left edge, px from the start of the ribbon. */
+  x: number;
+  width: number;
+  /** Days this phase covers, or undefined for the open-ended last one. */
+  days?: number;
+  /** True when the drawn width is smaller than the true duration. */
+  capped: boolean;
+  /** The last phase: it runs until something replaces it. */
+  open: boolean;
+}
+
+export function layoutRibbon(phases: readonly NutritionPhase[]): RibbonSegment[] {
+  const ordered = sortPhases(phases);
+  let x = 0;
+  return ordered.map((phase, i) => {
+    const nextStart = ordered[i + 1]?.startsOn;
+    const open = nextStart === undefined;
+    const days = open ? undefined : Math.max(1, daysBetweenKeys(phase.startsOn, nextStart));
+    const ideal = days === undefined ? RIBBON.TAIL_W : days * RIBBON.PX_PER_DAY;
+    const width =
+      days === undefined ? RIBBON.TAIL_W : Math.min(RIBBON.MAX_W, Math.max(RIBBON.MIN_W, ideal));
+    const seg: RibbonSegment = { phase, x, width, days, capped: ideal > width, open };
+    x += width;
+    return seg;
+  });
+}
+
+/** Total drawn width of a laid-out ribbon. */
+export function ribbonWidth(segments: readonly RibbonSegment[]): number {
+  const last = segments[segments.length - 1];
+  return last ? last.x + last.width : 0;
+}
+
+/**
+ * Where a date falls along the ribbon, in px, or undefined when it is before
+ * the ribbon starts.
+ *
+ * Inside a capped segment this is only approximately right - it cannot be
+ * otherwise, the segment is drawn shorter than it is - so it is clamped to stay
+ * within the segment rather than running off the end of it.
+ */
+export function ribbonX(segments: readonly RibbonSegment[], date: string): number | undefined {
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const s = segments[i];
+    if (s.phase.startsOn > date) continue;
+    const into = daysBetweenKeys(s.phase.startsOn, date);
+    const perDay = s.days ? s.width / s.days : RIBBON.PX_PER_DAY;
+    return s.x + Math.min(s.width, into * perDay);
+  }
+  return undefined;
+}
+
+/**
+ * How long a phase is, in the largest unit that still reads as a duration.
+ *
+ * Printed inside any segment whose drawn width is a lie, which is the honesty
+ * half of the capping rule above.
+ */
+export function durationLabel(days: number): string {
+  if (days < 14) return `${days} day${days === 1 ? "" : "s"}`;
+  if (days < 70) return `${Math.round(days / 7)} weeks`;
+  if (days < 365) return `${Math.round(days / 30.44)} months`;
+  const years = days / 365.25;
+  return years < 1.75 ? "1 year" : `${Math.round(years * 10) / 10} years`;
+}

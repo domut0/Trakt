@@ -296,31 +296,33 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
       <ActiveSessionBanner />
-      {onTab && (
-        // Settings, in the corner of every tab screen.
-        //
-        // Positioned against the shell rather than repeated in four route
-        // headers, so it cannot drift between them - and outside <main>, so it
-        // does not scroll away. 49px puts its 44px box on the centre line of a
-        // 28px t-title sitting under pt-14, and the banner pushes it down by
-        // exactly the pt-11 the banner reserves. Every tab header carries pr-12
-        // so a long title wraps rather than running underneath it.
-        <Link
-          to="/settings"
-          aria-label="Settings"
-          className="absolute right-1.5 z-30 flex h-11 w-11 items-center justify-center text-ink-3"
-          style={{ top: showBanner ? 93 : 49 }}
-        >
-          <Gear size={22} />
-        </Link>
-      )}
       <main
         className={
-          "min-h-0 flex-1 overflow-y-auto overscroll-contain " +
+          "relative min-h-0 flex-1 overflow-y-auto overscroll-contain " +
           (showBanner ? "pt-11 " : "") +
           routeAnimClass
         }
       >
+        {onTab && (
+          // Settings, in the corner of every tab screen.
+          //
+          // Positioned against the shell rather than repeated in four route
+          // headers, so it cannot drift between them - but INSIDE the scroll
+          // container, so it travels with the header it belongs to instead of
+          // hovering over whatever you have scrolled to. 49px puts its 44px box
+          // on the centre line of a 28px t-title sitting under pt-14, and the
+          // banner offsets it by exactly the pt-11 the banner reserves. Every
+          // tab header carries pr-12 so a long title wraps rather than running
+          // underneath it.
+          <Link
+            to="/settings"
+            aria-label="Settings"
+            className="absolute right-1.5 z-30 flex h-11 w-11 items-center justify-center text-ink-3"
+            style={{ top: showBanner ? 93 : 49 }}
+          >
+            <Gear size={22} />
+          </Link>
+        )}
         {children}
       </main>
       <BottomNav onOpenChooser={() => setChooserOpen(true)} />

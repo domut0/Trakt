@@ -318,6 +318,8 @@ interface State {
    * with a tiebreak nobody would remember. Edit the existing one instead. */
   addPhase: (phase: Omit<NutritionPhase, "id">) => NutritionPhase | undefined;
   updatePhase: (id: string, patch: Partial<Omit<NutritionPhase, "id">>) => void;
+  /** Move a change-point. Refuses a date another phase already occupies. */
+  setPhaseStart: (id: string, startsOn: string) => boolean;
   deletePhase: (id: string) => void;
   /** The phase in force on a "yyyy-MM-dd" day key, untracked ones included. */
   phaseForDay: (date: string) => NutritionPhase | undefined;
@@ -1440,6 +1442,16 @@ export const useStore = create<State>((set, get) => ({
     set({ nutritionPhases: next });
     const updated = next.find((p) => p.id === id);
     if (updated) safeWrite(() => db.nutritionPhases.put(updated));
+  },
+
+  setPhaseStart: (id, startsOn) => {
+    // Two phases starting on one day is a contradiction rather than something
+    // to resolve with a tiebreak nobody would remember, so it is refused here
+    // as well as in the editor - the ribbon can drag a boundary onto a
+    // neighbour's date, and a drag has no Save button to refuse at.
+    if (get().nutritionPhases.some((p) => p.id !== id && p.startsOn === startsOn)) return false;
+    get().updatePhase(id, { startsOn });
+    return true;
   },
 
   deletePhase: (id) => {
