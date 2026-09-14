@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Chevron } from "../components/icons";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { CoachSettings } from "../components/CoachSettings";
 import { SyncSettings } from "../components/SyncSettings";
 import { Toggle } from "../components/Toggle";
 import { dailyLogsToCsv, setsToCsv } from "../lib/csv";
@@ -200,6 +201,10 @@ function SettingsPage() {
             </button>
           ))}
         </div>
+      </Section>
+
+      <Section title="Coaching" delay={110}>
+        <CoachSettings />
       </Section>
 
       <Section title="Data" delay={120}>

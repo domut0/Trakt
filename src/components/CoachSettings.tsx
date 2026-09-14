@@ -1,0 +1,183 @@
+import { useEffect, useState } from "react";
+import { useCoachStore } from "../lib/coach-store";
+import { isLikelyExecUrl } from "../lib/sync-client";
+import { Chevron } from "./icons";
+import { Toggle } from "./Toggle";
+import { freshness } from "./ClientBanner";
+import type { CoachClient } from "../lib/db";
+
+/**
+ * Coach mode's Settings section: the client list, and the way into a client.
+ *
+ * What is stored per client is a pointer to their spreadsheet and a name to
+ * show it under. Nothing about their training is kept here -- it is pulled when
+ * their view opens and dropped when it closes, which is the whole reason this
+ * feature needs no database anyone has to protect.
+ */
+export function CoachSettings() {
+  const hydrate = useCoachStore((s) => s.hydrate);
+  const enabled = useCoachStore((s) => s.enabled);
+  const setEnabled = useCoachStore((s) => s.setEnabled);
+  const clients = useCoachStore((s) => s.clients);
+  const loading = useCoachStore((s) => s.loading);
+  const lastError = useCoachStore((s) => s.lastError);
+  const enterClientView = useCoachStore((s) => s.enterClientView);
+  const removeClient = useCoachStore((s) => s.removeClient);
+
+  const [adding, setAdding] = useState(false);
+
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  return (
+    <>
+      <div className="group-row">
+        <div className="min-w-0">
+          <div className="t-body">Coach mode</div>
+          <div className="t-label text-ink-2">Read a client&rsquo;s log and write their plan</div>
+        </div>
+        <Toggle checked={enabled} onChange={() => setEnabled(!enabled)} label="Coach mode" />
+      </div>
+
+      {enabled && (
+        <>
+          {clients.map((client) => (
+            <div key={client.id} className="group-row group-row-sep">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void enterClientView(client.id)}
+                className="flex min-w-0 flex-1 items-center justify-between text-left"
+              >
+                <span className="min-w-0">
+                  <span className="block t-body text-ink">{client.name}</span>
+                  <span className="block t-label text-ink-2">
+                    {client.lastPulledAt === undefined
+                      ? "Never opened"
+                      : `Last opened ${freshness(client.lastPulledAt)}`}
+                  </span>
+                </span>
+                <Chevron className="shrink-0 text-ink-2" size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => void removeClient(client.id)}
+                aria-label={`Remove ${client.name}`}
+                className="ml-3 min-h-[44px] shrink-0 t-label text-ink-2"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+
+          {lastError && (
+            <div className="group-row-sep px-4 py-3 t-label text-signal">
+              {lastError === "not-configured"
+                ? "This client's sheet cannot be opened yet."
+                : lastError === "unreadable"
+                  ? "That address did not return the expected reply."
+                  : "Couldn't reach that client's sheet."}
+            </div>
+          )}
+
+          {adding ? (
+            <AddClientForm onDone={() => setAdding(false)} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="group-row group-row-sep w-full text-left"
+            >
+              <div className="t-body">Add a client</div>
+              <Chevron className="shrink-0 text-ink-2" size={16} />
+            </button>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+/**
+ * Adding a client by their Apps Script deployment.
+ *
+ * The Sheets API path will add a client through the Google Picker instead,
+ * which needs no typing at all. This form stays for sheets set up by hand, and
+ * is the only way in until that transport exists.
+ */
+function AddClientForm({ onDone }: { onDone: () => void }) {
+  const addClient = useCoachStore((s) => s.addClient);
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
+  const [secret, setSecret] = useState("");
+  const [error, setError] = useState<string | undefined>();
+
+  const submit = async () => {
+    if (name.trim() === "") return setError("Give them a name.");
+    if (!isLikelyExecUrl(url)) {
+      // The easy mistake is pasting the editor URL instead of the deployment's.
+      return setError("That does not look like a deployment URL. It should end in /exec.");
+    }
+    if (secret.trim() === "") return setError("Paste their sheet's secret.");
+
+    const client: CoachClient = {
+      id: `cc_${crypto.randomUUID()}`,
+      name: name.trim(),
+      kind: "appsScript",
+      url: url.trim(),
+      secret: secret.trim(),
+    };
+    await addClient(client);
+    onDone();
+  };
+
+  return (
+    <div className="group-row-sep space-y-3 px-4 py-4">
+      <Field label="Name" value={name} onChange={setName} placeholder="Bob" />
+      <Field label="Sheet URL" value={url} onChange={setUrl} placeholder="https://…/exec" />
+      <Field label="Secret" value={secret} onChange={setSecret} placeholder="Their sheet secret" />
+      {error && <p className="t-label text-signal">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => void submit()}
+          className="min-h-[44px] flex-1 bg-ink t-body font-medium text-paper rounded-md"
+        >
+          Add
+        </button>
+        <button type="button" onClick={onDone} className="min-h-[44px] flex-1 t-body text-ink-2">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="block">
+      <span className="block pb-1 t-label text-ink-2">{label}</span>
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        className="min-h-[44px] w-full border border-rule bg-transparent px-3 t-body text-ink rounded-md"
+      />
+    </label>
+  );
+}
