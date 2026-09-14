@@ -400,6 +400,7 @@ export async function seedDb(data: {
   sets: WorkoutSet[];
   settings: SettingsMeta;
 }): Promise<void> {
+  assertWritable("seedDb");
   // dailyLogs, habits and habitEntries are in the transaction scope but
   // intentionally never written: a first run seeds no daily logs and no habits,
   // so those tables start empty. They are still listed because Dexie requires
@@ -438,6 +439,7 @@ export async function seedDb(data: {
  * input completely.
  */
 export async function replaceAllData(data: BackupData): Promise<void> {
+  assertWritable("replaceAllData");
   await db.transaction(
     "rw",
     [
@@ -540,6 +542,53 @@ export async function putActiveSessionMeta(meta: ActiveSessionMeta): Promise<voi
   await db.meta.put(meta);
 }
 
+/**
+ * Why every durable write in the app can be switched off.
+ *
+ * Coach mode renders another person's data through this app's own screens, and
+ * it does that by swapping the arrays in the Zustand store — which is what makes
+ * Today, Charts and History work unmodified for a client. The cost of that trick
+ * is that the store's ~33 write-through call sites are still wired to THIS
+ * device's database. A single action that slips past a disabled control would
+ * write the client's data into the coach's own log.
+ *
+ * That failure is quiet, which is what makes it serious. Nothing throws, nothing
+ * renders wrong, and the coach finds out weeks later that their own training
+ * history has a fortnight of somebody else's numbers in it.
+ *
+ * Disabling the controls is not the guarantee, because it relies on every future
+ * screen remembering to. This is the guarantee: one latch at the single
+ * chokepoint every write already passes through, so the safe behaviour is the
+ * default for code that has not been written yet.
+ *
+ * `reason` is a human-readable string rather than a boolean so that anything
+ * reporting a refused write can say WHY it was refused.
+ */
+let readOnlyReason: string | undefined;
+
+export function setDbReadOnly(reason: string | undefined): void {
+  readOnlyReason = reason;
+}
+
+/** The reason writes are currently refused, or undefined when they are allowed. */
+export function dbReadOnlyReason(): string | undefined {
+  return readOnlyReason;
+}
+
+/**
+ * Guard for the destructive writes that do NOT go through `safeWrite`.
+ *
+ * `replaceAllData` and `seedDb` are awaited by their callers rather than
+ * fire-and-forget, and they clear every table before writing. A silent no-op
+ * there would leave a restore reporting success having done nothing, so these
+ * throw instead — the asymmetry with `safeWrite` is deliberate.
+ */
+function assertWritable(op: string): void {
+  if (readOnlyReason !== undefined) {
+    throw new Error(`[db] ${op} refused: database is read-only (${readOnlyReason})`);
+  }
+}
+
 // Set by store.ts at module scope so a failed write can surface as UI state
 // (a banner) without db.ts importing store.ts back — store.ts already
 // imports db.ts, and that import would be circular.
@@ -560,6 +609,10 @@ export function setWriteErrorHandler(fn: ((err: unknown) => void) | null): void 
  * return a rejected promise. Both are handled here.
  */
 export function safeWrite(op: () => Promise<unknown>): void {
+  // The latch, at the one point every store write already passes through. A
+  // silent no-op is right here: these are mirror writes for state the in-memory
+  // store already holds, and the caller has nothing to do about a refusal.
+  if (readOnlyReason !== undefined) return;
   try {
     const result = op();
     Promise.resolve(result).catch((err: unknown) => {
