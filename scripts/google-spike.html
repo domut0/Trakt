@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trakt — Google spike</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        font:
+          15px/1.55 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 24px 16px 80px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 16px;
+        margin: 0 0 8px;
+      }
+      .sub {
+        opacity: 0.7;
+        margin: 0 0 24px;
+      }
+      section {
+        border: 1px solid rgba(128, 128, 128, 0.35);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        margin-bottom: 4px;
+        opacity: 0.8;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 12px;
+        font-family: ui-monospace, monospace;
+        font-size: 13px;
+        box-sizing: border-box;
+        border: 1px solid rgba(128, 128, 128, 0.4);
+        border-radius: 4px;
+        background: transparent;
+        color: inherit;
+      }
+      button {
+        padding: 9px 14px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid rgba(128, 128, 128, 0.45);
+        border-radius: 6px;
+        background: rgba(128, 128, 128, 0.12);
+        color: inherit;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 12.5px;
+        background: rgba(128, 128, 128, 0.12);
+        padding: 10px;
+        border-radius: 6px;
+        margin: 12px 0 0;
+        max-height: 260px;
+        overflow: auto;
+      }
+      .verdict {
+        font-weight: 700;
+        padding: 10px;
+        border-radius: 6px;
+        margin-top: 12px;
+      }
+      .pass {
+        background: rgba(0, 160, 70, 0.18);
+      }
+      .fail {
+        background: rgba(200, 40, 40, 0.18);
+      }
+      .note {
+        font-size: 13px;
+        opacity: 0.8;
+      }
+      code {
+        font-family: ui-monospace, monospace;
+        font-size: 0.92em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Trakt — Google spike</h1>
+    <p class="sub">
+      Answers the questions <code>docs/coaching-plan.md</code> §A9 rests on. Serve this over
+      <code>http://localhost:3000</code> (<code>npx serve scripts -l 3000</code>), not
+      <code>file://</code> — the origin has to match what you registered.
+    </p>
+
+    <section>
+      <h2>Credentials</h2>
+      <label for="clientId">OAuth client ID</label>
+      <input type="text" id="clientId" placeholder="…apps.googleusercontent.com" />
+      <label for="apiKey">API key (Picker)</label>
+      <input type="text" id="apiKey" placeholder="AIzaSy…" />
+      <p class="note">Kept in this page only. Nothing is stored or sent anywhere but Google.</p>
+    </section>
+
+    <section>
+      <h2>Check 1 — sign in</h2>
+      <p class="note">
+        Watch the consent screen. It should ask only to manage files this app creates, with no
+        "Google hasn't verified this app" warning.
+      </p>
+      <button id="btnAuth">Sign in with Google</button>
+      <pre id="outAuth">Not run.</pre>
+    </section>
+
+    <section>
+      <h2>Check 2 — create a spreadsheet</h2>
+      <p class="note">
+        Does <code>spreadsheets.create</code> work with <code>drive.file</code> alone?
+      </p>
+      <button id="btnCreate" disabled>Create a sheet</button>
+      <pre id="outCreate">Not run.</pre>
+    </section>
+
+    <section>
+      <h2>Check 3 — share it (Phase C step 3)</h2>
+      <p class="note">
+        Can the app add a reader to a file it created, with no Drive scope? Use any email you can
+        check — a second account of yours is ideal.
+      </p>
+      <label for="shareEmail">Email to share with</label>
+      <input type="text" id="shareEmail" placeholder="coach@example.com" />
+      <button id="btnShare" disabled>Share the sheet</button>
+      <pre id="outShare">Not run.</pre>
+    </section>
+
+    <section>
+      <h2>Check 4 — pick a sheet someone else made</h2>
+      <p class="note">
+        <strong>The critical one.</strong> All of coach mode's read path depends on it. Setup: from
+        a <em>second</em> Google account, create a spreadsheet, put something in cell A1, and share
+        it with the account you signed in as here. Then pick it below.
+      </p>
+      <button id="btnPick" disabled>Open the Picker</button>
+      <pre id="outPick">Not run.</pre>
+    </section>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <script>
+      const SCOPE = "https://www.googleapis.com/auth/drive.file";
+      let accessToken = null;
+      let createdSheetId = null;
+
+      const $ = (id) => document.getElementById(id);
+      const write = (id, text, verdict) => {
+        $(id).textContent = text;
+        const existing = $(id).parentElement.querySelector(".verdict");
+        if (existing) existing.remove();
+        if (verdict) {
+          const el = document.createElement("div");
+          el.className = "verdict " + (verdict.pass ? "pass" : "fail");
+          el.textContent = (verdict.pass ? "PASS — " : "FAIL — ") + verdict.text;
+          $(id).parentElement.appendChild(el);
+        }
+      };
+      const show = (o) => JSON.stringify(o, null, 2);
+
+      async function api(url, options = {}) {
+        const res = await fetch(url, {
+          ...options,
+          headers: {
+            Authorization: "Bearer " + accessToken,
+            "Content-Type": "application/json",
+            ...(options.headers || {}),
+          },
+        });
+        const body = await res.text();
+        let parsed;
+        try {
+          parsed = JSON.parse(body);
+        } catch {
+          parsed = body;
+        }
+        return { status: res.status, ok: res.ok, body: parsed };
+      }
+
+      // --- Check 1 -------------------------------------------------------
+      $("btnAuth").onclick = () => {
+        const clientId = $("clientId").value.trim();
+        if (!clientId) return write("outAuth", "Enter the client ID first.");
+        if (!window.google?.accounts?.oauth2) {
+          return write("outAuth", "GIS script has not loaded yet. Wait a second and retry.");
+        }
+        write("outAuth", "Opening the consent screen…");
+        try {
+          google.accounts.oauth2
+            .initTokenClient({
+              client_id: clientId,
+              scope: SCOPE,
+              callback: (resp) => {
+                if (resp.error) {
+                  return write("outAuth", show(resp), {
+                    pass: false,
+                    text: "Consent failed: " + resp.error,
+                  });
+                }
+                accessToken = resp.access_token;
+                $("btnCreate").disabled = false;
+                $("btnPick").disabled = false;
+                write(
+                  "outAuth",
+                  show({
+                    scope: resp.scope,
+                    expires_in: resp.expires_in,
+                    token: resp.access_token.slice(0, 12) + "…",
+                  }),
+                  {
+                    pass: resp.scope === SCOPE,
+                    text:
+                      resp.scope === SCOPE
+                        ? "drive.file only, token valid " + resp.expires_in + "s."
+                        : "Unexpected scopes granted: " + resp.scope,
+                  },
+                );
+              },
+            })
+            .requestAccessToken();
+        } catch (err) {
+          write("outAuth", String(err), { pass: false, text: "initTokenClient threw." });
+        }
+      };
+
+      // --- Check 2 -------------------------------------------------------
+      $("btnCreate").onclick = async () => {
+        write("outCreate", "Creating…");
+        const res = await api("https://sheets.googleapis.com/v4/spreadsheets", {
+          method: "POST",
+          body: JSON.stringify({
+            properties: { title: "Trakt spike — " + new Date().toISOString().slice(0, 16) },
+            sheets: ["sets", "sessions", "daily", "cardio", "plan", "_sync"].map((t) => ({
+              properties: { title: t },
+            })),
+          }),
+        });
+        if (res.ok) {
+          createdSheetId = res.body.spreadsheetId;
+          $("btnShare").disabled = false;
+          write(
+            "outCreate",
+            show({ spreadsheetId: createdSheetId, url: res.body.spreadsheetUrl }),
+            { pass: true, text: "Created with all six tabs in one call." },
+          );
+        } else {
+          write("outCreate", show(res), { pass: false, text: "HTTP " + res.status });
+        }
+      };
+
+      // --- Check 3 -------------------------------------------------------
+      $("btnShare").onclick = async () => {
+        const email = $("shareEmail").value.trim();
+        if (!email) return write("outShare", "Enter an email first.");
+        write("outShare", "Sharing…");
+        const res = await api(
+          "https://www.googleapis.com/drive/v3/files/" +
+            createdSheetId +
+            "/permissions?sendNotificationEmail=false",
+          {
+            method: "POST",
+            body: JSON.stringify({ role: "reader", type: "user", emailAddress: email }),
+          },
+        );
+        write("outShare", show(res), {
+          pass: res.ok,
+          text: res.ok
+            ? "drive.file can grant access to its own files. Phase C step 3 is one tap."
+            : "HTTP " + res.status + " — Phase C keeps a manual sharing step.",
+        });
+      };
+
+      // --- Check 4 -------------------------------------------------------
+      $("btnPick").onclick = () => {
+        const apiKey = $("apiKey").value.trim();
+        if (!apiKey) return write("outPick", "Enter the API key first.");
+        if (!window.gapi) return write("outPick", "gapi has not loaded yet. Wait and retry.");
+        write("outPick", "Loading the Picker…");
+        gapi.load("picker", () => {
+          const view = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+            .setIncludeFolders(false)
+            // The whole point: files owned by someone else and shared with us.
+            .setOwnedByMe(false);
+          new google.picker.PickerBuilder()
+            .setOAuthToken(accessToken)
+            .setDeveloperKey(apiKey)
+            .addView(view)
+            .setCallback(async (data) => {
+              if (data.action !== google.picker.Action.PICKED) {
+                if (data.action === google.picker.Action.CANCEL) {
+                  write("outPick", "Cancelled — nothing picked.");
+                }
+                return;
+              }
+              const doc = data.docs[0];
+              write("outPick", "Picked " + doc.name + ". Trying to read it…");
+              // The real test: can we read a file this app did not create?
+              const res = await api(
+                "https://sheets.googleapis.com/v4/spreadsheets/" +
+                  doc.id +
+                  "/values/A1:D5?valueRenderOption=UNFORMATTED_VALUE",
+              );
+              write("outPick", show({ picked: { id: doc.id, name: doc.name }, read: res }), {
+                pass: res.ok,
+                text: res.ok
+                  ? "Picker granted drive.file on another account's sheet. Coach mode works as designed."
+                  : "HTTP " +
+                    res.status +
+                    " — Picker did NOT grant read access. Phase B client-add needs redesigning.",
+              });
+            })
+            .build()
+            .setVisible(true);
+        });
+      };
+    </script>
+  </body>
+</html>
