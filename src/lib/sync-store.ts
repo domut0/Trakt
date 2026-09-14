@@ -166,6 +166,16 @@ function describeFailure(error: string): { status: SyncStatus; message: string }
       return { status: "error", message: "The sheet did not respond in time." };
     case "network":
       return { status: "error", message: "Couldn't reach the sheet." };
+    case "needs-consent":
+      // The one failure the user can actually clear, and the one where a retry
+      // is pointless: the browser token model has no refresh token, so a lapsed
+      // grant needs a tap.
+      return {
+        status: "blocked",
+        message: "Google sign-in has expired. Reconnect to keep syncing.",
+      };
+    case "empty-plan":
+      return { status: "error", message: "There was no plan to send." };
     case "unreadable":
       return {
         status: "blocked",

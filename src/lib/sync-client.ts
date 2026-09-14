@@ -44,6 +44,14 @@ export type SyncErrorCode =
   | "unknown-action"
   | "empty-plan"
   | "network"
+  /**
+   * Google sign-in is needed and cannot be renewed silently.
+   *
+   * Distinct from every other failure here because it is the only one the user
+   * can actually clear, and because retrying it is pointless -- the browser
+   * token model issues no refresh token, so a lapsed grant needs a tap.
+   */
+  | "needs-consent"
   | "timeout"
   | "unreadable";
 
