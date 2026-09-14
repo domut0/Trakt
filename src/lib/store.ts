@@ -266,6 +266,14 @@ interface State {
    * Undefined whenever the cursor is not on a rest.
    */
   restSince: string | undefined;
+  /**
+   * The `issuedAt` of the coach plan currently in force, or undefined when no
+   * coach plan has ever been accepted.
+   *
+   * What makes re-reading the plan tab on every sync idempotent: a plan is
+   * offered only when it is newer than this. See `isNewerCoachPlan`.
+   */
+  lastAcceptedPlanAt: string | undefined;
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
@@ -1049,6 +1057,7 @@ function persistSettingsFrom(s: State) {
     unit: s.unit,
     nextSlotId: s.nextSlotId,
     restSince: s.restSince,
+    lastAcceptedPlanAt: s.lastAcceptedPlanAt,
   };
   safeWrite(() => db.meta.put(settings));
 }
@@ -1064,6 +1073,7 @@ export const useStore = create<State>((set, get) => ({
   plannedDays: [],
   nextSlotId: undefined,
   restSince: undefined,
+  lastAcceptedPlanAt: undefined,
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -1105,6 +1115,7 @@ export const useStore = create<State>((set, get) => ({
           plannedDays: [],
           nextSlotId: undefined,
           restSince: undefined,
+          lastAcceptedPlanAt: undefined,
           activeSessionId: undefined,
           currentExerciseId: undefined,
           currentBlock: undefined,
@@ -1126,6 +1137,7 @@ export const useStore = create<State>((set, get) => ({
         plannedDays: data.plannedDays,
         nextSlotId: data.settings.nextSlotId,
         restSince: data.settings.restSince,
+        lastAcceptedPlanAt: data.settings.lastAcceptedPlanAt,
         // Both default on READ. A settings record written before planning
         // existed has neither key, and no migration is needed to make it mean
         // "no plan" (see the note on `plannedWeek` in db.ts).

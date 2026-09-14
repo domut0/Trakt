@@ -13,13 +13,25 @@
 const SECRET = "__SECRET__";
 
 /** Bumped when this file changes in a way the app needs to know about. */
-const SCRIPT_VERSION = 3;
+const SCRIPT_VERSION = 4;
 
-/** Tabs the app writes. Anything else in the spreadsheet is left alone. */
-const APP_TABS = ["sets", "sessions", "daily", "cardio"];
+/**
+ * Tabs the app writes. Anything else in the spreadsheet is left alone.
+ *
+ * "plan" is written only on the syncs that carry it. A push that omits a tab
+ * leaves that tab untouched, which is what lets a coach's plan survive the
+ * client's ordinary syncing until the client accepts it.
+ */
+const APP_TABS = ["sets", "sessions", "daily", "cardio", "plan"];
 
-/** Tabs the app reads back, because they carry editable columns. */
-const TWO_WAY_TABS = ["sets", "sessions", "daily"];
+/**
+ * Tabs the app reads back.
+ *
+ * "sets", "sessions" and "daily" because they carry editable columns; "plan"
+ * for a different reason entirely -- it is not a log with editable cells, it is
+ * a document a coach writes and the client reads.
+ */
+const TWO_WAY_TABS = ["sets", "sessions", "daily", "plan"];
 
 const META_TAB = "_sync";
 

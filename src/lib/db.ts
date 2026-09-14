@@ -42,6 +42,16 @@ export interface SettingsMeta {
    * answerable the next time the app opens. Non-indexed, so no version bump.
    */
   restSince?: string;
+  /**
+   * When the coach plan currently in force was issued, as its ISO instant.
+   *
+   * Held here rather than beside the sync config because it describes the app's
+   * own plan -- which coach plan has been absorbed -- and must survive a
+   * disconnect and reconnect of the sheet. Without it, reconnecting would
+   * re-offer a plan the client accepted weeks ago. Non-indexed, so no version
+   * bump.
+   */
+  lastAcceptedPlanAt?: string;
 }
 
 export interface ActiveSessionMeta {

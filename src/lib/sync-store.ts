@@ -15,9 +15,11 @@ import {
   buildBase,
   buildSheetTabs,
   mergeFromSheet,
+  SHEET_TABS,
   type Collision,
   type MergeResult,
 } from "./sync";
+import { isNewerCoachPlan, parsePlanTab, shouldPublishOwnPlan, type PlanPayload } from "./plan-tab";
 import {
   isLikelyExecUrl,
   pullFromSheet,
@@ -63,6 +65,15 @@ export interface SyncState {
   running: boolean;
   /** Sheet edits that lost to an app edit. Kept until the user dismisses them. */
   collisions: Collision[];
+  /**
+   * A coach-issued plan sitting in the sheet that this device has not absorbed.
+   *
+   * Held here rather than applied on arrival: a plan rewrites targets and the
+   * split, which is not something to do to someone between them opening the app
+   * and looking at it. The review screen shows what would change and the person
+   * decides, in the same shape as the backup import.
+   */
+  pendingCoachPlan?: PlanPayload;
   /**
    * Why sync is blocked, as a code rather than the prose in `lastError`.
    * The UI branches on this; matching on a message string would silently stop
@@ -170,6 +181,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   hydrated: false,
   running: false,
   collisions: [],
+  pendingCoachPlan: undefined,
 
   hydrate: async () => {
     if (get().hydrated) return;
@@ -327,6 +339,10 @@ async function runCycle(
   const connection = connectionFrom(config);
   let base = await loadSyncBase();
   let collisions: Collision[] = [];
+  // Undefined until a pull happens. On the very first sync there is nothing in
+  // the sheet to preserve, so publishing the app's own plan is always right.
+  let tabPlan: PlanPayload | undefined;
+  let pulledAnything = false;
 
   if (base) {
     const pulled = await pullFromSheet(connection);
@@ -345,6 +361,14 @@ async function runCycle(
     applyMerge(merged);
     collisions = merged.report.collisions;
 
+    // The plan tab sits outside the merge entirely. It is not a log with
+    // editable columns, it is a document one side hands the other, so it has
+    // its own format and its own conflict rule (see plan-tab.ts).
+    pulledAnything = true;
+    tabPlan = parsePlanTab(pulled.tabs?.[SHEET_TABS.plan]);
+    const offered = tabPlan && isNewerCoachPlan(tabPlan, useStore.getState().lastAcceptedPlanAt);
+    set({ pendingCoachPlan: offered ? tabPlan : undefined });
+
     // Push against what the sheet actually is now, not what it was when this
     // base was written, so a push that failed earlier does not read as stale
     // forever.
@@ -355,8 +379,13 @@ async function runCycle(
   // or the next pull would see them as edits all over again.
   const app = useStore.getState();
 
+  // Leaving the plan tab out of the payload is what preserves a coach's plan
+  // through the client's ordinary sync: the script clears only the tabs it is
+  // handed, so an absent key means "do not touch this one".
+  const publishOwnPlan = !pulledAnything || shouldPublishOwnPlan(tabPlan, app.lastAcceptedPlanAt);
+
   const response = await pushToSheet(connection, {
-    tabs: buildSheetTabs(app),
+    tabs: buildSheetTabs(app, publishOwnPlan ? { issuedAt: new Date().toISOString() } : undefined),
     expectedRevision: base?.revision ?? 0,
     // Without a base there is nothing to be stale against: this is the first
     // publish, and the app is the only thing that has ever written here.

@@ -16,6 +16,8 @@ const T = new Date(2026, 7, 12, 14, 30, 0).getTime();
 
 function source(overrides: Partial<SyncSource> = {}): SyncSource {
   return {
+    nutritionPhases: [],
+    plannedDays: [],
     exercises: [{ id: "e_bench", name: "Bench Press", type: "main" }],
     slots: [{ id: "s_hb", name: "Heavy Bench", rotationOrder: 0 }],
     sessions: [{ id: "sess_1", splitSlotId: "s_hb", startedAt: T, endedAt: T + 3600_000 }],
@@ -345,18 +347,18 @@ describe("mergeFromSheet: refusing an unreadable tab", () => {
 
 describe("buildSheetTabs", () => {
   it("prepends an ID column to the two-way record tabs", () => {
-    const tabs = buildSheetTabs(source());
+    const tabs = buildSheetTabs(source(), undefined);
     expect(tabs[SHEET_TABS.sets][0][0]).toBe(ID_HEADER);
     expect(tabs[SHEET_TABS.sessions][0][0]).toBe(ID_HEADER);
   });
 
   it("gives the daily tab no ID column, because its date IS the key", () => {
-    const tabs = buildSheetTabs(source());
+    const tabs = buildSheetTabs(source(), undefined);
     expect(tabs[SHEET_TABS.daily][0][0]).toBe("Date");
   });
 
   it("does not emit the _sync tab, which the script owns", () => {
-    expect(Object.keys(buildSheetTabs(source()))).not.toContain(SHEET_TABS.meta);
+    expect(Object.keys(buildSheetTabs(source(), undefined))).not.toContain(SHEET_TABS.meta);
   });
 
   it("round-trips through the merge as a no-op", () => {
@@ -383,7 +385,7 @@ describe("buildSheetTabs", () => {
         { date: "2026-08-12", calories: 2400, protein: 180, steps: 0, isUntracked: false },
       ],
     });
-    const tabs = buildSheetTabs(state);
+    const tabs = buildSheetTabs(state, undefined);
     const result = mergeFromSheet(buildBase(state, 1), state, tabs);
 
     expect(result.report.collisions).toHaveLength(0);

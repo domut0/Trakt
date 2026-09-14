@@ -56,6 +56,7 @@ async function resetAll() {
     running: false,
     collisions: [],
     blockedReason: undefined,
+    pendingCoachPlan: undefined,
   });
 }
 
@@ -160,7 +161,7 @@ describe("syncNow: the push", () => {
     await useSyncStore.getState().syncNow();
 
     const tabs = sent[0].body.tabs as Record<string, unknown[][]>;
-    expect(Object.keys(tabs).sort()).toEqual(["cardio", "daily", "sessions", "sets"]);
+    expect(Object.keys(tabs).sort()).toEqual(["cardio", "daily", "plan", "sessions", "sets"]);
     expect(tabs.sets[1]).toContain("Bench Press");
     expect(tabs.sets[1]).toContain("Heavy Bench");
   });
@@ -688,5 +689,107 @@ describe("taking over a sheet", () => {
     await useSyncStore.getState().takeOverSheet();
 
     expect(sent).toHaveLength(0);
+  });
+});
+
+describe("the plan tab", () => {
+  const PLAN_TAB = [
+    ["Kind", "Name", "Date", "Value", "Calories", "Order", "Card Kind", "Exercises"],
+    ["meta", "issuedBy", "", "coach"],
+    ["meta", "issuedAt", "", "2026-09-14T10:00:00.000Z"],
+    ["phase", "Cut", "2026-09-20", "targets", 2200],
+    ["card", "Upper", "", "", "", 0, "workout", "Bench Press"],
+  ];
+
+  /** A sheet that already has a base, so the cycle pulls before it pushes. */
+  async function withBase() {
+    await saveSyncBase(buildBase(useStore.getState(), 3));
+  }
+
+  beforeEach(async () => {
+    await resetAll();
+    await saveSyncConfig(CONFIG);
+    useStore.setState({
+      unit: "lbs",
+      exercises: [{ id: "e_bench", name: "Bench Press", type: "main" }],
+      slots: [{ id: "s_hb", name: "Heavy Bench", rotationOrder: 0 }],
+      sessions: [],
+      sets: [],
+      dailyLogs: [],
+      nutritionPhases: [],
+      plannedDays: [],
+      lastAcceptedPlanAt: undefined,
+      hydrated: true,
+    });
+    useSyncStore.setState({ config: CONFIG });
+  });
+
+  it("publishes the app's own plan on the first sync, when the sheet holds nothing", async () => {
+    const sent = stubFetch({ ok: true, revision: 1 });
+    await useSyncStore.getState().syncNow();
+    const tabs = sent[0].body.tabs as Record<string, unknown[][]>;
+    expect(tabs.plan).toBeDefined();
+    // Written as the client's, which is what marks it as not a coach's plan.
+    expect(JSON.stringify(tabs.plan)).toContain("client");
+  });
+
+  it("leaves a pending coach plan in the sheet instead of overwriting it", async () => {
+    // The bug this exists to prevent: the client's ordinary sync erasing the
+    // plan its coach just sent, before the client ever saw the prompt.
+    await withBase();
+    const sent = stubFetch({ ok: true, revision: 4, tabs: { plan: PLAN_TAB } });
+
+    await useSyncStore.getState().syncNow();
+
+    const push = sent.find((x) => x.body.action === "push")!;
+    const tabs = push.body.tabs as Record<string, unknown[][]>;
+    expect(tabs.plan).toBeUndefined();
+    expect(Object.keys(tabs).sort()).toEqual(["cardio", "daily", "sessions", "sets"]);
+  });
+
+  it("offers a coach plan the app has not absorbed", async () => {
+    await withBase();
+    stubFetch({ ok: true, revision: 4, tabs: { plan: PLAN_TAB } });
+
+    await useSyncStore.getState().syncNow();
+
+    const pending = useSyncStore.getState().pendingCoachPlan;
+    expect(pending?.issuedBy).toBe("coach");
+    expect(pending?.phases[0]).toMatchObject({ name: "Cut", calories: 2200 });
+  });
+
+  it("does not re-offer a plan already accepted, and resumes publishing its own", async () => {
+    // Re-reading the same tab on every sync has to be idempotent, or the app
+    // would nag about the same plan forever.
+    useStore.setState({ lastAcceptedPlanAt: "2026-09-14T10:00:00.000Z" });
+    await withBase();
+    const sent = stubFetch({ ok: true, revision: 4, tabs: { plan: PLAN_TAB } });
+
+    await useSyncStore.getState().syncNow();
+
+    expect(useSyncStore.getState().pendingCoachPlan).toBeUndefined();
+    const push = sent.find((x) => x.body.action === "push")!;
+    expect((push.body.tabs as Record<string, unknown[][]>).plan).toBeDefined();
+  });
+
+  it("does not offer a plan the app itself published", async () => {
+    await withBase();
+    const own = PLAN_TAB.map((r) => (r[1] === "issuedBy" ? ["meta", "issuedBy", "", "client"] : r));
+    stubFetch({ ok: true, revision: 4, tabs: { plan: own } });
+
+    await useSyncStore.getState().syncNow();
+
+    expect(useSyncStore.getState().pendingCoachPlan).toBeUndefined();
+  });
+
+  it("publishes its own plan over a plan tab it cannot read", async () => {
+    await withBase();
+    const sent = stubFetch({ ok: true, revision: 4, tabs: { plan: [["Nonsense"], ["rows"]] } });
+
+    await useSyncStore.getState().syncNow();
+
+    expect(useSyncStore.getState().pendingCoachPlan).toBeUndefined();
+    const push = sent.find((x) => x.body.action === "push")!;
+    expect((push.body.tabs as Record<string, unknown[][]>).plan).toBeDefined();
   });
 });

@@ -589,3 +589,23 @@ export function resolvePlan(
 
   return { slots, phases, pins, createdExercises, removedSlots };
 }
+
+/**
+ * Whether this device should publish its own plan over what the tab holds.
+ *
+ * Both sides write this tab, which makes "the client's ordinary sync overwrites
+ * the plan its coach just sent" a reachable bug -- and a bad one, because the
+ * plan would vanish before the client ever saw the prompt to accept it.
+ *
+ * So a coach-issued plan the client has not yet absorbed is left alone. Once it
+ * has been accepted, the client's own plan IS that plan, and publishing it
+ * again is harmless and keeps the tab current with any edits made since.
+ */
+export function shouldPublishOwnPlan(
+  tabPlan: PlanPayload | undefined,
+  lastAcceptedAt: string | undefined,
+): boolean {
+  if (!tabPlan) return true; // Empty, or a layout this app cannot read.
+  if (tabPlan.issuedBy !== "coach") return true;
+  return !isNewerCoachPlan(tabPlan, lastAcceptedAt);
+}
