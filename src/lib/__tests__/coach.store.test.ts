@@ -62,7 +62,11 @@ function stubClientSheet(source: SyncSource = BOB_SHEET) {
   setSyncFetch(() =>
     Promise.resolve(
       new Response(
-        JSON.stringify({ ok: true, revision: 1, tabs: buildSheetTabs(source, undefined) }),
+        JSON.stringify({
+          ok: true,
+          revision: 1,
+          tabs: buildSheetTabs(source, { issuedAt: "2026-09-10T08:00:00.000Z" }),
+        }),
       ),
     ),
   );
@@ -234,5 +238,126 @@ describe("sync while viewing a client", () => {
 
     expect(pushed).toBe(false);
     expect(useSyncStore.getState().pending).toBe(true);
+  });
+});
+
+describe("writing a plan back to a client", () => {
+  /** Captures what was POSTed, so the test can assert on the request itself. */
+  function captureSave(reply: unknown = { ok: true, revision: 1 }) {
+    const sent: Array<Record<string, unknown>> = [];
+    setSyncFetch((_url, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      sent.push(body);
+      if (body.action === "pull") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ ok: true, revision: 1, tabs: buildSheetTabs(BOB_SHEET, undefined) }),
+          ),
+        );
+      }
+      return Promise.resolve(new Response(JSON.stringify(reply)));
+    });
+    return sent;
+  }
+
+  it("reports nothing to save before the coach has changed anything", async () => {
+    stubClientSheet();
+    await useCoachStore.getState().enterClientView("c_bob");
+    expect(useCoachStore.getState().pendingChanges()).toEqual([]);
+  });
+
+  it("notices an edit made through the ordinary Plan screen", async () => {
+    stubClientSheet();
+    await useCoachStore.getState().enterClientView("c_bob");
+
+    // Exactly what the Plan tab does: coach mode put the client's plan in the
+    // store, so editing the store IS editing the client's plan.
+    useStore.setState({
+      nutritionPhases: [
+        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
+      ],
+    });
+
+    const changes = useCoachStore.getState().pendingChanges();
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({ area: "Nutrition", kind: "added" });
+    expect(changes[0].detail).toContain("2200");
+  });
+
+  it("sends only the plan tab, never the client's log", async () => {
+    stubClientSheet();
+    await useCoachStore.getState().enterClientView("c_bob");
+    const sent = captureSave();
+
+    useStore.setState({
+      nutritionPhases: [
+        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
+      ],
+    });
+    expect(await useCoachStore.getState().saveClientPlan()).toBe(true);
+
+    const save = sent.find((b) => b.action === "putPlan")!;
+    expect(save).toBeDefined();
+    // A coach must never rewrite a client's log, nor claim their sheet.
+    expect(sent.some((b) => b.action === "push")).toBe(false);
+    expect(Object.keys(save.tabs as object)).toEqual(["plan"]);
+    expect(JSON.stringify(save.tabs)).toContain("coach");
+  });
+
+  it("goes quiet after a successful save, rather than staying lit on sent work", async () => {
+    stubClientSheet();
+    await useCoachStore.getState().enterClientView("c_bob");
+    captureSave();
+
+    useStore.setState({
+      nutritionPhases: [
+        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
+      ],
+    });
+    await useCoachStore.getState().saveClientPlan();
+
+    expect(useCoachStore.getState().pendingChanges()).toEqual([]);
+  });
+
+  it("keeps the changes pending when the sheet refuses", async () => {
+    stubClientSheet();
+    await useCoachStore.getState().enterClientView("c_bob");
+    captureSave({ ok: false, error: "busy" });
+
+    useStore.setState({
+      nutritionPhases: [
+        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
+      ],
+    });
+
+    expect(await useCoachStore.getState().saveClientPlan()).toBe(false);
+    expect(useCoachStore.getState().lastError).toBe("unreachable");
+    // Losing the coach's edits on a failed send would be the worst outcome here.
+    expect(useCoachStore.getState().pendingChanges()).toHaveLength(1);
+  });
+
+  it("saves nothing when no client is open", async () => {
+    const sent = captureSave();
+    expect(await useCoachStore.getState().saveClientPlan()).toBe(false);
+    expect(sent).toEqual([]);
+  });
+});
+
+describe("opening a client with an existing plan", () => {
+  it("shows no pending changes, even though their sheet carries a plan", async () => {
+    // The baseline is read off the screen, so opening a client is never itself
+    // a change -- whether their sheet has a plan tab or only implied cards.
+    stubClientSheet({
+      ...BOB_SHEET,
+      nutritionPhases: [
+        { id: "p_cut", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2100 },
+      ],
+      plannedDays: [{ date: "2026-09-22", splitSlotId: "s1" }],
+    });
+
+    await useCoachStore.getState().enterClientView("c_bob");
+
+    expect(useStore.getState().nutritionPhases).toHaveLength(1);
+    expect(useCoachStore.getState().pendingChanges()).toEqual([]);
   });
 });

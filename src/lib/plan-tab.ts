@@ -609,3 +609,187 @@ export function shouldPublishOwnPlan(
   if (tabPlan.issuedBy !== "coach") return true;
   return !isNewerCoachPlan(tabPlan, lastAcceptedAt);
 }
+
+// --- What a plan would change --------------------------------------------
+
+/**
+ * One line of the review screen.
+ *
+ * Deliberately flat and pre-formatted rather than a structured delta. Every
+ * consumer renders the same sentence -- what it is, and what is happening to it
+ * -- and a structure rich enough to re-derive that sentence in three places
+ * would be three chances for the three to disagree about what "changed" means.
+ */
+export interface PlanChange {
+  area: "Nutrition" | "Training" | "Pinned days";
+  /** What is changing: a phase and field, a card name, a date. */
+  subject: string;
+  kind: "added" | "removed" | "changed";
+  /** "2400 → 2200", or a list of lifts. Absent when the subject says it all. */
+  detail?: string;
+}
+
+const MACRO_LABELS: Array<[keyof PlanPhase, string]> = [
+  ["calories", "Calories"],
+  ["protein", "Protein"],
+  ["carbs", "Carbs"],
+  ["fat", "Fat"],
+  ["steps", "Steps"],
+];
+
+function arrow(from: unknown, to: unknown): string {
+  return `${from ?? "—"} → ${to ?? "—"}`;
+}
+
+/**
+ * What accepting `next` would change, against `current`.
+ *
+ * An empty result means the two plans are the same, which is the signal the
+ * Save button uses to stay hidden and the accept screen uses to say there is
+ * nothing to review.
+ *
+ * Phases are matched by start date, cards by name -- the same identities the
+ * format itself uses, so a renamed card reads as one removed and one added
+ * rather than as a card that mysteriously changed its name. That is the honest
+ * rendering: as far as history is concerned, that is exactly what it is.
+ */
+export function diffPlan(current: PlanPayload | undefined, next: PlanPayload): PlanChange[] {
+  const changes: PlanChange[] = [];
+  const before = current ?? { phases: [], cards: [], pins: [] };
+
+  // --- Nutrition --------------------------------------------------------
+  const phasesBefore = new Map(before.phases.map((p) => [p.startsOn, p]));
+  const phasesAfter = new Map(next.phases.map((p) => [p.startsOn, p]));
+
+  for (const [startsOn, phase] of phasesAfter) {
+    const old = phasesBefore.get(startsOn);
+    if (!old) {
+      changes.push({
+        area: "Nutrition",
+        subject: `${phase.name}, from ${startsOn}`,
+        kind: "added",
+        detail: summarisePhase(phase),
+      });
+      continue;
+    }
+    if (old.name !== phase.name) {
+      changes.push({
+        area: "Nutrition",
+        subject: `Phase from ${startsOn}`,
+        kind: "changed",
+        detail: arrow(old.name, phase.name),
+      });
+    }
+    if (old.kind !== phase.kind) {
+      changes.push({
+        area: "Nutrition",
+        subject: `${phase.name}, from ${startsOn}`,
+        kind: "changed",
+        detail: arrow(old.kind, phase.kind),
+      });
+    }
+    for (const [field, label] of MACRO_LABELS) {
+      if (old[field] !== phase[field]) {
+        changes.push({
+          area: "Nutrition",
+          subject: `${phase.name} · ${label}`,
+          kind: "changed",
+          detail: arrow(old[field], phase[field]),
+        });
+      }
+    }
+  }
+  for (const [startsOn, phase] of phasesBefore) {
+    if (!phasesAfter.has(startsOn)) {
+      changes.push({
+        area: "Nutrition",
+        subject: `${phase.name}, from ${startsOn}`,
+        kind: "removed",
+      });
+    }
+  }
+
+  // --- Training ---------------------------------------------------------
+  const cardKey = (name: string) => name.trim().toLowerCase();
+  const cardsBefore = new Map(before.cards.map((c) => [cardKey(c.name), c]));
+  const cardsAfter = new Map(next.cards.map((c) => [cardKey(c.name), c]));
+
+  for (const [k, card] of cardsAfter) {
+    const old = cardsBefore.get(k);
+    if (!old) {
+      changes.push({
+        area: "Training",
+        subject: card.name,
+        kind: "added",
+        detail: card.exerciseNames.join(", ") || "no lifts yet",
+      });
+      continue;
+    }
+    if (old.kind !== card.kind) {
+      changes.push({
+        area: "Training",
+        subject: card.name,
+        kind: "changed",
+        detail: arrow(old.kind, card.kind),
+      });
+    }
+    if (old.rotationOrder !== card.rotationOrder) {
+      changes.push({
+        area: "Training",
+        subject: `${card.name} · position`,
+        kind: "changed",
+        detail: arrow(old.rotationOrder + 1, card.rotationOrder + 1),
+      });
+    }
+    // Compared as a joined string, not as sets: the order lifts are listed in
+    // is the order they are preloaded in, so reordering them is a real change.
+    const oldLifts = old.exerciseNames.join(", ");
+    const newLifts = card.exerciseNames.join(", ");
+    if (oldLifts !== newLifts) {
+      changes.push({
+        area: "Training",
+        subject: `${card.name} · lifts`,
+        kind: "changed",
+        detail: arrow(oldLifts || "none", newLifts || "none"),
+      });
+    }
+  }
+  for (const [k, card] of cardsBefore) {
+    if (!cardsAfter.has(k)) {
+      changes.push({ area: "Training", subject: card.name, kind: "removed" });
+    }
+  }
+
+  // --- Pinned days ------------------------------------------------------
+  const pinsBefore = new Map(before.pins.map((p) => [p.date, p]));
+  const pinsAfter = new Map(next.pins.map((p) => [p.date, p]));
+  for (const [date, pin] of pinsAfter) {
+    const old = pinsBefore.get(date);
+    if (!old) {
+      changes.push({ area: "Pinned days", subject: date, kind: "added", detail: pin.cardName });
+    } else if (cardKey(old.cardName) !== cardKey(pin.cardName)) {
+      changes.push({
+        area: "Pinned days",
+        subject: date,
+        kind: "changed",
+        detail: arrow(old.cardName, pin.cardName),
+      });
+    }
+  }
+  for (const [date, pin] of pinsBefore) {
+    if (!pinsAfter.has(date)) {
+      changes.push({ area: "Pinned days", subject: date, kind: "removed", detail: pin.cardName });
+    }
+  }
+
+  return changes;
+}
+
+/** A phase's targets on one line, for the "added" case where there is no before. */
+function summarisePhase(phase: PlanPhase): string {
+  if (phase.kind === "untracked") return "untracked";
+  const parts = MACRO_LABELS.filter(([field]) => phase[field] !== undefined).map(
+    ([field, label]) => `${label} ${phase[field]}`,
+  );
+  return parts.length > 0 ? parts.join(", ") : "no targets";
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPlanTab,
+  diffPlan,
   isNewerCoachPlan,
   parsePlanTab,
   planFromStore,
@@ -510,5 +511,134 @@ describe("resolvePlan", () => {
     expect(out.slots).toEqual([]);
     expect(out.phases).toEqual([]);
     expect(out.removedSlots).toHaveLength(3);
+  });
+});
+
+describe("diffPlan", () => {
+  const base: PlanPayload = {
+    phases: [{ startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2400, steps: 8000 }],
+    cards: [
+      { name: "Upper", rotationOrder: 0, kind: "workout", exerciseNames: ["Bench Press"] },
+      { name: "Lower", rotationOrder: 1, kind: "workout", exerciseNames: ["Squat"] },
+    ],
+    pins: [{ date: "2026-09-22", cardName: "Upper" }],
+    issuedBy: "coach",
+    issuedAt: "2026-09-14T10:00:00.000Z",
+  };
+
+  const withPhase = (patch: Partial<PlanPayload["phases"][0]>): PlanPayload => ({
+    ...base,
+    phases: [{ ...base.phases[0], ...patch }],
+  });
+
+  it("reports nothing when the plans are identical", () => {
+    expect(diffPlan(base, base)).toEqual([]);
+  });
+
+  it("reports a changed target with both numbers", () => {
+    const changes = diffPlan(base, withPhase({ calories: 2200 }));
+    expect(changes).toEqual([
+      { area: "Nutrition", subject: "Cut · Calories", kind: "changed", detail: "2400 → 2200" },
+    ]);
+  });
+
+  it("reports a target that was cleared", () => {
+    const changes = diffPlan(base, withPhase({ steps: undefined }));
+    expect(changes[0]).toMatchObject({ subject: "Cut · Steps", detail: "8000 → —" });
+  });
+
+  it("summarises a phase that is entirely new", () => {
+    const added: PlanPayload = {
+      ...base,
+      phases: [
+        ...base.phases,
+        { startsOn: "2026-10-01", name: "Maintain", kind: "targets", calories: 3000 },
+      ],
+    };
+    const change = diffPlan(base, added).find((c) => c.subject.includes("Maintain"))!;
+    expect(change).toMatchObject({ kind: "added", detail: "Calories 3000" });
+  });
+
+  it("describes an untracked phase as untracked rather than as no targets", () => {
+    const added: PlanPayload = {
+      ...base,
+      phases: [...base.phases, { startsOn: "2026-10-01", name: "Holiday", kind: "untracked" }],
+    };
+    const change = diffPlan(base, added).find((c) => c.subject.includes("Holiday"))!;
+    expect(change.detail).toBe("untracked");
+  });
+
+  it("reports a removed phase", () => {
+    const change = diffPlan(base, { ...base, phases: [] })[0];
+    expect(change).toMatchObject({ area: "Nutrition", kind: "removed" });
+  });
+
+  it("reports changed lifts on a card", () => {
+    const next: PlanPayload = {
+      ...base,
+      cards: [
+        { ...base.cards[0], exerciseNames: ["Bench Press", "Incline DB Press"] },
+        base.cards[1],
+      ],
+    };
+    expect(diffPlan(base, next)[0]).toMatchObject({
+      area: "Training",
+      subject: "Upper · lifts",
+      detail: "Bench Press → Bench Press, Incline DB Press",
+    });
+  });
+
+  it("treats reordered lifts as a change, since order is the preload order", () => {
+    const next: PlanPayload = {
+      ...base,
+      cards: [{ ...base.cards[0], exerciseNames: ["Bench Press", "Row"] }, base.cards[1]],
+    };
+    const reordered: PlanPayload = {
+      ...base,
+      cards: [{ ...base.cards[0], exerciseNames: ["Row", "Bench Press"] }, base.cards[1]],
+    };
+    expect(diffPlan(next, reordered)).toHaveLength(1);
+  });
+
+  it("reports a card's position in human numbering, not zero-based", () => {
+    const next: PlanPayload = {
+      ...base,
+      cards: [
+        { ...base.cards[0], rotationOrder: 1 },
+        { ...base.cards[1], rotationOrder: 0 },
+      ],
+    };
+    const change = diffPlan(base, next).find((c) => c.subject === "Upper · position")!;
+    expect(change.detail).toBe("1 → 2");
+  });
+
+  it("reads a renamed card as one removed and one added", () => {
+    // Honest: as far as logged history is concerned, that is what it is.
+    const next: PlanPayload = {
+      ...base,
+      cards: [{ ...base.cards[0], name: "Push" }, base.cards[1]],
+    };
+    const training = diffPlan(base, next).filter((c) => c.area === "Training");
+    expect(training.map((c) => c.kind).sort()).toEqual(["added", "removed"]);
+  });
+
+  it("reports a repointed pin", () => {
+    const next: PlanPayload = { ...base, pins: [{ date: "2026-09-22", cardName: "Lower" }] };
+    expect(diffPlan(base, next)[0]).toMatchObject({
+      area: "Pinned days",
+      subject: "2026-09-22",
+      detail: "Upper → Lower",
+    });
+  });
+
+  it("treats every part of a plan as added when there is nothing before it", () => {
+    const changes = diffPlan(undefined, base);
+    expect(changes.every((c) => c.kind === "added")).toBe(true);
+    expect(changes).toHaveLength(4); // one phase, two cards, one pin
+  });
+
+  it("ignores issuedAt and issuedBy, which are not changes to the plan", () => {
+    const reissued: PlanPayload = { ...base, issuedAt: "2027-01-01T00:00:00Z", issuedBy: "client" };
+    expect(diffPlan(base, reissued)).toEqual([]);
   });
 });

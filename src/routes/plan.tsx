@@ -6,6 +6,7 @@ import { NutritionRibbon } from "../components/NutritionRibbon";
 import { TargetStrip } from "../components/TargetStrip";
 import { SlotPlanSheet } from "../components/SlotPlanSheet";
 import { SplitCardList } from "../components/SplitCardList";
+import { SaveChangesBar } from "../components/SaveChangesBar";
 import { Plus } from "../components/icons";
 import { Chevron } from "../components/icons";
 import { dayKey, parseDayKey } from "../lib/daily-log";
@@ -65,6 +66,12 @@ function PlanPage() {
       <header className="pl-4 pr-12 pb-4 pt-14">
         <h1 className="t-title text-ink">Plan</h1>
       </header>
+
+      {/* Coach mode only: renders nothing unless a client's plan is on screen
+          and it has been edited. The Plan tab itself needs no coach-specific
+          branching -- it edits store state, and in coach mode the store holds
+          the client's plan. */}
+      <SaveChangesBar />
 
       <NutritionRibbon />
       <TargetStrip />

@@ -45,6 +45,7 @@ function doPost(e) {
 
     if (body.action === "pull") return json_(pull_());
     if (body.action === "push") return json_(push_(body));
+    if (body.action === "putPlan") return json_(putPlan_(body));
 
     return json_({ ok: false, error: "unknown-action" });
   } catch (err) {
@@ -74,6 +75,48 @@ function pull_() {
     spreadsheetUrl: ss.getUrl(),
     tabs: tabs,
   };
+}
+
+/**
+ * Writes the plan tab, and nothing else.
+ *
+ * This is how a coach's plan reaches a client. It differs from `push_` in three
+ * ways, each deliberate:
+ *
+ *   NO DEVICE CHECK. The whole point is that a device which does not own this
+ *   sheet can write here. Ownership is about who may rewrite the LOG, and this
+ *   touches none of it. `pull_` has no device check either, for the same
+ *   reason: reading and advising are not claiming.
+ *
+ *   NO REVISION BUMP. The revision is the log's optimistic-concurrency token.
+ *   Bumping it here would make the owning device's next push read as stale and
+ *   send it round a pointless merge, over a tab the merge does not even look at.
+ *
+ *   NO expectedRevision. There is nothing to be stale against: a plan is a
+ *   document that replaces the previous one wholesale, and the app's own
+ *   issuedAt ordering decides which of two plans wins.
+ *
+ * The secret is still required -- doPost checks it before dispatching -- so
+ * this is no more open than the rest of the endpoint.
+ */
+function putPlan_(body) {
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(20000)) return { ok: false, error: "busy" };
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    var rows = body.tabs && body.tabs.plan;
+    if (!rows || !rows.length) return { ok: false, error: "empty-plan" };
+    writeTab_(ss, "plan", rows);
+    return {
+      ok: true,
+      scriptVersion: SCRIPT_VERSION,
+      revision: readMeta_(ss).revision,
+      spreadsheetUrl: ss.getUrl(),
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function push_(body) {

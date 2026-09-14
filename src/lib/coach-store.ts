@@ -8,7 +8,14 @@ import {
 } from "./db";
 import { useStore } from "./store";
 import { buildClientSnapshot, type ClientSnapshot } from "./client-snapshot";
-import { pullFromSheet } from "./sync-client";
+import { pullFromSheet, putPlanOnSheet } from "./sync-client";
+import {
+  buildPlanTab,
+  diffPlan,
+  planFromStore,
+  type PlanChange,
+  type PlanPayload,
+} from "./plan-tab";
 import type { CellValue } from "./csv";
 
 /**
@@ -98,6 +105,14 @@ export interface ViewingClient {
   client: CoachClient;
   /** When the snapshot on screen was pulled. The banner says how stale it is. */
   pulledAt: number;
+  /**
+   * The plan as it stood in the sheet when this view opened.
+   *
+   * Kept so that "has the coach changed anything" is answerable without
+   * re-reading the sheet, and so the Save button can show exactly what it is
+   * about to send.
+   */
+  planAtOpen?: PlanPayload;
 }
 
 export interface CoachState {
@@ -107,6 +122,8 @@ export interface CoachState {
   viewing?: ViewingClient;
   /** True while a client's data is being fetched. */
   loading: boolean;
+  /** True while a plan is being written to a client's sheet. */
+  saving: boolean;
   lastError?: CoachError;
 
   hydrate: () => Promise<void>;
@@ -115,6 +132,17 @@ export interface CoachState {
   removeClient: (id: string) => Promise<void>;
   enterClientView: (id: string) => Promise<boolean>;
   exitClientView: () => void;
+  /**
+   * What the coach has changed since opening this client, as review lines.
+   *
+   * Reads the LIVE store, because the Plan tab edits it directly -- coach mode
+   * has replaced the store's contents with the client's, so the ordinary Plan
+   * screen editing ordinary store state is exactly right, and the latch stops
+   * any of it reaching disk.
+   */
+  pendingChanges: () => PlanChange[];
+  /** Writes the edited plan to the client's sheet. */
+  saveClientPlan: () => Promise<boolean>;
 }
 
 /** Pulls a client's tabs. Dispatches on how their sheet is reached. */
@@ -146,6 +174,7 @@ export const useCoachStore = create<CoachState>((set, get) => ({
   clients: [],
   hydrated: false,
   loading: false,
+  saving: false,
 
   hydrate: async () => {
     if (get().hydrated) return;
@@ -189,7 +218,16 @@ export const useCoachStore = create<CoachState>((set, get) => ({
       useStore.setState(asStoreState(buildClientSnapshot(pulled.tabs)));
 
       const pulledAt = Date.now();
-      set({ viewing: { client, pulledAt }, loading: false });
+      // Read back off the store rather than from `snapshot.plan`, so the
+      // baseline is exactly what is on screen and "nothing changed yet" holds
+      // by construction. A client whose sheet has no plan tab still has an
+      // implied plan -- the cards synthesised from their logged history -- and
+      // taking `undefined` as the baseline would show that whole split as the
+      // coach's unsaved changes the moment their view opened.
+      set({
+        viewing: { client, pulledAt, planAtOpen: currentPlanFromStore() },
+        loading: false,
+      });
       // Best-effort bookkeeping; a failure here costs a timestamp, not data.
       void saveCoachClient({ ...client, lastPulledAt: pulledAt }).catch(() => {});
       return true;
@@ -202,6 +240,42 @@ export const useCoachStore = create<CoachState>((set, get) => ({
       }
       setDbReadOnly(undefined);
       set({ loading: false, lastError: "unreachable", viewing: undefined });
+      return false;
+    }
+  },
+
+  pendingChanges: () => {
+    const viewing = get().viewing;
+    if (!viewing) return [];
+    return diffPlan(viewing.planAtOpen, currentPlanFromStore());
+  },
+
+  saveClientPlan: async () => {
+    const viewing = get().viewing;
+    if (!viewing || get().saving) return false;
+    const client = viewing.client;
+    if (client.kind !== "appsScript" || !client.url || !client.secret) {
+      set({ lastError: "not-configured" });
+      return false;
+    }
+
+    set({ saving: true, lastError: undefined });
+    try {
+      const plan = currentPlanFromStore();
+      const reply = await putPlanOnSheet(
+        { url: client.url, secret: client.secret, deviceId: "coach" },
+        buildPlanTab(plan),
+      );
+      if (!reply.ok) {
+        set({ saving: false, lastError: "unreachable" });
+        return false;
+      }
+      // The new plan becomes the baseline, so Save goes quiet until the coach
+      // changes something again rather than staying lit on work already sent.
+      set({ viewing: { ...viewing, planAtOpen: plan }, saving: false });
+      return true;
+    } catch {
+      set({ saving: false, lastError: "unreachable" });
       return false;
     }
   },
@@ -227,6 +301,17 @@ export const useCoachStore = create<CoachState>((set, get) => ({
  * one of the two.
  */
 let ownState: Swapped | undefined;
+
+/**
+ * The plan as the store currently holds it, issued by the coach.
+ *
+ * Stamped at read time rather than at save time so that the payload the review
+ * screen shows and the payload that gets written are the same object -- an
+ * issuedAt assigned during the save would make them differ by a field.
+ */
+function currentPlanFromStore(): PlanPayload {
+  return planFromStore(useStore.getState(), { by: "coach", at: new Date().toISOString() });
+}
 
 /** True when the main store currently holds someone else's data. */
 export function isViewingClient(): boolean {
