@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   clearSyncBase,
+  dbReadOnlyReason,
   deleteSyncConfig,
   loadDeviceId,
   loadSyncBase,
@@ -276,6 +277,16 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     // Pushing that would publish an empty sheet, and once a base exists it would
     // read as the user having deleted their entire history.
     if (!useStore.getState().hydrated) return;
+
+    // Coach mode has swapped a CLIENT's data into the store. Syncing now would
+    // publish that client's log to the coach's own sheet and then record it as
+    // the merge base, so the next sync would read the coach's real history as
+    // deletions. The read-only latch is the signal because it means exactly
+    // this: what the store holds is not this device's data.
+    if (dbReadOnlyReason() !== undefined) {
+      set({ pending: true });
+      return;
+    }
 
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       set({ status: "offline", pending: true });

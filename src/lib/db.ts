@@ -120,6 +120,32 @@ export interface SyncBaseMeta {
 
 type MetaRecord = SettingsMeta | ActiveSessionMeta | SyncConfigMeta | SyncBaseMeta | DeviceIdMeta;
 
+/**
+ * A client whose sheet this install can read, in coach mode.
+ *
+ * Pointers only. No client health data is stored here -- a client's log is
+ * pulled into memory when their view is opened and dropped when it is closed,
+ * which is the whole reason this feature needs no database to protect. What a
+ * coach's device holds about a client is how to reach their spreadsheet, plus
+ * the name to show it under.
+ *
+ * `kind` mirrors `SyncConfigMeta`: a sheet reached through the Apps Script has
+ * a url and a secret, one reached through the Sheets API has a spreadsheet id.
+ */
+export interface CoachClient {
+  id: string;
+  /** What the coach calls them. Shown in the banner and the client list. */
+  name: string;
+  kind: "google" | "appsScript";
+  /** google: the spreadsheet this app was granted access to via the Picker. */
+  spreadsheetId?: string;
+  /** appsScript: the /exec deployment and its secret. */
+  url?: string;
+  secret?: string;
+  /** When their data was last pulled, so the banner can say how stale it is. */
+  lastPulledAt?: number;
+}
+
 class WorkoutDb extends Dexie {
   exercises!: EntityTable<Exercise, "id">;
   slots!: EntityTable<SplitSlot, "id">;
@@ -129,6 +155,7 @@ class WorkoutDb extends Dexie {
   dailyLogs!: EntityTable<DailyLog, "date">;
   nutritionPhases!: EntityTable<NutritionPhase, "id">;
   plannedDays!: EntityTable<PlannedDay, "date">;
+  coachClients!: EntityTable<CoachClient, "id">;
 
   constructor() {
     super("workout-tracker");
@@ -321,6 +348,19 @@ class WorkoutDb extends Dexie {
         // The settings record keeps only what it still describes.
         await tx.table("meta").put({ key: "settings", unit: meta.unit ?? "lbs" });
       });
+
+    // v7 adds coach mode's client list, which is a genuine new table and so a
+    // genuine bump -- unlike `lastAcceptedPlanAt`, which arrived at the same
+    // time as a non-indexed field on the settings row and needed none.
+    //
+    // No secondary index. The list is read whole, every time, and a coach with
+    // enough clients for an index to matter has outgrown a phone-local list.
+    //
+    // No upgrade function: a new table starts empty, and there is nothing in any
+    // earlier version to migrate from.
+    this.version(7).stores({
+      coachClients: "id",
+    });
   }
 }
 
@@ -499,6 +539,30 @@ export async function replaceAllData(data: BackupData): Promise<void> {
       await db.meta.delete("syncBase");
     },
   );
+}
+
+// --- Coach mode -----------------------------------------------------------
+//
+// Like the sync meta below, these do NOT go through `safeWrite`: it flips the
+// global write-failure flag, which raises "Couldn't save to this device" -- far
+// too alarming for bookkeeping about somebody else's spreadsheet. Callers
+// handle their own failures.
+//
+// They are also exempt from the read-only latch on purpose. The latch protects
+// the coach's own training data while a client's is on screen; adding or
+// renaming a client is not that, and would otherwise be impossible to do from
+// inside the very mode it belongs to.
+
+export async function loadCoachClients(): Promise<CoachClient[]> {
+  return db.coachClients.toArray();
+}
+
+export async function saveCoachClient(client: CoachClient): Promise<void> {
+  await db.coachClients.put(client);
+}
+
+export async function deleteCoachClient(id: string): Promise<void> {
+  await db.coachClients.delete(id);
 }
 
 // --- Sync meta ------------------------------------------------------------

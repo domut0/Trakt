@@ -58,7 +58,10 @@ describe("daily logs (schema + write-through)", () => {
     // db.upgrade.test.ts: Dexie sets `verno` from the version() declarations, so
     // comparing it against itself could never fail. Bump it by hand, and when
     // you do, check that a new table has not quietly started out non-empty.
-    expect(db.verno).toBe(6);
+    expect(db.verno).toBe(7);
+    // The check the comment above asks for: v7 added `coachClients`, and a new
+    // table starting out with rows in it would mean a migration wrote there.
+    expect(await db.coachClients.count()).toBe(0);
     // The store and the DB have to agree. Checking only the store would pass if
     // hydrate had invented an empty array over a table that actually had rows.
     expect(useStore.getState().dailyLogs).toEqual([]);
