@@ -7,6 +7,7 @@ import { TargetStrip } from "../components/TargetStrip";
 import { SlotPlanSheet } from "../components/SlotPlanSheet";
 import { SplitCardList } from "../components/SplitCardList";
 import { SaveChangesBar } from "../components/SaveChangesBar";
+import { CoachPlanPrompt } from "../components/CoachPlanPrompt";
 import { Plus } from "../components/icons";
 import { Chevron } from "../components/icons";
 import { dayKey, parseDayKey } from "../lib/daily-log";
@@ -72,6 +73,10 @@ function PlanPage() {
           branching -- it edits store state, and in coach mode the store holds
           the client's plan. */}
       <SaveChangesBar />
+
+      {/* The client's side: renders nothing unless their sheet holds a
+          coach-issued plan they have not absorbed. */}
+      <CoachPlanPrompt />
 
       <NutritionRibbon />
       <TargetStrip />
