@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChartsRouteImport } from './routes/charts'
+import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as HistoryRouteImport } from './routes/history'
+import { Route as JoinRouteImport } from './routes/join'
 import { Route as PlanRouteImport } from './routes/plan'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as WorkoutRouteImport } from './routes/workout'
@@ -28,9 +30,19 @@ const ChartsRoute = ChartsRouteImport.update({
   path: '/charts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConnectRoute = ConnectRouteImport.update({
+  id: '/connect',
+  path: '/connect',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinRoute = JoinRouteImport.update({
+  id: '/join',
+  path: '/join',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlanRoute = PlanRouteImport.update({
@@ -62,7 +74,9 @@ const SessionIdRoute = SessionIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/charts': typeof ChartsRoute
+  '/connect': typeof ConnectRoute
   '/history': typeof HistoryRoute
+  '/join': typeof JoinRoute
   '/plan': typeof PlanRoute
   '/settings': typeof SettingsRoute
   '/workout': typeof WorkoutRoute
@@ -72,7 +86,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/charts': typeof ChartsRoute
+  '/connect': typeof ConnectRoute
   '/history': typeof HistoryRoute
+  '/join': typeof JoinRoute
   '/plan': typeof PlanRoute
   '/settings': typeof SettingsRoute
   '/workout': typeof WorkoutRoute
@@ -83,7 +99,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/charts': typeof ChartsRoute
+  '/connect': typeof ConnectRoute
   '/history': typeof HistoryRoute
+  '/join': typeof JoinRoute
   '/plan': typeof PlanRoute
   '/settings': typeof SettingsRoute
   '/workout': typeof WorkoutRoute
@@ -95,7 +113,9 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/charts'
+    | '/connect'
     | '/history'
+    | '/join'
     | '/plan'
     | '/settings'
     | '/workout'
@@ -105,7 +125,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/charts'
+    | '/connect'
     | '/history'
+    | '/join'
     | '/plan'
     | '/settings'
     | '/workout'
@@ -115,7 +137,9 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/charts'
+    | '/connect'
     | '/history'
+    | '/join'
     | '/plan'
     | '/settings'
     | '/workout'
@@ -126,7 +150,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChartsRoute: typeof ChartsRoute
+  ConnectRoute: typeof ConnectRoute
   HistoryRoute: typeof HistoryRoute
+  JoinRoute: typeof JoinRoute
   PlanRoute: typeof PlanRoute
   SettingsRoute: typeof SettingsRoute
   WorkoutRoute: typeof WorkoutRoute
@@ -150,11 +176,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChartsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/connect': {
+      id: '/connect'
+      path: '/connect'
+      fullPath: '/connect'
+      preLoaderRoute: typeof ConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/history': {
       id: '/history'
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join': {
+      id: '/join'
+      path: '/join'
+      fullPath: '/join'
+      preLoaderRoute: typeof JoinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/plan': {
@@ -198,7 +238,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChartsRoute: ChartsRoute,
+  ConnectRoute: ConnectRoute,
   HistoryRoute: HistoryRoute,
+  JoinRoute: JoinRoute,
   PlanRoute: PlanRoute,
   SettingsRoute: SettingsRoute,
   WorkoutRoute: WorkoutRoute,
