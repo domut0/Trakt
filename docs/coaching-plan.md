@@ -3,6 +3,27 @@
 Written 2026-09-14. Three phases, in build order: the frictionless Google Sheet,
 coach mode, then the invite link.
 
+## Status
+
+Everything that does not need a Google account is built, tested and on
+`claude/client-plans-no-database-mq7loc`. What remains is listed in
+[`docs/google-setup.md`](google-setup.md) and is roughly half an hour of
+console work.
+
+|                   | Built                                               | Waiting on                   |
+| ----------------- | --------------------------------------------------- | ---------------------------- |
+| A — one-tap sheet | transport, auth, error mapping                      | Cloud project, domain, spike |
+| B — coach mode    | latch, plan tab, snapshot, view, edit, save, accept | Picker (needs the API key)   |
+| C — invite links  | codec, `/connect`, `/join`                          | the production origin        |
+
+Three things in Phase B are deliberately still open, each because it needs the
+A9 spike answered first: adding a client through the Google Picker, opening a
+Google-backed client (the store refuses with `not-configured` rather than
+failing obscurely), and locking a coached client's own Plan tab.
+
+The Apps Script path works end to end today, so coach mode is usable for a
+client onboarded by hand before any of the Google work is done.
+
 ## The premise
 
 A coach wants to edit his clients' nutrition, training and step plans from inside
