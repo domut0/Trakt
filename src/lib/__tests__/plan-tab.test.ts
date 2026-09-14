@@ -4,6 +4,7 @@ import {
   isNewerCoachPlan,
   parsePlanTab,
   planFromStore,
+  resolvePlan,
   type PlanPayload,
 } from "../plan-tab";
 import type { CellValue } from "../csv";
@@ -337,5 +338,177 @@ describe("isNewerCoachPlan", () => {
 
   it("refuses a candidate whose issuedAt is unparseable", () => {
     expect(isNewerCoachPlan(coach("whenever"), "2026-09-14T10:00:00Z")).toBe(false);
+  });
+});
+
+describe("resolvePlan", () => {
+  /** Deterministic ids, so assertions can name them. */
+  function ids() {
+    let n = 0;
+    return () => `new${++n}`;
+  }
+
+  const target = {
+    slots: [
+      { id: "s_upper", name: "Upper", rotationOrder: 0, plannedExerciseIds: ["e_bench"] },
+      { id: "s_lower", name: "Lower", rotationOrder: 1, lastLoggedAt: 1_700_000_000_000 },
+      { id: "s_legs", name: "Legs", rotationOrder: 2 },
+    ],
+    exercises: [
+      { id: "e_bench", name: "Bench Press", type: "main" as const },
+      { id: "e_squat", name: "Back Squat", type: "main" as const },
+    ],
+    nutritionPhases: [
+      {
+        id: "p_cut",
+        startsOn: "2026-09-20",
+        name: "Cut",
+        kind: "targets" as const,
+        calories: 2800,
+      },
+    ],
+    sessions: [
+      { splitSlotId: "s_legs" },
+      { splitSlotId: "s_legs" },
+      { splitSlotId: "s_upper" },
+      { splitSlotId: undefined },
+    ],
+  };
+
+  const plan: PlanPayload = {
+    phases: [
+      { startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2400, protein: 210 },
+      { startsOn: "2026-10-01", name: "Maintain", kind: "targets", calories: 3000 },
+    ],
+    cards: [
+      {
+        name: "upper",
+        rotationOrder: 0,
+        kind: "workout",
+        exerciseNames: ["Bench Press", "Pendlay Row"],
+      },
+      { name: "Lower", rotationOrder: 1, kind: "workout", exerciseNames: ["Back Squat"] },
+    ],
+    pins: [{ date: "2026-09-22", cardName: "Upper" }],
+    issuedBy: "coach",
+    issuedAt: "2026-09-14T10:00:00.000Z",
+  };
+
+  it("keeps an existing slot's id when the name matches, ignoring case", () => {
+    // The whole reason cards match by name: every WorkoutSession pointing at
+    // s_upper must still point at it after the plan is accepted.
+    const out = resolvePlan(plan, target, ids());
+    expect(out.slots.find((s) => s.name === "upper")!.id).toBe("s_upper");
+  });
+
+  it("keeps where the client is in the split", () => {
+    const out = resolvePlan(plan, target, ids());
+    expect(out.slots.find((s) => s.name === "Lower")!.lastLoggedAt).toBe(1_700_000_000_000);
+  });
+
+  it("mints an id for a card the device has never had", () => {
+    const withNew: PlanPayload = {
+      ...plan,
+      cards: [
+        ...plan.cards,
+        { name: "Push", rotationOrder: 2, kind: "workout", exerciseNames: [] },
+      ],
+    };
+    const out = resolvePlan(withNew, target, ids());
+    // A minted id, not one of the device's existing ones. Which number it gets
+    // depends on how many exercises were created first, which is not a
+    // guarantee this function makes.
+    const push = out.slots.find((s) => s.name === "Push")!;
+    expect(push.id).toMatch(/^new\d+$/);
+    expect(target.slots.map((s) => s.id)).not.toContain(push.id);
+  });
+
+  it("resolves a known exercise to its existing id and creates nothing", () => {
+    const out = resolvePlan(plan, target, ids());
+    const lower = out.slots.find((s) => s.name === "Lower")!;
+    expect(lower.plannedExerciseIds).toEqual(["e_squat"]);
+  });
+
+  it("creates an exercise the device has never heard of, as an accessory", () => {
+    const out = resolvePlan(plan, target, ids());
+    expect(out.createdExercises).toHaveLength(1);
+    expect(out.createdExercises[0].name).toBe("Pendlay Row");
+    // cardio is the only type the app branches on, so nothing becomes cardio
+    // because a name arrived in a plan.
+    expect(out.createdExercises[0].type).toBe("accessory");
+  });
+
+  it("creates one record for a name used on two cards", () => {
+    const twice: PlanPayload = {
+      ...plan,
+      cards: [
+        { name: "A", rotationOrder: 0, kind: "workout", exerciseNames: ["Face Pull"] },
+        { name: "B", rotationOrder: 1, kind: "workout", exerciseNames: ["Face Pull"] },
+      ],
+      pins: [],
+    };
+    const out = resolvePlan(twice, target, ids());
+    expect(out.createdExercises).toHaveLength(1);
+    expect(out.slots[0].plannedExerciseIds).toEqual(out.slots[1].plannedExerciseIds);
+  });
+
+  it("keeps an existing phase's id when the start date matches", () => {
+    const out = resolvePlan(plan, target, ids());
+    const cut = out.phases.find((p) => p.startsOn === "2026-09-20")!;
+    expect(cut.id).toBe("p_cut");
+    expect(cut.calories).toBe(2400); // the plan's number, not the old one
+  });
+
+  it("carries a phase the device does not have yet", () => {
+    const out = resolvePlan(plan, target, ids());
+    expect(out.phases.find((p) => p.startsOn === "2026-10-01")).toMatchObject({
+      name: "Maintain",
+      calories: 3000,
+    });
+  });
+
+  it("points a pin at the resolved slot id", () => {
+    const out = resolvePlan(plan, target, ids());
+    expect(out.pins).toEqual([{ date: "2026-09-22", splitSlotId: "s_upper" }]);
+  });
+
+  it("reports a dropped card together with how much history points at it", () => {
+    // The honest part: the plan does not mention Legs, and two sessions do.
+    const out = resolvePlan(plan, target, ids());
+    expect(out.removedSlots).toHaveLength(1);
+    expect(out.removedSlots[0].slot.name).toBe("Legs");
+    expect(out.removedSlots[0].sessionCount).toBe(2);
+  });
+
+  it("reports a dropped card with no history as costing nothing", () => {
+    const unused = { ...target, sessions: [{ splitSlotId: "s_upper" }] };
+    const out = resolvePlan(plan, unused, ids());
+    expect(out.removedSlots[0].sessionCount).toBe(0);
+  });
+
+  it("reports nothing removed when the plan covers every card", () => {
+    const complete: PlanPayload = {
+      ...plan,
+      cards: [
+        ...plan.cards,
+        { name: "Legs", rotationOrder: 2, kind: "workout", exerciseNames: [] },
+      ],
+    };
+    expect(resolvePlan(complete, target, ids()).removedSlots).toEqual([]);
+  });
+
+  it("drops a pin naming a card the plan does not contain", () => {
+    // parsePlanTab already refuses this, so it can only arrive from a payload
+    // built in code -- which must still not produce a pin pointing at nothing.
+    const dangling: PlanPayload = { ...plan, pins: [{ date: "2026-09-22", cardName: "Nope" }] };
+    expect(resolvePlan(dangling, target, ids()).pins).toEqual([]);
+  });
+
+  it("resolves an empty plan to an empty split, reporting every card as dropped", () => {
+    const empty: PlanPayload = { ...plan, phases: [], cards: [], pins: [] };
+    const out = resolvePlan(empty, target, ids());
+    expect(out.slots).toEqual([]);
+    expect(out.phases).toEqual([]);
+    expect(out.removedSlots).toHaveLength(3);
   });
 });

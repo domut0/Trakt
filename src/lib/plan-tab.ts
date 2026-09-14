@@ -454,3 +454,138 @@ export function isNewerCoachPlan(
   if (Number.isNaN(acceptedAt)) return true;
   return candidateAt > acceptedAt;
 }
+
+// --- Resolving a plan onto this device ------------------------------------
+
+/**
+ * What a parsed plan becomes on the device accepting it.
+ *
+ * Returned rather than applied, so that every decision below is testable
+ * without a store or a database, and so the review screen can show what is
+ * about to happen before anything does. The caller feeds these through the
+ * store's own actions, keeping the existing write path the only one.
+ */
+export interface PlanResolution {
+  /** The split, after the plan. Existing ids are preserved wherever a name matched. */
+  slots: SplitSlot[];
+  phases: NutritionPhase[];
+  pins: PlannedDay[];
+  /** Exercises named by the plan that this device has never heard of. */
+  createdExercises: Exercise[];
+  /**
+   * Cards the plan does not mention, which accepting it would drop, along with
+   * how many logged sessions point at each.
+   *
+   * Surfaced rather than silently applied because a card with history is not
+   * the same as an unused one: `WorkoutSession.splitSlotId` points at it, and
+   * History renders a session whose slot is gone as "Unknown". A coach dropping
+   * "Legs" from a programme is ordinary; a client silently losing the label on
+   * eighteen months of leg sessions is not, so the review screen says so and
+   * the person accepting decides.
+   */
+  removedSlots: Array<{ slot: SplitSlot; sessionCount: number }>;
+}
+
+export interface PlanTarget {
+  slots: readonly SplitSlot[];
+  exercises: readonly Exercise[];
+  nutritionPhases: readonly NutritionPhase[];
+  sessions: readonly { splitSlotId?: string }[];
+}
+
+/** Names are matched case- and whitespace-insensitively; "bench press" is "Bench Press". */
+function key(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/**
+ * Maps a plan's names onto this device's records.
+ *
+ * `newId` is a parameter rather than a module import so the resolution is a
+ * total function over its inputs: the tests get deterministic ids, and nothing
+ * here has to reach for a clock or a random source.
+ *
+ * Three matching rules, and each one exists to protect something:
+ *
+ *   a CARD matches an existing slot BY NAME, keeping its id -- which keeps
+ *   every WorkoutSession that references it attached to it
+ *
+ *   a PHASE matches an existing phase BY START DATE, keeping its id -- phases
+ *   have no inbound references, so this is only to avoid needless churn
+ *
+ *   an EXERCISE matches BY NAME, and is created when nothing matches -- a
+ *   created one is an `accessory`, which is the conservative label: `cardio` is
+ *   the only type the app branches on, and nothing should become cardio because
+ *   a name arrived in a plan
+ */
+export function resolvePlan(
+  plan: PlanPayload,
+  target: PlanTarget,
+  newId: () => string,
+): PlanResolution {
+  const slotByName = new Map(target.slots.map((s) => [key(s.name), s]));
+  const exerciseByName = new Map(target.exercises.map((e) => [key(e.name), e]));
+  const phaseByStart = new Map(target.nutritionPhases.map((p) => [p.startsOn, p]));
+
+  const createdExercises: Exercise[] = [];
+  const resolveExercise = (name: string): Exercise => {
+    const existing = exerciseByName.get(key(name));
+    if (existing) return existing;
+    const created: Exercise = { id: newId(), name: name.trim(), type: "accessory" };
+    // Registered immediately so a name repeated across two cards resolves to
+    // one record rather than creating a duplicate on the second mention.
+    exerciseByName.set(key(name), created);
+    createdExercises.push(created);
+    return created;
+  };
+
+  const slots: SplitSlot[] = plan.cards.map((card) => {
+    const existing = slotByName.get(key(card.name));
+    return {
+      id: existing?.id ?? newId(),
+      name: card.name,
+      rotationOrder: card.rotationOrder,
+      kind: card.kind,
+      plannedExerciseIds: card.exerciseNames.map((n) => resolveExercise(n).id),
+      // Where the client is in the split is theirs, not the plan's: a new
+      // programme does not mean the last Upper day never happened.
+      ...(existing?.lastLoggedAt !== undefined ? { lastLoggedAt: existing.lastLoggedAt } : {}),
+    };
+  });
+
+  const keptIds = new Set(slots.map((s) => s.id));
+  const sessionsPerSlot = new Map<string, number>();
+  for (const session of target.sessions) {
+    if (session.splitSlotId === undefined) continue;
+    sessionsPerSlot.set(session.splitSlotId, (sessionsPerSlot.get(session.splitSlotId) ?? 0) + 1);
+  }
+  const removedSlots = target.slots
+    .filter((s) => !keptIds.has(s.id))
+    .map((slot) => ({ slot, sessionCount: sessionsPerSlot.get(slot.id) ?? 0 }));
+
+  const phases: NutritionPhase[] = plan.phases.map((phase) => ({
+    id: phaseByStart.get(phase.startsOn)?.id ?? newId(),
+    startsOn: phase.startsOn,
+    name: phase.name,
+    kind: phase.kind,
+    calories: phase.calories,
+    protein: phase.protein,
+    carbs: phase.carbs,
+    fat: phase.fat,
+    steps: phase.steps,
+  }));
+
+  const slotByPlanName = new Map(slots.map((s) => [key(s.name), s]));
+  const pins: PlannedDay[] = plan.pins
+    .map((pin) => {
+      const slot = slotByPlanName.get(key(pin.cardName));
+      return slot ? { date: pin.date, splitSlotId: slot.id } : undefined;
+    })
+    // `parsePlanTab` already refuses a plan whose pin names an absent card, so
+    // this cannot drop anything in practice. It is here so that a payload built
+    // in code, which never passed through the parser, cannot produce a pin
+    // pointing at nothing.
+    .filter((p): p is PlannedDay => p !== undefined);
+
+  return { slots, phases, pins, createdExercises, removedSlots };
+}
