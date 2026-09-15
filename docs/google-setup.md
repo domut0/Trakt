@@ -124,7 +124,15 @@ it.
 
 ### Scopes — the important screen
 
-**Add or remove scopes**, then add exactly one:
+**Left sidebar → Data Access**, then **Add or remove scopes**. This is its own
+page, not a step in the wizard you just finished, which is why the wizard never
+asked you about it.
+
+**What a scope is:** the list of things Trakt is allowed to touch in a client's
+Google account. It is exactly what the consent screen shows them when they tap
+Connect.
+
+Add exactly one:
 
 ```
 https://www.googleapis.com/auth/drive.file
@@ -133,10 +141,16 @@ https://www.googleapis.com/auth/drive.file
 It may be listed as "See, edit, create, and delete only the specific Google Drive
 files you use with this app."
 
-**Add nothing else.** Not `spreadsheets`, not `drive`, not `drive.readonly`.
-Those are sensitive scopes: adding any one of them triggers app verification,
-which needs a privacy policy, a homepage, a demo video, and weeks of review. With
-`drive.file` alone you skip all of it.
+That sentence is the narrowest access Google offers for this. Trakt creates the
+client's spreadsheet, so it can read and write that one file and nothing else —
+not their photos, not their documents, not any other spreadsheet they own.
+
+**Add nothing else.** Not `spreadsheets` (every spreadsheet they own), not
+`drive` (everything), not `drive.readonly`. Those are SENSITIVE scopes, and
+asking for one triggers app verification: a privacy policy, a homepage, a demo
+video, and weeks of waiting before any client can use the app. With `drive.file`
+alone there is nothing to review, which is the whole reason a client's setup is
+one tap instead of a queue.
 
 If the console shows your scopes in a "Sensitive scopes" or "Restricted scopes"
 table rather than the non-sensitive one, stop — something other than `drive.file`
@@ -144,13 +158,20 @@ got added.
 
 ### Publishing status
 
-Find **Publishing status** and click **Publish app** to move from Testing to
-**In production**.
+**Left sidebar → Audience** — the same page where you chose External. Find
+**Publishing status** and click **Publish app** to move from Testing to **In
+production**.
 
-This matters more than it looks. In Testing you are capped at 100 named test
-users and refresh tokens expire after seven days, which would break your clients
-weekly. In production with only a non-sensitive scope there is no cap, no
-verification review, and no unverified-app warning.
+Every new Google app starts in test mode, which has two limits that would wreck
+a coaching practice:
+
+- Only people you have added by email can sign in at all, capped at 100.
+- Their sign-in expires after seven days, so every client would be locked out
+  weekly.
+
+Publishing just flips it to normal. Because the only scope attached is
+`drive.file`, it costs nothing: no review, no waiting, and no "Google hasn't
+verified this app" warning in front of your clients.
 
 If it demands verification when you click Publish, a sensitive scope is still
 attached. Go back and remove it.
