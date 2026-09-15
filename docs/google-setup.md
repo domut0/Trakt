@@ -48,6 +48,28 @@ and anything already connected through it keeps working too.
 
 ## Step 1 — create the project
 
+**None of this costs anything, and no billing account is needed.** The console
+pushes its free trial hard — a banner or full-screen modal offering $300 in
+credits and asking for a card. Dismiss it. The trial is irrelevant here.
+
+Billing exists for metered services like Compute Engine and BigQuery. Everything
+this setup touches is free with no billing attached:
+
+|                                            | Cost                                              |
+| ------------------------------------------ | ------------------------------------------------- |
+| Creating a project                         | Free                                              |
+| Sheets, Drive and Picker APIs              | Free — Workspace APIs, not metered cloud services |
+| Consent screen, OAuth client IDs, API keys | Free                                              |
+
+The quotas are far above what a coaching practice generates. Trakt has no
+backend, which is the point of the whole architecture, so there is no server
+here to be billed for.
+
+If a billing prompt genuinely blocks project creation rather than merely nagging,
+the usual cause is a Google Workspace organization policy requiring billing on
+every project — a different problem, fixed by an org admin or by using a
+personal account instead. Do not attach a card to get past it.
+
 1. Go to <https://console.cloud.google.com>.
 2. Project dropdown in the top bar, then **New project**.
 3. Name it `trakt`. No organisation needed.
