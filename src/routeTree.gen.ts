@@ -15,6 +15,7 @@ import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as PlanRouteImport } from './routes/plan'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as WorkoutRouteImport } from './routes/workout'
 import { Route as ExerciseIdRouteImport } from './routes/exercise.$id'
@@ -50,6 +51,11 @@ const PlanRoute = PlanRouteImport.update({
   path: '/plan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/history': typeof HistoryRoute
   '/join': typeof JoinRoute
   '/plan': typeof PlanRoute
+  '/privacy': typeof PrivacyRoute
   '/settings': typeof SettingsRoute
   '/workout': typeof WorkoutRoute
   '/exercise/$id': typeof ExerciseIdRoute
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/history': typeof HistoryRoute
   '/join': typeof JoinRoute
   '/plan': typeof PlanRoute
+  '/privacy': typeof PrivacyRoute
   '/settings': typeof SettingsRoute
   '/workout': typeof WorkoutRoute
   '/exercise/$id': typeof ExerciseIdRoute
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/history': typeof HistoryRoute
   '/join': typeof JoinRoute
   '/plan': typeof PlanRoute
+  '/privacy': typeof PrivacyRoute
   '/settings': typeof SettingsRoute
   '/workout': typeof WorkoutRoute
   '/exercise/$id': typeof ExerciseIdRoute
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/join'
     | '/plan'
+    | '/privacy'
     | '/settings'
     | '/workout'
     | '/exercise/$id'
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/join'
     | '/plan'
+    | '/privacy'
     | '/settings'
     | '/workout'
     | '/exercise/$id'
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/join'
     | '/plan'
+    | '/privacy'
     | '/settings'
     | '/workout'
     | '/exercise/$id'
@@ -154,6 +166,7 @@ export interface RootRouteChildren {
   HistoryRoute: typeof HistoryRoute
   JoinRoute: typeof JoinRoute
   PlanRoute: typeof PlanRoute
+  PrivacyRoute: typeof PrivacyRoute
   SettingsRoute: typeof SettingsRoute
   WorkoutRoute: typeof WorkoutRoute
   ExerciseIdRoute: typeof ExerciseIdRoute
@@ -204,6 +217,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -242,6 +262,7 @@ const rootRouteChildren: RootRouteChildren = {
   HistoryRoute: HistoryRoute,
   JoinRoute: JoinRoute,
   PlanRoute: PlanRoute,
+  PrivacyRoute: PrivacyRoute,
   SettingsRoute: SettingsRoute,
   WorkoutRoute: WorkoutRoute,
   ExerciseIdRoute: ExerciseIdRoute,

@@ -243,6 +243,11 @@ function SettingsPage() {
           <div className="group-row-sep px-4 py-3 t-label text-signal">{importError}</div>
         )}
 
+        <a href="/privacy" className="group-row group-row-sep w-full text-left">
+          <div className="t-body">Privacy</div>
+          <Chevron className="shrink-0 text-ink-2" size={16} />
+        </a>
+
         {pendingImport && (
           <div className="group-row-sep space-y-3 p-4">
             <div className="t-label text-ink-2">
