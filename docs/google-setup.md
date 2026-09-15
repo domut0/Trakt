@@ -17,25 +17,32 @@ Work through it in order. Step 0 blocks everything else.
 
 ## Step 0 — decide the domain
 
-**Do this before anything else.** OAuth will not work without it, and changing it
-later means editing every credential you are about to create.
+**Settled.** Trakt is on Vercel at:
 
-There is no deploy config in this repo — no Vercel, Netlify, Fly, or CI config of
-any kind. So Trakt currently has no home, and OAuth needs a fixed, HTTPS origin
-that you tell Google about in advance.
+```
+https://trakt-fit.vercel.app
+```
 
-Pick one and get the app deployed there before step 4:
+That is the origin every credential below is registered against. Three origins
+get registered in total:
 
-- `trakt.yourdomain.com` if you already own a domain. Best option — clients see
-  your name, and you never have to migrate.
-- A free subdomain from a static host. Fine, and movable later if you accept
-  redoing step 4.
+| Origin                         | What it is for                                                        |
+| ------------------------------ | --------------------------------------------------------------------- |
+| `https://trakt-fit.vercel.app` | Production. What clients use.                                         |
+| `http://localhost:8080`        | The dev server (`npm run dev`) — the port is set in `vite.config.ts`. |
+| `http://localhost:3000`        | The spike page in step 7, served separately.                          |
 
-Write the final origin down. It must include the scheme and no trailing path:
-`https://trakt.yourdomain.com`.
+Two things about Vercel specifically, both worth knowing before you hit a
+confusing failure:
 
-You will register two origins: that one, and `http://localhost:3000` so the dev
-server keeps working.
+**OAuth will not work on preview deployments.** Vercel gives every branch a URL
+like `trakt-fit-git-somebranch-you.vercel.app`, and Google's authorized origins
+do not accept wildcards. Only production and localhost can sign in. Test OAuth
+on `localhost:8080` or on production, never on a preview.
+
+**If you later add a custom domain**, add it to the authorized origins as a
+fourth entry rather than replacing this one. The `.vercel.app` URL keeps working
+and anything already connected through it keeps working too.
 
 ---
 
@@ -120,8 +127,10 @@ attached. Go back and remove it.
 
 1. Application type: **Web application**.
 2. Name: `Trakt web` (internal label only, nobody sees it).
-3. **Authorized JavaScript origins** — add both:
-   - `https://trakt.yourdomain.com` (your real origin from step 0)
+3. **Authorized JavaScript origins** — add all three, exactly as written, with
+   no trailing slash:
+   - `https://trakt-fit.vercel.app`
+   - `http://localhost:8080`
    - `http://localhost:3000`
 4. **Authorized redirect URIs**: leave empty. Google Identity Services uses the
    token model, which does not redirect.
@@ -146,7 +155,8 @@ Copy it, then immediately click **Edit API key** and restrict it, because an
 unrestricted key is abusable:
 
 1. **Application restrictions**: HTTP referrers (web sites). Add:
-   - `https://trakt.yourdomain.com/*`
+   - `https://trakt-fit.vercel.app/*`
+   - `http://localhost:8080/*`
    - `http://localhost:3000/*`
 2. **API restrictions**: Restrict key, and select **Google Picker API** only.
 3. Save. Restrictions can take a few minutes to take effect.
@@ -164,9 +174,22 @@ VITE_GOOGLE_API_KEY=AIzaSy...
 
 `.env.local` is already covered by `.gitignore`, so it will not be committed.
 
-Both values also need setting in your host's environment variables for the
-production build. Neither is secret, but keeping them out of the repo means
-rotating one is a config change rather than a commit.
+Both also need setting on Vercel, or the production build ships without them and
+the Connect button fails with `no-client-id`:
+
+**Vercel dashboard → your project → Settings → Environment Variables.** Add
+`VITE_GOOGLE_CLIENT_ID` and `VITE_GOOGLE_API_KEY`, ticking Production (and
+Preview, if you want the spike reachable from a preview build).
+
+Two Vercel gotchas:
+
+- The `VITE_` prefix is not decorative. Vite only exposes variables with that
+  prefix to client code, and everything here runs in the browser.
+- Environment variables are read at **build** time, so adding them does nothing
+  to the deployment already live. Redeploy after adding them.
+
+Neither value is secret, but keeping them out of the repo means rotating one is
+a config change rather than a commit.
 
 ---
 
@@ -183,8 +206,10 @@ npx serve scripts -l 3000
 # then open http://localhost:3000/google-spike.html
 ```
 
-(It has to be served over `http://localhost:3000` rather than opened as a
-`file://` URL, because that origin is what you registered in step 4.)
+It has to be served over `http://localhost:3000` rather than opened as a
+`file://` URL, because Google checks the origin against what you registered and
+a `file://` page has none. Port 3000 rather than 8080 so it does not collide
+with the dev server if you have that running.
 
 Paste in your client ID and API key, then work down the page. It runs four
 checks:

@@ -82,8 +82,9 @@ No code. Done once, by hand.
    Phase C and the Picker in Phase B.
 3. OAuth consent screen: External, publishing status **In production**, scopes
    limited to `drive.file`.
-4. OAuth client ID, type **Web application**. Authorized JavaScript origins: the
-   production domain, plus `http://localhost:3000` for dev.
+4. OAuth client ID, type **Web application**. Authorized JavaScript origins:
+   `https://trakt-fit.vercel.app`, plus `http://localhost:8080` (the dev server)
+   and `http://localhost:3000` (the spike page).
 5. An API key restricted to the Picker API. Phase B needs it; create it now.
 
 Outputs `VITE_GOOGLE_CLIENT_ID` and `VITE_GOOGLE_API_KEY`. Both are public
