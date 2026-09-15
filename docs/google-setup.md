@@ -96,16 +96,31 @@ confusing 403 later.
 
 ## Step 3 — the consent screen
 
-**APIs & Services** then **OAuth consent screen** (it may appear as **Google Auth
-Platform** then **Branding**).
+**APIs & Services** then **OAuth consent screen**. On the current console this
+opens a numbered wizard under **Google Auth Platform** — App information,
+Audience, Contact information, Finish — rather than the older single form. The
+fields are the same either way.
 
-1. User type: **External**. Internal is only available with Google Workspace and
-   would limit you to your own organisation.
-2. App name: **Trakt**. Your clients see this on the consent screen, so use the
+1. App name: **Trakt**. Your clients see this on the consent screen, so use the
    name they know.
-3. User support email: yours.
+2. User support email: yours.
+3. **Audience: External.** Internal means only users inside your own Google
+   Workspace organisation can ever sign in. Clients are on personal Gmail
+   accounts, so Internal would make the app unusable for exactly the people it
+   is for — and without a paid Workspace plan it is not a real option anyway.
 4. Developer contact email: yours.
-5. Save and continue.
+5. Finish, and create.
+
+The Audience step carries two warnings that both describe defaults you are about
+to change, so do not be put off by them:
+
+**"Your app will start in testing mode."** True, and it is why publishing below
+matters. Testing caps you at 100 named test users and expires refresh tokens
+every seven days, which would break every client weekly.
+
+**"You may need to verify your app."** The "may" is load-bearing. Verification is
+triggered by SENSITIVE scopes. With `drive.file` alone there is none to trigger
+it.
 
 ### Scopes — the important screen
 
