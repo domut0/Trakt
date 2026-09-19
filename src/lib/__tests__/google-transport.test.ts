@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { errorForStatus } from "../sync-client-google";
+import { errorForStatus, shareWithCoach } from "../sync-client-google";
 import { clearGoogleToken, getAccessToken, setGoogleTokenSource } from "../google-auth";
 
 /**
@@ -17,6 +17,7 @@ afterEach(() => {
   setGoogleTokenSource(undefined);
   clearGoogleToken();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("errorForStatus", () => {
@@ -93,5 +94,47 @@ describe("the token source seam", () => {
 
     vi.useRealTimers();
     vi.unstubAllEnvs();
+  });
+});
+
+describe("shareWithCoach", () => {
+  function stubDrive(status = 200) {
+    const fetchMock = vi.fn((_url: string, _init?: RequestInit) =>
+      Promise.resolve(new Response("{}", { status })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("adds the coach as an EDITOR, since their app writes the plan tab", async () => {
+    setGoogleTokenSource(() => Promise.resolve("t"));
+    const fetchMock = stubDrive();
+    expect((await shareWithCoach("sheet-1", " coach@gmail.com ")).ok).toBe(true);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/drive/v3/files/sheet-1/permissions");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      role: "writer",
+      type: "user",
+      emailAddress: "coach@gmail.com",
+    });
+  });
+
+  it("may ask for consent, because it only ever runs from a tap", async () => {
+    const seen: boolean[] = [];
+    setGoogleTokenSource((interactive) => {
+      seen.push(interactive);
+      return Promise.resolve("t");
+    });
+    stubDrive();
+    await shareWithCoach("sheet-1", "coach@gmail.com");
+    expect(seen).toEqual([true]);
+  });
+
+  it("reports a refusal rather than claiming it shared", async () => {
+    setGoogleTokenSource(() => Promise.resolve("t"));
+    stubDrive(403);
+    expect(await shareWithCoach("sheet-1", "coach@gmail.com")).toMatchObject({ ok: false });
   });
 });

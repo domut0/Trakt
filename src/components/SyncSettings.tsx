@@ -3,6 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import scriptSource from "../../google-apps-script/sync.gs?raw";
 import { useStore } from "@/lib/store";
 import { generateSecret, useSyncStore } from "@/lib/sync-store";
+import { ShareWithCoach } from "./ShareWithCoach";
 import { Toggle } from "./Toggle";
 
 /**
@@ -273,6 +274,10 @@ export function SyncSettings() {
             →
           </span>
         </a>
+      )}
+
+      {config.kind === "google" && config.spreadsheetId && (
+        <ShareWithCoach spreadsheetId={config.spreadsheetId} />
       )}
 
       {blockedReason === "other-device" && (

@@ -192,3 +192,28 @@ export async function pushTabs(
 export function putPlanTab(spreadsheetId: string, plan: CellValue[][]): Promise<SyncResponse> {
   return pushTabs(spreadsheetId, { [SHEET_TABS.plan]: plan }, { interactive: true });
 }
+
+/**
+ * Shares this app's sheet with a coach, as an editor.
+ *
+ * Editor, not reader: the coach's app writes the plan tab. What stops it
+ * writing anything else is coach mode's read-only latch, not Drive -- Drive
+ * has no per-tab permission to express "the plan and nothing else".
+ *
+ * `drive.file` covers permission changes on files the app created, which the
+ * spike confirmed (check 3), so this needs no wider scope. Google emails the
+ * coach, which is how they learn the sheet is waiting in their Picker.
+ * Interactive: it only ever runs from a tap.
+ */
+export async function shareWithCoach(spreadsheetId: string, email: string): Promise<SyncResponse> {
+  const result = await call(
+    `https://www.googleapis.com/drive/v3/files/${spreadsheetId}/permissions?sendNotificationEmail=true`,
+    {
+      method: "POST",
+      interactive: true,
+      body: JSON.stringify({ role: "writer", type: "user", emailAddress: email.trim() }),
+    },
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+  return { ok: true, revision: 0 };
+}

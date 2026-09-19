@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { decodeInvite, type JoinPayload } from "../lib/invite";
+import { loadPendingCoach, savePendingCoach } from "../lib/pending-coach";
 import { Frame, Primary } from "./connect";
 
 export const Route = createFileRoute("/join")({
@@ -33,7 +34,19 @@ function JoinPage() {
   useEffect(() => {
     // Client-only: the fragment never reaches the server.
     const decoded = decodeInvite(window.location.hash);
-    setPayload(decoded?.kind === "join" ? decoded : undefined);
+    const join = decoded?.kind === "join" ? decoded : undefined;
+    setPayload(join);
+    // Remembered so Settings can offer the share as one tap once the sheet
+    // exists. Re-opening the same invite keeps the "already shared" mark.
+    if (join) {
+      const known = loadPendingCoach();
+      const same = known?.email !== undefined && known.email === join.coachEmail;
+      savePendingCoach({
+        name: join.coachName,
+        ...(join.coachEmail ? { email: join.coachEmail } : {}),
+        ...(same && known.sharedAt !== undefined ? { sharedAt: known.sharedAt } : {}),
+      });
+    }
     setReady(true);
   }, []);
 
@@ -65,9 +78,7 @@ function JoinPage() {
           In Settings. It creates one for you, in your own Drive.
         </Step>
         <Step n={3} title={`Share it with ${payload.coachName}`}>
-          {payload.coachEmail
-            ? `So they can see your log and write your plan. Their address is ${payload.coachEmail}.`
-            : "So they can see your log and write your plan."}
+          In Settings, under Sheet sync. One tap, once your sheet exists.
         </Step>
       </ol>
 
