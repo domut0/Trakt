@@ -78,7 +78,7 @@ export function CoachSettings() {
                 : lastError === "unreadable"
                   ? "That address did not return the expected reply."
                   : lastError === "needs-consent"
-                    ? "Reconnect Google to open this client"
+                    ? "Google sign-in was closed before it finished"
                     : "Couldn't reach that client's sheet."}
             </div>
           )}

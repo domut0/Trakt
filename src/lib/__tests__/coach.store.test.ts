@@ -161,14 +161,15 @@ describe("entering a client's view", () => {
 });
 
 describe("a Google-backed client", () => {
-  const GOOGLE_CLIENT: CoachClient = {
+  const ANN: CoachClient = {
     id: "c_ann",
     name: "Ann",
     kind: "google",
     spreadsheetId: "ann-sheet-123",
   };
 
-  const GOOGLE_TAB_NAMES = [
+  /** The tab order `pullTabs` requests, which is how it matches replies: by index. */
+  const TAB_ORDER = [
     SHEET_TABS.sets,
     SHEET_TABS.sessions,
     SHEET_TABS.daily,
@@ -177,33 +178,50 @@ describe("a Google-backed client", () => {
     SHEET_TABS.meta,
   ];
 
-  function stubGoogleFetch(impl?: (url: string, init?: RequestInit) => Promise<Response>) {
-    const defaultImpl = (url: string) => {
-      if (url.includes("values:batchGet")) {
-        const tabs = buildSheetTabs(BOB_SHEET, { issuedAt: "2026-09-10T08:00:00.000Z" });
-        const valueRanges = GOOGLE_TAB_NAMES.map((name) => ({ values: tabs[name] ?? [] }));
-        return Promise.resolve(
-          new Response(JSON.stringify({ valueRanges }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      }
-      return Promise.resolve(
-        new Response(JSON.stringify({}), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-    };
-    const mock = vi.fn(impl ?? defaultImpl);
-    vi.stubGlobal("fetch", mock);
-    return mock;
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+  interface Sent {
+    url: string;
+    method: string;
+    body: Record<string, unknown>;
   }
 
+  /**
+   * Ann's sheet, reached the way the Sheets API reaches it. A read returns
+   * Bob's data; a write answers `writeStatus`.
+   */
+  function stubSheetsApi({ readStatus = 200, writeStatus = 200 } = {}) {
+    const sent: Sent[] = [];
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      sent.push({
+        url,
+        method,
+        body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {},
+      });
+      if (method === "GET") {
+        if (readStatus !== 200) return Promise.resolve(json({}, readStatus));
+        const tabs = buildSheetTabs(BOB_SHEET, { issuedAt: "2026-09-10T08:00:00.000Z" });
+        return Promise.resolve(
+          json({ valueRanges: TAB_ORDER.map((name) => ({ values: tabs[name] ?? [] })) }),
+        );
+      }
+      return Promise.resolve(json({}, writeStatus));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return { fetchMock, sent };
+  }
+
+  let tokenRequests: boolean[];
+
   beforeEach(async () => {
-    setGoogleTokenSource(() => Promise.resolve("fake-token"));
-    await useCoachStore.getState().addClient(GOOGLE_CLIENT);
+    tokenRequests = [];
+    setGoogleTokenSource((interactive) => {
+      tokenRequests.push(interactive);
+      return Promise.resolve("fake-token");
+    });
+    await useCoachStore.getState().addClient(ANN);
   });
 
   afterEach(() => {
@@ -212,13 +230,19 @@ describe("a Google-backed client", () => {
     clearGoogleToken();
   });
 
-  it("opens: enterClientView returns true and the store shows Bob's data", async () => {
-    // Opening a Google-backed client populates the main store with their data,
-    // swapping the coach's local state out and locking the database read-only.
-    stubGoogleFetch();
-    const ok = await useCoachStore.getState().enterClientView("c_ann");
+  /** An edit the coach makes through the ordinary Plan screen. */
+  function editPlan() {
+    useStore.setState({
+      nutritionPhases: [
+        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
+      ],
+    });
+  }
 
-    expect(ok).toBe(true);
+  it("opens into the screens the app already has", async () => {
+    stubSheetsApi();
+    expect(await useCoachStore.getState().enterClientView("c_ann")).toBe(true);
+
     const state = useStore.getState();
     expect(state.sets).toHaveLength(1);
     expect(state.sets[0].weight).toBe(100);
@@ -227,128 +251,76 @@ describe("a Google-backed client", () => {
     expect(state.unit).toBe("kg");
   });
 
-  it("the request carries Authorization: Bearer fake-token and hits the client's spreadsheetId", async () => {
-    // Google API requests must identify the target spreadsheet in the URL path
-    // and carry the OAuth access token on the Authorization header.
-    const fetchMock = stubGoogleFetch();
+  it("reads that client's sheet, with the coach's token", async () => {
+    const { fetchMock } = stubSheetsApi();
     await useCoachStore.getState().enterClientView("c_ann");
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("ann-sheet-123");
-    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer fake-token");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/ann-sheet-123/");
+    expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer fake-token");
   });
 
-  it("a 401 reply -> enterClientView false, lastError needs-consent, dbReadOnlyReason() undefined, coach state untouched", async () => {
-    // When Google revokes or expires the grant, enterClientView must report
-    // needs-consent without locking writes or corrupting coach state.
-    stubGoogleFetch(() => Promise.resolve(new Response("{}", { status: 401 })));
-    const ok = await useCoachStore.getState().enterClientView("c_ann");
+  it("may ask Google for consent, because opening and saving are always a tap", async () => {
+    // A silent request fails once the coach reloads, and coach mode has no
+    // Reconnect button of its own -- so these two may show the popup.
+    stubSheetsApi();
+    await useCoachStore.getState().enterClientView("c_ann");
+    editPlan();
+    await useCoachStore.getState().saveClientPlan();
 
-    expect(ok).toBe(false);
+    expect(tokenRequests.length).toBeGreaterThan(0);
+    expect(tokenRequests.every((interactive) => interactive)).toBe(true);
+  });
+
+  it("reports a refused grant without touching the coach's state", async () => {
+    stubSheetsApi({ readStatus: 401 });
+    expect(await useCoachStore.getState().enterClientView("c_ann")).toBe(false);
+
     expect(useCoachStore.getState().lastError).toBe("needs-consent");
+    expect(useCoachStore.getState().viewing).toBeUndefined();
     expect(dbReadOnlyReason()).toBeUndefined();
     expect(useStore.getState().sets[0].weight).toBe(315);
-    expect(useCoachStore.getState().viewing).toBeUndefined();
   });
 
-  it("a 404 reply -> lastError unreadable", async () => {
-    // A sheet that cannot be found surfaces as unreadable rather than a generic network error.
-    stubGoogleFetch(() => Promise.resolve(new Response("{}", { status: 404 })));
-    const ok = await useCoachStore.getState().enterClientView("c_ann");
-
-    expect(ok).toBe(false);
+  it("reports a sheet that is gone or unshared as unreadable", async () => {
+    stubSheetsApi({ readStatus: 404 });
+    expect(await useCoachStore.getState().enterClientView("c_ann")).toBe(false);
     expect(useCoachStore.getState().lastError).toBe("unreadable");
   });
 
-  it("missing spreadsheetId -> not-configured", async () => {
-    // A client without a spreadsheetId cannot be pulled from and must fail before network.
-    await useCoachStore.getState().addClient({
-      id: "c_ann_noid",
-      name: "Ann",
-      kind: "google",
-    });
-    const ok = await useCoachStore.getState().enterClientView("c_ann_noid");
+  it("refuses a client with no sheet before asking the network", async () => {
+    const { fetchMock } = stubSheetsApi();
+    await useCoachStore.getState().addClient({ id: "c_nosheet", name: "Ann", kind: "google" });
 
-    expect(ok).toBe(false);
+    expect(await useCoachStore.getState().enterClientView("c_nosheet")).toBe(false);
     expect(useCoachStore.getState().lastError).toBe("not-configured");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("saving a plan: clears and updates only the plan tab", async () => {
-    // Google Sheets API does not support atomic plan swaps, so putPlanTab
-    // clears the plan tab first via batchClear and then writes rows via batchUpdate.
-    const requests: Array<{ url: string; method: string; body: Record<string, unknown> }> = [];
-    stubGoogleFetch((url, init) => {
-      const method = init?.method ?? "GET";
-      const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
-      requests.push({ url, method, body });
-
-      if (url.includes("values:batchGet")) {
-        const tabs = buildSheetTabs(BOB_SHEET, { issuedAt: "2026-09-10T08:00:00.000Z" });
-        const valueRanges = GOOGLE_TAB_NAMES.map((name) => ({ values: tabs[name] ?? [] }));
-        return Promise.resolve(
-          new Response(JSON.stringify({ valueRanges }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      }
-      return Promise.resolve(
-        new Response(JSON.stringify({}), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-    });
-
+  it("writes only the plan tab, never the client's log", async () => {
+    const { sent } = stubSheetsApi();
     await useCoachStore.getState().enterClientView("c_ann");
-
-    useStore.setState({
-      nutritionPhases: [
-        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
-      ],
-    });
+    editPlan();
 
     expect(await useCoachStore.getState().saveClientPlan()).toBe(true);
 
-    const postCalls = requests.filter((r) => r.method === "POST");
-    expect(postCalls).toHaveLength(2);
-
-    expect(postCalls[0].url).toContain("values:batchClear");
-    expect(postCalls[0].body).toEqual({ ranges: ["plan"] });
-
-    expect(postCalls[1].url).toContain("values:batchUpdate");
-    const updateData = postCalls[1].body.data as Array<{ range: string }>;
-    expect(updateData).toHaveLength(1);
-    expect(updateData[0].range).toBe("plan");
+    const writes = sent.filter((r) => r.method === "POST");
+    expect(writes).toHaveLength(2);
+    // Cleared first, because batchUpdate does not shrink a range.
+    expect(writes[0].url).toContain("values:batchClear");
+    expect(writes[0].body).toEqual({ ranges: ["plan"] });
+    expect(writes[1].url).toContain("values:batchUpdate");
+    expect((writes[1].body.data as Array<{ range: string }>).map((d) => d.range)).toEqual(["plan"]);
   });
 
-  it("a failed save (500) keeps the changes pending and returns false", async () => {
-    // A network or server failure on save must leave pending edits intact in the store
-    // so the coach can retry without losing their work.
-    stubGoogleFetch((url) => {
-      if (url.includes("values:batchGet")) {
-        const tabs = buildSheetTabs(BOB_SHEET, { issuedAt: "2026-09-10T08:00:00.000Z" });
-        const valueRanges = GOOGLE_TAB_NAMES.map((name) => ({ values: tabs[name] ?? [] }));
-        return Promise.resolve(
-          new Response(JSON.stringify({ valueRanges }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      }
-      return Promise.resolve(new Response("{}", { status: 500 }));
-    });
-
+  it("keeps the changes pending when the sheet refuses the save", async () => {
+    stubSheetsApi({ writeStatus: 500 });
     await useCoachStore.getState().enterClientView("c_ann");
-
-    useStore.setState({
-      nutritionPhases: [
-        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
-      ],
-    });
+    editPlan();
 
     expect(await useCoachStore.getState().saveClientPlan()).toBe(false);
+    expect(useCoachStore.getState().lastError).toBe("unreachable");
     expect(useCoachStore.getState().pendingChanges()).toHaveLength(1);
   });
 });
