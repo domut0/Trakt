@@ -46,6 +46,8 @@ export function SyncSettings() {
   const lastError = useSyncStore((s) => s.lastError);
   const pending = useSyncStore((s) => s.pending);
   const connect = useSyncStore((s) => s.connect);
+  const connectGoogle = useSyncStore((s) => s.connectGoogle);
+  const googleAvailable = useSyncStore((s) => s.googleAvailable);
   const disconnect = useSyncStore((s) => s.disconnect);
   const setEnabled = useSyncStore((s) => s.setEnabled);
   const syncNow = useSyncStore((s) => s.syncNow);
@@ -57,6 +59,9 @@ export function SyncSettings() {
   const dayCount = useStore((s) => s.dailyLogs.length);
 
   const [showSetup, setShowSetup] = useState(false);
+  // `connecting` is shared with the Apps Script form below: only one connection
+  // attempt can be in flight, and two flags would be two things to keep in step.
+  const [googleError, setGoogleError] = useState<string | undefined>();
   const [secret, setSecret] = useState("");
   const [url, setUrl] = useState("");
   const [formError, setFormError] = useState<string>();
@@ -101,17 +106,64 @@ export function SyncSettings() {
     return (
       <>
         {!showSetup ? (
-          <button type="button" onClick={openSetup} className="group-row w-full text-left">
-            <div>
-              <div className="t-body">Set up sheet sync</div>
-              <div className="t-label text-ink-2">
-                Keep a Google Sheet up to date with your log.
+          <>
+            {/* The one-tap path, first, because it is the one anyone should
+                use. The Apps Script flow below it is ten minutes at a desktop
+                and only exists for builds with no OAuth client configured, and
+                for sheets already set up that way. */}
+            {googleAvailable() && (
+              <>
+                <button
+                  type="button"
+                  disabled={connecting}
+                  onClick={() => {
+                    setConnecting(true);
+                    setGoogleError(undefined);
+                    void connectGoogle().then((result) => {
+                      setConnecting(false);
+                      if (!result.ok) setGoogleError(result.error);
+                    });
+                  }}
+                  className="group-row w-full text-left"
+                >
+                  <div>
+                    <div className="t-body">
+                      {connecting ? "Connecting…" : "Connect Google Sheet"}
+                    </div>
+                    <div className="t-label text-ink-2">
+                      Creates one in your own Drive. Trakt can only see the file it makes.
+                    </div>
+                  </div>
+                  <span className="t-action" aria-hidden="true">
+                    →
+                  </span>
+                </button>
+                {googleError && (
+                  <div className="group-row-sep px-4 py-3 t-label text-signal">{googleError}</div>
+                )}
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={openSetup}
+              className={"group-row w-full text-left" + (googleAvailable() ? " group-row-sep" : "")}
+            >
+              <div>
+                <div className="t-body">
+                  {googleAvailable() ? "Connect a sheet set up by hand" : "Set up sheet sync"}
+                </div>
+                <div className="t-label text-ink-2">
+                  {googleAvailable()
+                    ? "The Apps Script route. Needs a computer."
+                    : "Keep a Google Sheet up to date with your log."}
+                </div>
               </div>
-            </div>
-            <span className="t-action" aria-hidden="true">
-              →
-            </span>
-          </button>
+              <span className="t-action" aria-hidden="true">
+                →
+              </span>
+            </button>
+          </>
         ) : (
           <div className="space-y-4 p-4">
             <ol className="space-y-2 t-label text-ink-2">
