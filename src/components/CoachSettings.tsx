@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { useCoachStore } from "../lib/coach-store";
 import { isLikelyExecUrl } from "../lib/sync-client";
+import {
+  pickerAvailable,
+  pickSharedSpreadsheet,
+  type PickedSheet,
+  type PickFailure,
+} from "../lib/google-picker";
 import { Chevron } from "./icons";
 import { Toggle } from "./Toggle";
 import { freshness } from "./ClientBanner";
@@ -100,13 +106,107 @@ export function CoachSettings() {
 }
 
 /**
- * Adding a client by their Apps Script deployment.
+ * Adding a client.
  *
- * The Sheets API path will add a client through the Google Picker instead,
- * which needs no typing at all. This form stays for sheets set up by hand, and
- * is the only way in until that transport exists.
+ * The Picker is the way in: the client shares their sheet with the coach, and
+ * picking it is what grants this app access to it (see google-picker.ts). The
+ * Apps Script form stays for sheets set up by hand, one tap away rather than
+ * alongside, since a coach choosing between the two up front is choosing
+ * between words they do not know.
  */
 function AddClientForm({ onDone }: { onDone: () => void }) {
+  const [byLink, setByLink] = useState(!pickerAvailable());
+  return byLink ? (
+    <AddByLinkForm onDone={onDone} />
+  ) : (
+    <AddByPickerForm onDone={onDone} onUseLink={() => setByLink(true)} />
+  );
+}
+
+const PICK_ERRORS: Record<PickFailure, string> = {
+  "needs-consent": "Google sign-in was closed before it finished",
+  "script-blocked": "Couldn't load Google. Check your connection or content blocker",
+  "no-api-key": "This build has no Google API key",
+  "no-client-id": "This build has no Google client id",
+};
+
+function AddByPickerForm({ onDone, onUseLink }: { onDone: () => void; onUseLink: () => void }) {
+  const addClient = useCoachStore((s) => s.addClient);
+  const [name, setName] = useState("");
+  const [sheet, setSheet] = useState<PickedSheet | undefined>();
+  const [picking, setPicking] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
+  const pick = async () => {
+    setPicking(true);
+    setError(undefined);
+    try {
+      const picked = await pickSharedSpreadsheet();
+      if (picked) {
+        setSheet(picked);
+        // The sheet's own title is usually the client's name already.
+        if (name.trim() === "") setName(picked.name);
+      }
+    } catch (err) {
+      const code = (err instanceof Error ? err.message : "") as PickFailure;
+      setError(PICK_ERRORS[code] ?? PICK_ERRORS["script-blocked"]);
+    } finally {
+      setPicking(false);
+    }
+  };
+
+  const submit = async () => {
+    if (!sheet) return setError("Choose their sheet first");
+    if (name.trim() === "") return setError("Give them a name");
+    await addClient({
+      id: `cc_${crypto.randomUUID()}`,
+      name: name.trim(),
+      kind: "google",
+      spreadsheetId: sheet.id,
+    });
+    onDone();
+  };
+
+  return (
+    <div className="group-row-sep space-y-3 px-4 py-4">
+      <button
+        type="button"
+        disabled={picking}
+        onClick={() => void pick()}
+        className="flex min-h-[44px] w-full items-center justify-between border border-rule px-3 text-left rounded-md"
+      >
+        <span className="min-w-0 truncate t-body text-ink">
+          {picking
+            ? "Opening Google…"
+            : sheet
+              ? sheet.name || "Untitled sheet"
+              : "Choose their sheet"}
+        </span>
+        <span className="shrink-0 pl-3 t-label text-ink-2">{sheet ? "Change" : ""}</span>
+      </button>
+      <Field label="Name" value={name} onChange={setName} placeholder="Bob" />
+      {error && <p className="t-label text-signal">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => void submit()}
+          className="min-h-[44px] flex-1 bg-ink t-body font-medium text-paper rounded-md"
+        >
+          Add
+        </button>
+        <button type="button" onClick={onDone} className="min-h-[44px] flex-1 t-body text-ink-2">
+          Cancel
+        </button>
+      </div>
+      <button type="button" onClick={onUseLink} className="min-h-[44px] t-label text-ink-2">
+        Use an Apps Script link instead
+      </button>
+    </div>
+  );
+}
+
+/** Adding a client by their Apps Script deployment, for sheets set up by hand. */
+function AddByLinkForm({ onDone }: { onDone: () => void }) {
   const addClient = useCoachStore((s) => s.addClient);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");

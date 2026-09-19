@@ -49,7 +49,7 @@ const SILENT_TOKEN_TIMEOUT_MS = 30_000;
 const INTERACTIVE_TOKEN_TIMEOUT_MS = 120_000;
 
 /** Rejects with `reason` if `promise` has not settled in time. */
-function withTimeout<T>(promise: Promise<T>, ms: number, reason: AuthFailure): Promise<T> {
+export function withTimeout<T>(promise: Promise<T>, ms: number, reason: AuthFailure): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(reason)), ms);
     promise.then(
