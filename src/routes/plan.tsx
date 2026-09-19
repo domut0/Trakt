@@ -8,6 +8,8 @@ import { SlotPlanSheet } from "../components/SlotPlanSheet";
 import { SplitCardList } from "../components/SplitCardList";
 import { SaveChangesBar } from "../components/SaveChangesBar";
 import { CoachPlanPrompt } from "../components/CoachPlanPrompt";
+import { CoachManagedBanner } from "../components/CoachManagedBanner";
+import { usePlanLocked } from "../lib/plan-lock";
 import { Plus } from "../components/icons";
 import { Chevron } from "../components/icons";
 import { dayKey, parseDayKey } from "../lib/daily-log";
@@ -45,6 +47,7 @@ function PlanPage() {
   const unpinDay = useStore((s) => s.unpinDay);
   const next = useStore((s) => s.nextCard());
   const hydrated = useStore((s) => s.hydrated);
+  const locked = usePlanLocked();
 
   const [editingSlot, setEditingSlot] = useState<SplitSlot | undefined>();
   const [cardOpen, setCardOpen] = useState(false);
@@ -77,74 +80,81 @@ function PlanPage() {
       {/* The client's side: renders nothing unless their sheet holds a
           coach-issued plan they have not absorbed. */}
       <CoachPlanPrompt />
+      <CoachManagedBanner />
 
-      <NutritionRibbon />
-      <TargetStrip />
+      {/* Inert while a coach manages the plan: readable, not editable. The
+          store refuses these edits anyway; this is so nothing looks tappable. */}
+      <div inert={locked}>
+        <NutritionRibbon />
+        <TargetStrip />
 
-      {/* ---- The workout split ----------------------------------------- */}
-      <section className="px-4 section-gap anim-fade-up">
-        <div className="group-header">
-          <h2 className="t-caption">Workout split</h2>
-          <button
-            type="button"
-            onClick={() => {
-              setEditingSlot(undefined);
-              setCardOpen(true);
-            }}
-            aria-label="Add a card to the split"
-            className="flex min-h-[44px] items-center text-ink"
-          >
-            <Plus size={18} />
-          </button>
-        </div>
-
-        {/* Directly under the heading, where the user asked for it: what you do
-            next is the one thing this section is read for. */}
-        {next && <p className="px-4 pb-2 t-label text-ink-2">Next: {next.name}</p>}
-
-        {rotation.length === 0 ? (
-          <div className="group-list px-4 py-5">
-            <p className="t-body text-ink-2">No cards yet</p>
-          </div>
-        ) : (
-          <SplitCardList
-            onEdit={(slot) => {
-              setEditingSlot(slot);
-              setCardOpen(true);
-            }}
-          />
-        )}
-      </section>
-
-      {/* ---- Pinned ---- */}
-      {futurePins.length > 0 && (
+        {/* ---- The workout split ----------------------------------------- */}
         <section className="px-4 section-gap anim-fade-up">
           <div className="group-header">
-            <h2 className="t-caption">Pinned</h2>
+            <h2 className="t-caption">Workout split</h2>
+            {!locked && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingSlot(undefined);
+                  setCardOpen(true);
+                }}
+                aria-label="Add a card to the split"
+                className="flex min-h-[44px] items-center text-ink"
+              >
+                <Plus size={18} />
+              </button>
+            )}
           </div>
-          <div className="group-list">
-            {futurePins.map((p, i) => (
-              <div key={p.date} className={`group-row ${i === 0 ? "" : "group-row-sep"}`}>
-                <span className="min-w-0">
-                  <span className="block t-body text-ink">
-                    {slots.find((s) => s.id === p.splitSlotId)?.name ?? "Unknown"}
-                  </span>
-                  <span className="block t-label text-ink-2">
-                    {format(parseDayKey(p.date), "EEE d MMM")}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => unpinDay(p.date)}
-                  className="shrink-0 min-h-[44px] px-2 t-action t-label"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
+
+          {/* Directly under the heading, where the user asked for it: what you do
+            next is the one thing this section is read for. */}
+          {next && <p className="px-4 pb-2 t-label text-ink-2">Next: {next.name}</p>}
+
+          {rotation.length === 0 ? (
+            <div className="group-list px-4 py-5">
+              <p className="t-body text-ink-2">No cards yet</p>
+            </div>
+          ) : (
+            <SplitCardList
+              onEdit={(slot) => {
+                setEditingSlot(slot);
+                setCardOpen(true);
+              }}
+            />
+          )}
         </section>
-      )}
+
+        {/* ---- Pinned ---- */}
+        {futurePins.length > 0 && (
+          <section className="px-4 section-gap anim-fade-up">
+            <div className="group-header">
+              <h2 className="t-caption">Pinned</h2>
+            </div>
+            <div className="group-list">
+              {futurePins.map((p, i) => (
+                <div key={p.date} className={`group-row ${i === 0 ? "" : "group-row-sep"}`}>
+                  <span className="min-w-0">
+                    <span className="block t-body text-ink">
+                      {slots.find((s) => s.id === p.splitSlotId)?.name ?? "Unknown"}
+                    </span>
+                    <span className="block t-label text-ink-2">
+                      {format(parseDayKey(p.date), "EEE d MMM")}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => unpinDay(p.date)}
+                    className="shrink-0 min-h-[44px] px-2 t-action t-label"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
 
       <div className="pb-8" />
 

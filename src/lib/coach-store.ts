@@ -67,6 +67,9 @@ const SWAPPED_KEYS = [
   "nextSlotId",
   "restSince",
   "lastAcceptedPlanAt",
+  // Swapped so the COACH can edit a client's plan even when the coach is
+  // coached themselves -- and so the client's own flag never reaches here.
+  "coachManaged",
 ] as const;
 
 type SwappedKey = (typeof SWAPPED_KEYS)[number];
@@ -97,6 +100,7 @@ function asStoreState(snapshot: ClientSnapshot): Swapped {
     nextSlotId: undefined,
     restSince: undefined,
     lastAcceptedPlanAt: undefined,
+    coachManaged: false,
   };
 }
 

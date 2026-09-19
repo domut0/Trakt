@@ -322,6 +322,8 @@ interface State {
    * offered only when it is newer than this. See `isNewerCoachPlan`.
    */
   lastAcceptedPlanAt: string | undefined;
+  /** See `SettingsMeta.coachManaged`. */
+  coachManaged: boolean;
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
@@ -400,7 +402,8 @@ interface State {
 
   // --- The workout split --------------------------------------------------
   /** Appends a card. A repeat needs no name and is never a day. */
-  addSplitCard: (input: { name?: string; kind?: SplitCardKind }) => SplitSlot;
+  /** Undefined while a coach manages the plan. */
+  addSplitCard: (input: { name?: string; kind?: SplitCardKind }) => SplitSlot | undefined;
   updateSplitCard: (id: string, patch: { name?: string; kind?: SplitCardKind }) => void;
   /** Removes a card. If the cursor was on it, the cursor moves on rather than
    * being left pointing at nothing. */
@@ -440,6 +443,12 @@ interface State {
    * session keeps the slot it was logged against.
    */
   acceptCoachPlan: (plan: PlanPayload) => void;
+  /**
+   * Hands the plan back to its owner. Nothing about the plan changes: the
+   * coach's last plan simply becomes theirs to edit. It does not stop the
+   * coach seeing the sheet -- only unsharing it in Google Drive does that.
+   */
+  unlinkCoach: () => void;
   pinDay: (date: string, splitSlotId: string) => void;
   unpinDay: (date: string) => void;
   /** The slot pinned to a date, or undefined. NEVER the rotation's guess: the
@@ -1119,6 +1128,7 @@ function persistSettingsFrom(s: State) {
     nextSlotId: s.nextSlotId,
     restSince: s.restSince,
     lastAcceptedPlanAt: s.lastAcceptedPlanAt,
+    coachManaged: s.coachManaged,
   };
   safeWrite(() => db.meta.put(settings));
 }
@@ -1135,6 +1145,7 @@ export const useStore = create<State>((set, get) => ({
   nextSlotId: undefined,
   restSince: undefined,
   lastAcceptedPlanAt: undefined,
+  coachManaged: false,
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -1177,6 +1188,7 @@ export const useStore = create<State>((set, get) => ({
           nextSlotId: undefined,
           restSince: undefined,
           lastAcceptedPlanAt: undefined,
+          coachManaged: false,
           activeSessionId: undefined,
           currentExerciseId: undefined,
           currentBlock: undefined,
@@ -1199,6 +1211,7 @@ export const useStore = create<State>((set, get) => ({
         nextSlotId: data.settings.nextSlotId,
         restSince: data.settings.restSince,
         lastAcceptedPlanAt: data.settings.lastAcceptedPlanAt,
+        coachManaged: data.settings.coachManaged ?? false,
         // Both default on READ. A settings record written before planning
         // existed has neither key, and no migration is needed to make it mean
         // "no plan" (see the note on `plannedWeek` in db.ts).
@@ -1547,6 +1560,7 @@ export const useStore = create<State>((set, get) => ({
   // --- Nutrition phases ---------------------------------------------------
 
   addPhase: (phase) => {
+    if (get().coachManaged) return undefined;
     if (get().nutritionPhases.some((p) => p.startsOn === phase.startsOn)) return undefined;
     const created: NutritionPhase = { ...phase, id: `np_${uid()}`, name: phase.name.trim() };
     const next = [...get().nutritionPhases, created];
@@ -1556,6 +1570,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   updatePhase: (id, patch) => {
+    if (get().coachManaged) return;
     const next = get().nutritionPhases.map((p) => (p.id === id ? { ...p, ...patch } : p));
     set({ nutritionPhases: next });
     const updated = next.find((p) => p.id === id);
@@ -1563,6 +1578,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   setPhaseStart: (id, startsOn) => {
+    if (get().coachManaged) return false;
     // Two phases starting on one day is a contradiction rather than something
     // to resolve with a tiebreak nobody would remember, so it is refused here
     // as well as in the editor - the ribbon can drag a boundary onto a
@@ -1573,6 +1589,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   deletePhase: (id) => {
+    if (get().coachManaged) return;
     set({ nutritionPhases: get().nutritionPhases.filter((p) => p.id !== id) });
     safeWrite(() => db.nutritionPhases.delete(id));
   },
@@ -1587,6 +1604,10 @@ export const useStore = create<State>((set, get) => ({
   // --- The workout split --------------------------------------------------
 
   addSplitCard: ({ name, kind }) => {
+    // The one plan guard with a comment, standing for all of them: while a coach
+    // manages the plan, the Plan tab is inert, and this is what makes that a
+    // guarantee rather than a matter of every control remembering to hide.
+    if (get().coachManaged) return undefined;
     const k = kind ?? "workout";
     const orderEnd = get().slots.reduce((m, sl) => Math.max(m, sl.rotationOrder), -1) + 1;
     const card: SplitSlot = {
@@ -1604,6 +1625,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   updateSplitCard: (id, patch) => {
+    if (get().coachManaged) return;
     const next = get().slots.map((sl) => {
       if (sl.id !== id) return sl;
       const k = patch.kind ?? kindOf(sl);
@@ -1624,6 +1646,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   deleteSplitCard: (id) => {
+    if (get().coachManaged) return;
     const remaining = orderedSplit(get().slots.filter((sl) => sl.id !== id)).map((sl, i) => ({
       ...sl,
       rotationOrder: i,
@@ -1652,6 +1675,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   moveSplitCard: (id, toIndex) => {
+    if (get().coachManaged) return;
     const ordered = orderedSplit(get().slots);
     const from = ordered.findIndex((sl) => sl.id === id);
     if (from < 0) return;
@@ -1719,6 +1743,7 @@ export const useStore = create<State>((set, get) => ({
   // --- Training plan ------------------------------------------------------
 
   setSlotExercises: (slotId, exerciseIds) => {
+    if (get().coachManaged) return;
     // Deduped and pruned to exercises that still exist, so deleting an exercise
     // cannot leave a slot preloading a lift the picker has never heard of.
     const live = new Set(get().exercises.map((e) => e.id));
@@ -1755,6 +1780,7 @@ export const useStore = create<State>((set, get) => ({
       nutritionPhases: resolved.phases,
       plannedDays: resolved.pins,
       lastAcceptedPlanAt: plan.issuedAt,
+      coachManaged: true,
       // The split cursor may point at a card this plan dropped. Clearing it
       // sends the rotation back to the top rather than leaving it stranded on
       // a card that no longer exists.
@@ -1797,7 +1823,13 @@ export const useStore = create<State>((set, get) => ({
     persistSettingsFrom(get());
   },
 
+  unlinkCoach: () => {
+    set({ coachManaged: false });
+    persistSettingsFrom(get());
+  },
+
   pinDay: (date, splitSlotId) => {
+    if (get().coachManaged) return;
     if (!get().slots.some((sl) => sl.id === splitSlotId)) return;
     const pin: PlannedDay = { date, splitSlotId };
     set({ plannedDays: [...get().plannedDays.filter((d) => d.date !== date), pin] });
@@ -1805,6 +1837,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   unpinDay: (date) => {
+    if (get().coachManaged) return;
     set({ plannedDays: get().plannedDays.filter((d) => d.date !== date) });
     safeWrite(() => db.plannedDays.delete(date));
   },
@@ -1815,6 +1848,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   reorderSlots: (fromId, toId) => {
+    if (get().coachManaged) return;
     const slots = [...get().slots].sort((a, b) => a.rotationOrder - b.rotationOrder);
     const fromIdx = slots.findIndex((s) => s.id === fromId);
     const toIdx = slots.findIndex((s) => s.id === toId);
@@ -1853,6 +1887,12 @@ export const useStore = create<State>((set, get) => ({
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
+      // Neither is in a backup, and `replaceAllData` has just written a settings
+      // record without them. Cleared here too, or the store would disagree with
+      // disk until a reload. A coach plan still in the sheet is simply offered
+      // again, and accepting it restores both.
+      lastAcceptedPlanAt: undefined,
+      coachManaged: false,
     });
   },
 
@@ -1887,6 +1927,8 @@ export const useStore = create<State>((set, get) => ({
       activeSessionId: undefined,
       currentExerciseId: undefined,
       currentBlock: undefined,
+      lastAcceptedPlanAt: undefined,
+      coachManaged: false,
     });
   },
 

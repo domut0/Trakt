@@ -122,7 +122,7 @@ export function SlotPlanSheet({
   const save = () => {
     const target = slot ?? addSplitCard({ name, kind });
     if (slot) updateSplitCard(slot.id, { name, kind });
-    if (kind === "workout") setSlotExercises(target.id, picked);
+    if (kind === "workout" && target) setSlotExercises(target.id, picked);
     onClose();
   };
 

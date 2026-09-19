@@ -56,6 +56,7 @@ const COACH_STATE = {
   nextSlotId: "my_s",
   restSince: undefined,
   lastAcceptedPlanAt: undefined,
+  coachManaged: false,
   hydrated: true,
 };
 
@@ -338,6 +339,20 @@ describe("leaving a client's view", () => {
     expect(state.unit).toBe("lbs");
     expect(state.exercises.map((e) => e.name)).toEqual(["Bench Press"]);
     expect(state.dailyLogs[0].calories).toBe(3200);
+  });
+
+  it("lets a coached coach edit their client's plan, then locks their own again", async () => {
+    // A coach can have a coach. Their own lock must not follow them into a
+    // client's plan, and must be waiting for them when they come back.
+    useStore.setState({ coachManaged: true });
+    stubClientSheet();
+
+    await useCoachStore.getState().enterClientView("c_bob");
+    expect(useStore.getState().coachManaged).toBe(false);
+    expect(useStore.getState().addSplitCard({ name: "Arms" })).toBeDefined();
+
+    useCoachStore.getState().exitClientView();
+    expect(useStore.getState().coachManaged).toBe(true);
   });
 
   it("gives the coach their workout back", async () => {

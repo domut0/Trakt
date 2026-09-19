@@ -69,6 +69,7 @@ beforeEach(async () => {
     nextSlotId: "s_legs",
     restSince: undefined,
     lastAcceptedPlanAt: undefined,
+    coachManaged: false,
     hydrated: true,
   });
 });
@@ -187,5 +188,70 @@ describe("acceptCoachPlan", () => {
     expect(state.slots).toEqual([]);
     expect(state.nutritionPhases).toEqual([]);
     expect(state.sets).toHaveLength(1);
+  });
+});
+
+describe("a coach-managed plan", () => {
+  it("is what accepting a coach's plan makes it, and survives a reload", async () => {
+    useStore.getState().acceptCoachPlan(PLAN);
+    expect(useStore.getState().coachManaged).toBe(true);
+    await flush();
+    useStore.setState({ hydrated: false, coachManaged: false });
+    await useStore.getState().hydrate();
+    expect(useStore.getState().coachManaged).toBe(true);
+  });
+
+  it("refuses every plan edit, so a control that forgets to hide cannot reach it", () => {
+    useStore.getState().acceptCoachPlan(PLAN);
+    const s = useStore.getState();
+    const before = JSON.stringify({
+      slots: s.slots,
+      phases: s.nutritionPhases,
+      pins: s.plannedDays,
+    });
+    const upper = s.slots.find((sl) => sl.name === "Upper")!;
+    const phase = s.nutritionPhases[0];
+
+    expect(s.addSplitCard({ name: "Arms" })).toBeUndefined();
+    s.updateSplitCard(upper.id, { name: "Push" });
+    s.deleteSplitCard(upper.id);
+    s.moveSplitCard(upper.id, 1);
+    s.reorderSlots(upper.id, s.slots[1].id);
+    s.setSlotExercises(upper.id, []);
+    expect(s.addPhase({ startsOn: "2026-12-01", name: "Gain", kind: "targets" })).toBeUndefined();
+    s.updatePhase(phase.id, { calories: 9999 });
+    expect(s.setPhaseStart(phase.id, "2026-11-01")).toBe(false);
+    s.deletePhase(phase.id);
+    s.pinDay("2026-09-30", upper.id);
+    s.unpinDay("2026-09-22");
+
+    const after = useStore.getState();
+    expect(
+      JSON.stringify({
+        slots: after.slots,
+        phases: after.nutritionPhases,
+        pins: after.plannedDays,
+      }),
+    ).toBe(before);
+  });
+
+  it("still lets the person train: logging never waits on a plan", () => {
+    useStore.getState().acceptCoachPlan(PLAN);
+    useStore.getState().upsertDailyLog("2026-09-15", { calories: 2100 });
+    expect(useStore.getState().dailyLogFor("2026-09-15")?.calories).toBe(2100);
+  });
+
+  it("hands the plan back on unlink, persisted, with the plan itself untouched", async () => {
+    useStore.getState().acceptCoachPlan(PLAN);
+    const slots = useStore.getState().slots;
+    useStore.getState().unlinkCoach();
+
+    expect(useStore.getState().coachManaged).toBe(false);
+    expect(useStore.getState().slots).toEqual(slots);
+    expect(useStore.getState().addSplitCard({ name: "Arms" })).toBeDefined();
+    await flush();
+    useStore.setState({ hydrated: false });
+    await useStore.getState().hydrate();
+    expect(useStore.getState().coachManaged).toBe(false);
   });
 });

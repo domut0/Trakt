@@ -38,11 +38,11 @@ async function buildUL() {
   });
   const s = useStore.getState();
   return {
-    upper: s.addSplitCard({ name: "Upper" }),
-    lower: s.addSplitCard({ name: "Lower" }),
-    rep1: s.addSplitCard({ kind: "repeat" }),
-    rest: s.addSplitCard({ kind: "rest" }),
-    rep2: s.addSplitCard({ kind: "repeat" }),
+    upper: s.addSplitCard({ name: "Upper" })!,
+    lower: s.addSplitCard({ name: "Lower" })!,
+    rep1: s.addSplitCard({ kind: "repeat" })!,
+    rest: s.addSplitCard({ kind: "rest" })!,
+    rep2: s.addSplitCard({ kind: "repeat" })!,
   };
 }
 
@@ -154,8 +154,8 @@ describe("taking a rest", () => {
     // cursor LANDED on is as taken as one chosen by hand.
     await buildUL();
     const s = useStore.getState();
-    const push = s.addSplitCard({ name: "Push" });
-    const rest2 = s.addSplitCard({ kind: "rest" });
+    const push = s.addSplitCard({ name: "Push" })!;
+    const rest2 = s.addSplitCard({ kind: "rest" })!;
     useStore.getState().setNextCard(push.id);
     useStore.getState().startWorkout("Push");
     useStore.getState().endWorkout();

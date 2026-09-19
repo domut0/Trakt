@@ -34,11 +34,11 @@ async function reset() {
 /** The user's own split: Upper, Lower, Repeat, Rest, Repeat. */
 function buildUL() {
   const s = useStore.getState();
-  const upper = s.addSplitCard({ name: "Upper" });
-  const lower = s.addSplitCard({ name: "Lower" });
-  const rep1 = s.addSplitCard({ kind: "repeat" });
-  const rest = s.addSplitCard({ kind: "rest" });
-  const rep2 = s.addSplitCard({ kind: "repeat" });
+  const upper = s.addSplitCard({ name: "Upper" })!;
+  const lower = s.addSplitCard({ name: "Lower" })!;
+  const rep1 = s.addSplitCard({ kind: "repeat" })!;
+  const rest = s.addSplitCard({ kind: "rest" })!;
+  const rep2 = s.addSplitCard({ kind: "repeat" })!;
   return { upper, lower, rep1, rest, rep2 };
 }
 

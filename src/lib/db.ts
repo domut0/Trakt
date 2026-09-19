@@ -52,6 +52,12 @@ export interface SettingsMeta {
    * bump.
    */
   lastAcceptedPlanAt?: string;
+  /**
+   * Whether a coach manages this person's plan. Set by accepting a coach's
+   * plan, cleared only by unlinking. While set, the Plan tab is read-only and
+   * the store refuses plan edits. Non-indexed, so no version bump.
+   */
+  coachManaged?: boolean;
 }
 
 export interface ActiveSessionMeta {
