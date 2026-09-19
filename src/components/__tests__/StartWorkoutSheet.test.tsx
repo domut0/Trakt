@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StartWorkoutSheet } from "../StartWorkoutSheet";
 import { useStore, type Exercise, type SplitSlot } from "../../lib/store";
+import { dayKey } from "../../lib/daily-log";
 
 /**
  * Choosing what to train, and preloading what it is for.
@@ -131,7 +132,9 @@ describe("StartWorkoutSheet", () => {
 
     it("prefers a pin for today over the rotation", () => {
       // A pin is a fact the user recorded about this day, so it outranks a guess.
-      const today = new Date().toISOString().slice(0, 10);
+      // The LOCAL date, as the app computes it. `toISOString` is UTC, which is
+      // already tomorrow every evening west of Greenwich.
+      const today = dayKey(new Date());
       useStore.setState({ plannedDays: [{ date: today, splitSlotId: "s_upper" }] });
       renderSheet();
       fireEvent.click(screen.getByRole("button", { name: "Start" }));
