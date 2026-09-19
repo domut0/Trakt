@@ -306,6 +306,9 @@
           new google.picker.PickerBuilder()
             .setOAuthToken(accessToken)
             .setDeveloperKey(apiKey)
+            // drive.file is granted to the app the Picker names. Without the project
+            // number here a pick grants nothing, and check 4 fails for the wrong reason.
+            .setAppId($("clientId").value.trim().split("-")[0])
             .addView(view)
             .setCallback(async (data) => {
               if (data.action !== google.picker.Action.PICKED) {
