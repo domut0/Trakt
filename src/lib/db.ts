@@ -42,6 +42,16 @@ export interface SettingsMeta {
    * answerable the next time the app opens. Non-indexed, so no version bump.
    */
   restSince?: string;
+  /**
+   * When the coach plan currently in force was issued, as its ISO instant.
+   *
+   * Held here rather than beside the sync config because it describes the app's
+   * own plan -- which coach plan has been absorbed -- and must survive a
+   * disconnect and reconnect of the sheet. Without it, reconnecting would
+   * re-offer a plan the client accepted weeks ago. Non-indexed, so no version
+   * bump.
+   */
+  lastAcceptedPlanAt?: string;
 }
 
 export interface ActiveSessionMeta {
@@ -110,6 +120,32 @@ export interface SyncBaseMeta {
 
 type MetaRecord = SettingsMeta | ActiveSessionMeta | SyncConfigMeta | SyncBaseMeta | DeviceIdMeta;
 
+/**
+ * A client whose sheet this install can read, in coach mode.
+ *
+ * Pointers only. No client health data is stored here -- a client's log is
+ * pulled into memory when their view is opened and dropped when it is closed,
+ * which is the whole reason this feature needs no database to protect. What a
+ * coach's device holds about a client is how to reach their spreadsheet, plus
+ * the name to show it under.
+ *
+ * `kind` mirrors `SyncConfigMeta`: a sheet reached through the Apps Script has
+ * a url and a secret, one reached through the Sheets API has a spreadsheet id.
+ */
+export interface CoachClient {
+  id: string;
+  /** What the coach calls them. Shown in the banner and the client list. */
+  name: string;
+  kind: "google" | "appsScript";
+  /** google: the spreadsheet this app was granted access to via the Picker. */
+  spreadsheetId?: string;
+  /** appsScript: the /exec deployment and its secret. */
+  url?: string;
+  secret?: string;
+  /** When their data was last pulled, so the banner can say how stale it is. */
+  lastPulledAt?: number;
+}
+
 class WorkoutDb extends Dexie {
   exercises!: EntityTable<Exercise, "id">;
   slots!: EntityTable<SplitSlot, "id">;
@@ -119,6 +155,7 @@ class WorkoutDb extends Dexie {
   dailyLogs!: EntityTable<DailyLog, "date">;
   nutritionPhases!: EntityTable<NutritionPhase, "id">;
   plannedDays!: EntityTable<PlannedDay, "date">;
+  coachClients!: EntityTable<CoachClient, "id">;
 
   constructor() {
     super("workout-tracker");
@@ -311,6 +348,19 @@ class WorkoutDb extends Dexie {
         // The settings record keeps only what it still describes.
         await tx.table("meta").put({ key: "settings", unit: meta.unit ?? "lbs" });
       });
+
+    // v7 adds coach mode's client list, which is a genuine new table and so a
+    // genuine bump -- unlike `lastAcceptedPlanAt`, which arrived at the same
+    // time as a non-indexed field on the settings row and needed none.
+    //
+    // No secondary index. The list is read whole, every time, and a coach with
+    // enough clients for an index to matter has outgrown a phone-local list.
+    //
+    // No upgrade function: a new table starts empty, and there is nothing in any
+    // earlier version to migrate from.
+    this.version(7).stores({
+      coachClients: "id",
+    });
   }
 }
 
@@ -400,6 +450,7 @@ export async function seedDb(data: {
   sets: WorkoutSet[];
   settings: SettingsMeta;
 }): Promise<void> {
+  assertWritable("seedDb");
   // dailyLogs, habits and habitEntries are in the transaction scope but
   // intentionally never written: a first run seeds no daily logs and no habits,
   // so those tables start empty. They are still listed because Dexie requires
@@ -438,6 +489,7 @@ export async function seedDb(data: {
  * input completely.
  */
 export async function replaceAllData(data: BackupData): Promise<void> {
+  assertWritable("replaceAllData");
   await db.transaction(
     "rw",
     [
@@ -487,6 +539,30 @@ export async function replaceAllData(data: BackupData): Promise<void> {
       await db.meta.delete("syncBase");
     },
   );
+}
+
+// --- Coach mode -----------------------------------------------------------
+//
+// Like the sync meta below, these do NOT go through `safeWrite`: it flips the
+// global write-failure flag, which raises "Couldn't save to this device" -- far
+// too alarming for bookkeeping about somebody else's spreadsheet. Callers
+// handle their own failures.
+//
+// They are also exempt from the read-only latch on purpose. The latch protects
+// the coach's own training data while a client's is on screen; adding or
+// renaming a client is not that, and would otherwise be impossible to do from
+// inside the very mode it belongs to.
+
+export async function loadCoachClients(): Promise<CoachClient[]> {
+  return db.coachClients.toArray();
+}
+
+export async function saveCoachClient(client: CoachClient): Promise<void> {
+  await db.coachClients.put(client);
+}
+
+export async function deleteCoachClient(id: string): Promise<void> {
+  await db.coachClients.delete(id);
 }
 
 // --- Sync meta ------------------------------------------------------------
@@ -540,6 +616,53 @@ export async function putActiveSessionMeta(meta: ActiveSessionMeta): Promise<voi
   await db.meta.put(meta);
 }
 
+/**
+ * Why every durable write in the app can be switched off.
+ *
+ * Coach mode renders another person's data through this app's own screens, and
+ * it does that by swapping the arrays in the Zustand store — which is what makes
+ * Today, Charts and History work unmodified for a client. The cost of that trick
+ * is that the store's ~33 write-through call sites are still wired to THIS
+ * device's database. A single action that slips past a disabled control would
+ * write the client's data into the coach's own log.
+ *
+ * That failure is quiet, which is what makes it serious. Nothing throws, nothing
+ * renders wrong, and the coach finds out weeks later that their own training
+ * history has a fortnight of somebody else's numbers in it.
+ *
+ * Disabling the controls is not the guarantee, because it relies on every future
+ * screen remembering to. This is the guarantee: one latch at the single
+ * chokepoint every write already passes through, so the safe behaviour is the
+ * default for code that has not been written yet.
+ *
+ * `reason` is a human-readable string rather than a boolean so that anything
+ * reporting a refused write can say WHY it was refused.
+ */
+let readOnlyReason: string | undefined;
+
+export function setDbReadOnly(reason: string | undefined): void {
+  readOnlyReason = reason;
+}
+
+/** The reason writes are currently refused, or undefined when they are allowed. */
+export function dbReadOnlyReason(): string | undefined {
+  return readOnlyReason;
+}
+
+/**
+ * Guard for the destructive writes that do NOT go through `safeWrite`.
+ *
+ * `replaceAllData` and `seedDb` are awaited by their callers rather than
+ * fire-and-forget, and they clear every table before writing. A silent no-op
+ * there would leave a restore reporting success having done nothing, so these
+ * throw instead — the asymmetry with `safeWrite` is deliberate.
+ */
+function assertWritable(op: string): void {
+  if (readOnlyReason !== undefined) {
+    throw new Error(`[db] ${op} refused: database is read-only (${readOnlyReason})`);
+  }
+}
+
 // Set by store.ts at module scope so a failed write can surface as UI state
 // (a banner) without db.ts importing store.ts back — store.ts already
 // imports db.ts, and that import would be circular.
@@ -560,6 +683,10 @@ export function setWriteErrorHandler(fn: ((err: unknown) => void) | null): void 
  * return a rejected promise. Both are handled here.
  */
 export function safeWrite(op: () => Promise<unknown>): void {
+  // The latch, at the one point every store write already passes through. A
+  // silent no-op is right here: these are mirror writes for state the in-memory
+  // store already holds, and the caller has nothing to do about a refusal.
+  if (readOnlyReason !== undefined) return;
   try {
     const result = op();
     Promise.resolve(result).catch((err: unknown) => {

@@ -9,7 +9,7 @@ import { useStore } from "../store";
 // for every test after it. One upgrade-from-scratch claim per file is the only
 // arrangement that holds.
 
-const CURRENT_SCHEMA_VERSION = 6;
+const CURRENT_SCHEMA_VERSION = 7;
 
 /** The v5 schema, which is what every install carrying the weekly-template
  *  planning model is sitting on. */

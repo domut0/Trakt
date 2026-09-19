@@ -13,13 +13,25 @@
 const SECRET = "__SECRET__";
 
 /** Bumped when this file changes in a way the app needs to know about. */
-const SCRIPT_VERSION = 3;
+const SCRIPT_VERSION = 4;
 
-/** Tabs the app writes. Anything else in the spreadsheet is left alone. */
-const APP_TABS = ["sets", "sessions", "daily", "cardio"];
+/**
+ * Tabs the app writes. Anything else in the spreadsheet is left alone.
+ *
+ * "plan" is written only on the syncs that carry it. A push that omits a tab
+ * leaves that tab untouched, which is what lets a coach's plan survive the
+ * client's ordinary syncing until the client accepts it.
+ */
+const APP_TABS = ["sets", "sessions", "daily", "cardio", "plan"];
 
-/** Tabs the app reads back, because they carry editable columns. */
-const TWO_WAY_TABS = ["sets", "sessions", "daily"];
+/**
+ * Tabs the app reads back.
+ *
+ * "sets", "sessions" and "daily" because they carry editable columns; "plan"
+ * for a different reason entirely -- it is not a log with editable cells, it is
+ * a document a coach writes and the client reads.
+ */
+const TWO_WAY_TABS = ["sets", "sessions", "daily", "plan"];
 
 const META_TAB = "_sync";
 
@@ -33,6 +45,7 @@ function doPost(e) {
 
     if (body.action === "pull") return json_(pull_());
     if (body.action === "push") return json_(push_(body));
+    if (body.action === "putPlan") return json_(putPlan_(body));
 
     return json_({ ok: false, error: "unknown-action" });
   } catch (err) {
@@ -62,6 +75,48 @@ function pull_() {
     spreadsheetUrl: ss.getUrl(),
     tabs: tabs,
   };
+}
+
+/**
+ * Writes the plan tab, and nothing else.
+ *
+ * This is how a coach's plan reaches a client. It differs from `push_` in three
+ * ways, each deliberate:
+ *
+ *   NO DEVICE CHECK. The whole point is that a device which does not own this
+ *   sheet can write here. Ownership is about who may rewrite the LOG, and this
+ *   touches none of it. `pull_` has no device check either, for the same
+ *   reason: reading and advising are not claiming.
+ *
+ *   NO REVISION BUMP. The revision is the log's optimistic-concurrency token.
+ *   Bumping it here would make the owning device's next push read as stale and
+ *   send it round a pointless merge, over a tab the merge does not even look at.
+ *
+ *   NO expectedRevision. There is nothing to be stale against: a plan is a
+ *   document that replaces the previous one wholesale, and the app's own
+ *   issuedAt ordering decides which of two plans wins.
+ *
+ * The secret is still required -- doPost checks it before dispatching -- so
+ * this is no more open than the rest of the endpoint.
+ */
+function putPlan_(body) {
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(20000)) return { ok: false, error: "busy" };
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    var rows = body.tabs && body.tabs.plan;
+    if (!rows || !rows.length) return { ok: false, error: "empty-plan" };
+    writeTab_(ss, "plan", rows);
+    return {
+      ok: true,
+      scriptVersion: SCRIPT_VERSION,
+      revision: readMeta_(ss).revision,
+      spreadsheetUrl: ss.getUrl(),
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function push_(body) {

@@ -12,6 +12,8 @@ import {
   type ColumnSpec,
 } from "./csv";
 import type { DailyLog, Exercise, SplitSlot, WorkoutSession, WorkoutSet } from "./store";
+import type { NutritionPhase, PlannedDay } from "./planning";
+import { buildPlanTab, planFromStore } from "./plan-tab";
 
 /**
  * Google Sheets sync: pure logic only.
@@ -42,13 +44,19 @@ import type { DailyLog, Exercise, SplitSlot, WorkoutSession, WorkoutSet } from "
  */
 
 /** Bumped when the tab layout changes in a way a reader would notice. */
-export const SYNC_FORMAT_VERSION = 2;
+export const SYNC_FORMAT_VERSION = 3;
 
 export const SHEET_TABS = {
   sets: "sets",
   sessions: "sessions",
   daily: "daily",
   cardio: "cardio",
+  /**
+   * The training and nutrition plan. Unlike the other tabs this is not a log:
+   * both sides write it, and it is how a coach's plan reaches a client. See
+   * plan-tab.ts, which owns its format.
+   */
+  plan: "plan",
   /** Written by the Apps Script, not by the app. Leading underscore sorts it last. */
   meta: "_sync",
 } as const;
@@ -117,7 +125,16 @@ export interface SyncBase {
 }
 
 /** The store fields that reach the sheet. Anything absent here cannot dirty a sync. */
-const SYNC_SOURCE_KEYS = ["exercises", "slots", "sessions", "sets", "dailyLogs", "unit"] as const;
+const SYNC_SOURCE_KEYS = [
+  "exercises",
+  "slots",
+  "sessions",
+  "sets",
+  "dailyLogs",
+  "nutritionPhases",
+  "plannedDays",
+  "unit",
+] as const;
 
 /**
  * Whether a store update changed anything the sheet would show.
@@ -143,6 +160,9 @@ export interface SyncSource {
   sessions: readonly WorkoutSession[];
   sets: readonly WorkoutSet[];
   dailyLogs: readonly DailyLog[];
+  /** Carried so the plan tab can be written; not part of any merge. */
+  nutritionPhases: readonly NutritionPhase[];
+  plannedDays: readonly PlannedDay[];
   unit: "lbs" | "kg";
 }
 
@@ -185,10 +205,13 @@ function withIdColumn<T extends { id: string }>(columns: ColumnSpec<T>[]): Colum
  * revision it carries is assigned server-side and the app cannot know it until
  * the push comes back.
  */
-export function buildSheetTabs(source: SyncSource): Record<string, CellValue[][]> {
+export function buildSheetTabs(
+  source: SyncSource,
+  plan: { issuedAt: string } | undefined,
+): Record<string, CellValue[][]> {
   const { exercises, slots, sessions, sets, dailyLogs, unit } = source;
 
-  return {
+  const tabs: Record<string, CellValue[][]> = {
     [SHEET_TABS.sets]: toRows(
       sortSetsByLoggedAt(sets),
       withIdColumn(setColumns(sessions, exercises, slots, unit)),
@@ -204,6 +227,17 @@ export function buildSheetTabs(source: SyncSource): Record<string, CellValue[][]
       withIdColumn(cardioColumns(exercises, unit)),
     ),
   };
+
+  // Omitted entirely rather than written blank when the caller says to leave it:
+  // the Apps Script only clears the tabs it is handed, so an absent key is what
+  // preserves a coach's pending plan through the client's ordinary sync.
+  if (plan) {
+    tabs[SHEET_TABS.plan] = buildPlanTab(
+      planFromStore(source, { by: "client", at: plan.issuedAt }),
+    );
+  }
+
+  return tabs;
 }
 
 // --- Pull: parsing the tabs back -----------------------------------------

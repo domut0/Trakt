@@ -1,6 +1,8 @@
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { useStore } from "../lib/store";
+import { useCoachStore } from "../lib/coach-store";
+import { ClientBanner } from "./ClientBanner";
 import { Gear } from "./icons";
 import { StartWorkoutSheet } from "./StartWorkoutSheet";
 import { WorkoutChooserSheet } from "./WorkoutChooserSheet";
@@ -148,6 +150,10 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   const location = useLocation();
   const router = useRouter();
   const activeSessionId = useStore((s) => s.activeSessionId);
+  // Logging is the one thing coach mode cannot offer: the data on screen is a
+  // client's, and the read-only latch would refuse the write anyway. Better to
+  // say so on the button than to let it open a sheet that silently does nothing.
+  const viewingClient = useCoachStore((s) => s.viewing !== undefined);
   if (location.pathname === "/workout") return null;
   const items = TABS;
   const currentIndex = items.findIndex((it) => it.to === location.pathname);
@@ -211,15 +217,30 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
             row. Source order does the same job with nothing to get wrong. */}
         <li className="flex items-center justify-center">
           <button
-            onClick={() =>
-              activeSessionId ? router.navigate({ to: "/workout" }) : onOpenChooser()
+            onClick={() => {
+              if (viewingClient) return;
+              if (activeSessionId) router.navigate({ to: "/workout" });
+              else onOpenChooser();
+            }}
+            disabled={viewingClient}
+            aria-label={
+              viewingClient
+                ? "Starting a workout is unavailable while viewing a client"
+                : activeSessionId
+                  ? "Return to active workout"
+                  : "Start workout"
             }
-            aria-label={activeSessionId ? "Return to active workout" : "Start workout"}
             // Foreground, not accent. Accent in this bar now means exactly one
             // thing - the tab you are on - so the action button states its rank
             // with fill and weight instead: a solid glyph and a semibold label
             // against four muted outlined tabs.
-            className="flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 bg-ink px-1 py-1 text-paper rounded-md"
+            className={
+              "flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-md " +
+              // Muted rather than hidden. A button that vanishes moves the four
+              // tabs on either side of it, and the bar's whole geometry is five
+              // equal columns with the action in the middle one.
+              (viewingClient ? "bg-ink-3 text-paper" : "bg-ink text-paper")
+            }
           >
             <span className="relative flex items-center justify-center">
               <FlameIcon />
@@ -306,9 +327,15 @@ function useRestDaySettles() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const activeSessionId = useStore((s) => s.activeSessionId);
+  const viewingClient = useCoachStore((s) => s.viewing !== undefined);
   const location = useLocation();
   const router = useRouter();
-  const showBanner = activeSessionId && location.pathname !== "/workout";
+  // Exactly one banner occupies the top slot, and only 44px is reserved for it.
+  // These two cannot both apply -- entering a client's view clears the active
+  // session (see `asStoreState`) -- but the client banner wins if they ever do,
+  // because whose data is on screen outranks what the coach was doing.
+  const showClientBanner = viewingClient;
+  const showBanner = !showClientBanner && activeSessionId && location.pathname !== "/workout";
   const onTab = TABS.some((t) => t.to === location.pathname);
 
   useRestDaySettles();
@@ -334,11 +361,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
-      <ActiveSessionBanner />
+      {showClientBanner ? <ClientBanner /> : <ActiveSessionBanner />}
       <main
         className={
           "relative min-h-0 flex-1 overflow-y-auto overscroll-contain " +
-          (showBanner ? "pt-11 " : "") +
+          (showBanner || showClientBanner ? "pt-11 " : "") +
           routeAnimClass
         }
       >
@@ -357,7 +384,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             to="/settings"
             aria-label="Settings"
             className="absolute right-1.5 z-30 flex h-11 w-11 items-center justify-center text-ink-3"
-            style={{ top: showBanner ? 93 : 49 }}
+            style={{ top: showBanner || showClientBanner ? 93 : 49 }}
           >
             <Gear size={22} />
           </Link>

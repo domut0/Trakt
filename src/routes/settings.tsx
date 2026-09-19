@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Chevron } from "../components/icons";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { CoachSettings } from "../components/CoachSettings";
 import { SyncSettings } from "../components/SyncSettings";
 import { Toggle } from "../components/Toggle";
 import { dailyLogsToCsv, setsToCsv } from "../lib/csv";
@@ -202,6 +203,10 @@ function SettingsPage() {
         </div>
       </Section>
 
+      <Section title="Coaching" delay={110}>
+        <CoachSettings />
+      </Section>
+
       <Section title="Data" delay={120}>
         <button type="button" onClick={exportJson} className="group-row w-full text-left">
           <div className="t-body">Export backup</div>
@@ -237,6 +242,11 @@ function SettingsPage() {
         {importError && (
           <div className="group-row-sep px-4 py-3 t-label text-signal">{importError}</div>
         )}
+
+        <a href="/privacy" className="group-row group-row-sep w-full text-left">
+          <div className="t-body">Privacy</div>
+          <Chevron className="shrink-0 text-ink-2" size={16} />
+        </a>
 
         {pendingImport && (
           <div className="group-row-sep space-y-3 p-4">

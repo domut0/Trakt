@@ -28,6 +28,7 @@ import {
   type SplitCardKind,
 } from "./planning";
 import { seedExercises } from "./exercise-library";
+import { resolvePlan, type PlanPayload } from "./plan-tab";
 
 export type ExerciseType = "main" | "accessory" | "cardio";
 
@@ -266,6 +267,14 @@ interface State {
    * Undefined whenever the cursor is not on a rest.
    */
   restSince: string | undefined;
+  /**
+   * The `issuedAt` of the coach plan currently in force, or undefined when no
+   * coach plan has ever been accepted.
+   *
+   * What makes re-reading the plan tab on every sync idempotent: a plan is
+   * offered only when it is newer than this. See `isNewerCoachPlan`.
+   */
+  lastAcceptedPlanAt: string | undefined;
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
@@ -371,6 +380,19 @@ interface State {
   setSlotExercises: (slotId: string, exerciseIds: string[]) => void;
   /** Pins a slot to one date, for when you do know. Replaces any existing pin
    * on that date, because a day trains one thing. */
+  /**
+   * Adopts a coach-issued plan wholesale.
+   *
+   * Replaces the split, the nutrition timeline and the pins in one write. Not
+   * expressed as a sequence of the existing add/update/delete actions on
+   * purpose: those each write through independently, so a failure part-way
+   * would leave the user following half of two plans, which is worse than
+   * following either.
+   *
+   * Logged history is untouched. `resolvePlan` matches cards by name so every
+   * session keeps the slot it was logged against.
+   */
+  acceptCoachPlan: (plan: PlanPayload) => void;
   pinDay: (date: string, splitSlotId: string) => void;
   unpinDay: (date: string) => void;
   /** The slot pinned to a date, or undefined. NEVER the rotation's guess: the
@@ -1049,6 +1071,7 @@ function persistSettingsFrom(s: State) {
     unit: s.unit,
     nextSlotId: s.nextSlotId,
     restSince: s.restSince,
+    lastAcceptedPlanAt: s.lastAcceptedPlanAt,
   };
   safeWrite(() => db.meta.put(settings));
 }
@@ -1064,6 +1087,7 @@ export const useStore = create<State>((set, get) => ({
   plannedDays: [],
   nextSlotId: undefined,
   restSince: undefined,
+  lastAcceptedPlanAt: undefined,
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -1105,6 +1129,7 @@ export const useStore = create<State>((set, get) => ({
           plannedDays: [],
           nextSlotId: undefined,
           restSince: undefined,
+          lastAcceptedPlanAt: undefined,
           activeSessionId: undefined,
           currentExerciseId: undefined,
           currentBlock: undefined,
@@ -1126,6 +1151,7 @@ export const useStore = create<State>((set, get) => ({
         plannedDays: data.plannedDays,
         nextSlotId: data.settings.nextSlotId,
         restSince: data.settings.restSince,
+        lastAcceptedPlanAt: data.settings.lastAcceptedPlanAt,
         // Both default on READ. A settings record written before planning
         // existed has neither key, and no migration is needed to make it mean
         // "no plan" (see the note on `plannedWeek` in db.ts).
@@ -1647,6 +1673,68 @@ export const useStore = create<State>((set, get) => ({
     set({ slots: next });
     const updated = next.find((sl) => sl.id === slotId);
     if (updated) safeWrite(() => db.slots.put(updated));
+  },
+
+  acceptCoachPlan: (plan) => {
+    const state = get();
+    const resolved = resolvePlan(
+      plan,
+      {
+        slots: state.slots,
+        exercises: state.exercises,
+        nutritionPhases: state.nutritionPhases,
+        sessions: state.sessions,
+      },
+      uid,
+    );
+
+    const exercises = [...state.exercises, ...resolved.createdExercises];
+    set({
+      exercises,
+      slots: resolved.slots,
+      nutritionPhases: resolved.phases,
+      plannedDays: resolved.pins,
+      lastAcceptedPlanAt: plan.issuedAt,
+      // The split cursor may point at a card this plan dropped. Clearing it
+      // sends the rotation back to the top rather than leaving it stranded on
+      // a card that no longer exists.
+      nextSlotId: resolved.slots.some((sl) => sl.id === state.nextSlotId)
+        ? state.nextSlotId
+        : undefined,
+    });
+
+    // One transaction, so the tables cannot disagree about which plan is in
+    // force. Deletes come from the difference against what was there before:
+    // Dexie has no "replace this table" primitive.
+    const keptSlotIds = new Set(resolved.slots.map((sl) => sl.id));
+    const droppedSlotIds = state.slots.map((sl) => sl.id).filter((id) => !keptSlotIds.has(id));
+    const keptPhaseIds = new Set(resolved.phases.map((ph) => ph.id));
+    const droppedPhaseIds = state.nutritionPhases
+      .map((ph) => ph.id)
+      .filter((id) => !keptPhaseIds.has(id));
+    const keptPinDates = new Set(resolved.pins.map((pin) => pin.date));
+    const droppedPinDates = state.plannedDays
+      .map((pin) => pin.date)
+      .filter((date) => !keptPinDates.has(date));
+
+    safeWrite(() =>
+      db.transaction(
+        "rw",
+        [db.exercises, db.slots, db.nutritionPhases, db.plannedDays, db.meta],
+        async () => {
+          if (resolved.createdExercises.length > 0) {
+            await db.exercises.bulkPut(resolved.createdExercises);
+          }
+          await db.slots.bulkDelete(droppedSlotIds);
+          await db.slots.bulkPut(resolved.slots);
+          await db.nutritionPhases.bulkDelete(droppedPhaseIds);
+          await db.nutritionPhases.bulkPut(resolved.phases);
+          await db.plannedDays.bulkDelete(droppedPinDates);
+          await db.plannedDays.bulkPut(resolved.pins);
+        },
+      ),
+    );
+    persistSettingsFrom(get());
   },
 
   pinDay: (date, splitSlotId) => {

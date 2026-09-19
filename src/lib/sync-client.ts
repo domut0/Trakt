@@ -42,7 +42,16 @@ export type SyncErrorCode =
   | "stale"
   | "busy"
   | "unknown-action"
+  | "empty-plan"
   | "network"
+  /**
+   * Google sign-in is needed and cannot be renewed silently.
+   *
+   * Distinct from every other failure here because it is the only one the user
+   * can actually clear, and because retrying it is pointless -- the browser
+   * token model issues no refresh token, so a lapsed grant needs a tap.
+   */
+  | "needs-consent"
   | "timeout"
   | "unreadable";
 
@@ -136,6 +145,20 @@ export function pushToSheet(connection: SyncConnection, input: PushInput): Promi
     },
     PUSH_TIMEOUT_MS,
   );
+}
+
+/**
+ * Writes only the plan tab, leaving the log alone.
+ *
+ * Used by coach mode against a CLIENT's sheet, which is why it exists as its
+ * own call rather than a flag on push: a push carries the whole log and claims
+ * the sheet for the pushing device, and a coach must do neither.
+ */
+export function putPlanOnSheet(
+  connection: SyncConnection,
+  plan: CellValue[][],
+): Promise<SyncResponse> {
+  return call(connection, { action: "putPlan", tabs: { plan } }, PUSH_TIMEOUT_MS);
 }
 
 export function pullFromSheet(connection: SyncConnection): Promise<SyncResponse> {
