@@ -5,24 +5,31 @@ coach mode, then the invite link.
 
 ## Status
 
-Everything that does not need a Google account is built, tested and on
-`claude/client-plans-no-database-mq7loc`. What remains is listed in
-[`docs/google-setup.md`](google-setup.md) and is roughly half an hour of
-console work.
+**Built end to end as of 2026-09-19**, on `main`. The Google side is set up
+(consent screen in production, `drive.file` only, client id and API key in
+Vercel), and the spike passed all four checks.
 
-|                   | Built                                               | Waiting on                   |
-| ----------------- | --------------------------------------------------- | ---------------------------- |
-| A — one-tap sheet | transport, auth, error mapping                      | Cloud project, domain, spike |
-| B — coach mode    | latch, plan tab, snapshot, view, edit, save, accept | Picker (needs the API key)   |
-| C — invite links  | codec, `/connect`, `/join`                          | the production origin        |
+|                   | Built                                                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| A — one-tap sheet | transport, auth, error mapping, live in production                                                                            |
+| B — coach mode    | latch, plan tab, snapshot, view, edit, save, accept, Picker client-add, Google-backed open and save, Plan-tab lock and unlink |
+| C — invite links  | codec, `/connect`, `/join`, the coach's "Invite a client", one-tap share                                                      |
 
-Three things in Phase B are deliberately still open, each because it needs the
-A9 spike answered first: adding a client through the Google Picker, opening a
-Google-backed client (the store refuses with `not-configured` rather than
-failing obscurely), and locking a coached client's own Plan tab.
+Decisions taken while finishing it:
 
-The Apps Script path works end to end today, so coach mode is usable for a
-client onboarded by hand before any of the Google work is done.
+- **The Picker needs `setAppId(project number)`** or a pick grants nothing. The
+  project number is derived from the client id.
+- **A client shares their sheet as EDITOR**, not reader: the coach's app writes
+  the plan tab. Coach mode's read-only latch is what keeps it to that tab.
+- **A card a coach's plan drops goes quietly**, with no count on the review
+  screen. Its past sessions keep the card's name (`WorkoutSession.slotName`),
+  which also fixed hand-deleted cards turning history into "Untitled".
+- **Opening a client, saving a plan and sharing are interactive** token
+  requests, because each is a tap and coach mode has no Reconnect button.
+- **The lock is latch first**: every plan-editing store action refuses while
+  `coachManaged` is set, and the Plan tab is `inert` so nothing looks tappable.
+
+Still untested on real hardware: silent token renewal in an installed iOS PWA.
 
 ## The premise
 
