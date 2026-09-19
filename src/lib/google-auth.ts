@@ -32,7 +32,40 @@ const GIS_SRC = "https://accounts.google.com/gsi/client";
 /** Renew this long before expiry, so a sync cannot start on a token that dies mid-flight. */
 const RENEW_MARGIN_MS = 60_000;
 
-export type AuthFailure = "needs-consent" | "no-client-id" | "script-blocked";
+/**
+ * Nothing here may hang forever.
+ *
+ * `syncNow` holds a single-flight `running` flag for the length of a cycle, so
+ * a promise that never settles does not merely fail -- it wedges sync for the
+ * rest of the session, silently, with the UI still reading "syncing". Google
+ * Identity Services is a third-party script that can be blocked by an
+ * extension, stalled by a captive portal, or loaded into a tab that is then
+ * backgrounded, and in none of those cases is either callback guaranteed.
+ */
+const GIS_LOAD_TIMEOUT_MS = 15_000;
+
+/** Silent renewal should be immediate; an interactive one waits on a human. */
+const SILENT_TOKEN_TIMEOUT_MS = 30_000;
+const INTERACTIVE_TOKEN_TIMEOUT_MS = 120_000;
+
+/** Rejects with `reason` if `promise` has not settled in time. */
+function withTimeout<T>(promise: Promise<T>, ms: number, reason: AuthFailure): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(reason)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err: unknown) => {
+        clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      },
+    );
+  });
+}
+
+export type AuthFailure = "needs-consent" | "no-client-id" | "script-blocked" | "timeout";
 
 interface TokenResponse {
   access_token?: string;
@@ -96,11 +129,22 @@ function loadGis(): Promise<void> {
   scriptPromise = new Promise<void>((resolve, reject) => {
     if (typeof document === "undefined") return reject(new Error("script-blocked"));
     if (window.google?.accounts?.oauth2) return resolve();
+    const timer = setTimeout(() => {
+      // Let a later attempt start fresh rather than awaiting a promise that is
+      // never going to settle.
+      scriptPromise = undefined;
+      reject(new Error("script-blocked" satisfies AuthFailure));
+    }, GIS_LOAD_TIMEOUT_MS);
+
     const el = document.createElement("script");
     el.src = GIS_SRC;
     el.async = true;
-    el.onload = () => resolve();
+    el.onload = () => {
+      clearTimeout(timer);
+      resolve();
+    };
     el.onerror = () => {
+      clearTimeout(timer);
       // Let a later attempt retry: a blocked script is often a network blip or
       // a content blocker the user can turn off, not a permanent state.
       scriptPromise = undefined;
@@ -127,11 +171,11 @@ export async function getAccessToken({ interactive }: { interactive: boolean }):
   const clientId = googleClientId();
   if (!clientId) throw new Error("no-client-id" satisfies AuthFailure);
 
-  await loadGis();
+  await withTimeout(loadGis(), GIS_LOAD_TIMEOUT_MS, "script-blocked");
   const oauth2 = window.google?.accounts?.oauth2;
   if (!oauth2) throw new Error("script-blocked" satisfies AuthFailure);
 
-  return new Promise<string>((resolve, reject) => {
+  const request = new Promise<string>((resolve, reject) => {
     let settled = false;
     const finish = (fn: () => void) => {
       if (settled) return;
@@ -164,4 +208,10 @@ export async function getAccessToken({ interactive }: { interactive: boolean }):
     // account picker and consent screen appear when they have to.
     client.requestAccessToken(interactive ? undefined : { prompt: "" });
   });
+
+  return withTimeout(
+    request,
+    interactive ? INTERACTIVE_TOKEN_TIMEOUT_MS : SILENT_TOKEN_TIMEOUT_MS,
+    "timeout",
+  );
 }

@@ -66,9 +66,32 @@ describe("the token source seam", () => {
   });
 
   it("fails with no-client-id when the build carries no OAuth client", async () => {
-    // No source installed and no VITE_GOOGLE_CLIENT_ID in the test env, which
-    // is the state of every build until the console setup is done.
+    // Stubbed rather than relying on the ambient env: whether .env.local exists
+    // is a property of the machine running the tests, and a test that passes or
+    // hangs depending on that is worse than no test.
+    vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "");
     setGoogleTokenSource(undefined);
     await expect(getAccessToken({ interactive: false })).rejects.toThrow(/no-client-id/);
+    vi.unstubAllEnvs();
+  });
+
+  it("gives up on a Google script that never loads, instead of hanging", async () => {
+    // The failure this guards against is not a slow sync, it is a wedged one:
+    // syncNow holds a single-flight flag for the length of a cycle, so a promise
+    // that never settles stops the app syncing for the rest of the session with
+    // the UI still reading "syncing".
+    vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "test.apps.googleusercontent.com");
+    setGoogleTokenSource(undefined);
+    vi.useFakeTimers();
+
+    const pending = getAccessToken({ interactive: false });
+    const assertion = expect(pending).rejects.toThrow(/script-blocked/);
+    // jsdom appends the script tag and neither event ever fires, which is
+    // exactly the real-world case of a blocked or stalled third-party script.
+    await vi.advanceTimersByTimeAsync(20_000);
+    await assertion;
+
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
   });
 });

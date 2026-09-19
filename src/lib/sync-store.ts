@@ -12,6 +12,7 @@ import {
   type SyncConfigMeta,
 } from "./db";
 import { useStore } from "./store";
+import type { CellValue } from "./csv";
 import {
   buildBase,
   buildSheetTabs,
@@ -27,7 +28,10 @@ import {
   pushToSheet,
   type SyncConnection,
   type SyncErrorCode,
+  type SyncResponse,
 } from "./sync-client";
+import { createSpreadsheet, pullTabs, pushTabs } from "./sync-client-google";
+import { clearGoogleToken, googleClientId } from "./google-auth";
 
 /**
  * Sheet sync state, deliberately in its own store.
@@ -84,6 +88,15 @@ export interface SyncState {
 
   hydrate: () => Promise<void>;
   connect: (url: string, secret: string) => Promise<{ ok: boolean; error?: string }>;
+  /**
+   * Creates a spreadsheet in the user's own Drive and syncs to it.
+   *
+   * The whole point of the Sheets transport: no Apps Script editor, no deploy
+   * dialogs, no URL to copy. One consent screen and the sheet exists.
+   */
+  connectGoogle: () => Promise<{ ok: boolean; error?: string }>;
+  /** True when this build carries an OAuth client id, so the button can exist. */
+  googleAvailable: () => boolean;
   disconnect: () => Promise<void>;
   setEnabled: (enabled: boolean) => Promise<void>;
   markPending: () => void;
@@ -113,6 +126,51 @@ function applyMerge(result: MergeResult): void {
 
 function connectionFrom(config: SyncConfigMeta): SyncConnection {
   return { url: config.url, secret: config.secret, deviceId: config.deviceId };
+}
+
+/**
+ * Which transport a connection uses.
+ *
+ * An absent `kind` is an Apps Script connection made before the Sheets API
+ * transport existed, so the default is what keeps every one of those working.
+ */
+function isGoogle(config: SyncConfigMeta): boolean {
+  return config.kind === "google";
+}
+
+/**
+ * Pull and push, dispatched on transport.
+ *
+ * The two live here rather than behind one client module because they are the
+ * only two places the transports differ at all. Everything downstream -- the
+ * merge, the base snapshot, the collision reporting -- reads the same tabs
+ * whichever produced them, which is the property worth protecting: a sheet
+ * written by one transport is readable by the other.
+ */
+function pullFor(config: SyncConfigMeta): Promise<SyncResponse> {
+  return isGoogle(config)
+    ? pullTabs(config.spreadsheetId ?? "")
+    : pullFromSheet(connectionFrom(config));
+}
+
+function pushFor(
+  config: SyncConfigMeta,
+  input: {
+    tabs: Record<string, CellValue[][]>;
+    expectedRevision: number;
+    force: boolean;
+    unit: "lbs" | "kg";
+    takeover?: boolean;
+  },
+): Promise<SyncResponse> {
+  if (isGoogle(config)) {
+    // No revision, no device ownership and no takeover: those exist because an
+    // Apps Script deployment is a shared endpoint several installs could post
+    // to. A spreadsheet reached with this device's own OAuth token has no such
+    // ambiguity -- the grant IS the identity.
+    return pushTabs(config.spreadsheetId ?? "", input.tabs);
+  }
+  return pushToSheet(connectionFrom(config), input);
 }
 
 /** Long enough that guessing it is not a way in, short enough to paste. */
@@ -243,7 +301,59 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     return { ok: true };
   },
 
+  googleAvailable: () => googleClientId() !== undefined,
+
+  connectGoogle: async () => {
+    if (googleClientId() === undefined) {
+      // A build with no client id cannot sign in at all, and saying so beats
+      // an opaque failure from Google Identity Services.
+      return { ok: false, error: "This build has no Google client id configured." };
+    }
+
+    const title = `Trakt — ${new Date().toISOString().slice(0, 10)}`;
+    const created = await createSpreadsheet(title);
+    if (!created.ok) {
+      const { message } = describeFailure(created.error);
+      return { ok: false, error: message };
+    }
+
+    // createSpreadsheet carries the new id back in a reserved tab key, since
+    // SyncOk has no field of its own for it.
+    const spreadsheetId = String(created.tabs?.__id?.[0]?.[0] ?? "");
+    if (spreadsheetId === "") {
+      return { ok: false, error: "Google did not return a spreadsheet id." };
+    }
+
+    let config: SyncConfigMeta;
+    try {
+      config = {
+        key: "syncConfig",
+        kind: "google",
+        spreadsheetId,
+        // Empty rather than optional: the Apps Script fields stay on the record
+        // so that every reader keeps one shape to handle.
+        url: "",
+        secret: "",
+        deviceId: await ensureDeviceId(),
+        enabled: true,
+        spreadsheetUrl: created.spreadsheetUrl,
+      };
+      await saveSyncConfig(config);
+      // A brand new spreadsheet has nothing in it, so the first sync publishes.
+      await clearSyncBase();
+    } catch {
+      return { ok: false, error: "Couldn't save the connection to this device." };
+    }
+
+    set({ config, status: "idle", lastError: undefined, blockedReason: undefined });
+    await get().syncNow();
+    return { ok: true };
+  },
+
   disconnect: async () => {
+    // Drop the token as well: leaving it cached would let the next connection
+    // reuse a grant the user believes they just ended.
+    clearGoogleToken();
     try {
       await deleteSyncConfig();
       await clearSyncBase();
@@ -357,7 +467,6 @@ async function runCycle(
   attempt: number,
   options: { takeover?: boolean } = {},
 ): Promise<void> {
-  const connection = connectionFrom(config);
   let base = await loadSyncBase();
   let collisions: Collision[] = [];
   // Undefined until a pull happens. On the very first sync there is nothing in
@@ -366,7 +475,7 @@ async function runCycle(
   let pulledAnything = false;
 
   if (base) {
-    const pulled = await pullFromSheet(connection);
+    const pulled = await pullFor(config);
     if (!pulled.ok) {
       const { status, message } = describeFailure(pulled.error);
       set({
@@ -405,7 +514,7 @@ async function runCycle(
   // handed, so an absent key means "do not touch this one".
   const publishOwnPlan = !pulledAnything || shouldPublishOwnPlan(tabPlan, app.lastAcceptedPlanAt);
 
-  const response = await pushToSheet(connection, {
+  const response = await pushFor(config, {
     tabs: buildSheetTabs(app, publishOwnPlan ? { issuedAt: new Date().toISOString() } : undefined),
     expectedRevision: base?.revision ?? 0,
     // Without a base there is nothing to be stale against: this is the first

@@ -96,8 +96,20 @@ export interface DeviceIdMeta {
  */
 export interface SyncConfigMeta {
   key: "syncConfig";
-  /** The Apps Script web app /exec URL. */
+  /**
+   * How the sheet is reached.
+   *
+   * Absent reads as `"appsScript"`, so every install that connected before the
+   * Sheets API transport existed needs no migration -- the same convention
+   * `WorkoutSession.kind` and `SplitSlot.kind` already use. Non-indexed, so no
+   * Dexie version bump either.
+   */
+  kind?: "appsScript" | "google";
+  /** google only: the spreadsheet this app created and owns access to. */
+  spreadsheetId?: string;
+  /** appsScript only: the web app /exec URL. Empty on a google connection. */
   url: string;
+  /** appsScript only. Empty on a google connection, which authenticates by token. */
   secret: string;
   /** Identifies this install to the script, which refuses a push from another. */
   deviceId: string;
