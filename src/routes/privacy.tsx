@@ -14,14 +14,15 @@ import { createFileRoute } from "@tanstack/react-router";
  */
 
 /**
- * The one thing that has to be filled in before this is published.
+ * Where someone writes in about their own data.
  *
- * Deliberately not defaulted to a real address: this page is public, and
- * publishing someone's email is not a decision to make on their behalf.
+ * Public by design: it is linked from the Google consent screen and is the only
+ * way a reader has to reach a person, so it has to be an address that is
+ * actually read.
  */
-const CONTACT_EMAIL = "you@example.com";
+const CONTACT_EMAIL = "ccblue241@gmail.com";
 
-const UPDATED = "15 September 2026";
+const UPDATED = "19 September 2026";
 
 export const Route = createFileRoute("/privacy")({
   head: () => ({
