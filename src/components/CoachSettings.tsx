@@ -11,7 +11,7 @@ import { Chevron } from "./icons";
 import { Toggle } from "./Toggle";
 import { freshness } from "./ClientBanner";
 import type { CoachClient } from "../lib/db";
-import { inviteUrl, INVITE_VERSION, type JoinPayload } from "../lib/invite";
+import { inviteUrl, INVITE_VERSION } from "../lib/invite";
 import { isLikelyEmail, loadCoachProfile, saveCoachProfile } from "../lib/coach-profile";
 
 /**
@@ -279,9 +279,10 @@ function AddByLinkForm({ onDone }: { onDone: () => void }) {
  * with, so it must be the Google account the coach signs in to Trakt with.
  */
 function InviteForm({ onDone }: { onDone: () => void }) {
+  const [profile] = useState(loadCoachProfile);
   const [clientName, setClientName] = useState("");
-  const [coachName, setCoachName] = useState(() => loadCoachProfile().name);
-  const [coachEmail, setCoachEmail] = useState(() => loadCoachProfile().email);
+  const [coachName, setCoachName] = useState(profile.name);
+  const [coachEmail, setCoachEmail] = useState(profile.email);
   const [error, setError] = useState<string | undefined>();
   const [status, setStatus] = useState<"copied" | "manual" | undefined>();
   const [manualUrl, setManualUrl] = useState<string | undefined>();
@@ -290,63 +291,38 @@ function InviteForm({ onDone }: { onDone: () => void }) {
     const name = coachName.trim();
     const email = coachEmail.trim();
     const theirName = clientName.trim();
+    setStatus(undefined);
+    setManualUrl(undefined);
 
-    if (name === "") {
-      setError("Add your name");
-      setStatus(undefined);
-      setManualUrl(undefined);
-      return;
-    }
-    if (!isLikelyEmail(email)) {
-      setError("That email does not look right");
-      setStatus(undefined);
-      setManualUrl(undefined);
-      return;
-    }
+    if (name === "") return setError("Add your name");
+    if (!isLikelyEmail(email)) return setError("That email does not look right");
     setError(undefined);
-
     saveCoachProfile({ name, email });
 
-    const payload: JoinPayload = {
+    const url = inviteUrl(window.location.origin, {
       v: INVITE_VERSION,
       kind: "join",
       coachName: name,
       coachEmail: email,
       ...(theirName ? { clientName: theirName } : {}),
-    };
-    const url = inviteUrl(window.location.origin, payload);
+    });
 
-    let fallthrough = true;
-    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+    // The share sheet first, because on a phone that IS sending it. Closing the
+    // sheet is an answer, not a failure, so it does not fall through to a copy.
+    if (typeof navigator.share === "function") {
       try {
         await navigator.share({ title: "Join me on Trakt", url });
-        fallthrough = false;
-        setStatus(undefined);
-        setManualUrl(undefined);
-      } catch (err: unknown) {
-        const isAbort =
-          (err instanceof Error && err.name === "AbortError") ||
-          (typeof err === "object" &&
-            err !== null &&
-            (err as { name?: unknown }).name === "AbortError");
-        if (isAbort) {
-          return;
-        }
+        return;
+      } catch (err) {
+        if ((err as { name?: string } | null)?.name === "AbortError") return;
       }
     }
-
-    if (fallthrough) {
-      try {
-        if (!navigator?.clipboard?.writeText) {
-          throw new Error("Clipboard API unavailable");
-        }
-        await navigator.clipboard.writeText(url);
-        setStatus("copied");
-        setManualUrl(undefined);
-      } catch {
-        setStatus("manual");
-        setManualUrl(url);
-      }
+    try {
+      await navigator.clipboard.writeText(url);
+      setStatus("copied");
+    } catch {
+      setStatus("manual");
+      setManualUrl(url);
     }
   };
 
