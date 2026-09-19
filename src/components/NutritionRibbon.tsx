@@ -21,6 +21,7 @@ import {
   type TargetField,
 } from "../lib/targets";
 import { Trash } from "./icons";
+import { usePlanLocked } from "../lib/plan-lock";
 
 const FIELD_LABELS: Record<TargetField, string> = {
   calories: "Calories",
@@ -70,6 +71,7 @@ const DRAG_SLOP = 4;
  * Drag for days, type for dates. That split is the whole interaction.
  */
 export function NutritionRibbon() {
+  const locked = usePlanLocked();
   const phases = useStore((s) => s.nutritionPhases);
   const addPhase = useStore((s) => s.addPhase);
   const updatePhase = useStore((s) => s.updatePhase);
@@ -208,9 +210,11 @@ export function NutritionRibbon() {
     <section className="anim-fade-up">
       <div className="px-4 group-header">
         <h2 className="t-caption">Nutrition</h2>
-        <button type="button" onClick={addAfterLast} className="t-action t-label">
-          Add
-        </button>
+        {!locked && (
+          <button type="button" onClick={addAfterLast} className="t-action t-label">
+            Add
+          </button>
+        )}
       </div>
 
       {ordered.length === 0 ? (
