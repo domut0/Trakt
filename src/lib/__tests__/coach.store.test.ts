@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, dbReadOnlyReason, loadCoachClients, type CoachClient } from "../db";
 import { useCoachStore } from "../coach-store";
 import { useStore } from "../store";
 import { useSyncStore } from "../sync-store";
-import { buildSheetTabs, type SyncSource } from "../sync";
+import { buildSheetTabs, SHEET_TABS, type SyncSource } from "../sync";
 import { setSyncFetch } from "../sync-client";
+import { clearGoogleToken, setGoogleTokenSource } from "../google-auth";
 
 /**
  * Coach mode's two guarantees, which are the only things in it that can lose
@@ -157,17 +158,170 @@ describe("entering a client's view", () => {
     expect(dbReadOnlyReason()).toBeUndefined();
     expect(useStore.getState().sets[0].weight).toBe(315);
   });
+});
 
-  it("refuses a Google-backed client until that transport exists", async () => {
-    await useCoachStore.getState().addClient({
-      id: "c_ann",
-      name: "Ann",
-      kind: "google",
-      spreadsheetId: "sheet123",
+describe("a Google-backed client", () => {
+  const ANN: CoachClient = {
+    id: "c_ann",
+    name: "Ann",
+    kind: "google",
+    spreadsheetId: "ann-sheet-123",
+  };
+
+  /** The tab order `pullTabs` requests, which is how it matches replies: by index. */
+  const TAB_ORDER = [
+    SHEET_TABS.sets,
+    SHEET_TABS.sessions,
+    SHEET_TABS.daily,
+    SHEET_TABS.cardio,
+    SHEET_TABS.plan,
+    SHEET_TABS.meta,
+  ];
+
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+  interface Sent {
+    url: string;
+    method: string;
+    body: Record<string, unknown>;
+  }
+
+  /**
+   * Ann's sheet, reached the way the Sheets API reaches it. A read returns
+   * Bob's data; a write answers `writeStatus`.
+   */
+  function stubSheetsApi({ readStatus = 200, writeStatus = 200 } = {}) {
+    const sent: Sent[] = [];
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      sent.push({
+        url,
+        method,
+        body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {},
+      });
+      if (method === "GET") {
+        if (readStatus !== 200) return Promise.resolve(json({}, readStatus));
+        const tabs = buildSheetTabs(BOB_SHEET, { issuedAt: "2026-09-10T08:00:00.000Z" });
+        return Promise.resolve(
+          json({ valueRanges: TAB_ORDER.map((name) => ({ values: tabs[name] ?? [] })) }),
+        );
+      }
+      return Promise.resolve(json({}, writeStatus));
     });
+    vi.stubGlobal("fetch", fetchMock);
+    return { fetchMock, sent };
+  }
+
+  let tokenRequests: boolean[];
+
+  beforeEach(async () => {
+    tokenRequests = [];
+    setGoogleTokenSource((interactive) => {
+      tokenRequests.push(interactive);
+      return Promise.resolve("fake-token");
+    });
+    await useCoachStore.getState().addClient(ANN);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setGoogleTokenSource(undefined);
+    clearGoogleToken();
+  });
+
+  /** An edit the coach makes through the ordinary Plan screen. */
+  function editPlan() {
+    useStore.setState({
+      nutritionPhases: [
+        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
+      ],
+    });
+  }
+
+  it("opens into the screens the app already has", async () => {
+    stubSheetsApi();
+    expect(await useCoachStore.getState().enterClientView("c_ann")).toBe(true);
+
+    const state = useStore.getState();
+    expect(state.sets).toHaveLength(1);
+    expect(state.sets[0].weight).toBe(100);
+    expect(state.exercises.map((e) => e.name)).toEqual(["Front Squat"]);
+    expect(state.dailyLogs[0].calories).toBe(2100);
+    expect(state.unit).toBe("kg");
+  });
+
+  it("reads that client's sheet, with the coach's token", async () => {
+    const { fetchMock } = stubSheetsApi();
+    await useCoachStore.getState().enterClientView("c_ann");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/ann-sheet-123/");
+    expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer fake-token");
+  });
+
+  it("may ask Google for consent, because opening and saving are always a tap", async () => {
+    // A silent request fails once the coach reloads, and coach mode has no
+    // Reconnect button of its own -- so these two may show the popup.
+    stubSheetsApi();
+    await useCoachStore.getState().enterClientView("c_ann");
+    editPlan();
+    await useCoachStore.getState().saveClientPlan();
+
+    expect(tokenRequests.length).toBeGreaterThan(0);
+    expect(tokenRequests.every((interactive) => interactive)).toBe(true);
+  });
+
+  it("reports a refused grant without touching the coach's state", async () => {
+    stubSheetsApi({ readStatus: 401 });
     expect(await useCoachStore.getState().enterClientView("c_ann")).toBe(false);
-    expect(useCoachStore.getState().lastError).toBe("not-configured");
+
+    expect(useCoachStore.getState().lastError).toBe("needs-consent");
+    expect(useCoachStore.getState().viewing).toBeUndefined();
     expect(dbReadOnlyReason()).toBeUndefined();
+    expect(useStore.getState().sets[0].weight).toBe(315);
+  });
+
+  it("reports a sheet that is gone or unshared as unreadable", async () => {
+    stubSheetsApi({ readStatus: 404 });
+    expect(await useCoachStore.getState().enterClientView("c_ann")).toBe(false);
+    expect(useCoachStore.getState().lastError).toBe("unreadable");
+  });
+
+  it("refuses a client with no sheet before asking the network", async () => {
+    const { fetchMock } = stubSheetsApi();
+    await useCoachStore.getState().addClient({ id: "c_nosheet", name: "Ann", kind: "google" });
+
+    expect(await useCoachStore.getState().enterClientView("c_nosheet")).toBe(false);
+    expect(useCoachStore.getState().lastError).toBe("not-configured");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("writes only the plan tab, never the client's log", async () => {
+    const { sent } = stubSheetsApi();
+    await useCoachStore.getState().enterClientView("c_ann");
+    editPlan();
+
+    expect(await useCoachStore.getState().saveClientPlan()).toBe(true);
+
+    const writes = sent.filter((r) => r.method === "POST");
+    expect(writes).toHaveLength(2);
+    // Cleared first, because batchUpdate does not shrink a range.
+    expect(writes[0].url).toContain("values:batchClear");
+    expect(writes[0].body).toEqual({ ranges: ["plan"] });
+    expect(writes[1].url).toContain("values:batchUpdate");
+    expect((writes[1].body.data as Array<{ range: string }>).map((d) => d.range)).toEqual(["plan"]);
+  });
+
+  it("keeps the changes pending when the sheet refuses the save", async () => {
+    stubSheetsApi({ writeStatus: 500 });
+    await useCoachStore.getState().enterClientView("c_ann");
+    editPlan();
+
+    expect(await useCoachStore.getState().saveClientPlan()).toBe(false);
+    expect(useCoachStore.getState().lastError).toBe("unreachable");
+    expect(useCoachStore.getState().pendingChanges()).toHaveLength(1);
   });
 });
 

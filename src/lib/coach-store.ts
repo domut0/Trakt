@@ -8,7 +8,8 @@ import {
 } from "./db";
 import { useStore } from "./store";
 import { buildClientSnapshot, type ClientSnapshot } from "./client-snapshot";
-import { pullFromSheet, putPlanOnSheet } from "./sync-client";
+import { pullFromSheet, putPlanOnSheet, type SyncFail, type SyncResponse } from "./sync-client";
+import { pullTabs, putPlanTab } from "./sync-client-google";
 import {
   buildPlanTab,
   diffPlan,
@@ -99,7 +100,7 @@ function asStoreState(snapshot: ClientSnapshot): Swapped {
   };
 }
 
-export type CoachError = "unreachable" | "unreadable" | "not-configured";
+export type CoachError = "unreachable" | "unreadable" | "not-configured" | "needs-consent";
 
 export interface ViewingClient {
   client: CoachClient;
@@ -145,6 +146,13 @@ export interface CoachState {
   saveClientPlan: () => Promise<boolean>;
 }
 
+/** Maps a Sheets API failure onto what the coach is told. */
+function coachErrorFor(code: SyncFail["error"]): CoachError {
+  if (code === "needs-consent") return "needs-consent";
+  if (code === "unreadable" || code === "bad-secret") return "unreadable";
+  return "unreachable";
+}
+
 /** Pulls a client's tabs. Dispatches on how their sheet is reached. */
 async function pullClientTabs(
   client: CoachClient,
@@ -164,8 +172,15 @@ async function pullClientTabs(
     }
     return { ok: true, tabs: reply.tabs ?? {} };
   }
-  // The Sheets API transport lands with Phase A; until then a Google-backed
-  // client cannot be opened, and says so rather than failing obscurely.
+  if (client.kind === "google") {
+    if (!client.spreadsheetId) return { ok: false, error: "not-configured" };
+    // Interactive, because opening a client is always a tap. A silent request
+    // fails once the coach reloads or the hour-long token lapses, and coach
+    // mode has no Reconnect button of its own to recover with.
+    const reply = await pullTabs(client.spreadsheetId, { interactive: true });
+    if (!reply.ok) return { ok: false, error: coachErrorFor(reply.error) };
+    return { ok: true, tabs: reply.tabs ?? {} };
+  }
   return { ok: false, error: "not-configured" };
 }
 
@@ -254,7 +269,20 @@ export const useCoachStore = create<CoachState>((set, get) => ({
     const viewing = get().viewing;
     if (!viewing || get().saving) return false;
     const client = viewing.client;
-    if (client.kind !== "appsScript" || !client.url || !client.secret) {
+
+    // Which sheet, and how to reach it, settled once up front so the send below
+    // has nothing left to check.
+    let send: (tab: CellValue[][]) => Promise<SyncResponse>;
+    let errorFor: (code: SyncFail["error"]) => CoachError;
+    if (client.kind === "appsScript" && client.url && client.secret) {
+      const target = { url: client.url, secret: client.secret, deviceId: "coach" };
+      send = (tab) => putPlanOnSheet(target, tab);
+      errorFor = () => "unreachable";
+    } else if (client.kind === "google" && client.spreadsheetId) {
+      const id = client.spreadsheetId;
+      send = (tab) => putPlanTab(id, tab);
+      errorFor = coachErrorFor;
+    } else {
       set({ lastError: "not-configured" });
       return false;
     }
@@ -262,12 +290,9 @@ export const useCoachStore = create<CoachState>((set, get) => ({
     set({ saving: true, lastError: undefined });
     try {
       const plan = currentPlanFromStore();
-      const reply = await putPlanOnSheet(
-        { url: client.url, secret: client.secret, deviceId: "coach" },
-        buildPlanTab(plan),
-      );
+      const reply = await send(buildPlanTab(plan));
       if (!reply.ok) {
-        set({ saving: false, lastError: "unreachable" });
+        set({ saving: false, lastError: errorFor(reply.error) });
         return false;
       }
       // The new plan becomes the baseline, so Save goes quiet until the coach

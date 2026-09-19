@@ -111,11 +111,23 @@ export async function createSpreadsheet(title: string): Promise<SyncResponse> {
   };
 }
 
+/**
+ * Asked of a transport call. Background sync stays silent; a coach's tap may
+ * put a consent popup in front of them, since they are there to answer it.
+ */
+interface CallOptions {
+  interactive?: boolean;
+}
+
 /** Reads every tab the app knows about, in one request. */
-export async function pullTabs(spreadsheetId: string): Promise<SyncResponse> {
+export async function pullTabs(
+  spreadsheetId: string,
+  { interactive = false }: CallOptions = {},
+): Promise<SyncResponse> {
   const ranges = ALL_TABS.map((t) => `ranges=${encodeURIComponent(t)}`).join("&");
   const result = await call(
     `${SHEETS}/${spreadsheetId}/values:batchGet?${ranges}&valueRenderOption=UNFORMATTED_VALUE`,
+    { interactive },
   );
   if (!result.ok) return { ok: false, error: result.error };
 
@@ -148,18 +160,21 @@ export async function pullTabs(spreadsheetId: string): Promise<SyncResponse> {
 export async function pushTabs(
   spreadsheetId: string,
   tabs: Record<string, CellValue[][]>,
+  { interactive = false }: CallOptions = {},
 ): Promise<SyncResponse> {
   const names = Object.keys(tabs);
   if (names.length === 0) return { ok: true, revision: 0 };
 
   const cleared = await call(`${SHEETS}/${spreadsheetId}/values:batchClear`, {
     method: "POST",
+    interactive,
     body: JSON.stringify({ ranges: names }),
   });
   if (!cleared.ok) return { ok: false, error: cleared.error };
 
   const written = await call(`${SHEETS}/${spreadsheetId}/values:batchUpdate`, {
     method: "POST",
+    interactive,
     body: JSON.stringify({
       valueInputOption: "RAW",
       data: names.map((name) => ({ range: name, values: tabs[name] })),
@@ -169,7 +184,11 @@ export async function pushTabs(
   return { ok: true, revision: 0 };
 }
 
-/** Writes only the plan tab, for a coach writing to a client's sheet. */
+/**
+ * Writes only the plan tab, for a coach writing to a client's sheet.
+ *
+ * Interactive: it only ever runs from the coach's Save tap.
+ */
 export function putPlanTab(spreadsheetId: string, plan: CellValue[][]): Promise<SyncResponse> {
-  return pushTabs(spreadsheetId, { [SHEET_TABS.plan]: plan });
+  return pushTabs(spreadsheetId, { [SHEET_TABS.plan]: plan }, { interactive: true });
 }
