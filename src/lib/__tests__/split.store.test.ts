@@ -154,6 +154,27 @@ describe("deleteSplitCard", () => {
     expect(ordered.map((s) => s.rotationOrder)).toEqual([0, 1, 2, 3]);
   });
 
+  it("keeps the card's name on the sessions logged against it", async () => {
+    // History and the sheet name a session by its card. Without the copy, a
+    // deleted card turns every session it ever owned into "Untitled".
+    const { upper, lower } = buildUL();
+    useStore.setState({
+      sessions: [
+        { id: "x_up", splitSlotId: upper.id, startedAt: 1 },
+        { id: "x_low", splitSlotId: lower.id, startedAt: 2 },
+        { id: "x_cardio", kind: "cardio", startedAt: 3 },
+      ],
+    });
+    useStore.getState().deleteSplitCard(upper.id);
+
+    const byId = new Map(useStore.getState().sessions.map((s) => [s.id, s]));
+    expect(byId.get("x_up")).toMatchObject({ splitSlotId: upper.id, slotName: "Upper" });
+    expect(byId.get("x_low")!.slotName).toBeUndefined();
+    expect(byId.get("x_cardio")!.slotName).toBeUndefined();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect((await db.sessions.get("x_up"))?.slotName).toBe("Upper");
+  });
+
   it("survives deleting every card", () => {
     const cards = Object.values(buildUL());
     for (const c of cards) useStore.getState().deleteSplitCard(c.id);

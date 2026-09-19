@@ -86,6 +86,19 @@ describe("acceptCoachPlan", () => {
     expect(state.sessions[0].splitSlotId).toBe("s_upper");
   });
 
+  it("drops a card quietly, but its sessions keep its name", async () => {
+    const legsDay = { id: "sess_legs", splitSlotId: "s_legs", startedAt: DAY - 86_400_000 };
+    useStore.setState({ sessions: [...useStore.getState().sessions, legsDay] });
+    useStore.getState().acceptCoachPlan(PLAN);
+
+    const byId = new Map(useStore.getState().sessions.map((s) => [s.id, s]));
+    expect(byId.get("sess_legs")).toMatchObject({ splitSlotId: "s_legs", slotName: "Legs" });
+    // A session on a surviving card is left exactly as it was.
+    expect(byId.get("sess_1")!.slotName).toBeUndefined();
+    await flush();
+    expect((await db.sessions.get("sess_legs"))?.slotName).toBe("Legs");
+  });
+
   it("replaces the nutrition timeline with the coach's", () => {
     useStore.getState().acceptCoachPlan(PLAN);
     const phases = useStore.getState().nutritionPhases;

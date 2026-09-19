@@ -343,6 +343,17 @@ describe("sheet-only column specs", () => {
     { id: "set_2", sessionId: "sess_1", exerciseId: "e_bench", weight: 225, reps: 4, loggedAt: t },
   ];
 
+  it("names a session by the card it was logged under, after that card is deleted", () => {
+    const orphan: WorkoutSession = { ...strength, splitSlotId: "s_gone", slotName: "Legs" };
+    // Column 1 is "Split Slot".
+    expect(toRows([orphan], sessionColumns(slots, sets))[1][1]).toBe("Legs");
+    // A live card still wins over the copy, so a rename reaches old sessions.
+    expect(toRows([{ ...strength, slotName: "Old" }], sessionColumns(slots, sets))[1][1]).toBe(
+      "Heavy Bench",
+    );
+    expect(setsToCsv([sets[0]], [orphan], exercises, slots, "lbs")).toContain("Legs");
+  });
+
   it("splits strength and cardio sessions into their own tables", () => {
     const all = [cardio, strength];
     expect(strengthSessionsInOrder(all).map((s) => s.id)).toEqual(["sess_1"]);

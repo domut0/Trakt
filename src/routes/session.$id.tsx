@@ -2,7 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { AppShell } from "../components/AppShell";
 import { DeleteWorkoutButton } from "../components/DeleteWorkoutButton";
 import { SessionView } from "../components/SessionView";
-import { isCardioSession, useStore } from "../lib/store";
+import { isCardioSession, sessionSlotName, useStore } from "../lib/store";
 
 export const Route = createFileRoute("/session/$id")({
   head: () => ({
@@ -28,10 +28,12 @@ function SessionPage() {
   }
 
   const isCardio = isCardioSession(session);
-  const slot = !isCardio ? slots.find((sl) => sl.id === session.splitSlotId) : undefined;
+  // A session whose card was deleted is still a session: it opens under the
+  // name it was logged with, rather than as "not found".
+  const slotName = !isCardio ? sessionSlotName(session, slots) : undefined;
   const cardioEx = isCardio ? exercises.find((e) => e.id === session.cardioExerciseId) : undefined;
 
-  if (!isCardio && !slot) {
+  if (!isCardio && session.splitSlotId == null) {
     return (
       <AppShell>
         <div className="px-4 py-20 text-center t-body text-ink-2">Session not found.</div>
@@ -39,7 +41,7 @@ function SessionPage() {
     );
   }
 
-  const title = isCardio ? (cardioEx?.name ?? "Cardio") : slot!.name;
+  const title = isCardio ? (cardioEx?.name ?? "Cardio") : (slotName ?? "Untitled");
   const d = new Date(session.startedAt);
 
   return (

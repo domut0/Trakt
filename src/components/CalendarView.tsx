@@ -11,7 +11,7 @@ import {
 } from "date-fns";
 import { dayKey } from "../lib/daily-log";
 import { DayStatsCard } from "./DayStatsCard";
-import { isCardioSession, useStore, type WorkoutSession } from "../lib/store";
+import { isCardioSession, sessionSlotName, useStore, type WorkoutSession } from "../lib/store";
 
 /**
  * Monday-start, matching `weekStartKey` in daily-log.ts and therefore the
@@ -247,13 +247,11 @@ export function CalendarView() {
             <div className="group-list">
               {selectedSessions.map((session, i) => {
                 const isCardio = isCardioSession(session);
-                const slot = !isCardio
-                  ? slots.find((sl) => sl.id === session.splitSlotId)
-                  : undefined;
+                const slotName = !isCardio ? sessionSlotName(session, slots) : undefined;
                 const cardioEx = isCardio
                   ? exercises.find((e) => e.id === session.cardioExerciseId)
                   : undefined;
-                const title = isCardio ? (cardioEx?.name ?? "Cardio") : (slot?.name ?? "Untitled");
+                const title = isCardio ? (cardioEx?.name ?? "Cardio") : (slotName ?? "Untitled");
                 const cardioDetails = isCardio
                   ? fmtCardioDetails(session.durationMinutes, session.distance, unit)
                   : null;

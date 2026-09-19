@@ -108,6 +108,53 @@ export interface WorkoutSession {
   /** Free-text note for the whole session ("felt flat", "shoulder tweaked").
    * Non-indexed, so adding it needed no Dexie version bump. */
   note?: string;
+  /**
+   * The card's name, copied here when the card itself is deleted.
+   *
+   * A card with history is removed from the split, not from the record:
+   * without this, every session logged against a dropped "Legs" would read
+   * "Untitled" in History and blank in the sheet. `splitSlotId` is left
+   * pointing at the dead id rather than cleared, so nothing that already
+   * treats "has no slot" as cardio starts treating these as cardio.
+   * Non-indexed, so no Dexie version bump.
+   */
+  slotName?: string;
+}
+
+/** What to call a strength session: its card, or the card it had when that was deleted. */
+export function sessionSlotName(
+  session: WorkoutSession,
+  slots: readonly SplitSlot[],
+): string | undefined {
+  if (session.splitSlotId == null) return undefined;
+  return slots.find((sl) => sl.id === session.splitSlotId)?.name ?? session.slotName;
+}
+
+/**
+ * Stamps the dropped cards' names onto the sessions logged against them.
+ * Returns only the sessions it changed, so the caller writes nothing else.
+ */
+export function rememberSlotNames(
+  sessions: readonly WorkoutSession[],
+  dropped: readonly SplitSlot[],
+): WorkoutSession[] {
+  const names = new Map(dropped.map((sl) => [sl.id, sl.name]));
+  return sessions.flatMap((session) => {
+    const name = session.splitSlotId == null ? undefined : names.get(session.splitSlotId);
+    return name !== undefined && session.slotName === undefined
+      ? [{ ...session, slotName: name }]
+      : [];
+  });
+}
+
+/** `sessions` with `changed` swapped in by id. */
+function withSessions(
+  sessions: WorkoutSession[],
+  changed: readonly WorkoutSession[],
+): WorkoutSession[] {
+  if (changed.length === 0) return sessions;
+  const byId = new Map(changed.map((s) => [s.id, s]));
+  return sessions.map((s) => byId.get(s.id) ?? s);
 }
 
 /**
@@ -1587,11 +1634,20 @@ export const useStore = create<State>((set, get) => ({
     const cursorWasHere = get().nextSlotId === id;
     const moved = cursorWasHere ? advanceSplit(get().slots, id)?.id : get().nextSlotId;
     const nextSlotId = moved === id ? firstDayCard(remaining)?.id : moved;
-    set({ slots: remaining, ...cursorTo(remaining, nextSlotId) });
-    safeWrite(async () => {
-      await db.slots.delete(id);
-      await db.slots.bulkPut(remaining);
+    const dropped = get().slots.filter((sl) => sl.id === id);
+    const named = rememberSlotNames(get().sessions, dropped);
+    set({
+      slots: remaining,
+      sessions: withSessions(get().sessions, named),
+      ...cursorTo(remaining, nextSlotId),
     });
+    safeWrite(() =>
+      db.transaction("rw", [db.slots, db.sessions], async () => {
+        await db.slots.delete(id);
+        await db.slots.bulkPut(remaining);
+        if (named.length > 0) await db.sessions.bulkPut(named);
+      }),
+    );
     persistSettingsFrom(get());
   },
 
@@ -1688,9 +1744,14 @@ export const useStore = create<State>((set, get) => ({
     );
 
     const exercises = [...state.exercises, ...resolved.createdExercises];
+    const keptSlotIds = new Set(resolved.slots.map((sl) => sl.id));
+    const droppedSlots = state.slots.filter((sl) => !keptSlotIds.has(sl.id));
+    // A dropped card goes quietly, but its history keeps its name.
+    const named = rememberSlotNames(state.sessions, droppedSlots);
     set({
       exercises,
       slots: resolved.slots,
+      sessions: withSessions(state.sessions, named),
       nutritionPhases: resolved.phases,
       plannedDays: resolved.pins,
       lastAcceptedPlanAt: plan.issuedAt,
@@ -1705,8 +1766,7 @@ export const useStore = create<State>((set, get) => ({
     // One transaction, so the tables cannot disagree about which plan is in
     // force. Deletes come from the difference against what was there before:
     // Dexie has no "replace this table" primitive.
-    const keptSlotIds = new Set(resolved.slots.map((sl) => sl.id));
-    const droppedSlotIds = state.slots.map((sl) => sl.id).filter((id) => !keptSlotIds.has(id));
+    const droppedSlotIds = droppedSlots.map((sl) => sl.id);
     const keptPhaseIds = new Set(resolved.phases.map((ph) => ph.id));
     const droppedPhaseIds = state.nutritionPhases
       .map((ph) => ph.id)
@@ -1719,8 +1779,9 @@ export const useStore = create<State>((set, get) => ({
     safeWrite(() =>
       db.transaction(
         "rw",
-        [db.exercises, db.slots, db.nutritionPhases, db.plannedDays, db.meta],
+        [db.exercises, db.slots, db.sessions, db.nutritionPhases, db.plannedDays, db.meta],
         async () => {
+          if (named.length > 0) await db.sessions.bulkPut(named);
           if (resolved.createdExercises.length > 0) {
             await db.exercises.bulkPut(resolved.createdExercises);
           }

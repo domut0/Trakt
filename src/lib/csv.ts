@@ -125,7 +125,7 @@ export function setColumns(
         // the `!= null` convention used by store.ts's slot guards keeps the two
         // readings of "has no slot" identical.
         if (sess == null || sess.splitSlotId == null) return "";
-        return slotMap.get(sess.splitSlotId)?.name ?? "";
+        return slotMap.get(sess.splitSlotId)?.name ?? sess.slotName ?? "";
       },
     },
     {
@@ -252,7 +252,8 @@ export function sessionColumns(
     { header: "Date", accessor: (s) => dayKey(new Date(s.startedAt)) },
     {
       header: "Split Slot",
-      accessor: (s) => (s.splitSlotId == null ? "" : (slotMap.get(s.splitSlotId)?.name ?? "")),
+      accessor: (s) =>
+        s.splitSlotId == null ? "" : (slotMap.get(s.splitSlotId)?.name ?? s.slotName ?? ""),
     },
     { header: "Started", accessor: (s) => formatLocalTime(s.startedAt) },
     { header: "Ended", accessor: (s) => (s.endedAt == null ? "" : formatLocalTime(s.endedAt)) },
