@@ -77,7 +77,9 @@ export function CoachSettings() {
                 ? "This client's sheet cannot be opened yet."
                 : lastError === "unreadable"
                   ? "That address did not return the expected reply."
-                  : "Couldn't reach that client's sheet."}
+                  : lastError === "needs-consent"
+                    ? "Reconnect Google to open this client"
+                    : "Couldn't reach that client's sheet."}
             </div>
           )}
 
