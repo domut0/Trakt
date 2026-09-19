@@ -1683,7 +1683,6 @@ export const useStore = create<State>((set, get) => ({
         slots: state.slots,
         exercises: state.exercises,
         nutritionPhases: state.nutritionPhases,
-        sessions: state.sessions,
       },
       uid,
     );

@@ -334,7 +334,6 @@ export function buildClientSnapshot(
         slots: [...slots.values()],
         exercises: [...exercises.values()],
         nutritionPhases: [],
-        sessions,
       },
       // Deterministic, like every other id in this file: a snapshot built twice
       // from one sheet must come out identical, or React would see every row as

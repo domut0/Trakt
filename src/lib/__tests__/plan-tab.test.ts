@@ -368,12 +368,6 @@ describe("resolvePlan", () => {
         calories: 2800,
       },
     ],
-    sessions: [
-      { splitSlotId: "s_legs" },
-      { splitSlotId: "s_legs" },
-      { splitSlotId: "s_upper" },
-      { splitSlotId: undefined },
-    ],
   };
 
   const plan: PlanPayload = {
@@ -473,29 +467,11 @@ describe("resolvePlan", () => {
     expect(out.pins).toEqual([{ date: "2026-09-22", splitSlotId: "s_upper" }]);
   });
 
-  it("reports a dropped card together with how much history points at it", () => {
-    // The honest part: the plan does not mention Legs, and two sessions do.
+  it("drops a card the plan does not mention, quietly", () => {
+    // A deliberate product call: the review screen lists the plan, not what it
+    // costs. Sessions logged against the card keep their splitSlotId.
     const out = resolvePlan(plan, target, ids());
-    expect(out.removedSlots).toHaveLength(1);
-    expect(out.removedSlots[0].slot.name).toBe("Legs");
-    expect(out.removedSlots[0].sessionCount).toBe(2);
-  });
-
-  it("reports a dropped card with no history as costing nothing", () => {
-    const unused = { ...target, sessions: [{ splitSlotId: "s_upper" }] };
-    const out = resolvePlan(plan, unused, ids());
-    expect(out.removedSlots[0].sessionCount).toBe(0);
-  });
-
-  it("reports nothing removed when the plan covers every card", () => {
-    const complete: PlanPayload = {
-      ...plan,
-      cards: [
-        ...plan.cards,
-        { name: "Legs", rotationOrder: 2, kind: "workout", exerciseNames: [] },
-      ],
-    };
-    expect(resolvePlan(complete, target, ids()).removedSlots).toEqual([]);
+    expect(out.slots.map((s) => s.name)).not.toContain("Legs");
   });
 
   it("drops a pin naming a card the plan does not contain", () => {
@@ -505,12 +481,11 @@ describe("resolvePlan", () => {
     expect(resolvePlan(dangling, target, ids()).pins).toEqual([]);
   });
 
-  it("resolves an empty plan to an empty split, reporting every card as dropped", () => {
+  it("resolves an empty plan to an empty split", () => {
     const empty: PlanPayload = { ...plan, phases: [], cards: [], pins: [] };
     const out = resolvePlan(empty, target, ids());
     expect(out.slots).toEqual([]);
     expect(out.phases).toEqual([]);
-    expect(out.removedSlots).toHaveLength(3);
   });
 });
 

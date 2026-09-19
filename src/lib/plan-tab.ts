@@ -472,25 +472,12 @@ export interface PlanResolution {
   pins: PlannedDay[];
   /** Exercises named by the plan that this device has never heard of. */
   createdExercises: Exercise[];
-  /**
-   * Cards the plan does not mention, which accepting it would drop, along with
-   * how many logged sessions point at each.
-   *
-   * Surfaced rather than silently applied because a card with history is not
-   * the same as an unused one: `WorkoutSession.splitSlotId` points at it, and
-   * History renders a session whose slot is gone as "Unknown". A coach dropping
-   * "Legs" from a programme is ordinary; a client silently losing the label on
-   * eighteen months of leg sessions is not, so the review screen says so and
-   * the person accepting decides.
-   */
-  removedSlots: Array<{ slot: SplitSlot; sessionCount: number }>;
 }
 
 export interface PlanTarget {
   slots: readonly SplitSlot[];
   exercises: readonly Exercise[];
   nutritionPhases: readonly NutritionPhase[];
-  sessions: readonly { splitSlotId?: string }[];
 }
 
 /** Names are matched case- and whitespace-insensitively; "bench press" is "Bench Press". */
@@ -553,16 +540,6 @@ export function resolvePlan(
     };
   });
 
-  const keptIds = new Set(slots.map((s) => s.id));
-  const sessionsPerSlot = new Map<string, number>();
-  for (const session of target.sessions) {
-    if (session.splitSlotId === undefined) continue;
-    sessionsPerSlot.set(session.splitSlotId, (sessionsPerSlot.get(session.splitSlotId) ?? 0) + 1);
-  }
-  const removedSlots = target.slots
-    .filter((s) => !keptIds.has(s.id))
-    .map((slot) => ({ slot, sessionCount: sessionsPerSlot.get(slot.id) ?? 0 }));
-
   const phases: NutritionPhase[] = plan.phases.map((phase) => ({
     id: phaseByStart.get(phase.startsOn)?.id ?? newId(),
     startsOn: phase.startsOn,
@@ -587,7 +564,7 @@ export function resolvePlan(
     // pointing at nothing.
     .filter((p): p is PlannedDay => p !== undefined);
 
-  return { slots, phases, pins, createdExercises, removedSlots };
+  return { slots, phases, pins, createdExercises };
 }
 
 /**
