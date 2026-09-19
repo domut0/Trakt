@@ -85,7 +85,7 @@ export function CoachSettings() {
               {lastError === "not-configured"
                 ? "This client's sheet cannot be opened yet."
                 : lastError === "unreadable"
-                  ? "That address did not return the expected reply."
+                  ? "Couldn't read that client's sheet. It may no longer be shared with you"
                   : lastError === "needs-consent"
                     ? "Google sign-in was closed before it finished"
                     : "Couldn't reach that client's sheet."}
@@ -162,8 +162,9 @@ function AddByPickerForm({ onDone, onUseLink }: { onDone: () => void; onUseLink:
       const picked = await pickSharedSpreadsheet();
       if (picked) {
         setSheet(picked);
-        // The sheet's own title is usually the client's name already.
-        if (name.trim() === "") setName(picked.name);
+        // A renamed sheet usually carries the client's name. The app's own
+        // default, "Trakt — <date>", does not, and would be a useless prefill.
+        if (name.trim() === "" && !picked.name.startsWith("Trakt")) setName(picked.name);
       }
     } catch (err) {
       const code = (err instanceof Error ? err.message : "") as PickFailure;

@@ -75,10 +75,15 @@ export function SaveChangesBar() {
             onClick={() => {
               void save().then((ok) => {
                 setOpen(false);
+                const error = useCoachStore.getState().lastError;
                 showToast({
                   message: ok
-                    ? `Plan sent to ${viewing.client.name}.`
-                    : "Couldn't reach that client's sheet.",
+                    ? `Plan sent to ${viewing.client.name}`
+                    : error === "needs-consent"
+                      ? "Google sign-in was closed before it finished"
+                      : error === "unreadable"
+                        ? `Their sheet isn't shared with you for editing. Ask ${viewing.client.name} to share it again`
+                        : "Couldn't reach that client's sheet",
                   durationMs: 4000,
                 });
               });
