@@ -11,6 +11,8 @@ import { Chevron } from "./icons";
 import { Toggle } from "./Toggle";
 import { freshness } from "./ClientBanner";
 import type { CoachClient } from "../lib/db";
+import { inviteUrl, INVITE_VERSION, type JoinPayload } from "../lib/invite";
+import { isLikelyEmail, loadCoachProfile, saveCoachProfile } from "../lib/coach-profile";
 
 /**
  * Coach mode's Settings section: the client list, and the way into a client.
@@ -31,6 +33,7 @@ export function CoachSettings() {
   const removeClient = useCoachStore((s) => s.removeClient);
 
   const [adding, setAdding] = useState(false);
+  const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
     void hydrate();
@@ -98,6 +101,19 @@ export function CoachSettings() {
               className="group-row group-row-sep w-full text-left"
             >
               <div className="t-body">Add a client</div>
+              <Chevron className="shrink-0 text-ink-2" size={16} />
+            </button>
+          )}
+
+          {inviting ? (
+            <InviteForm onDone={() => setInviting(false)} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setInviting(true)}
+              className="group-row group-row-sep w-full text-left"
+            >
+              <div className="t-body">Invite a client</div>
               <Chevron className="shrink-0 text-ink-2" size={16} />
             </button>
           )}
@@ -250,6 +266,126 @@ function AddByLinkForm({ onDone }: { onDone: () => void }) {
         </button>
         <button type="button" onClick={onDone} className="min-h-[44px] flex-1 t-body text-ink-2">
           Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Inviting a new client.
+ *
+ * The coach's email is the address the client's app will share their sheet
+ * with, so it must be the Google account the coach signs in to Trakt with.
+ */
+function InviteForm({ onDone }: { onDone: () => void }) {
+  const [clientName, setClientName] = useState("");
+  const [coachName, setCoachName] = useState(() => loadCoachProfile().name);
+  const [coachEmail, setCoachEmail] = useState(() => loadCoachProfile().email);
+  const [error, setError] = useState<string | undefined>();
+  const [status, setStatus] = useState<"copied" | "manual" | undefined>();
+  const [manualUrl, setManualUrl] = useState<string | undefined>();
+
+  const submit = async () => {
+    const name = coachName.trim();
+    const email = coachEmail.trim();
+    const theirName = clientName.trim();
+
+    if (name === "") {
+      setError("Add your name");
+      setStatus(undefined);
+      setManualUrl(undefined);
+      return;
+    }
+    if (!isLikelyEmail(email)) {
+      setError("That email does not look right");
+      setStatus(undefined);
+      setManualUrl(undefined);
+      return;
+    }
+    setError(undefined);
+
+    saveCoachProfile({ name, email });
+
+    const payload: JoinPayload = {
+      v: INVITE_VERSION,
+      kind: "join",
+      coachName: name,
+      coachEmail: email,
+      ...(theirName ? { clientName: theirName } : {}),
+    };
+    const url = inviteUrl(window.location.origin, payload);
+
+    let fallthrough = true;
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "Join me on Trakt", url });
+        fallthrough = false;
+        setStatus(undefined);
+        setManualUrl(undefined);
+      } catch (err: unknown) {
+        const isAbort =
+          (err instanceof Error && err.name === "AbortError") ||
+          (typeof err === "object" &&
+            err !== null &&
+            (err as { name?: unknown }).name === "AbortError");
+        if (isAbort) {
+          return;
+        }
+      }
+    }
+
+    if (fallthrough) {
+      try {
+        if (!navigator?.clipboard?.writeText) {
+          throw new Error("Clipboard API unavailable");
+        }
+        await navigator.clipboard.writeText(url);
+        setStatus("copied");
+        setManualUrl(undefined);
+      } catch {
+        setStatus("manual");
+        setManualUrl(url);
+      }
+    }
+  };
+
+  return (
+    <div className="group-row-sep space-y-3 px-4 py-4">
+      <Field label="Their name" value={clientName} onChange={setClientName} placeholder="Bob" />
+      <Field label="Your name" value={coachName} onChange={setCoachName} placeholder="Marcus" />
+      <Field
+        label="Your Google email"
+        value={coachEmail}
+        onChange={setCoachEmail}
+        placeholder="you@gmail.com"
+      />
+      {error && <p className="t-label text-signal">{error}</p>}
+      {status === "copied" && <p className="t-label text-ink-2">Link copied</p>}
+      {status === "manual" && <p className="t-label text-ink-2">Copy this link</p>}
+      {status === "manual" && manualUrl && (
+        <input
+          type="text"
+          readOnly
+          value={manualUrl}
+          onFocus={(e) => e.currentTarget.select()}
+          onClick={(e) => e.currentTarget.select()}
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          className="min-h-[44px] w-full border border-rule bg-transparent px-3 t-body text-ink rounded-md"
+        />
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => void submit()}
+          className="min-h-[44px] flex-1 bg-ink t-body font-medium text-paper rounded-md"
+        >
+          Send invite
+        </button>
+        <button type="button" onClick={onDone} className="min-h-[44px] flex-1 t-body text-ink-2">
+          Done
         </button>
       </div>
     </div>
