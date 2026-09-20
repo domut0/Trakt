@@ -4,6 +4,7 @@ import { DeleteWorkoutButton } from "../components/DeleteWorkoutButton";
 import { Flap } from "../components/Flap";
 import { SessionView } from "../components/SessionView";
 import { WorkoutLog } from "../components/WorkoutLog";
+import { TutorialBanner } from "../components/TutorialBanner";
 import { WorkoutSummaryScreen } from "../components/WorkoutSummaryScreen";
 import { useStore } from "../lib/store";
 import { buildWorkoutSummary, type WorkoutSummaryData } from "../lib/workout-summary";
@@ -126,6 +127,7 @@ function WorkoutPage() {
 
   return (
     <div className="mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-paper">
+      <TutorialBanner />
       {/*
         The screen is set as an attempt card: the split names the page in the
         margin, the lift you are on is the one large thing, and the clock sits

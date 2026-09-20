@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus } from "./icons";
+import { TutorialBanner } from "./TutorialBanner";
 import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { lastSessionFor } from "../lib/exercise-history";
 import {
@@ -186,6 +187,7 @@ export function ExerciseScreen({
   return createPortal(
     <div className="fixed inset-x-0 top-0 z-50 h-[100dvh] bg-paper anim-backdrop">
       <div className="mx-auto flex h-full max-w-md flex-col">
+        <TutorialBanner />
         {/* The way out, in the corner every other screen in this app keeps it.
             There used to be a full-width Done pinned to the bottom instead,
             which promised a transaction that does not exist: a set is saved the

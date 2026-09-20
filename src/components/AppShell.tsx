@@ -2,7 +2,9 @@ import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { useStore } from "../lib/store";
 import { useCoachStore } from "../lib/coach-store";
+import { useTutorialStore } from "../lib/tutorial-store";
 import { ClientBanner } from "./ClientBanner";
+import { TutorialBanner } from "./TutorialBanner";
 import { Gear } from "./icons";
 import { StartWorkoutSheet } from "./StartWorkoutSheet";
 import { WorkoutChooserSheet } from "./WorkoutChooserSheet";
@@ -338,14 +340,15 @@ function useRestDaySettles() {
 export function AppShell({ children }: { children: ReactNode }) {
   const activeSessionId = useStore((s) => s.activeSessionId);
   const viewingClient = useCoachStore((s) => s.viewing !== undefined);
+  const tutorialActive = useTutorialStore((s) => s.active);
   const location = useLocation();
   const router = useRouter();
   // Exactly one banner occupies the top slot, and only 44px is reserved for it.
-  // These two cannot both apply -- entering a client's view clears the active
-  // session (see `asStoreState`) -- but the client banner wins if they ever do,
-  // because whose data is on screen outranks what the coach was doing.
-  const showClientBanner = viewingClient;
-  const showBanner = !showClientBanner && activeSessionId && location.pathname !== "/workout";
+  // The priority order is: tutorial banner, then client banner, then active-session
+  // banner. Whichever wins takes the slot, and only one is ever shown.
+  const showTutorialBanner = tutorialActive;
+  const showClientBanner = !showTutorialBanner && viewingClient;
+  const showBanner = !showTutorialBanner && !showClientBanner && activeSessionId && location.pathname !== "/workout";
   const onTab = TABS.some((t) => t.to === location.pathname);
 
   useRestDaySettles();
@@ -360,7 +363,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
-      {showClientBanner ? <ClientBanner /> : <ActiveSessionBanner />}
+      {showTutorialBanner ? (
+        <TutorialBanner />
+      ) : showClientBanner ? (
+        <ClientBanner />
+      ) : (
+        <ActiveSessionBanner />
+      )}
       <main
         // A plain fade, and deliberately no slide. A 24px horizontal travel on
         // every tab tap is the most app-template motion there was, and its
