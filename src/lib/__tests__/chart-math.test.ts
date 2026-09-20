@@ -269,6 +269,55 @@ describe("rollingAverage", () => {
     expect(rollingAverage(spring, 7)[6].val).toBeCloseTo(mean(springVals), 10);
   });
 
+  it("throws away the one day that would have described the week", () => {
+    // Six ordinary days and one that is a measurement of the logging rather
+    // than of the week. A plain mean reports 151.4 and draws a spike; the
+    // trimmed one reports the six ordinary days back.
+    const points = [
+      day(2025, 6, 1, 10),
+      day(2025, 6, 2, 10),
+      day(2025, 6, 3, 10),
+      day(2025, 6, 4, 10),
+      day(2025, 6, 5, 10),
+      day(2025, 6, 6, 10),
+      day(2025, 6, 7, 1000),
+    ];
+    expect(rollingAverage(points, 7)[6].val).toBe(10);
+  });
+
+  it("means the middle five of a full week", () => {
+    const points = [1, 2, 3, 4, 5, 6, 100].map((v, i) => day(2025, 6, i + 1, v));
+    // 1 and 100 are dropped; 2 through 6 remain.
+    expect(rollingAverage(points, 7)[6].val).toBe(4);
+  });
+
+  it("trims a short window too, rather than changing method at a threshold", () => {
+    const three = [day(2025, 6, 1, 1), day(2025, 6, 2, 2), day(2025, 6, 3, 99)];
+    // Three readings leave exactly one standing.
+    expect(rollingAverage(three, 7)[2].val).toBe(2);
+
+    const four = [
+      day(2025, 6, 1, 1),
+      day(2025, 6, 2, 10),
+      day(2025, 6, 3, 20),
+      day(2025, 6, 4, 99),
+    ];
+    expect(rollingAverage(four, 7)[3].val).toBe(15);
+  });
+
+  it("leaves two readings alone, having nothing to spare", () => {
+    const points = [day(2025, 6, 1, 10), day(2025, 6, 2, 1000)];
+    expect(rollingAverage(points, 7)[1].val).toBe(505);
+  });
+
+  it("drops one copy of a repeated extreme, not every copy", () => {
+    const points = [day(2025, 6, 1, 1), day(2025, 6, 2, 1), day(2025, 6, 3, 1), day(2025, 6, 4, 9)];
+    // Sorted, that is [1, 1, 1, 9]: one 1 goes as the low, the 9 as the high,
+    // and the two remaining 1s are the average. Dropping every 1 would leave
+    // nothing at all.
+    expect(rollingAverage(points, 7)[3].val).toBe(1);
+  });
+
   it("treats a 1 day window as the point's own day", () => {
     const points = [day(2025, 6, 1, 10), day(2025, 6, 2, 20)];
     const avg = rollingAverage(points, 1);

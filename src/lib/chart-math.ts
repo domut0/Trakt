@@ -187,14 +187,44 @@ export function linearRegression<T extends Point>(
 }
 
 /**
- * Calculates a true calendar-day trailing rolling average over `windowDays`.
+ * The mean of a window with its single highest and lowest readings discarded.
+ *
+ * This is a cuber's average of five, and it is here for the same reason it
+ * exists there: one bad solve should not be allowed to describe the session.
+ * A day on the scale after a late meal, or a day you logged 900 calories
+ * because you stopped logging at lunch, is a measurement of the logging, not
+ * of the week - and a plain mean lets exactly one of those days drag the line
+ * it is supposed to be smoothing.
+ *
+ * Trimming needs something left over to average, so it starts at three
+ * readings. Below that the window is too thin for an outlier to be
+ * distinguishable from the signal, and dropping anything would leave a mean of
+ * one value or of none.
+ */
+function trimmedMean(vals: readonly number[]): number {
+  if (vals.length < 3) {
+    return vals.reduce((acc, v) => acc + v, 0) / vals.length;
+  }
+  // A copy, sorted: the caller's window is in date order and must stay that
+  // way. Windows are a week wide, so this sorts at most seven numbers.
+  const middle = [...vals].sort((a, b) => a - b).slice(1, -1);
+  return middle.reduce((acc, v) => acc + v, 0) / middle.length;
+}
+
+/**
+ * Calculates a true calendar-day trailing rolling average over `windowDays`,
+ * trimming the extremes out of each window (see `trimmedMean`).
  *
  * Unlike a trailing-N-points window, which distorts averages across logging
  * gaps, the window spans the `windowDays` calendar days ending on each point's
- * own day. Missing days are omitted from both sum and count rather than
- * assumed to be zero, and days are compared as calendar days rather than
- * millisecond offsets so a daylight-saving transition inside the window cannot
- * quietly shorten it.
+ * own day. Missing days are omitted rather than assumed to be zero, and days
+ * are compared as calendar days rather than millisecond offsets so a daylight
+ * saving transition inside the window cannot quietly shorten it.
+ *
+ * The trim is applied to whatever the window actually holds, not to a notional
+ * seven: a week with four readings in it averages the middle two. That keeps
+ * the line continuous across the gaps that are the normal state of this data,
+ * rather than changing method silently at a threshold nobody can see.
  */
 export function rollingAverage<T extends Point>(points: readonly T[], windowDays: number): T[] {
   if (points.length === 0) return [];
@@ -205,17 +235,15 @@ export function rollingAverage<T extends Point>(points: readonly T[], windowDays
   return points.map((p, i) => {
     const endDay = days[i];
     const startDay = endDay - span;
-    let sum = 0;
-    let count = 0;
+    const vals: number[] = [];
 
     for (let j = 0; j < points.length; j++) {
       if (days[j] >= startDay && days[j] <= endDay) {
-        sum += points[j].val;
-        count += 1;
+        vals.push(points[j].val);
       }
     }
 
-    const avgVal = count > 0 ? sum / count : p.val;
+    const avgVal = vals.length > 0 ? trimmedMean(vals) : p.val;
     return { ...p, val: avgVal };
   });
 }

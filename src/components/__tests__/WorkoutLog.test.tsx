@@ -77,8 +77,11 @@ function save() {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
 }
 
+/** Leaving the exercise screen. The control says Back rather than Done: the
+ *  screen commits nothing on the way out, so it is an exit, not a transaction.
+ *  The auto-advance it triggers is unchanged, which is what these tests check. */
 function done() {
-  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
 }
 
 describe("WorkoutLog", () => {
@@ -335,5 +338,66 @@ describe("what the review added", () => {
 
     expect(loggedToday()).toHaveLength(1);
     expect(loggedToday()[0].setupNote).toBe("Pin 6");
+  });
+
+  it("changes the setup note without logging anything", () => {
+    setup([{ exerciseId: BENCH.id, sets: 3, reps: "8" }]);
+    openExercise("Bench Press");
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit setup note" }));
+    type("Setup note", "Pin 4");
+    fireEvent.blur(screen.getByLabelText("Setup note"));
+
+    // The lasting half: the note belongs to the bench, not to today.
+    expect(useStore.getState().exercises.find((e) => e.id === BENCH.id)?.setupNote).toBe("Pin 4");
+    // And nothing was logged to say it.
+    expect(loggedToday()).toHaveLength(0);
+  });
+
+  it("restamps the sets already logged in this session", () => {
+    setup([{ exerciseId: BENCH.id, sets: 2, reps: "5" }]);
+    openExercise("Bench Press");
+    tapRow(1);
+    type("Weight", "100");
+    type("Setup note", "Pin 4");
+    save();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit setup note" }));
+    type("Setup note", "Pin 6");
+    fireEvent.blur(screen.getByLabelText("Setup note"));
+
+    // `prefillFor` buckets a lift's history by its note, so a session left
+    // carrying the old one would prefill the next session from the wrong setup.
+    expect(loggedToday()[0].setupNote).toBe("Pin 6");
+  });
+
+  it("leaves a past session's record alone", () => {
+    const history = [pastSet(BENCH.id, 95, 5, 150)];
+    setup([{ exerciseId: BENCH.id, sets: 1, reps: "5" }], history);
+    openExercise("Bench Press");
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit setup note" }));
+    type("Setup note", "Pin 6");
+    fireEvent.blur(screen.getByLabelText("Setup note"));
+
+    // Last week was done how last week was done. A note typed today does not
+    // get to rewrite it.
+    const past = useStore.getState().sets.find((s) => s.sessionId === LAST_WEEK.id);
+    expect(past?.setupNote).toBeUndefined();
+  });
+
+  it("clears a note by emptying it", () => {
+    setup([{ exerciseId: BENCH.id, sets: 1, reps: "5" }]);
+    openExercise("Bench Press");
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit setup note" }));
+    type("Setup note", "Pin 4");
+    fireEvent.blur(screen.getByLabelText("Setup note"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit setup note" }));
+    type("Setup note", "   ");
+    fireEvent.blur(screen.getByLabelText("Setup note"));
+
+    expect(useStore.getState().exercises.find((e) => e.id === BENCH.id)?.setupNote).toBeUndefined();
   });
 });

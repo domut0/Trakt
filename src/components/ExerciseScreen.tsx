@@ -49,11 +49,15 @@ export function ExerciseScreen({
   const logSet = useStore((s) => s.logSet);
   const updateSet = useStore((s) => s.updateSet);
   const lastSetupNoteFor = useStore((s) => s.lastSetupNoteFor);
+  const setSetupNote = useStore((s) => s.setSetupNote);
 
   /** How far "+ Add set" has pushed the row count past what is prescribed. */
   const [minRows, setMinRows] = useState(0);
   /** The row whose editor is open, by its 1-based index, or null for none. */
   const [editing, setEditing] = useState<number | null>(null);
+  /** Whether the setup note at the top is open for editing, and its draft. */
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState("");
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
   const [rpe, setRpe] = useState("");
@@ -123,9 +127,25 @@ export function ExerciseScreen({
       setRpe(row.ghost.rpe != null ? String(row.ghost.rpe) : "");
     }
     // Carried forward rather than blank: the setup is the same bench at the
-    // same pin height until somebody changes it, and this is the only place it
-    // can be changed.
+    // same pin height until somebody changes it. This field is the per-SET
+    // snapshot - the one set you did at a different pin - while the note at the
+    // top of the screen is the lift's own, and changing that one does not need
+    // a set to hang off.
     setNote(row.set?.setupNote ?? setupNote ?? "");
+  };
+
+  /**
+   * Committed on blur, and on Enter by way of blurring.
+   *
+   * No Escape: this screen is used on a phone, where there is no such key, and
+   * a cancel that only exists on a desktop keyboard is a cancel most people
+   * never have. Backing out of a note is retyping it, which is the same gesture
+   * as writing one.
+   */
+  const commitNote = () => {
+    setEditingNote(false);
+    if (noteDraft.trim() === (setupNote ?? "").trim()) return;
+    setSetupNote(exerciseId, noteDraft);
   };
 
   const parsedWeight = parseFloat(weight);
@@ -166,7 +186,22 @@ export function ExerciseScreen({
   return createPortal(
     <div className="fixed inset-x-0 top-0 z-50 h-[100dvh] bg-paper anim-backdrop">
       <div className="mx-auto flex h-full max-w-md flex-col">
-        <div className="px-4 pt-14 pb-2">
+        {/* The way out, in the corner every other screen in this app keeps it.
+            There used to be a full-width Done pinned to the bottom instead,
+            which promised a transaction that does not exist: a set is saved the
+            moment you save it, and nothing on this screen is waiting to be
+            committed. Naming the exit after a commit made leaving mid-exercise
+            feel like abandoning something. */}
+        <div className="flex items-center justify-between px-4 pt-14 pb-2">
+          <button
+            onClick={() => onDone(complete)}
+            className="-my-[11px] flex min-h-[44px] items-center t-body font-medium t-action"
+          >
+            Back
+          </button>
+        </div>
+
+        <div className="px-4 pb-2">
           <h1 className="text-balance break-words t-title text-ink">
             {exercise?.name ?? "Unknown exercise"}
           </h1>
@@ -185,8 +220,42 @@ export function ExerciseScreen({
               Last time <span className="tnum text-ink">{lastTime}</span>
             </p>
           )}
-          {setupNote && (
-            <p className="mt-2 rounded-md bg-wash px-3 py-1.5 t-label text-ink-2">{setupNote}</p>
+          {/* The setup, as a thing you can change rather than a thing you are
+              told. It was a paragraph, and the only way to alter it was to open
+              a set row and save a set - so the one screen that shows you the
+              pin height was the one place you could not correct it. */}
+          {editingNote ? (
+            <input
+              type="text"
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              onBlur={commitNote}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              autoFocus
+              placeholder="Seat, pins, grip"
+              aria-label="Setup note"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              className="mt-2 min-h-[44px] w-full rounded-md bg-wash px-3 t-label text-ink outline-none placeholder:text-ink-3"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setNoteDraft(setupNote ?? "");
+                setEditingNote(true);
+              }}
+              // Named for what tapping it does. Its visible text is the note
+              // itself, which reads as a statement rather than a control, and
+              // when there is no note yet that text is only a placeholder.
+              aria-label="Edit setup note"
+              className="mt-2 flex min-h-[44px] w-full items-center rounded-md bg-wash px-3 text-left t-label text-ink-2"
+            >
+              {setupNote ?? <span className="text-ink-3">Seat, pins, grip</span>}
+            </button>
           )}
 
           <div className="mt-3 flex items-baseline justify-between gap-3">
@@ -196,8 +265,14 @@ export function ExerciseScreen({
         </div>
 
         <div
-          className="min-h-0 flex-1 overflow-y-auto px-4 pb-4"
-          style={{ marginBottom: keyboardOffset }}
+          className="min-h-0 flex-1 overflow-y-auto px-4"
+          // The scroller reaches the bottom of the screen now that no bar is
+          // parked there, so "Add set" is the last thing on it and needs the
+          // inset itself.
+          style={{
+            marginBottom: keyboardOffset,
+            paddingBottom: "max(env(safe-area-inset-bottom), 24px)",
+          }}
         >
           <ul className="group-list">
             {rows.map((row, idx) => {
@@ -310,18 +385,6 @@ export function ExerciseScreen({
           >
             <Plus size={18} />
             Add set
-          </button>
-        </div>
-
-        <div
-          className="px-4 pt-3"
-          style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
-        >
-          <button
-            onClick={() => onDone(complete)}
-            className="min-h-[56px] w-full bg-ink t-heading text-paper rounded-md"
-          >
-            Done
           </button>
         </div>
       </div>

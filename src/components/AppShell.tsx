@@ -200,7 +200,20 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
     <nav
       aria-label="Primary"
       className="relative z-30 shrink-0 bg-paper"
-      style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
+      // CLAMPED, not simply honoured. On the phone this app is actually used on
+      // - Android, gesture navigation, the hint bar switched off - the inset
+      // comes back at around 85px and nothing whatsoever is drawn in it, so the
+      // bar floated a thumb's width above the bottom of a screen that had no
+      // system furniture to clear. A sheet can afford to be generous here; the
+      // nav is the one bar that is always on screen, and an inset it cannot see
+      // is not a reason to spend an eighth of the display on black.
+      //
+      // The floor keeps the labels off the very edge. The ceiling is set below
+      // an iOS home indicator's 34px on purpose: this bar's rows are 44px, so
+      // an indicator drawn over the last few pixels of it costs nothing you can
+      // tap, and the alternative is reserving space for a device nobody here
+      // runs.
+      style={{ paddingBottom: "clamp(8px, env(safe-area-inset-bottom, 0px), 16px)" }}
     >
       {/* THREE EQUAL COLUMNS, with the button in the middle one.
 

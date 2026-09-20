@@ -397,6 +397,20 @@ interface State {
   endWorkout: () => void;
   setCurrentExercise: (exerciseId: string) => void;
   addExercise: (name: string, type: ExerciseType) => Exercise;
+  /**
+   * Change a lift's setup note without logging anything.
+   *
+   * It writes in both directions on purpose. The exercise's own note is the
+   * lasting one - the pin height is a property of the bench, not of Tuesday -
+   * and the sets already logged in the open session are restamped so the
+   * session you are standing in agrees with what you just said about it. That
+   * second half matters beyond tidiness: `prefillFor` buckets a lift's history
+   * by `setupNoteKey`, so a session left carrying the old note would go on
+   * prefilling the next one from the wrong setup.
+   *
+   * An empty string clears the note rather than storing one.
+   */
+  setSetupNote: (exerciseId: string, note: string) => void;
   logSet: (input: {
     exerciseId: string;
     weight: number;
@@ -1419,6 +1433,38 @@ export const useStore = create<State>((set, get) => ({
     set({ exercises: [...get().exercises, ex] });
     safeWrite(() => db.exercises.put(ex));
     return ex;
+  },
+
+  setSetupNote: (exerciseId, note) => {
+    const trimmed = note.trim();
+    const value = trimmed || undefined;
+
+    const exercises = get().exercises.map((e) =>
+      e.id === exerciseId ? { ...e, setupNote: value } : e,
+    );
+    const updatedExercise = exercises.find((e) => e.id === exerciseId);
+    if (!updatedExercise) return;
+
+    // Only the open session. A past session is a record of how that day was
+    // actually done, and rewriting it to match a note typed weeks later would
+    // be the app editing history on the user's behalf.
+    const activeSessionId = get().activeSessionId;
+    const restamped = activeSessionId
+      ? get().sets.map((s) =>
+          s.sessionId === activeSessionId && s.exerciseId === exerciseId
+            ? { ...s, setupNote: value }
+            : s,
+        )
+      : get().sets;
+
+    set({ exercises, sets: restamped });
+    safeWrite(() => db.exercises.put(updatedExercise));
+    if (activeSessionId) {
+      const touched = restamped.filter(
+        (s) => s.sessionId === activeSessionId && s.exerciseId === exerciseId,
+      );
+      if (touched.length > 0) safeWrite(() => db.sets.bulkPut(touched));
+    }
   },
 
   logSet: ({ exerciseId, weight, reps, rpe, setupNote }) => {
