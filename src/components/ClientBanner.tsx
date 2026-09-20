@@ -20,9 +20,12 @@ export function ClientBanner() {
 
   return (
     <div
-      // Same geometry as ActiveSessionBanner: AppShell reserves exactly pt-11
-      // (44px) for whichever of the two is showing.
-      className="fixed left-0 right-0 top-0 z-40 flex min-h-[44px] items-center justify-between gap-3 bg-accent px-4 py-2.5 text-accent-foreground"
+      // In flow, not fixed over the top of the page: the app runs under a
+      // translucent status bar (apple-mobile-web-app-status-bar-style), so a
+      // bar pinned to top-0 sits beneath the clock and its button cannot be
+      // tapped. In flow it also needs no reserved gap in <main> to match.
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+      className="relative z-40 flex min-h-[44px] w-full shrink-0 items-center justify-between gap-3 bg-accent px-4 py-2.5 text-accent-foreground"
     >
       <span className="flex min-w-0 items-center gap-2 t-label font-medium">
         <span className="truncate">{viewing.client.name}&rsquo;s Trakt</span>

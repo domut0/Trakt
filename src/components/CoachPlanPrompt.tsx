@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSyncStore } from "../lib/sync-store";
 import { useStore } from "../lib/store";
 import { diffPlan, planFromStore } from "../lib/plan-tab";
@@ -58,63 +59,73 @@ export function CoachPlanPrompt() {
         <span className="shrink-0 t-label font-medium">Review →</span>
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-paper">
-          <header className="px-4 pb-3 pt-14">
-            <h1 className="t-title text-ink">New plan</h1>
-            <p className="t-label text-ink-2">From your coach</p>
-          </header>
+      {/* Portalled to the body, like every other overlay here. AppShell leaves a
+          transform on <main> after a route animation, and a transformed
+          ancestor becomes the containing block for position: fixed -- which put
+          this screen inside the scrolling <main> and left its Accept and Not now
+          buttons outside the visible box. */}
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex flex-col bg-paper">
+            <header className="px-4 pb-3 pt-14">
+              <h1 className="t-title text-ink">New plan</h1>
+              <p className="t-label text-ink-2">From your coach</p>
+            </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4">
-            {changes.length === 0 ? (
-              <p className="t-body text-ink-2">This plan matches what you are already following.</p>
-            ) : (
-              <ul className="space-y-3">
-                {changes.map((c, i) => (
-                  <li key={i} className="border-b border-rule pb-3">
-                    <span className="block t-label text-ink-2">{c.area}</span>
-                    <span className="block t-body text-ink">
-                      {c.kind === "removed" ? "Remove " : c.kind === "added" ? "Add " : ""}
-                      {c.subject}
-                    </span>
-                    {c.detail && <span className="block t-label text-ink-2">{c.detail}</span>}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="py-4 t-label text-ink-2">
-              Accepting replaces your plan. Everything you have logged is kept.
-            </p>
-          </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4">
+              {changes.length === 0 ? (
+                <p className="t-body text-ink-2">
+                  This plan matches what you are already following.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {changes.map((c, i) => (
+                    <li key={i} className="border-b border-rule pb-3">
+                      <span className="block t-label text-ink-2">{c.area}</span>
+                      <span className="block t-body text-ink">
+                        {c.kind === "removed" ? "Remove " : c.kind === "added" ? "Add " : ""}
+                        {c.subject}
+                      </span>
+                      {c.detail && <span className="block t-label text-ink-2">{c.detail}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="py-4 t-label text-ink-2">
+                Accepting replaces your plan. Everything you have logged is kept.
+              </p>
+            </div>
 
-          <div
-            className="flex gap-2 px-4 pt-2"
-            style={{ paddingBottom: "max(env(safe-area-inset-bottom), 16px)" }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                acceptCoachPlan(pending);
-                // Clearing it here rather than waiting for the next sync means
-                // the prompt goes away the moment the client acts on it.
-                useSyncStore.setState({ pendingCoachPlan: undefined });
-                setOpen(false);
-                showToast({ message: "New plan applied.", durationMs: 4000 });
-              }}
-              className="min-h-[44px] flex-1 bg-ink t-body font-semibold text-paper rounded-md"
+            <div
+              className="flex gap-2 px-4 pt-2"
+              style={{ paddingBottom: "max(env(safe-area-inset-bottom), 16px)" }}
             >
-              Accept
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="min-h-[44px] flex-1 t-body text-ink-2"
-            >
-              Not now
-            </button>
-          </div>
-        </div>
-      )}
+              <button
+                type="button"
+                onClick={() => {
+                  acceptCoachPlan(pending);
+                  // Clearing it here rather than waiting for the next sync means
+                  // the prompt goes away the moment the client acts on it.
+                  useSyncStore.setState({ pendingCoachPlan: undefined });
+                  setOpen(false);
+                  showToast({ message: "New plan applied.", durationMs: 4000 });
+                }}
+                className="min-h-[44px] flex-1 bg-ink t-body font-semibold text-paper rounded-md"
+              >
+                Accept
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="min-h-[44px] flex-1 t-body text-ink-2"
+              >
+                Not now
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

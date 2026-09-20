@@ -129,10 +129,12 @@ export function ActiveSessionBanner() {
   return (
     <button
       onClick={() => router.navigate({ to: "/workout" })}
-      // min-h-[44px] is not only the touch-target floor: AppShell already
-      // reserves exactly pt-11 (44px) for this banner, and at py-2.5 the bar
-      // measured ~38px, so the reserved gap never matched the real bar.
-      className="fixed left-0 right-0 top-0 z-40 flex min-h-[44px] items-center justify-between gap-3 bg-accent px-4 py-2.5 text-accent-foreground"
+      // In flow, not fixed over the top of the page: the app runs under a
+      // translucent status bar (apple-mobile-web-app-status-bar-style), so a
+      // bar pinned to top-0 sits beneath the clock and its button cannot be
+      // tapped. In flow it also needs no reserved gap in <main> to match.
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+      className="relative z-40 flex min-h-[44px] w-full shrink-0 items-center justify-between gap-3 bg-accent px-4 py-2.5 text-accent-foreground"
     >
       <span className="flex min-w-0 items-center gap-2 t-label font-medium">
         <span className="relative flex h-2 w-2 shrink-0">
@@ -363,11 +365,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="relative mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
       {showClientBanner ? <ClientBanner /> : <ActiveSessionBanner />}
       <main
-        className={
-          "relative min-h-0 flex-1 overflow-y-auto overscroll-contain " +
-          (showBanner || showClientBanner ? "pt-11 " : "") +
-          routeAnimClass
-        }
+        className={"relative min-h-0 flex-1 overflow-y-auto overscroll-contain " + routeAnimClass}
       >
         {onTab && (
           // Settings, in the corner of every tab screen.
@@ -377,14 +375,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           // container, so it travels with the header it belongs to instead of
           // hovering over whatever you have scrolled to. 49px puts its 44px box
           // on the centre line of a 28px t-title sitting under pt-14, and the
-          // banner offsets it by exactly the pt-11 the banner reserves. Every
+          // banners are in flow above <main>, so it needs no offset. Every
           // tab header carries pr-12 so a long title wraps rather than running
           // underneath it.
           <Link
             to="/settings"
             aria-label="Settings"
             className="absolute right-1.5 z-30 flex h-11 w-11 items-center justify-center text-ink-3"
-            style={{ top: showBanner || showClientBanner ? 93 : 49 }}
+            style={{ top: 49 }}
           >
             <Gear size={22} />
           </Link>

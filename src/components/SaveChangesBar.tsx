@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useCoachStore } from "../lib/coach-store";
 import { useStore } from "../lib/store";
 import { useToast } from "./Toast";
@@ -33,7 +34,12 @@ export function SaveChangesBar() {
 
   const label = changes.length === 1 ? "1 change" : `${changes.length} changes`;
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  // Portalled for the same reason as CoachPlanPrompt: a route animation leaves
+  // a transform on <main>, and a fixed bar inside a transformed ancestor is
+  // positioned against that ancestor rather than against the screen.
+  return createPortal(
     <>
       {open && (
         <div className="fixed inset-x-0 bottom-0 z-50 max-h-[60vh] overflow-y-auto bg-paper px-4 pb-28 pt-4">
@@ -94,6 +100,7 @@ export function SaveChangesBar() {
           </button>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
