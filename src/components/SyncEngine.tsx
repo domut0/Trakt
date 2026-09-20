@@ -27,6 +27,9 @@ const BACKOFF_MS = [30_000, 120_000, 600_000, 1_800_000];
 
 export function SyncEngine() {
   const hydrateSync = useSyncStore((s) => s.hydrate);
+  const config = useSyncStore((s) => s.config);
+  const appHydrated = useStore((s) => s.hydrated);
+  const launched = useRef(false);
   const collisionCount = useSyncStore((s) => s.collisions.length);
   const showToast = useToast();
   const announcedCollisions = useRef(0);
@@ -34,6 +37,21 @@ export function SyncEngine() {
   useEffect(() => {
     void hydrateSync();
   }, [hydrateSync]);
+
+  /**
+   * One sync on launch, once both stores have read their rows.
+   *
+   * Everything else here is a reaction: to an edit, to coming back from the
+   * background, to the network returning. A cold start is none of those, so a
+   * freshly opened app showed whatever it had last written until something
+   * happened -- which is also why a coach's plan could sit unseen in the sheet.
+   * Guarded by a ref rather than by state so a re-render cannot fire it twice.
+   */
+  useEffect(() => {
+    if (launched.current || !config || !appHydrated) return;
+    launched.current = true;
+    void useSyncStore.getState().syncNow();
+  }, [config, appHydrated]);
 
   useEffect(() => {
     // A collision means something the user typed into the sheet was discarded,
