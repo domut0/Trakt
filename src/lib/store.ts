@@ -14,7 +14,7 @@ import {
   type SettingsMeta,
   type WorkoutTemplate,
 } from "./db";
-import { dayKey, isDailyLogEmpty } from "./daily-log";
+import { dayKey, isDailyLogEmpty, parseDayKey } from "./daily-log";
 import {
   cardForWeekday,
   convertSplit,
@@ -386,7 +386,14 @@ interface State {
 
   /** Client-only. Loads persisted state from IndexedDB, seeding it on first-ever run. Idempotent. */
   hydrate: () => Promise<void>;
-  startWorkout: (slotName: string) => string;
+  /**
+   * Starts a workout, optionally on a day that has already happened.
+   *
+   * `on` is a day key. A workout you forgot to log is the ordinary case -
+   * you train, you shower, you remember at nine - and the alternative was a
+   * second logging screen for past workouts, which would drift from this one.
+   */
+  startWorkout: (slotName: string, on?: string) => string;
   endWorkout: () => void;
   setCurrentExercise: (exerciseId: string) => void;
   addExercise: (name: string, type: ExerciseType) => Exercise;
@@ -541,6 +548,11 @@ interface State {
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+
+/** Whether an instant falls on today, by the app's own day boundary. */
+function isToday(at: number): boolean {
+  return dayKey(new Date(at)) === dayKey(new Date());
+}
 
 // ---------------------------------------------------------------------------
 // Pure logic, extracted so it can be unit-tested with plain arrays — no store,
@@ -1305,7 +1317,7 @@ export const useStore = create<State>((set, get) => ({
     return card && kindOf(card) === "workout" ? card.name : undefined;
   },
 
-  startWorkout: (slotName) => {
+  startWorkout: (slotName, on) => {
     const trimmed = slotName.trim();
     let slot = matchSlot(get().slots, trimmed);
     if (!slot) {
@@ -1315,7 +1327,12 @@ export const useStore = create<State>((set, get) => ({
       safeWrite(() => db.slots.put(slot!));
     }
     const sessionId = uid();
-    const session: WorkoutSession = { id: sessionId, splitSlotId: slot.id, startedAt: Date.now() };
+    // A backdated session starts at midday on its own day rather than at the
+    // current time of day: nobody remembers when they started, midday sorts
+    // after nothing else on that date, and every day-bucketing surface reads
+    // startedAt.
+    const startedAt = on ? parseDayKey(on).setHours(12, 0, 0, 0) : Date.now();
+    const session: WorkoutSession = { id: sessionId, splitSlotId: slot.id, startedAt };
     set({
       sessions: [...get().sessions, session],
       activeSessionId: sessionId,
@@ -1333,7 +1350,13 @@ export const useStore = create<State>((set, get) => ({
     const id = get().activeSessionId;
     if (!id) return;
     const sess = get().sessions.find((s) => s.id === id);
-    const endedAt = Date.now();
+    // A backdated workout ended when its last set was logged, not now: an
+    // endedAt from the clock would make a Tuesday session eleven hours long.
+    const lastSet = [...get().sets]
+      .filter((s) => s.sessionId === id)
+      .sort((a, b) => b.loggedAt - a.loggedAt)[0];
+    const endedAt =
+      sess && !isToday(sess.startedAt) ? (lastSet?.loggedAt ?? sess.startedAt) : Date.now();
     const updatedSessions = get().sessions.map((s) => (s.id === id ? { ...s, endedAt } : s));
     // Rotation bookkeeping is strength-only. A cardio session (or any session
     // without a Split Slot) must never stamp a slot's lastLoggedAt, or it would
@@ -1348,9 +1371,16 @@ export const useStore = create<State>((set, get) => ({
     // split on for a workout. A cardio bout does not: it has no slot, so there
     // is no card to spend. Computed off the pre-update slots because the walk
     // only reads order and kind, neither of which endWorkout touches.
-    const consumedSplit = sess?.splitSlotId
-      ? advanceSplit(updatedSlots, sess.splitSlotId)?.id
-      : get().nextSlotId;
+    // Backfilling last Tuesday must not move where you are in the split: the
+    // cursor advances only when the workout just logged is the newest one in
+    // the log, which is exactly the "logged it a few hours late" case.
+    const newest =
+      sess !== undefined &&
+      get().sessions.every((s) => s.id === id || s.startedAt <= sess.startedAt);
+    const consumedSplit =
+      sess?.splitSlotId && newest
+        ? advanceSplit(updatedSlots, sess.splitSlotId)?.id
+        : get().nextSlotId;
     set({
       sessions: updatedSessions,
       slots: updatedSlots,
@@ -1393,10 +1423,19 @@ export const useStore = create<State>((set, get) => ({
   logSet: ({ exerciseId, weight, reps, rpe, setupNote }) => {
     const sessionId = get().activeSessionId;
     if (!sessionId) return;
+    const session = get().sessions.find((s) => s.id === sessionId);
     const blockGroupId = uid();
     const setsInSession = get().sets.filter((s) => s.sessionId === sessionId);
     const lastLogged = setsInSession.sort((a, b) => b.loggedAt - a.loggedAt)[0];
-    const tbs = lastLogged ? Math.round((Date.now() - lastLogged.loggedAt) / 1000) : undefined;
+    // A backdated session is not happening now, so its sets take their own
+    // day and carry NO time between sets: the gaps are unknown, and a number
+    // read off the clock would be a measurement of how long ago the workout
+    // was. One second apart keeps them in order without inventing rest times.
+    const backdated = session !== undefined && !isToday(session.startedAt);
+    const now = Date.now();
+    const loggedAt = backdated ? session.startedAt + setsInSession.length * 1000 : now;
+    const tbs =
+      lastLogged && !backdated ? Math.round((now - lastLogged.loggedAt) / 1000) : undefined;
     const note = setupNote?.trim();
     const newSet: WorkoutSet = {
       id: uid(),
@@ -1408,7 +1447,7 @@ export const useStore = create<State>((set, get) => ({
       setupNote: note || undefined,
       timeBetweenSetsSeconds: tbs,
       blockGroupId,
-      loggedAt: Date.now(),
+      loggedAt,
     };
     set({ sets: [...get().sets, newSet], currentExerciseId: exerciseId });
     safeWrite(() => db.sets.put(newSet));

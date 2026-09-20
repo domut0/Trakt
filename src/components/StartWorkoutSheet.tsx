@@ -1,21 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSheetDismiss } from "../hooks/useSheetDismiss";
-import { dayKey } from "../lib/daily-log";
+import { format } from "date-fns";
+import { dayKey, parseDayKey } from "../lib/daily-log";
 import { useStore, type Exercise } from "../lib/store";
 
 export function StartWorkoutSheet({
   open,
   onClose,
   onStart,
+  on: openedOn,
 }: {
   open: boolean;
   onClose: () => void;
   onStart: (sessionId: string) => void;
+  /** The day this was opened from, when that is not today. */
+  on?: string;
 }) {
   const slots = useStore((s) => s.slots);
   const predicted = useStore((s) => s.predictedNextSlotName());
   const startWorkout = useStore((s) => s.startWorkout);
+  const today = dayKey(new Date());
+  const [on, setOn] = useState(openedOn ?? today);
   const exercises = useStore((s) => s.exercises);
   const setCurrentExercise = useStore((s) => s.setCurrentExercise);
   const pinnedSlotFor = useStore((s) => s.pinnedSlotFor);
@@ -26,8 +32,11 @@ export function StartWorkoutSheet({
   useEffect(() => {
     if (open) {
       setValue("");
+      // Reopening starts on the day it was opened from - today, unless History
+      // opened it on a past one. A date is chosen per workout, not a mode.
+      setOn(openedOn ?? dayKey(new Date()));
     }
-  }, [open, predicted]);
+  }, [open, predicted, openedOn]);
 
   useSheetDismiss(open, onClose);
 
@@ -69,7 +78,7 @@ export function StartWorkoutSheet({
   const handleStart = (name?: string) => {
     const n = (name ?? value).trim() || (suggestedName ?? "");
     if (!n) return;
-    const id = startWorkout(n);
+    const id = startWorkout(n, on === today ? undefined : on);
     // Preload: the first planned lift becomes the current exercise, so the log
     // button opens straight onto it with its own history prefilled and the
     // workout starts as a confirmation rather than a search. Nothing is logged,
@@ -92,7 +101,23 @@ export function StartWorkoutSheet({
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-wash" />
-        <h2 className="t-caption text-ink-2">Today's session</h2>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="t-caption text-ink-2">
+            {on === today ? "Today's session" : format(parseDayKey(on), "EEEE d MMM")}
+          </h2>
+          {/* A workout you forgot to log is the ordinary case: you train,
+              you shower, you remember at nine. The alternative was a second
+              logging screen for past workouts, which would drift from this
+              one. */}
+          <input
+            type="date"
+            value={on}
+            max={today}
+            onChange={(e) => setOn(e.target.value || today)}
+            aria-label="Workout date"
+            className="min-h-[44px] rounded-md bg-wash px-2 t-label text-ink-2 outline-none"
+          />
+        </div>
 
         {shown.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">

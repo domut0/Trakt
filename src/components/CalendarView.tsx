@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   addMonths,
@@ -11,6 +11,8 @@ import {
 } from "date-fns";
 import { dayKey } from "../lib/daily-log";
 import { DayStatsCard } from "./DayStatsCard";
+import { StartWorkoutSheet } from "./StartWorkoutSheet";
+import { Plus } from "./icons";
 import { isCardioSession, sessionSlotName, useStore, type WorkoutSession } from "../lib/store";
 
 /**
@@ -89,6 +91,11 @@ export function CalendarView() {
     return new Date(y, m - 1, d);
   }, [selectedKey]);
   const selectedSessions = byDay.get(selectedKey) ?? [];
+  const todayKey = dayKey(new Date());
+  const selectedIsToday = selectedKey === todayKey;
+  const selectedIsFuture = selectedKey > todayKey;
+  const [adding, setAdding] = useState(false);
+  const router = useRouter();
 
   const monthLabel = format(viewedMonth, "MMMM yyyy");
   const cells = useMemo(() => {
@@ -287,8 +294,33 @@ export function CalendarView() {
               })}
             </div>
           )}
+
+          {/* The other half of backdating. The Start Workout sheet carries a
+              date, but the place you NOTICE a missing workout is the day
+              itself, so the day offers it. Today's own column says Start
+              instead, because that is what it is. */}
+          {!selectedIsFuture && (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="flex min-h-[44px] w-full items-center gap-2 t-action t-body"
+            >
+              <Plus size={18} />
+              {selectedIsToday ? "Start a workout" : "Add a workout"}
+            </button>
+          )}
         </div>
       </section>
+
+      <StartWorkoutSheet
+        open={adding}
+        on={selectedKey}
+        onClose={() => setAdding(false)}
+        onStart={() => {
+          setAdding(false);
+          router.navigate({ to: "/workout" });
+        }}
+      />
     </>
   );
 }

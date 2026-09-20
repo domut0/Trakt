@@ -352,3 +352,78 @@ describe("week mode", () => {
     useStore.setState({ coachManaged: false });
   });
 });
+
+describe("logging a workout you forgot", () => {
+  /** Yesterday, as a day key. */
+  const yesterday = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  it("puts the session on the day it happened, not on the day it was typed", () => {
+    const { upper } = buildUL();
+    const id = useStore.getState().startWorkout(upper.name, yesterday());
+
+    const session = useStore.getState().sessions.find((s) => s.id === id)!;
+    // Midday: nobody remembers when they started, and every day-bucketing
+    // surface reads startedAt.
+    expect(new Date(session.startedAt).getHours()).toBe(12);
+    expect(new Date(session.startedAt).getDate()).toBe(new Date().getDate() - 1);
+  });
+
+  it("dates its sets to that day, and claims no rest times it cannot know", () => {
+    const { upper } = buildUL();
+    useStore.setState({ exercises: [{ id: "e1", name: "Bench Press", type: "main" }] });
+    useStore.getState().startWorkout(upper.name, yesterday());
+
+    useStore.getState().logSet({ exerciseId: "e1", weight: 100, reps: 5 });
+    useStore.getState().logSet({ exerciseId: "e1", weight: 100, reps: 5 });
+
+    const sets = useStore.getState().sets;
+    expect(sets).toHaveLength(2);
+    for (const set of sets) {
+      expect(new Date(set.loggedAt).getDate()).toBe(new Date().getDate() - 1);
+      // A gap read off the clock would measure how long ago the workout was.
+      expect(set.timeBetweenSetsSeconds).toBeUndefined();
+    }
+    // Still in order, which is what the row list and every chart sort on.
+    expect(sets[0].loggedAt).toBeLessThan(sets[1].loggedAt);
+  });
+
+  it("moves the split on when the workout just logged is the newest one", () => {
+    // The case this exists for: trained this morning, logged it tonight.
+    const { upper, lower } = buildUL();
+    useStore.getState().setNextCard(upper.id);
+    useStore.getState().startWorkout(upper.name, yesterday());
+    useStore.getState().endWorkout();
+
+    expect(useStore.getState().nextCard()?.id).toBe(lower.id);
+  });
+
+  it("leaves the split alone when backfilling something older than the last workout", () => {
+    // Backfilling last Tuesday must not throw away where you actually are.
+    const { upper, lower } = buildUL();
+    useStore.setState({
+      sessions: [{ id: "sess_recent", splitSlotId: lower.id, startedAt: Date.now() }],
+    });
+    useStore.getState().setNextCard(upper.id);
+
+    useStore.getState().startWorkout(upper.name, yesterday());
+    useStore.getState().endWorkout();
+
+    expect(useStore.getState().nextCard()?.id).toBe(upper.id);
+  });
+
+  it("ends a backdated workout when its last set was logged, not hours later", () => {
+    const { upper } = buildUL();
+    useStore.setState({ exercises: [{ id: "e1", name: "Bench Press", type: "main" }] });
+    const id = useStore.getState().startWorkout(upper.name, yesterday());
+    useStore.getState().logSet({ exerciseId: "e1", weight: 100, reps: 5 });
+    useStore.getState().endWorkout();
+
+    const session = useStore.getState().sessions.find((s) => s.id === id)!;
+    const minutes = (session.endedAt! - session.startedAt) / 60_000;
+    expect(minutes).toBeLessThan(5);
+  });
+});
