@@ -11,9 +11,8 @@ import { Route as WorkoutRoute } from "../../routes/workout";
 const navigateMock = vi.fn();
 
 vi.mock("@tanstack/react-router", async () => {
-  const actual = await vi.importActual<typeof import("@tanstack/react-router")>(
-    "@tanstack/react-router",
-  );
+  const actual =
+    await vi.importActual<typeof import("@tanstack/react-router")>("@tanstack/react-router");
   return {
     ...actual,
     useRouter: () => ({ navigate: navigateMock, history: { back: vi.fn() } }),
@@ -78,7 +77,13 @@ describe("TutorialBanner standalone", () => {
     expect(banner.className).not.toContain("fixed");
     expect(banner.className).toContain("z-40");
     expect(banner.className).toContain("min-h-[44px]");
-    expect(banner.style.paddingTop).toBe("env(safe-area-inset-top, 0px)");
+    // The safe-area inset is deliberately NOT asserted here. jsdom drops CSS
+    // values it cannot parse, and `env()` is one of them, so it is absent from
+    // both `style.paddingTop` and the serialised style attribute no matter what
+    // the component sets - any assertion on it can only ever fail. Being in
+    // flow rather than fixed is the claim that matters and the one jsdom can
+    // actually see. The inset is the same one ClientBanner uses, and it is the
+    // kind of thing a screenshot catches and a unit test cannot.
   });
 
   it("exits with no confirmation, calls skip(), and navigates to /", () => {
@@ -156,23 +161,13 @@ describe("TutorialBanner mount points", () => {
     // Inactive tutorial: banner is not rendered
     useTutorialStore.setState({ active: false });
     const { rerender } = render(
-      <ExerciseScreen
-        exerciseId="e1"
-        stopwatch="1:00"
-        onDone={() => {}}
-      />,
+      <ExerciseScreen exerciseId="e1" stopwatch="1:00" onDone={() => {}} />,
     );
     expect(screen.queryByText("Tutorial mode")).not.toBeInTheDocument();
 
     // Active tutorial: banner is rendered inside the portal
     useTutorialStore.setState({ active: true });
-    rerender(
-      <ExerciseScreen
-        exerciseId="e1"
-        stopwatch="1:00"
-        onDone={() => {}}
-      />,
-    );
+    rerender(<ExerciseScreen exerciseId="e1" stopwatch="1:00" onDone={() => {}} />);
     expect(screen.getByText("Tutorial mode")).toBeInTheDocument();
   });
 });

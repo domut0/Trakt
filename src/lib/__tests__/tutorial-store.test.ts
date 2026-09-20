@@ -48,7 +48,7 @@ const REAL_USER_STATE: Swapped = {
       loggedAt: 1700001000000,
     },
   ],
-  dailyLogs: [{ date: "2026-09-20", calories: 2400, weight: 185 }],
+  dailyLogs: [{ date: "2026-09-20", calories: 2400, bodyweight: 185 }],
   nutritionPhases: [
     {
       id: "np_real",
@@ -57,15 +57,15 @@ const REAL_USER_STATE: Swapped = {
       protein: 180,
       carbs: 250,
       fat: 75,
-      startedAt: "2026-09-01",
+      startsOn: "2026-09-01",
     },
   ],
-  plannedDays: [{ date: "2026-09-20", slotId: "slot_a" }],
+  plannedDays: [{ date: "2026-09-20", splitSlotId: "slot_a" }],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   nextSlotId: "slot_a",
   restSince: undefined,
-  lastAcceptedPlanAt: 1700000000000,
+  lastAcceptedPlanAt: "2026-09-14T10:04:00.000Z",
   coachManaged: false,
 };
 

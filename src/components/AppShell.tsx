@@ -284,7 +284,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   // banner. Whichever wins takes the slot, and only one is ever shown.
   const showTutorialBanner = tutorialActive;
   const showClientBanner = !showTutorialBanner && viewingClient;
-  const showBanner = !showTutorialBanner && !showClientBanner && activeSessionId && location.pathname !== "/workout";
+  const showBanner =
+    !showTutorialBanner && !showClientBanner && activeSessionId && location.pathname !== "/workout";
   const onTab = TABS.some((t) => t.to === location.pathname);
 
   useRestDaySettles();
