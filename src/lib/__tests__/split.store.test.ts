@@ -247,6 +247,28 @@ describe("ending a workout consumes its card", () => {
     expect(rest).toBeDefined();
   });
 
+  it("writes the advance to disk, so a relaunch does not undo it", async () => {
+    // The bug this is for: endWorkout moved the cursor in memory but was the
+    // only cursor mover that never persisted. A PWA relaunch read the old
+    // settings record back, and the split sat on the same card forever --
+    // right on Upper days, wrong on Lower days.
+    const { upper, lower } = buildUL();
+    const s = () => useStore.getState();
+    s().setNextCard(upper.id);
+    s().startWorkout("Upper");
+    s().endWorkout();
+    expect(s().nextCard()?.id).toBe(lower.id);
+
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    // Or hydrate reads an empty exercises table as a first run and never looks
+    // at the settings record (see the persistence test above).
+    await db.exercises.put({ id: "e1", name: "Bench Press", type: "main" });
+    useStore.setState({ hydrated: false });
+    await s().hydrate();
+
+    expect(s().nextCard()?.id).toBe(lower.id);
+  });
+
   it("returns to the top after a rest is taken", () => {
     const { upper, rest } = buildUL();
     useStore.getState().setNextCard(rest.id);

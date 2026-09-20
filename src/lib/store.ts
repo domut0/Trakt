@@ -1305,6 +1305,11 @@ export const useStore = create<State>((set, get) => ({
       currentExerciseId: undefined,
       currentBlock: undefined,
     });
+    // The cursor moved, so the settings record has to move with it. Every other
+    // cursor mover persists; this one did not, and the advance was lost on the
+    // next launch -- which in a PWA is constantly. The split then sat forever on
+    // the card it was pointing at when it was last written.
+    persistSettingsFrom(get());
   },
 
   setCurrentExercise: (exerciseId) => {
