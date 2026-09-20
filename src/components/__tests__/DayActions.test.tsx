@@ -103,3 +103,39 @@ describe("DayActions", () => {
     expect(screen.queryByRole("button", { name: /^Start/ })).toBeNull();
   });
 });
+
+describe("DayActions on a planned cardio day", () => {
+  const RIDE: SplitSlot = {
+    id: "s_ride",
+    name: "Conditioning",
+    rotationOrder: 2,
+    kind: "cardio",
+    weekday: 6,
+  };
+  /** Saturday 22 August 2026, which is what RIDE's weekday 6 resolves to. */
+  const SATURDAY = "2026-08-22";
+
+  beforeEach(() => setup({ slots: [UPPER, REST, RIDE] }));
+
+  it("offers the cardio day by name", () => {
+    render(<DayActions date={SATURDAY} />);
+    expect(screen.getByRole("button", { name: "Start Conditioning day" })).toBeTruthy();
+  });
+
+  it("stops offering it once cardio has been logged that day", () => {
+    setup({
+      slots: [UPPER, REST, RIDE],
+      sessions: [session(SATURDAY, { kind: "cardio", splitSlotId: undefined })],
+    });
+    render(<DayActions date={SATURDAY} />);
+    expect(screen.queryByRole("button", { name: /^Start/ })).toBeNull();
+  });
+
+  it("keeps offering it when the day's only session was strength", () => {
+    // The mirror of the rule on a workout day: a squat session is not the
+    // conditioning the plan asked for.
+    setup({ slots: [UPPER, REST, RIDE], sessions: [session(SATURDAY)] });
+    render(<DayActions date={SATURDAY} />);
+    expect(screen.getByRole("button", { name: "Start Conditioning day" })).toBeTruthy();
+  });
+});

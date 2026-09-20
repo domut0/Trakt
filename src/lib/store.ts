@@ -45,6 +45,19 @@ export interface Exercise {
   setupNote?: string;
 }
 
+/**
+ * A prescribed cardio bout: what, and how much of it.
+ *
+ * Both measures are optional and neither implies the other. "20 minutes on the
+ * bike" and "5k, however long it takes" are both complete instructions, and a
+ * plan that demanded both would make one of them up.
+ */
+export interface PlannedCardio {
+  exerciseId: string;
+  durationMinutes?: number;
+  distance?: number;
+}
+
 export interface SplitSlot {
   id: string;
   name: string;
@@ -83,6 +96,23 @@ export interface SplitSlot {
    * can be logged once the workout is running.
    */
   plannedLifts?: PlannedLift[];
+  /**
+   * Cardio this card prescribes.
+   *
+   * It rides on a card of ANY kind, and that is the point of it being separate
+   * from `kind: "cardio"` rather than an alternative to it. Both shapes are
+   * real and they are different things:
+   *
+   *   A CARDIO CARD is a day whose whole content is the cardio - a conditioning
+   *   day in the rotation, or a Sunday run in the week.
+   *
+   *   A CARDIO LINE ON A WORKOUT CARD is a finisher: lifts, and then twenty
+   *   minutes on the bike. It is not a day of its own and must not take one.
+   *
+   * Absent on a cardio card means the day says "do some cardio" without saying
+   * which, which is a legitimate thing for a plan to say.
+   */
+  plannedCardio?: PlannedCardio;
 }
 
 /**
@@ -505,6 +535,9 @@ interface State {
   /** The lifts a slot is for. Preloaded at Start Workout, never a constraint. */
   /** Replaces a card's prescribed lifts, in the order the workout opens them. */
   setSlotLifts: (slotId: string, lifts: PlannedLift[]) => void;
+  /** What this card prescribes on the bike or the treadmill. `undefined`
+   *  removes it. Refused, like every plan edit, while a coach owns the plan. */
+  setSlotCardio: (slotId: string, cardio: PlannedCardio | undefined) => void;
   /** Pins a slot to one date, for when you do know. Replaces any existing pin
    * on that date, because a day trains one thing. */
   /**
@@ -1940,6 +1973,19 @@ export const useStore = create<State>((set, get) => ({
     if (updated) safeWrite(() => db.slots.put(updated));
   },
 
+  setSlotCardio: (slotId, cardio) => {
+    if (get().coachManaged) return;
+    // Pruned the same way lifts are: a card pointing at an exercise the picker
+    // has never heard of would prescribe a bout nothing can start.
+    const live = cardio && get().exercises.some((e) => e.id === cardio.exerciseId);
+    const next = get().slots.map((sl) =>
+      sl.id === slotId ? { ...sl, plannedCardio: live ? cardio : undefined } : sl,
+    );
+    set({ slots: next });
+    const updated = next.find((sl) => sl.id === slotId);
+    if (updated) safeWrite(() => db.slots.put(updated));
+  },
+
   acceptCoachPlan: (plan) => {
     const state = get();
     const resolved = resolvePlan(
@@ -2128,19 +2174,25 @@ export const useStore = create<State>((set, get) => ({
   },
 
   plannedCardFor: (date) => {
+    // A workout or a cardio day. A rest is a day too, but it is not something
+    // to start, and a repeat is not a day at all.
+    const startable = (card: SplitSlot | undefined): SplitSlot | undefined => {
+      if (!card) return undefined;
+      const k = kindOf(card);
+      return k === "workout" || k === "cardio" ? card : undefined;
+    };
+
     const pinned = get().pinnedSlotFor(date);
-    if (pinned) return kindOf(pinned) === "workout" ? pinned : undefined;
+    if (pinned) return startable(pinned);
 
     const { slots, planningMode } = get();
     if (planningMode === "week") {
-      const card = cardForWeekday(slots, parseDayKey(date).getDay());
-      return card && kindOf(card) === "workout" ? card : undefined;
+      return startable(cardForWeekday(slots, parseDayKey(date).getDay()));
     }
 
     // Rotation: today only. See the note on the declaration.
     if (date !== dayKey(new Date())) return undefined;
-    const card = get().nextCard();
-    return card && kindOf(card) === "workout" ? card : undefined;
+    return startable(get().nextCard());
   },
 
   reorderSlots: (fromId, toId) => {

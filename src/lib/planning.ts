@@ -208,7 +208,18 @@ export function isPlannedDay(v: unknown): v is PlannedDay {
  * Absent means `workout`, so every slot that existed before this needs no
  * migration.
  */
-export type SplitCardKind = "workout" | "rest" | "repeat";
+export type SplitCardKind = "workout" | "rest" | "repeat" | "cardio";
+
+/**
+ * A card that occupies a day, as against one that only redirects the cursor.
+ *
+ * `repeat` is the only kind that is not a day. Everything else - a workout, a
+ * rest, a cardio session - is something you spend a day on, and spending it
+ * moves the rotation forward.
+ */
+export function isDayCard(card: SplitCardLike): boolean {
+  return kindOf(card) !== "repeat";
+}
 
 /** The shape `advanceSplit` reads. `SplitSlot` satisfies it. */
 export interface SplitCardLike {

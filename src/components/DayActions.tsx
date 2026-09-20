@@ -5,6 +5,7 @@ import { useStore } from "../lib/store";
 import { useCoachStore } from "../lib/coach-store";
 import { dayKey } from "../lib/daily-log";
 import { isCardioSession } from "../lib/store";
+import { kindOf } from "../lib/planning";
 import { StartWorkoutSheet } from "./StartWorkoutSheet";
 import { WorkoutChooserSheet } from "./WorkoutChooserSheet";
 
@@ -39,6 +40,8 @@ export function DayActions({ date }: { date: string }) {
 
   const [chooserOpen, setChooserOpen] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
+  /** The chooser, opened straight onto cardio for a planned cardio day. */
+  const [cardioOpen, setCardioOpen] = useState(false);
 
   const todayKey = dayKey(new Date());
 
@@ -48,8 +51,8 @@ export function DayActions({ date }: { date: string }) {
    * Cardio deliberately does not count. A bike ride is not the planned Upper
    * day, and having logged one is no reason to stop offering to start the other.
    */
-  const trainedThisDay = useMemo(
-    () => sessions.some((s) => !isCardioSession(s) && dayKey(new Date(s.startedAt)) === date),
+  const sessionsThisDay = useMemo(
+    () => sessions.filter((s) => dayKey(new Date(s.startedAt)) === date),
     [sessions, date],
   );
 
@@ -62,10 +65,24 @@ export function DayActions({ date }: { date: string }) {
     [date, slots, plannedDays, planningMode, plannedCardFor],
   );
 
-  // Offered while the day still has its planned session ahead of it. Once you
-  // have trained, the plan for that day is spent and the button would be
-  // offering to do it twice.
-  const showStart = planned !== undefined && !trainedThisDay && !viewingClient;
+  const plannedIsCardio = planned !== undefined && kindOf(planned) === "cardio";
+
+  /**
+   * Whether the day's planned session has already been done.
+   *
+   * Matched by KIND, not merely by "something was logged". A bike ride is not
+   * the planned Upper day, and logging one is no reason to stop offering to
+   * start the other - nor is a squat session a reason to stop offering the
+   * conditioning the plan asked for.
+   */
+  const alreadyDone = plannedIsCardio
+    ? sessionsThisDay.some((s) => isCardioSession(s))
+    : sessionsThisDay.some((s) => !isCardioSession(s));
+
+  // Offered while the day still has its planned session ahead of it. Once it is
+  // done, the plan for that day is spent and the button would be offering to do
+  // it twice.
+  const showStart = planned !== undefined && !alreadyDone && !viewingClient;
 
   return (
     <>
@@ -87,7 +104,7 @@ export function DayActions({ date }: { date: string }) {
         // an answer for is asking a question it knows the answer to.
         <button
           type="button"
-          onClick={() => setStartOpen(true)}
+          onClick={() => (plannedIsCardio ? setCardioOpen(true) : setStartOpen(true))}
           className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-md bg-ink t-body font-semibold text-paper"
         >
           Start {planned.name} day
@@ -95,10 +112,15 @@ export function DayActions({ date }: { date: string }) {
       )}
 
       <WorkoutChooserSheet
-        open={chooserOpen}
-        onClose={() => setChooserOpen(false)}
+        open={chooserOpen || cardioOpen}
+        startOn={cardioOpen ? "cardio" : "choose"}
+        onClose={() => {
+          setChooserOpen(false);
+          setCardioOpen(false);
+        }}
         onChooseStrength={() => {
           setChooserOpen(false);
+          setCardioOpen(false);
           setStartOpen(true);
         }}
       />

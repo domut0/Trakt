@@ -51,16 +51,22 @@ export function WorkoutChooserSheet({
   open,
   onClose,
   onChooseStrength,
+  startOn = "choose",
 }: {
   open: boolean;
   onClose: () => void;
   onChooseStrength: () => void;
+  /** Which screen to open on. "cardio" skips the chooser, for a day whose plan
+   *  already says it is a cardio day - the question has an answer, so asking it
+   *  would be the app pretending not to know. Back still returns to the
+   *  chooser, because a plan is not a cage. */
+  startOn?: "choose" | "cardio";
 }) {
-  const [mode, setMode] = useState<"choose" | "cardio">("choose");
+  const [mode, setMode] = useState<"choose" | "cardio">(startOn);
 
   useEffect(() => {
-    if (open) setMode("choose");
-  }, [open]);
+    if (open) setMode(startOn);
+  }, [open, startOn]);
 
   // Escape closes the whole popup even from cardio mode, matching what a
   // backdrop tap already does from there. CardioLogCard's own Back button is

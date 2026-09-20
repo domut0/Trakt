@@ -99,6 +99,22 @@ export function SplitCardList({ onEdit }: { onEdit: (slot: SplitSlot) => void })
           .map((lift) => exercises.find((e) => e.id === lift.exerciseId)?.name)
           .filter((n): n is string => n !== undefined);
 
+        // The cardio line, said the way it is prescribed: what, then how much
+        // of it, with whatever was not prescribed simply absent.
+        const cardio = slot.plannedCardio;
+        const cardioName = cardio
+          ? exercises.find((e) => e.id === cardio.exerciseId)?.name
+          : undefined;
+        const cardioLine = cardioName
+          ? [
+              cardioName,
+              cardio?.durationMinutes === undefined ? undefined : `${cardio.durationMinutes} min`,
+              cardio?.distance === undefined ? undefined : `${cardio.distance}`,
+            ]
+              .filter(Boolean)
+              .join(", ")
+          : undefined;
+
         return (
           <div key={slot.id}>
             <div className="relative overflow-hidden">
@@ -157,6 +173,13 @@ export function SplitCardList({ onEdit }: { onEdit: (slot: SplitSlot) => void })
                     {kind === "workout" && (
                       <span className="block truncate t-label text-ink-2">
                         {lifts.length > 0 ? lifts.join(" · ") : "No lifts chosen"}
+                      </span>
+                    )}
+                    {/* A cardio card's line IS the card; on a workout card it
+                        sits under the lifts as the finisher it is. */}
+                    {(kind === "cardio" || (kind === "workout" && cardioLine)) && (
+                      <span className="block truncate t-label text-ink-2">
+                        {cardioLine ?? "No activity chosen"}
                       </span>
                     )}
                   </span>
