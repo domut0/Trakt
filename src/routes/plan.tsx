@@ -107,7 +107,7 @@ function PlanPage() {
             }}
           />
         ) : (
-          <section className="px-4 section-gap anim-fade-up">
+          <section className="px-4 section-gap">
             <div className="group-header">
               <h2 className="t-caption">Workout split</h2>
               {!locked && (
@@ -168,7 +168,7 @@ function PlanPage() {
 
         {/* ---- Pinned ---- */}
         {futurePins.length > 0 && (
-          <section className="px-4 section-gap anim-fade-up">
+          <section className="px-4 section-gap">
             <div className="group-header">
               <h2 className="t-caption">Pinned</h2>
             </div>

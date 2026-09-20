@@ -189,7 +189,7 @@ function ChartsPage() {
       </header>
 
       {/* Metric and date range selection cluster tightened into a single calm block */}
-      <div className="mb-4 flex flex-col gap-2.5 anim-fade-up">
+      <div className="mb-4 flex flex-col gap-2.5">
         <div role="group" aria-label="Metric" className="flex gap-2 overflow-x-auto px-4">
           {METRICS.map((m) => (
             <button
@@ -230,10 +230,7 @@ function ChartsPage() {
         </div>
       </div>
 
-      <div
-        className="mx-4 rounded-lg bg-surface p-4 anim-fade-up"
-        style={{ animationDelay: "40ms" }}
-      >
+      <div className="mx-4 rounded-lg bg-surface p-4" style={{ animationDelay: "40ms" }}>
         {/* Inline segmented control on chart card to toggle raw vs smoothed series */}
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="t-caption text-ink-2 truncate">{metric.label}</h2>

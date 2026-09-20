@@ -207,7 +207,7 @@ export function NutritionRibbon() {
   };
 
   return (
-    <section className="anim-fade-up">
+    <section className="">
       <div className="px-4 group-header">
         <h2 className="t-caption">Nutrition</h2>
         {!locked && (

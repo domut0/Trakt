@@ -48,7 +48,7 @@ export function WeekPlanner({ onEdit }: { onEdit: (slot: SplitSlot) => void }) {
       .join(", ");
 
   return (
-    <section className="px-4 section-gap anim-fade-up">
+    <section className="px-4 section-gap">
       <div className="group-header">
         <h2 className="t-caption">Week</h2>
       </div>

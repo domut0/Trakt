@@ -28,24 +28,18 @@ type TabItem = {
  * Order is Today, Plan | Charts, History: what you are about to do on the left
  * of the button, what you already did on the right.
  */
+/**
+ * Three, with the action in the middle.
+ *
+ * History and Charts left the bar for two icons on Today: they are places
+ * you go to look at something, not places you log from, and a five-column
+ * bar spent its width saying so. What is left is the three things the app
+ * is for - the day, the plan, and training.
+ */
 const TABS: TabItem[] = [
   { to: "/", label: "Today", icon: "home" },
   { to: "/plan", label: "Plan", icon: "plan" },
-  { to: "/charts", label: "Charts", icon: "chart" },
-  { to: "/history", label: "History", icon: "calendar" },
 ];
-
-/**
- * Direction of the most recent tab-to-tab navigation, recorded right before
- * the navigate() call fires (a bottom-nav tap) and consumed once by
- * the next AppShell mount to pick its entrance animation. Module-level
- * because each tab page mounts a fresh AppShell instance, so this can't live
- * in component state. Never touched during SSR (only DOM event handlers
- * write to it), so it's always null on the server and on a fresh client
- * load - no hydration mismatch.
- */
-type NavDirection = "forward" | "back" | null;
-let lastNavDirection: NavDirection = null;
 
 function Icon({ name }: { name: TabItem["icon"] }) {
   const stroke = "currentColor";
@@ -163,21 +157,14 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   const planWaiting = useSyncStore((s) => s.pendingCoachPlan !== undefined);
   if (location.pathname === "/workout") return null;
   const items = TABS;
-  const currentIndex = items.findIndex((it) => it.to === location.pathname);
 
-  const renderTab = (it: TabItem, i: number) => {
+  const renderTab = (it: TabItem) => {
     const active = location.pathname === it.to;
     return (
       <li key={it.to}>
         <Link
           to={it.to}
-          onClick={() => {
-            // Record travel direction before the route change so the
-            // page we're about to mount knows which way to slide in.
-            if (currentIndex !== -1 && i !== currentIndex) {
-              lastNavDirection = i > currentIndex ? "forward" : "back";
-            }
-          }}
+
           // Full width of its grid cell, with an explicit height floor so the
           // 22px icon plus 11px label can never fall under 44px if either is
           // restyled later.
@@ -215,21 +202,17 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
       className="relative z-30 shrink-0 bg-paper"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
     >
-      {/* FIVE EQUAL COLUMNS, with the button in the middle one.
-          
-          The bar this replaces put two flex-1 <ul>s either side of a shrink-0
-          button, which centred the button exactly but made the four tabs
-          unequal: each one sat in the middle of half of whatever space the
-          button left, so the gap between Today and Plan was wider than the gap
-          between Plan and the button. An even grid has no halves to be unequal
-          about - every cell is the same width, and the third of five is the
-          axis by construction. */}
-      <ul className="mx-auto grid max-w-md grid-cols-5 items-stretch px-2 pt-2">
-        {items.slice(0, 2).map((it, i) => renderTab(it, i))}
-        {/* Third of five in DOM order, not placed by grid-column: an explicitly
-            placed item still takes its own auto ROW, so a button assigned to
-            column 3 after four siblings had filled row 1 wrapped onto a second
-            row. Source order does the same job with nothing to get wrong. */}
+      {/* THREE EQUAL COLUMNS, with the button in the middle one.
+
+          An even grid has no halves to be unequal about: every cell is the
+          same width and the middle one is the axis by construction. The
+          labels still differ in width, so the GAPS between words differ -
+          which is why the active tab is marked by colour alone and never by
+          weight, since a bolder label is a wider one and would shift. */}
+      <ul className="mx-auto grid max-w-md grid-cols-3 items-stretch px-2 pt-2">
+        {items.map((it) => renderTab(it))}
+        {/* Last in DOM order rather than placed by grid-column: an explicitly
+            placed item still takes its own auto ROW. */}
         <li className="flex items-center justify-center">
           <button
             onClick={() => {
@@ -245,15 +228,15 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
                   ? "Return to active workout"
                   : "Start workout"
             }
-            // Foreground, not accent. Accent in this bar now means exactly one
+            // Foreground, not accent. Accent in this bar means exactly one
             // thing - the tab you are on - so the action button states its rank
             // with fill and weight instead: a solid glyph and a semibold label
-            // against four muted outlined tabs.
+            // against two muted outlined tabs.
             className={
               "flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-md " +
-              // Muted rather than hidden. A button that vanishes moves the four
-              // tabs on either side of it, and the bar's whole geometry is five
-              // equal columns with the action in the middle one.
+              // Muted rather than hidden. A button that vanishes moves the tabs
+              // on either side of it, and the bar's whole geometry is three equal
+              // columns with the action in the middle one.
               (viewingClient ? "bg-ink-3 text-paper" : "bg-ink text-paper")
             }
           >
@@ -274,7 +257,6 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
             <span className="t-label font-semibold">{activeSessionId ? "Return" : "Workout"}</span>
           </button>
         </li>
-        {items.slice(2).map((it, i) => renderTab(it, i + 2))}
       </ul>
       {activeSessionId && (
         // A real rule, not ink at 40%. Opacity variants are the thing this
@@ -363,25 +345,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [chooserOpen, setChooserOpen] = useState(false);
   const [startSheetOpen, setStartSheetOpen] = useState(false);
 
-  // Picked once per mount from whatever direction the bottom-nav tap or
-  // swipe recorded right before navigating here; null (fresh load / deep
-  // link) falls back to a plain fade with no horizontal slide.
-  const [routeAnimClass] = useState(() => {
-    const dir = lastNavDirection;
-    lastNavDirection = null;
-    if (dir === "forward") return "anim-route-in-right";
-    if (dir === "back") return "anim-route-in-left";
-    return "anim-route-fade";
-  });
-
   return (
     <div className="relative mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
       {showClientBanner ? <ClientBanner /> : <ActiveSessionBanner />}
       <main
-        className={"relative min-h-0 flex-1 overflow-y-auto overscroll-contain " + routeAnimClass}
+        // A plain fade, and deliberately no slide. A 24px horizontal travel on
+        // every tab tap is the most app-template motion there was, and its
+        // `both` fill left a transform on this element forever - which made it
+        // the containing block for every fixed overlay inside it and put the
+        // Accept button on a client's new plan off the bottom of the screen.
+        className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain anim-route-fade"
       >
         {onTab && (
-          // Settings, in the corner of every tab screen.
+          // The corner where you go elsewhere: History and Charts on Today,
+          // and Settings on every tab. One rule for the whole app rather than
+          // two toolbars on one screen.
           //
           // Positioned against the shell rather than repeated in four route
           // headers, so it cannot drift between them - but INSIDE the scroll
@@ -391,14 +369,36 @@ export function AppShell({ children }: { children: ReactNode }) {
           // banners are in flow above <main>, so it needs no offset. Every
           // tab header carries pr-12 so a long title wraps rather than running
           // underneath it.
-          <Link
-            to="/settings"
-            aria-label="Settings"
-            className="absolute right-1.5 z-30 flex h-11 w-11 items-center justify-center text-ink-3"
+          <div
+            className="absolute right-1.5 z-30 flex items-center justify-end"
             style={{ top: 49 }}
           >
-            <Gear size={22} />
-          </Link>
+            {location.pathname === "/" && (
+              <>
+                <Link
+                  to="/history"
+                  aria-label="History"
+                  className="flex h-11 w-11 items-center justify-center text-ink-3"
+                >
+                  <Icon name="calendar" />
+                </Link>
+                <Link
+                  to="/charts"
+                  aria-label="Charts"
+                  className="flex h-11 w-11 items-center justify-center text-ink-3"
+                >
+                  <Icon name="chart" />
+                </Link>
+              </>
+            )}
+            <Link
+              to="/settings"
+              aria-label="Settings"
+              className="flex h-11 w-11 items-center justify-center text-ink-3"
+            >
+              <Gear size={22} />
+            </Link>
+          </div>
         )}
         {children}
       </main>

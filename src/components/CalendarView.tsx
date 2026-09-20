@@ -155,7 +155,7 @@ export function CalendarView() {
         // border-coloured background, which drew a hairline between all 35
         // cells: on paper that was the grid the month is printed on, and on a
         // dark ground it is 70 bright lines fighting the dots they surround.
-        className="mx-4 grid grid-cols-7 gap-px overflow-hidden rounded-lg bg-surface anim-fade-up"
+        className="mx-4 grid grid-cols-7 gap-px overflow-hidden rounded-lg bg-surface"
       >
         {cells.map((cell, i) => {
           if (!cell) return <div key={`blank-${i}`} className="min-h-[64px] " />;
@@ -247,7 +247,7 @@ export function CalendarView() {
             denser copy of the same six numbers behind a sheet. The empty-day
             state went with it: a card of six rows waiting to be typed into IS
             the empty state, and it is the one that lets you do something. */}
-        <div className="mx-4 space-y-3 anim-fade-up">
+        <div className="mx-4 space-y-3">
           <DayStatsCard date={selectedKey} editable />
 
           {selectedSessions.length > 0 && (

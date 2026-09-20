@@ -112,7 +112,7 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
           <h1 className="mt-1 text-balance break-words t-title">{data.slotName}</h1>
         </header>
 
-        <section className="section-gap flex flex-col items-center px-4 text-center anim-fade-up">
+        <section className="section-gap flex flex-col items-center px-4 text-center">
           {subject.isRecord ? (
             // A record is a success, never an alert, and never a badge either: it
             // is a fact stated in the same eyebrow slot every other state uses,

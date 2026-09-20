@@ -133,7 +133,7 @@ export function TargetStrip() {
   const dayIndex = day ? days.indexOf(day) : -1;
 
   return (
-    <section className="px-4 section-gap anim-fade-up">
+    <section className="px-4 section-gap">
       <div className="group-header">
         <h2 className="t-caption">Against target</h2>
       </div>

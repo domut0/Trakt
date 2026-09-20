@@ -409,7 +409,7 @@ function Section({
   delay?: number;
 }) {
   return (
-    <section className="section-gap anim-fade-up" style={{ animationDelay: `${delay}ms` }}>
+    <section className="section-gap" style={{ animationDelay: `${delay}ms` }}>
       {/* No px-4 on the header and no mx-4 on the list. group-list used to
           bleed itself to the trim with a -20px inline margin, so every caller
           had to cancel it; a card does not bleed, and group-header carries its

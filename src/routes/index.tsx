@@ -150,7 +150,7 @@ function Home() {
         than a thing you used, in an app whose two daily visits are both
         entry - one-handed mid-set, and half-asleep in bed.
       */}
-      <section className="px-4 pt-4 anim-fade-up">
+      <section className="px-4 pt-4">
         {/* The card IS the editor. It used to be a readout wrapped in a button
             that opened a sheet holding the same six fields against the same
             targets - so the sheet's whole contribution was a Save button and a
