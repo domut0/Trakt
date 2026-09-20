@@ -8,7 +8,7 @@ import { LogSetSheet } from "../components/LogSetSheet";
 import { SessionView } from "../components/SessionView";
 import { WorkoutSummaryScreen } from "../components/WorkoutSummaryScreen";
 import { dayKey } from "../lib/daily-log";
-import { useStore, type Exercise } from "../lib/store";
+import { useStore, type Exercise, type PlannedLift } from "../lib/store";
 import { buildWorkoutSummary, type WorkoutSummaryData } from "../lib/workout-summary";
 
 export const Route = createFileRoute("/workout")({
@@ -38,6 +38,16 @@ function fmtTime(s: number) {
   const m = Math.floor(s / 60);
   const r = s % 60;
   return `${m}:${String(r).padStart(2, "0")}`;
+}
+
+/** "3 x 8-12 · RPE 8", or nothing when no numbers were prescribed. */
+function prescriptionOf(lift: PlannedLift): string {
+  const parts: string[] = [];
+  if (lift.sets !== undefined && lift.reps) parts.push(`${lift.sets} x ${lift.reps}`);
+  else if (lift.sets !== undefined) parts.push(`${lift.sets} sets`);
+  else if (lift.reps) parts.push(lift.reps);
+  if (lift.load) parts.push(lift.load);
+  return parts.join(" · ");
 }
 
 function WorkoutPage() {
@@ -113,10 +123,13 @@ function WorkoutPage() {
   const planned = useMemo(() => {
     if (!session?.splitSlotId) return null;
     const slot = slots.find((sl) => sl.id === session.splitSlotId);
-    if (!slot?.plannedExerciseIds?.length) return null;
-    const lifts = slot.plannedExerciseIds
-      .map((id) => exercises.find((e) => e.id === id))
-      .filter((e): e is Exercise => e !== undefined);
+    if (!slot?.plannedLifts?.length) return null;
+    const lifts = slot.plannedLifts
+      .map((lift) => {
+        const exercise = exercises.find((e) => e.id === lift.exerciseId);
+        return exercise ? { ...lift, exercise } : undefined;
+      })
+      .filter((l): l is PlannedLift & { exercise: Exercise } => l !== undefined);
     return lifts.length > 0 ? { name: slot.name, lifts } : null;
   }, [slots, session, exercises]);
   const currentSetupNote = currentExerciseId ? lastSetupNoteFor(currentExerciseId) : undefined;
@@ -311,7 +324,8 @@ function WorkoutPage() {
             )}
           </div>
           <ul className="group-list">
-            {planned.lifts.map((ex, idx) => {
+            {planned.lifts.map((lift, idx) => {
+              const ex = lift.exercise;
               const logged = sessSets.filter((s) => s.exerciseId === ex.id).length;
               const isCurrent = ex.id === currentExerciseId;
               return (
@@ -345,13 +359,26 @@ function WorkoutPage() {
                               : "mark-open"
                         }`}
                       />
-                      <span className="truncate t-body">{ex.name}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate t-body">{ex.name}</span>
+                        {/* What was prescribed, where it was prescribed. Blank
+                            for a lift nobody put numbers against. */}
+                        {prescriptionOf(lift) && (
+                          <span
+                            className={`block truncate t-label ${isCurrent ? "text-paper opacity-80" : "text-ink-2"}`}
+                          >
+                            {prescriptionOf(lift)}
+                          </span>
+                        )}
+                      </span>
                     </span>
                     {logged > 0 && (
                       <span
                         className={`shrink-0 tnum t-label ${isCurrent ? "text-paper" : "text-ink-2"}`}
                       >
-                        {logged} {logged === 1 ? "set" : "sets"}
+                        {logged}
+                        {lift.sets ? `/${lift.sets}` : ""}{" "}
+                        {logged === 1 && !lift.sets ? "set" : "sets"}
                       </span>
                     )}
                   </button>

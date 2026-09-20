@@ -28,7 +28,7 @@ import {
   type SplitCardKind,
 } from "./planning";
 import { seedExercises } from "./exercise-library";
-import { resolvePlan, type PlanPayload } from "./plan-tab";
+import { resolvePlan, type PlanningMode, type PlanPayload } from "./plan-tab";
 
 export type ExerciseType = "main" | "accessory" | "cardio";
 
@@ -58,6 +58,13 @@ export interface SplitSlot {
    */
   kind?: SplitCardKind;
   /**
+   * Which weekday this card is on, 0 = Sunday, in `week` planning mode.
+   *
+   * Absent in `rotation` mode, where the split advances when you train and a
+   * weekday would be a lie. Non-indexed, so no Dexie version bump.
+   */
+  weekday?: number;
+  /**
    * The lifts this slot is for, which is where a training plan actually lives.
    *
    * It used to hang off a WEEKDAY, which cannot express UL×infinity: that split
@@ -69,7 +76,23 @@ export interface SplitSlot {
    * Preloaded by startWorkout, and never a constraint: nothing filters what else
    * can be logged once the workout is running.
    */
-  plannedExerciseIds?: string[];
+  plannedLifts?: PlannedLift[];
+}
+
+/**
+ * One prescribed lift: which exercise, and optionally how much of it.
+ *
+ * Every field but the exercise is optional, and a lift with none is what the
+ * app had before prescriptions existed: a name in an order. `reps` and `load`
+ * are strings because programmes are written as "8-12" and "RPE 8" as often as
+ * they are written as numbers, and a field that cannot hold those makes the
+ * coach round their own programme to fit the app.
+ */
+export interface PlannedLift {
+  exerciseId: string;
+  sets?: number;
+  reps?: string;
+  load?: string;
 }
 
 /**
@@ -324,6 +347,16 @@ interface State {
   lastAcceptedPlanAt: string | undefined;
   /** See `SettingsMeta.coachManaged`. */
   coachManaged: boolean;
+  /**
+   * How the split is arranged.
+   *
+   * `week` is the default for anyone starting now: seven days, each holding a
+   * card. `rotation` is the consumable-card cycle - Upper, Lower, Repeat -
+   * which advances when you train and has no weekdays in it. Part of the plan,
+   * so a coach sets it per client and it travels in the plan tab.
+   */
+  planningMode: PlanningMode;
+  setPlanningMode: (mode: PlanningMode) => void;
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
@@ -427,7 +460,8 @@ interface State {
 
   // --- Training plan ------------------------------------------------------
   /** The lifts a slot is for. Preloaded at Start Workout, never a constraint. */
-  setSlotExercises: (slotId: string, exerciseIds: string[]) => void;
+  /** Replaces a card's prescribed lifts, in the order the workout opens them. */
+  setSlotLifts: (slotId: string, lifts: PlannedLift[]) => void;
   /** Pins a slot to one date, for when you do know. Replaces any existing pin
    * on that date, because a day trains one thing. */
   /**
@@ -1129,6 +1163,7 @@ function persistSettingsFrom(s: State) {
     restSince: s.restSince,
     lastAcceptedPlanAt: s.lastAcceptedPlanAt,
     coachManaged: s.coachManaged,
+    planningMode: s.planningMode,
   };
   safeWrite(() => db.meta.put(settings));
 }
@@ -1146,6 +1181,7 @@ export const useStore = create<State>((set, get) => ({
   restSince: undefined,
   lastAcceptedPlanAt: undefined,
   coachManaged: false,
+  planningMode: "week",
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -1189,6 +1225,7 @@ export const useStore = create<State>((set, get) => ({
           restSince: undefined,
           lastAcceptedPlanAt: undefined,
           coachManaged: false,
+          planningMode: "week",
           activeSessionId: undefined,
           currentExerciseId: undefined,
           currentBlock: undefined,
@@ -1212,6 +1249,9 @@ export const useStore = create<State>((set, get) => ({
         restSince: data.settings.restSince,
         lastAcceptedPlanAt: data.settings.lastAcceptedPlanAt,
         coachManaged: data.settings.coachManaged ?? false,
+        // Absent means a plan written before week mode existed, which is a
+        // rotation by construction: cards in a cycle, with no weekdays.
+        planningMode: data.settings.planningMode ?? "rotation",
         // Both default on READ. A settings record written before planning
         // existed has neither key, and no migration is needed to make it mean
         // "no plan" (see the note on `plannedWeek` in db.ts).
@@ -1641,7 +1681,7 @@ export const useStore = create<State>((set, get) => ({
       };
       // A card that stops being a workout stops carrying lifts: keeping them
       // would resurrect a plan silently if it were ever switched back.
-      if (k !== "workout") merged.plannedExerciseIds = undefined;
+      if (k !== "workout") merged.plannedLifts = undefined;
       if (k === "repeat") merged.name = "Repeat";
       return merged;
     });
@@ -1747,14 +1787,19 @@ export const useStore = create<State>((set, get) => ({
 
   // --- Training plan ------------------------------------------------------
 
-  setSlotExercises: (slotId, exerciseIds) => {
+  setSlotLifts: (slotId, lifts) => {
     if (get().coachManaged) return;
     // Deduped and pruned to exercises that still exist, so deleting an exercise
-    // cannot leave a slot preloading a lift the picker has never heard of.
+    // cannot leave a card preloading a lift the picker has never heard of.
     const live = new Set(get().exercises.map((e) => e.id));
-    const cleaned = [...new Set(exerciseIds)].filter((id) => live.has(id));
+    const seen = new Set<string>();
+    const cleaned = lifts.filter((lift) => {
+      if (!live.has(lift.exerciseId) || seen.has(lift.exerciseId)) return false;
+      seen.add(lift.exerciseId);
+      return true;
+    });
     const next = get().slots.map((sl) =>
-      sl.id === slotId ? { ...sl, plannedExerciseIds: cleaned } : sl,
+      sl.id === slotId ? { ...sl, plannedLifts: cleaned } : sl,
     );
     set({ slots: next });
     const updated = next.find((sl) => sl.id === slotId);
@@ -1782,6 +1827,9 @@ export const useStore = create<State>((set, get) => ({
       exercises,
       slots: resolved.slots,
       sessions: withSessions(state.sessions, named),
+      // The coach chooses how the split is arranged, the same as they choose
+      // what is in it.
+      planningMode: plan.mode,
       nutritionPhases: resolved.phases,
       plannedDays: resolved.pins,
       lastAcceptedPlanAt: plan.issuedAt,
@@ -1825,6 +1873,12 @@ export const useStore = create<State>((set, get) => ({
         },
       ),
     );
+    persistSettingsFrom(get());
+  },
+
+  setPlanningMode: (mode) => {
+    if (get().coachManaged) return;
+    set({ planningMode: mode });
     persistSettingsFrom(get());
   },
 

@@ -188,16 +188,16 @@ describe("updateSplitCard", () => {
     // Keeping them would resurrect a plan silently if the card were ever
     // switched back to a workout.
     const { upper } = buildUL();
-    useStore.getState().setSlotExercises(upper.id, []);
+    useStore.getState().setSlotLifts(upper.id, []);
     useStore.setState({
       slots: useStore
         .getState()
-        .slots.map((s) => (s.id === upper.id ? { ...s, plannedExerciseIds: ["e1"] } : s)),
+        .slots.map((s) => (s.id === upper.id ? { ...s, plannedLifts: [{ exerciseId: "e1" }] } : s)),
     });
     useStore.getState().updateSplitCard(upper.id, { kind: "rest" });
     const card = useStore.getState().slots.find((s) => s.id === upper.id);
     expect(card?.kind).toBe("rest");
-    expect(card?.plannedExerciseIds).toBeUndefined();
+    expect(card?.plannedLifts).toBeUndefined();
   });
 
   it("forces a repeat's name, whatever was typed", () => {

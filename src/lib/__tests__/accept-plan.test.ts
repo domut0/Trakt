@@ -24,11 +24,12 @@ const PLAN: PlanPayload = {
       name: "Upper",
       rotationOrder: 0,
       kind: "workout",
-      exerciseNames: ["Bench Press", "Face Pull"],
+      lifts: [{ name: "Bench Press" }, { name: "Face Pull" }],
     },
-    { name: "Rest", rotationOrder: 1, kind: "rest", exerciseNames: [] },
+    { name: "Rest", rotationOrder: 1, kind: "rest", lifts: [] },
   ],
   pins: [{ date: "2026-09-22", cardName: "Upper" }],
+  mode: "rotation",
   issuedBy: "coach",
   issuedAt: "2026-09-14T10:00:00.000Z",
 };
@@ -122,7 +123,7 @@ describe("acceptCoachPlan", () => {
     const facePull = state.exercises.find((e) => e.name === "Face Pull")!;
     expect(facePull).toBeDefined();
     const upper = state.slots.find((s) => s.name === "Upper")!;
-    expect(upper.plannedExerciseIds).toEqual([
+    expect(upper.plannedLifts?.map((l) => l.exerciseId)).toEqual([
       state.exercises.find((e) => e.name === "Bench Press")!.id,
       facePull.id,
     ]);
@@ -217,7 +218,7 @@ describe("a coach-managed plan", () => {
     s.deleteSplitCard(upper.id);
     s.moveSplitCard(upper.id, 1);
     s.reorderSlots(upper.id, s.slots[1].id);
-    s.setSlotExercises(upper.id, []);
+    s.setSlotLifts(upper.id, []);
     expect(s.addPhase({ startsOn: "2026-12-01", name: "Gain", kind: "targets" })).toBeUndefined();
     s.updatePhase(phase.id, { calories: 9999 });
     expect(s.setPhaseStart(phase.id, "2026-11-01")).toBe(false);

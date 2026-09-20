@@ -134,7 +134,7 @@ describe("SlotPlanSheet", () => {
       fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
       const card = useStore.getState().slots[0];
-      expect(card.plannedExerciseIds).toEqual(["e_bench", "e_squat"]);
+      expect(card.plannedLifts?.map((l) => l.exerciseId)).toEqual(["e_bench", "e_squat"]);
     });
 
     it("cannot move the ends off the list", () => {

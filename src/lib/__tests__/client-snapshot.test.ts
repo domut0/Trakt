@@ -18,6 +18,7 @@ const LATER = new Date(2026, 8, 12, 10, 15, 0).getTime();
 
 const SOURCE: SyncSource = {
   unit: "lbs",
+  planningMode: "rotation",
   exercises: [
     { id: "e_bench", name: "Bench Press", type: "main" },
     { id: "e_row", name: "Barbell Row", type: "accessory" },
@@ -162,8 +163,11 @@ describe("the plan inside a client's sheet", () => {
     const tabs = buildSheetTabs(SOURCE, { issuedAt: "2026-09-14T10:00:00.000Z" });
     tabs[SHEET_TABS.plan] = buildPlanTab({
       phases: [{ startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 }],
-      cards: [{ name: "Upper", rotationOrder: 0, kind: "workout", exerciseNames: ["Bench Press"] }],
+      cards: [
+        { name: "Upper", rotationOrder: 0, kind: "workout", lifts: [{ name: "Bench Press" }] },
+      ],
       pins: [{ date: "2026-09-22", cardName: "Upper" }],
+      mode: "rotation",
       issuedBy: "coach",
       issuedAt: "2026-09-14T10:00:00.000Z",
     });
@@ -176,7 +180,7 @@ describe("the plan inside a client's sheet", () => {
     const upper = snap.slots.filter((s) => s.name === "Upper");
     expect(upper).toHaveLength(1);
     expect(snap.plannedDays[0].splitSlotId).toBe(upper[0].id);
-    expect(upper[0].plannedExerciseIds).toEqual([
+    expect(upper[0].plannedLifts?.map((l) => l.exerciseId)).toEqual([
       snap.exercises.find((e) => e.name === "Bench Press")!.id,
     ]);
   });

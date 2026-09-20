@@ -48,9 +48,9 @@ export function StartWorkoutSheet({
    *  weekday. Resolved for whichever slot is about to be started. */
   const liftsFor = (name: string): Exercise[] => {
     const slot = slots.find((s) => s.name.trim().toLowerCase() === name.trim().toLowerCase());
-    if (!slot?.plannedExerciseIds) return [];
-    return slot.plannedExerciseIds
-      .map((id) => exercises.find((e) => e.id === id))
+    if (!slot?.plannedLifts) return [];
+    return slot.plannedLifts
+      .map((lift) => exercises.find((e) => e.id === lift.exerciseId))
       .filter((e): e is Exercise => e !== undefined);
   };
 

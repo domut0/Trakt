@@ -18,6 +18,7 @@ function source(overrides: Partial<SyncSource> = {}): SyncSource {
   return {
     nutritionPhases: [],
     plannedDays: [],
+    planningMode: "rotation",
     exercises: [{ id: "e_bench", name: "Bench Press", type: "main" }],
     slots: [{ id: "s_hb", name: "Heavy Bench", rotationOrder: 0 }],
     sessions: [{ id: "sess_1", splitSlotId: "s_hb", startedAt: T, endedAt: T + 3600_000 }],

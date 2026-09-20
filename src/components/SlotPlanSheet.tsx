@@ -3,7 +3,7 @@ import { seedExercises } from "../lib/exercise-library";
 import { createPortal } from "react-dom";
 import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { kindOf, type SplitCardKind } from "../lib/planning";
-import { useStore, type Exercise, type SplitSlot } from "../lib/store";
+import { useStore, type Exercise, type PlannedLift, type SplitSlot } from "../lib/store";
 import { Close } from "./icons";
 import { Reorder } from "./SplitCardList";
 
@@ -40,21 +40,21 @@ export function SlotPlanSheet({
   onClose: () => void;
 }) {
   const exercises = useStore((s) => s.exercises);
-  const setSlotExercises = useStore((s) => s.setSlotExercises);
+  const setSlotLifts = useStore((s) => s.setSlotLifts);
   const addExercise = useStore((s) => s.addExercise);
   const addSplitCard = useStore((s) => s.addSplitCard);
   const updateSplitCard = useStore((s) => s.updateSplitCard);
 
   const [name, setName] = useState("");
   const [kind, setKind] = useState<SplitCardKind>("workout");
-  const [picked, setPicked] = useState<string[]>([]);
+  const [picked, setPicked] = useState<PlannedLift[]>([]);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setName(slot?.name ?? "");
     setKind(slot ? kindOf(slot) : "workout");
-    setPicked(slot?.plannedExerciseIds ?? []);
+    setPicked(slot?.plannedLifts ?? []);
     setQuery("");
   }, [open, slot]);
 
@@ -68,8 +68,11 @@ export function SlotPlanSheet({
   const chosen = useMemo(
     () =>
       picked
-        .map((id) => liftable.find((e) => e.id === id))
-        .filter((e): e is Exercise => e !== undefined),
+        .map((lift) => {
+          const exercise = liftable.find((e) => e.id === lift.exerciseId);
+          return exercise ? { lift, exercise } : undefined;
+        })
+        .filter((c): c is { lift: PlannedLift; exercise: Exercise } => c !== undefined),
     [liftable, picked],
   );
 
@@ -86,9 +89,8 @@ export function SlotPlanSheet({
   const library = useMemo(() => {
     const q = query.trim().toLowerCase();
     const known = new Set(liftable.map((e) => e.name.trim().toLowerCase()));
-    const pool: Array<Exercise & { preset?: true }> = liftable.filter(
-      (e) => !picked.includes(e.id),
-    );
+    const pickedIds = new Set(picked.map((lift) => lift.exerciseId));
+    const pool: Array<Exercise & { preset?: true }> = liftable.filter((e) => !pickedIds.has(e.id));
     for (const preset of seedExercises) {
       if (preset.type === "cardio" || known.has(preset.name.trim().toLowerCase())) continue;
       pool.push({ ...preset, preset: true });
@@ -98,7 +100,12 @@ export function SlotPlanSheet({
 
   if (!open || typeof document === "undefined") return null;
 
-  const add = (id: string) => setPicked((p) => (p.includes(id) ? p : [...p, id]));
+  const add = (id: string) =>
+    setPicked((p) => (p.some((lift) => lift.exerciseId === id) ? p : [...p, { exerciseId: id }]));
+
+  /** Edits one lift's prescription in place. A blank field clears it. */
+  const prescribe = (id: string, patch: Partial<Omit<PlannedLift, "exerciseId">>) =>
+    setPicked((p) => p.map((lift) => (lift.exerciseId === id ? { ...lift, ...patch } : lift)));
 
   /**
    * Whether the typed name is worth offering to create.
@@ -122,7 +129,7 @@ export function SlotPlanSheet({
     add(addExercise(typed, "accessory").id);
     setQuery("");
   };
-  const remove = (id: string) => setPicked((p) => p.filter((x) => x !== id));
+  const remove = (id: string) => setPicked((p) => p.filter((lift) => lift.exerciseId !== id));
 
   /** Same reordering the split cards get, for the same reason: the order is
    *  meaningful - it is the order the workout opens these lifts in - so it has
@@ -143,7 +150,7 @@ export function SlotPlanSheet({
   const save = () => {
     const target = slot ?? addSplitCard({ name, kind });
     if (slot) updateSplitCard(slot.id, { name, kind });
-    if (kind === "workout" && target) setSlotExercises(target.id, picked);
+    if (kind === "workout" && target) setSlotLifts(target.id, picked);
     onClose();
   };
 
@@ -230,25 +237,58 @@ export function SlotPlanSheet({
                   <h3 className="t-caption">Chosen</h3>
                 </div>
                 <div className="group-list bg-wash">
-                  {chosen.map((e, i) => (
-                    <div key={e.id} className={`group-row ${i === 0 ? "" : "group-row-sep"}`}>
-                      <span className="min-w-0 truncate t-body text-ink">{e.name}</span>
-                      <span className="flex shrink-0 items-center gap-1">
-                        <Reorder
-                          label={e.name}
-                          index={i}
-                          count={chosen.length}
-                          onMove={(to) => move(i, to)}
+                  {chosen.map(({ lift, exercise: e }, i) => (
+                    <div key={e.id} className={`px-4 py-2 ${i === 0 ? "" : "group-row-sep"}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate t-body text-ink">{e.name}</span>
+                        <span className="flex shrink-0 items-center gap-1">
+                          <Reorder
+                            label={e.name}
+                            index={i}
+                            count={chosen.length}
+                            onMove={(to) => move(i, to)}
+                          />
+                          <button
+                            type="button"
+                            aria-label={`Remove ${e.name}`}
+                            onClick={() => remove(e.id)}
+                            className="flex h-11 w-9 items-center justify-center text-ink-3"
+                          >
+                            <Close size={16} />
+                          </button>
+                        </span>
+                      </div>
+                      {/* Sets, reps and load, all optional: a lift with none is
+                          what every card held before prescriptions existed.
+                          Reps and load are text because "8-12" and "RPE 8" are
+                          how programmes are written. */}
+                      <div className="flex gap-2 pb-1">
+                        <Prescribe
+                          label={`${e.name} sets`}
+                          placeholder="Sets"
+                          value={lift.sets === undefined ? "" : String(lift.sets)}
+                          onChange={(v) => {
+                            const n = Number(v);
+                            prescribe(e.id, {
+                              sets: v.trim() === "" || Number.isNaN(n) ? undefined : n,
+                            });
+                          }}
+                          numeric
                         />
-                        <button
-                          type="button"
-                          aria-label={`Remove ${e.name}`}
-                          onClick={() => remove(e.id)}
-                          className="flex h-11 w-9 items-center justify-center text-ink-3"
-                        >
-                          <Close size={16} />
-                        </button>
-                      </span>
+                        <Prescribe
+                          label={`${e.name} reps`}
+                          placeholder="Reps"
+                          value={lift.reps ?? ""}
+                          onChange={(v) => prescribe(e.id, { reps: v.trim() || undefined })}
+                        />
+                        <Prescribe
+                          label={`${e.name} load`}
+                          placeholder="Load"
+                          value={lift.load ?? ""}
+                          onChange={(v) => prescribe(e.id, { load: v.trim() || undefined })}
+                          wide
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -358,5 +398,39 @@ function Switch({
         }`}
       />
     </button>
+  );
+}
+
+/** One prescription field. Unlabelled on screen: the placeholder is the label. */
+function Prescribe({
+  label,
+  placeholder,
+  value,
+  onChange,
+  numeric,
+  wide,
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  numeric?: boolean;
+  wide?: boolean;
+}) {
+  return (
+    <input
+      type="text"
+      inputMode={numeric ? "numeric" : "text"}
+      value={value}
+      placeholder={placeholder}
+      aria-label={label}
+      onChange={(e) => onChange(e.target.value)}
+      autoCapitalize="off"
+      autoCorrect="off"
+      spellCheck={false}
+      className={`min-h-[38px] rounded-md bg-wash px-2 t-label text-ink outline-none placeholder:text-ink-3 ${
+        wide ? "flex-[2]" : "flex-1"
+      }`}
+    />
   );
 }

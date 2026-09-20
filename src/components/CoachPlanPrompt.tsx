@@ -24,16 +24,17 @@ function usePendingChanges() {
   const slots = useStore((s) => s.slots);
   const plannedDays = useStore((s) => s.plannedDays);
   const exercises = useStore((s) => s.exercises);
+  const planningMode = useStore((s) => s.planningMode);
 
   return useMemo(() => {
     if (!pending) return [];
     const current = planFromStore(
-      { slots, exercises, nutritionPhases: phases, plannedDays },
+      { slots, exercises, nutritionPhases: phases, plannedDays, planningMode },
       // Only the plan's shape is compared; the attribution is not a change.
       { by: "client", at: "" },
     );
     return diffPlan(current, pending);
-  }, [pending, slots, exercises, phases, plannedDays]);
+  }, [pending, slots, exercises, phases, plannedDays, planningMode]);
 }
 
 /**

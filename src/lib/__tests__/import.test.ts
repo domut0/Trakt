@@ -694,7 +694,7 @@ describe("importData (full backup restore)", () => {
       slots: [
         // The lifts live on the slot now, so a backup that lost this field would
         // lose the whole training plan while looking complete.
-        { id: "s1", name: "Upper", rotationOrder: 0, plannedExerciseIds: ["e1"] },
+        { id: "s1", name: "Upper", rotationOrder: 0, plannedLifts: [{ exerciseId: "e1" }] },
       ],
       sessions: [],
       sets: [],
@@ -740,7 +740,7 @@ describe("importData (full backup restore)", () => {
     const reloaded = useStore.getState();
     expect(sortById(reloaded.nutritionPhases)).toEqual(sortById(v5Backup.nutritionPhases));
     expect(reloaded.plannedDays).toEqual(v5Backup.plannedDays);
-    expect(reloaded.slots[0].plannedExerciseIds).toEqual(["e1"]);
+    expect(reloaded.slots[0].plannedLifts?.map((l) => l.exerciseId)).toEqual(["e1"]);
   });
 
   it("drops a pin naming a slot the file does not contain", () => {

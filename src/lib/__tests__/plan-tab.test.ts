@@ -5,7 +5,11 @@ import {
   isNewerCoachPlan,
   parsePlanTab,
   planFromStore,
+  formatLift,
+  parseLift,
+  PLAN_FORMAT_VERSION,
   resolvePlan,
+  type PlanLift,
   type PlanPayload,
 } from "../plan-tab";
 import type { CellValue } from "../csv";
@@ -32,11 +36,17 @@ const PLAN: PlanPayload = {
     { startsOn: "2026-09-19", name: "Off", kind: "untracked" },
   ],
   cards: [
-    { name: "Upper", rotationOrder: 0, kind: "workout", exerciseNames: ["Bench Press", "Row"] },
-    { name: "Lower", rotationOrder: 1, kind: "workout", exerciseNames: ["Squat"] },
-    { name: "Rest", rotationOrder: 2, kind: "rest", exerciseNames: [] },
+    {
+      name: "Upper",
+      rotationOrder: 0,
+      kind: "workout",
+      lifts: [{ name: "Bench Press" }, { name: "Row" }],
+    },
+    { name: "Lower", rotationOrder: 1, kind: "workout", lifts: [{ name: "Squat" }] },
+    { name: "Rest", rotationOrder: 2, kind: "rest", lifts: [] },
   ],
   pins: [{ date: "2026-09-22", cardName: "Upper" }],
+  mode: "rotation",
   issuedBy: "coach",
   issuedAt: "2026-09-14T10:04:00.000Z",
 };
@@ -105,7 +115,7 @@ describe("round trip", () => {
 
   it("round-trips a card with no exercises as an empty list, not one blank name", () => {
     const out = through(PLAN);
-    expect(out!.cards.find((c) => c.name === "Rest")!.exerciseNames).toEqual([]);
+    expect(out!.cards.find((c) => c.name === "Rest")!.lifts).toEqual([]);
   });
 
   it("keeps a zero target, which is a value rather than a blank", () => {
@@ -124,12 +134,12 @@ describe("round trip", () => {
           name: "Push",
           rotationOrder: 0,
           kind: "workout",
-          exerciseNames: ["Incline DB Press", "Cable Fly (low-to-high)"],
+          lifts: [{ name: "Incline DB Press" }, { name: "Cable Fly (low-to-high)" }],
         },
       ],
       pins: [],
     };
-    expect(through(plan)!.cards[0].exerciseNames).toEqual([
+    expect(through(plan)!.cards[0].lifts.map((l) => l.name)).toEqual([
       "Incline DB Press",
       "Cable Fly (low-to-high)",
     ]);
@@ -195,8 +205,8 @@ describe("refusing a malformed tab", () => {
     const plan: PlanPayload = {
       ...PLAN,
       cards: [
-        { name: "Upper", rotationOrder: 0, kind: "workout", exerciseNames: [] },
-        { name: "upper", rotationOrder: 1, kind: "workout", exerciseNames: [] },
+        { name: "Upper", rotationOrder: 0, kind: "workout", lifts: [] },
+        { name: "upper", rotationOrder: 1, kind: "workout", lifts: [] },
       ],
       pins: [],
     };
@@ -265,19 +275,25 @@ describe("planFromStore", () => {
       { id: "e2", name: "Row", type: "main" as const },
     ],
     slots: [
-      { id: "s1", name: "Upper", rotationOrder: 0, plannedExerciseIds: ["e1", "e2"] },
+      {
+        id: "s1",
+        name: "Upper",
+        rotationOrder: 0,
+        plannedLifts: [{ exerciseId: "e1" }, { exerciseId: "e2" }],
+      },
       { id: "s2", name: "Rest", rotationOrder: 1, kind: "rest" as const },
     ],
     nutritionPhases: [
       { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets" as const, calories: 3000 },
     ],
     plannedDays: [{ date: "2026-09-22", splitSlotId: "s1" }],
+    planningMode: "rotation" as const,
   };
   const issued = { by: "client" as const, at: "2026-09-14T10:00:00.000Z" };
 
   it("carries exercises as names and no ids at all", () => {
     const plan = planFromStore(source, issued);
-    expect(plan.cards[0].exerciseNames).toEqual(["Bench Press", "Row"]);
+    expect(plan.cards[0].lifts.map((l) => l.name)).toEqual(["Bench Press", "Row"]);
     expect(JSON.stringify(plan)).not.toContain("e1");
     expect(JSON.stringify(plan)).not.toContain("s1");
     expect(JSON.stringify(plan)).not.toContain("p1");
@@ -299,10 +315,19 @@ describe("planFromStore", () => {
   it("drops an exercise id that matches no record", () => {
     const orphaned = {
       ...source,
-      slots: [{ id: "s1", name: "Upper", rotationOrder: 0, plannedExerciseIds: ["e1", "gone"] }],
+      slots: [
+        {
+          id: "s1",
+          name: "Upper",
+          rotationOrder: 0,
+          plannedLifts: [{ exerciseId: "e1" }, { exerciseId: "gone" }],
+        },
+      ],
       plannedDays: [],
     };
-    expect(planFromStore(orphaned, issued).cards[0].exerciseNames).toEqual(["Bench Press"]);
+    expect(planFromStore(orphaned, issued).cards[0].lifts.map((l) => l.name)).toEqual([
+      "Bench Press",
+    ]);
   });
 
   it("produces a payload the tab round-trips", () => {
@@ -351,7 +376,7 @@ describe("resolvePlan", () => {
 
   const target = {
     slots: [
-      { id: "s_upper", name: "Upper", rotationOrder: 0, plannedExerciseIds: ["e_bench"] },
+      { id: "s_upper", name: "Upper", rotationOrder: 0, plannedLifts: [{ exerciseId: "e_bench" }] },
       { id: "s_lower", name: "Lower", rotationOrder: 1, lastLoggedAt: 1_700_000_000_000 },
       { id: "s_legs", name: "Legs", rotationOrder: 2 },
     ],
@@ -380,11 +405,12 @@ describe("resolvePlan", () => {
         name: "upper",
         rotationOrder: 0,
         kind: "workout",
-        exerciseNames: ["Bench Press", "Pendlay Row"],
+        lifts: [{ name: "Bench Press" }, { name: "Pendlay Row" }],
       },
-      { name: "Lower", rotationOrder: 1, kind: "workout", exerciseNames: ["Back Squat"] },
+      { name: "Lower", rotationOrder: 1, kind: "workout", lifts: [{ name: "Back Squat" }] },
     ],
     pins: [{ date: "2026-09-22", cardName: "Upper" }],
+    mode: "rotation",
     issuedBy: "coach",
     issuedAt: "2026-09-14T10:00:00.000Z",
   };
@@ -404,10 +430,7 @@ describe("resolvePlan", () => {
   it("mints an id for a card the device has never had", () => {
     const withNew: PlanPayload = {
       ...plan,
-      cards: [
-        ...plan.cards,
-        { name: "Push", rotationOrder: 2, kind: "workout", exerciseNames: [] },
-      ],
+      cards: [...plan.cards, { name: "Push", rotationOrder: 2, kind: "workout", lifts: [] }],
     };
     const out = resolvePlan(withNew, target, ids());
     // A minted id, not one of the device's existing ones. Which number it gets
@@ -421,7 +444,7 @@ describe("resolvePlan", () => {
   it("resolves a known exercise to its existing id and creates nothing", () => {
     const out = resolvePlan(plan, target, ids());
     const lower = out.slots.find((s) => s.name === "Lower")!;
-    expect(lower.plannedExerciseIds).toEqual(["e_squat"]);
+    expect(lower.plannedLifts?.map((l) => l.exerciseId)).toEqual(["e_squat"]);
   });
 
   it("creates an exercise the device has never heard of, as an accessory", () => {
@@ -437,14 +460,14 @@ describe("resolvePlan", () => {
     const twice: PlanPayload = {
       ...plan,
       cards: [
-        { name: "A", rotationOrder: 0, kind: "workout", exerciseNames: ["Face Pull"] },
-        { name: "B", rotationOrder: 1, kind: "workout", exerciseNames: ["Face Pull"] },
+        { name: "A", rotationOrder: 0, kind: "workout", lifts: [{ name: "Face Pull" }] },
+        { name: "B", rotationOrder: 1, kind: "workout", lifts: [{ name: "Face Pull" }] },
       ],
       pins: [],
     };
     const out = resolvePlan(twice, target, ids());
     expect(out.createdExercises).toHaveLength(1);
-    expect(out.slots[0].plannedExerciseIds).toEqual(out.slots[1].plannedExerciseIds);
+    expect(out.slots[0].plannedLifts).toEqual(out.slots[1].plannedLifts);
   });
 
   it("keeps an existing phase's id when the start date matches", () => {
@@ -493,10 +516,11 @@ describe("diffPlan", () => {
   const base: PlanPayload = {
     phases: [{ startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2400, steps: 8000 }],
     cards: [
-      { name: "Upper", rotationOrder: 0, kind: "workout", exerciseNames: ["Bench Press"] },
-      { name: "Lower", rotationOrder: 1, kind: "workout", exerciseNames: ["Squat"] },
+      { name: "Upper", rotationOrder: 0, kind: "workout", lifts: [{ name: "Bench Press" }] },
+      { name: "Lower", rotationOrder: 1, kind: "workout", lifts: [{ name: "Squat" }] },
     ],
     pins: [{ date: "2026-09-22", cardName: "Upper" }],
+    mode: "rotation",
     issuedBy: "coach",
     issuedAt: "2026-09-14T10:00:00.000Z",
   };
@@ -552,7 +576,7 @@ describe("diffPlan", () => {
     const next: PlanPayload = {
       ...base,
       cards: [
-        { ...base.cards[0], exerciseNames: ["Bench Press", "Incline DB Press"] },
+        { ...base.cards[0], lifts: [{ name: "Bench Press" }, { name: "Incline DB Press" }] },
         base.cards[1],
       ],
     };
@@ -566,11 +590,17 @@ describe("diffPlan", () => {
   it("treats reordered lifts as a change, since order is the preload order", () => {
     const next: PlanPayload = {
       ...base,
-      cards: [{ ...base.cards[0], exerciseNames: ["Bench Press", "Row"] }, base.cards[1]],
+      cards: [
+        { ...base.cards[0], lifts: [{ name: "Bench Press" }, { name: "Row" }] },
+        base.cards[1],
+      ],
     };
     const reordered: PlanPayload = {
       ...base,
-      cards: [{ ...base.cards[0], exerciseNames: ["Row", "Bench Press"] }, base.cards[1]],
+      cards: [
+        { ...base.cards[0], lifts: [{ name: "Row" }, { name: "Bench Press" }] },
+        base.cards[1],
+      ],
     };
     expect(diffPlan(next, reordered)).toHaveLength(1);
   });
@@ -615,5 +645,113 @@ describe("diffPlan", () => {
   it("ignores issuedAt and issuedBy, which are not changes to the plan", () => {
     const reissued: PlanPayload = { ...base, issuedAt: "2027-01-01T00:00:00Z", issuedBy: "client" };
     expect(diffPlan(base, reissued)).toEqual([]);
+  });
+});
+
+describe("prescriptions", () => {
+  // The sheet is a readable rendering, not a serialisation: a coach opens it in
+  // Google Sheets and reads the programme off the screen, so the cell says
+  // "Bench Press 3x8-12 @100kg" rather than carrying JSON.
+  const CASES: Array<[string, PlanLift]> = [
+    ["Bench Press", { name: "Bench Press" }],
+    ["Bench Press 3x8", { name: "Bench Press", sets: 3, reps: "8" }],
+    ["Bench Press 3x8-12", { name: "Bench Press", sets: 3, reps: "8-12" }],
+    ["Bench Press 3x8 @100kg", { name: "Bench Press", sets: 3, reps: "8", load: "100kg" }],
+    ["Bench Press 3x8 @RPE 8", { name: "Bench Press", sets: 3, reps: "8", load: "RPE 8" }],
+    ["Pull-up 3 sets", { name: "Pull-up", sets: 3 }],
+    ["Plank x60s", { name: "Plank", reps: "60s" }],
+    ["Push-up @bodyweight", { name: "Push-up", load: "bodyweight" }],
+  ];
+
+  it.each(CASES)("round-trips %s", (text, lift) => {
+    expect(parseLift(text)).toEqual(lift);
+    expect(formatLift(lift)).toBe(text);
+  });
+
+  it("takes anything it cannot read as a bare name, rather than losing the lift", () => {
+    // Kept whole rather than guessed at: a lift called "Farmer Carry 2x30m each
+    // side" reads correctly on the screen, where half of one would not.
+    expect(parseLift("Farmer Carry 2x30m each side")).toEqual({
+      name: "Farmer Carry 2x30m each side",
+    });
+    expect(parseLift("21s")).toEqual({ name: "21s" });
+    expect(parseLift("   ")).toBeUndefined();
+  });
+
+  it("carries sets, reps and load through the tab", () => {
+    const plan: PlanPayload = {
+      ...PLAN,
+      cards: [
+        {
+          name: "Upper",
+          rotationOrder: 0,
+          kind: "workout",
+          lifts: [
+            { name: "Bench Press", sets: 3, reps: "8-12", load: "RPE 8" },
+            { name: "Row", sets: 4, reps: "10" },
+            { name: "Face Pull" },
+          ],
+        },
+      ],
+      pins: [],
+    };
+    expect(through(plan)!.cards[0].lifts).toEqual(plan.cards[0].lifts);
+  });
+});
+
+describe("planning mode and weekdays", () => {
+  it("carries the mode, so a coach chooses how the split is arranged", () => {
+    expect(through({ ...PLAN, mode: "week" })!.mode).toBe("week");
+    expect(through({ ...PLAN, mode: "rotation" })!.mode).toBe("rotation");
+  });
+
+  it("reads a plan with no mode row as a rotation, which is what it was", () => {
+    const rows = grid();
+    const metaRows = rows.filter((r) => r[0] === "meta" && r[1] === "mode");
+    expect(metaRows).toHaveLength(1);
+    const without = rows.filter((r) => !(r[0] === "meta" && r[1] === "mode"));
+    expect(parsePlanTab(without)!.mode).toBe("rotation");
+  });
+
+  it("carries the day a card sits on in week mode", () => {
+    const plan: PlanPayload = {
+      ...PLAN,
+      mode: "week",
+      cards: [
+        { name: "Upper", rotationOrder: 0, kind: "workout", lifts: [], weekday: 1 },
+        { name: "Rest", rotationOrder: 1, kind: "rest", lifts: [], weekday: 0 },
+      ],
+      pins: [],
+    };
+    const out = through(plan)!;
+    expect(out.cards.map((c) => c.weekday)).toEqual([1, 0]);
+  });
+
+  it("refuses a day column it cannot read, rather than landing the card nowhere", () => {
+    const rows = grid();
+    setCell(rows, rowOfKind(rows, "card"), "Day", "Someday");
+    expect(parsePlanTab(rows)).toBeUndefined();
+  });
+});
+
+describe("the format version", () => {
+  it("is written, so an older app can recognise a plan it cannot read", () => {
+    const rows = grid();
+    const version = rows.find((r) => r[0] === "meta" && r[1] === "version");
+    expect(version?.[3]).toBe(PLAN_FORMAT_VERSION);
+  });
+
+  it("refuses a plan from a newer build instead of applying half of it", () => {
+    // Applying what it understood and republishing would strip the coach's
+    // programming back out of the sheet.
+    const rows = grid();
+    const version = rows.find((r) => r[0] === "meta" && r[1] === "version")!;
+    version[3] = PLAN_FORMAT_VERSION + 1;
+    expect(parsePlanTab(rows)).toBeUndefined();
+  });
+
+  it("reads a plan with no version row, which is one written before this", () => {
+    const rows = grid().filter((r) => !(r[0] === "meta" && r[1] === "version"));
+    expect(parsePlanTab(rows)).toBeDefined();
   });
 });

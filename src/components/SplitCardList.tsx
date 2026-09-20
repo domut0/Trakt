@@ -95,8 +95,8 @@ export function SplitCardList({ onEdit }: { onEdit: (slot: SplitSlot) => void })
         const isNext = nextCard?.id === slot.id;
         const isSwiped = swipedId === slot.id;
         const showActions = actionsId === slot.id;
-        const lifts = (slot.plannedExerciseIds ?? [])
-          .map((id) => exercises.find((e) => e.id === id)?.name)
+        const lifts = (slot.plannedLifts ?? [])
+          .map((lift) => exercises.find((e) => e.id === lift.exerciseId)?.name)
           .filter((n): n is string => n !== undefined);
 
         return (

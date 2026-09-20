@@ -58,6 +58,8 @@ export interface SettingsMeta {
    * the store refuses plan edits. Non-indexed, so no version bump.
    */
   coachManaged?: boolean;
+  /** See `State.planningMode`. Absent reads as "rotation". */
+  planningMode?: "week" | "rotation";
 }
 
 export interface ActiveSessionMeta {
@@ -411,7 +413,7 @@ export interface AllData {
 export async function loadAll(): Promise<AllData> {
   const [
     exercises,
-    slots,
+    storedSlots,
     sessions,
     sets,
     dailyLogs,
@@ -430,9 +432,19 @@ export async function loadAll(): Promise<AllData> {
     db.meta.get("settings"),
     db.meta.get("activeSession"),
   ]);
-  // Nothing to backfill. Settings is two fields now - targets moved to their
-  // own table as a timeline - so a record written before any of this simply
-  // reads as itself.
+  // Cards written before prescriptions existed carry `plannedExerciseIds`: a
+  // list of ids with no sets, reps or load against them. Read as lifts with
+  // nothing prescribed, which is exactly what they were. Done on READ rather
+  // than as a Dexie upgrade because the field is not indexed and a rewrite of
+  // every slot would be a migration to maintain for a mapping this small.
+  const slots = storedSlots.map((slot) => {
+    const legacy = (slot as { plannedExerciseIds?: string[] }).plannedExerciseIds;
+    if (!legacy || slot.plannedLifts) return slot;
+    return { ...slot, plannedLifts: legacy.map((exerciseId) => ({ exerciseId })) };
+  });
+
+  // Settings is two fields now - targets moved to their own table as a
+  // timeline - so a record written before any of this simply reads as itself.
   const stored = settingsMeta as SettingsMeta | undefined;
   const settings: SettingsMeta = stored ?? defaultSettings();
   return {

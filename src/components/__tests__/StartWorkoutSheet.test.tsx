@@ -16,8 +16,13 @@ import { dayKey } from "../../lib/daily-log";
 const SQUAT: Exercise = { id: "e_squat", name: "Back Squat", type: "main" };
 const BENCH: Exercise = { id: "e_bench", name: "Bench Press", type: "main" };
 
-function slot(name: string, plannedExerciseIds?: string[], rotationOrder = 0): SplitSlot {
-  return { id: `s_${name.toLowerCase()}`, name, rotationOrder, plannedExerciseIds };
+function slot(name: string, exerciseIds?: string[], rotationOrder = 0): SplitSlot {
+  return {
+    id: `s_${name.toLowerCase()}`,
+    name,
+    rotationOrder,
+    plannedLifts: exerciseIds?.map((exerciseId) => ({ exerciseId })),
+  };
 }
 
 function renderSheet() {

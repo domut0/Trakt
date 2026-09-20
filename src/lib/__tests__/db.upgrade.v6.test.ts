@@ -81,9 +81,13 @@ describe("Dexie v5 -> v6: the weekly template becomes a timeline and a rotation"
     // --- training: the lifts land on the slots ------------------------------
     const upper = await db.slots.get("s_upper");
     const lower = await db.slots.get("s_lower");
-    expect(upper?.plannedExerciseIds).toEqual(["e_bench", "e_row"]);
+    // The v6 upgrade writes the pre-prescription field; loadAll reads it as lifts.
+    expect((upper as { plannedExerciseIds?: string[] })?.plannedExerciseIds).toEqual([
+      "e_bench",
+      "e_row",
+    ]);
     // The case-and-whitespace case: "  lower  " found the slot called "Lower".
-    expect(lower?.plannedExerciseIds).toEqual(["e_squat"]);
+    expect((lower as { plannedExerciseIds?: string[] })?.plannedExerciseIds).toEqual(["e_squat"]);
 
     // --- the settings row keeps only what it still describes ----------------
     const settings = (await db.meta.get("settings")) as unknown as Record<string, unknown>;
@@ -100,9 +104,8 @@ describe("Dexie v5 -> v6: the weekly template becomes a timeline and a rotation"
     expect(state.unit).toBe("kg");
     expect(state.nutritionPhases).toHaveLength(1);
     expect(state.plannedDays).toEqual([]);
-    expect(state.slots.find((s) => s.id === "s_upper")?.plannedExerciseIds).toEqual([
-      "e_bench",
-      "e_row",
-    ]);
+    expect(
+      state.slots.find((s) => s.id === "s_upper")?.plannedLifts?.map((l) => l.exerciseId),
+    ).toEqual(["e_bench", "e_row"]);
   });
 });

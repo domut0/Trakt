@@ -53,6 +53,19 @@ import type { NutritionPhase, PlannedDay } from "./planning";
 
 export const PLAN_TAB = "plan";
 
+export type PlanningMode = "week" | "rotation";
+
+/**
+ * The plan format this build writes.
+ *
+ * Bumped when a field is ADDED that an older build would drop on the floor:
+ * prescriptions and weekdays are exactly that, and an older client that read
+ * this plan, applied what it understood and published the result would strip
+ * the coach's programming back out. An app that meets a higher number refuses
+ * the plan and says to update, rather than half-applying it.
+ */
+export const PLAN_FORMAT_VERSION = 2;
+
 /** A nutrition phase, keyed by its start date rather than an id. */
 export interface PlanPhase {
   /** Local "yyyy-MM-dd". The identity of the phase. */
@@ -66,12 +79,22 @@ export interface PlanPhase {
   steps?: number;
 }
 
+/** One prescribed lift, named rather than pointed at. See `PlannedLift`. */
+export interface PlanLift {
+  name: string;
+  sets?: number;
+  reps?: string;
+  load?: string;
+}
+
 /** A split card, keyed by name, with its lifts carried as names. */
 export interface PlanCard {
   name: string;
   rotationOrder: number;
   kind: SplitCardKind;
-  exerciseNames: string[];
+  lifts: PlanLift[];
+  /** 0 = Sunday. Present in `week` mode, absent in `rotation`. */
+  weekday?: number;
 }
 
 /** A pinned day, naming the card it pins rather than pointing at an id. */
@@ -85,6 +108,12 @@ export interface PlanPayload {
   phases: PlanPhase[];
   cards: PlanCard[];
   pins: PlanPin[];
+  /**
+   * How the split is arranged: a repeating week, or a rotation that advances
+   * when you train. Part of the plan rather than a device setting, so a coach
+   * chooses it per client and it travels with the plan they send.
+   */
+  mode: PlanningMode;
   /** Who wrote this plan. Only a coach-issued plan is offered to a client. */
   issuedBy: "coach" | "client";
   /** ISO instant. Orders two plans; a stale one is never applied over a newer. */
@@ -110,13 +139,61 @@ const HEADERS = [
   "Steps",
   "Order",
   "Card Kind",
+  "Day",
   "Exercises",
 ] as const;
 
 type Header = (typeof HEADERS)[number];
 
-/** Separates exercise names in the `Exercises` cell. */
+/** Separates lifts in the `Exercises` cell. */
 const EXERCISE_SEPARATOR = " | ";
+
+/** Sunday first, matching `Date.getDay()`, and written out so the sheet reads. */
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/**
+ * One lift, as a person would write it: `Bench Press 3x8-12 @100kg`.
+ *
+ * The sheet is a readable rendering, not a serialisation, and a coach opening
+ * it in Google Sheets should be able to read the programme off the screen and
+ * type into it. The parser accepts what it writes plus the obvious variations
+ * (`x` or `×`, en dash or hyphen, a missing load, a bare name).
+ */
+export function formatLift(lift: PlanLift): string {
+  const parts = [lift.name.trim()];
+  if (lift.sets !== undefined && lift.reps) parts.push(`${lift.sets}x${lift.reps}`);
+  else if (lift.sets !== undefined) parts.push(`${lift.sets} sets`);
+  else if (lift.reps) parts.push(`x${lift.reps}`);
+  if (lift.load) parts.push(`@${lift.load}`);
+  return parts.join(" ");
+}
+
+const LIFT =
+  /^(.*?)\s+(?:(\d+)\s*(?:x|×)\s*([^@\s]+)|(\d+)\s+sets|(?:x|×)\s*([^@\s]+))\s*(?:@\s*(.*))?$/i;
+
+/** The inverse of `formatLift`. A cell it cannot parse is taken as a bare name. */
+export function parseLift(cell: string): PlanLift | undefined {
+  const text = cell.trim();
+  if (text === "") return undefined;
+
+  const withLoad = /^(.*?)\s*@\s*(.+)$/.exec(text);
+  const match = LIFT.exec(text);
+  if (!match) {
+    // No sets or reps, but possibly still a load: "Bench Press @100kg".
+    if (withLoad && withLoad[1].trim() !== "") {
+      return { name: withLoad[1].trim(), load: withLoad[2].trim() };
+    }
+    return { name: text };
+  }
+  const [, name, sets, reps, setsOnly, repsOnly, load] = match;
+  if (name.trim() === "") return { name: text };
+  return {
+    name: name.trim(),
+    ...((sets ?? setsOnly) ? { sets: Number(sets ?? setsOnly) } : {}),
+    ...((reps ?? repsOnly) ? { reps: (reps ?? repsOnly).trim() } : {}),
+    ...(load && load.trim() !== "" ? { load: load.trim() } : {}),
+  };
+}
 
 const MACRO_HEADERS: Array<[keyof PlanPhase, Header]> = [
   ["calories", "Calories"],
@@ -158,6 +235,9 @@ export function buildPlanTab(plan: PlanPayload): CellValue[][] {
   };
   meta("issuedBy", plan.issuedBy);
   meta("issuedAt", plan.issuedAt);
+  meta("mode", plan.mode);
+  // Last of the meta rows, and the first thing the parser looks at.
+  meta("version", PLAN_FORMAT_VERSION);
 
   for (const phase of [...plan.phases].sort((a, b) => a.startsOn.localeCompare(b.startsOn))) {
     const row = blankRow();
@@ -177,12 +257,13 @@ export function buildPlanTab(plan: PlanPayload): CellValue[][] {
     at(row, "Name", card.name);
     at(row, "Order", card.rotationOrder);
     at(row, "Card Kind", card.kind);
+    at(row, "Day", card.weekday === undefined ? undefined : WEEKDAYS[card.weekday]);
     // An empty list writes a blank cell rather than an empty string, so a card
     // with no lifts round-trips as absent rather than as one nameless exercise.
     at(
       row,
       "Exercises",
-      card.exerciseNames.length > 0 ? card.exerciseNames.join(EXERCISE_SEPARATOR) : undefined,
+      card.lifts.length > 0 ? card.lifts.map(formatLift).join(EXERCISE_SEPARATOR) : undefined,
     );
     rows.push(row);
   }
@@ -205,6 +286,7 @@ export interface PlanSource {
   exercises: readonly Exercise[];
   nutritionPhases: readonly NutritionPhase[];
   plannedDays: readonly PlannedDay[];
+  planningMode: PlanningMode;
 }
 
 /**
@@ -240,13 +322,24 @@ export function planFromStore(
       name: s.name,
       rotationOrder: s.rotationOrder,
       kind: s.kind ?? "workout",
-      exerciseNames: (s.plannedExerciseIds ?? [])
-        .map((id) => exerciseNameById.get(id))
-        .filter((name): name is string => name !== undefined),
+      ...(s.weekday === undefined ? {} : { weekday: s.weekday }),
+      lifts: (s.plannedLifts ?? [])
+        .map(({ exerciseId, sets, reps, load }): PlanLift | undefined => {
+          const name = exerciseNameById.get(exerciseId);
+          if (name === undefined) return undefined;
+          return {
+            name,
+            ...(sets === undefined ? {} : { sets }),
+            ...(reps === undefined ? {} : { reps }),
+            ...(load === undefined ? {} : { load }),
+          };
+        })
+        .filter((lift): lift is PlanLift => lift !== undefined),
     })),
     pins: source.plannedDays
       .map((p) => ({ date: p.date, cardName: slotNameById.get(p.splitSlotId) }))
       .filter((p): p is PlanPin => p.cardName !== undefined),
+    mode: source.planningMode,
     issuedBy: issued.by,
     issuedAt: issued.at,
   };
@@ -332,6 +425,9 @@ export function parsePlanTab(rows: readonly CellValue[][] | undefined): PlanPayl
   const pins: PlanPin[] = [];
   let issuedBy: "coach" | "client" | undefined;
   let issuedAt: string | undefined;
+  // Absent is version 1: a plan written before prescriptions and week mode.
+  let version = 1;
+  let mode: PlanningMode | undefined;
 
   const seenPhaseDates = new Set<string>();
   const seenCardNames = new Set<string>();
@@ -350,6 +446,13 @@ export function parsePlanTab(rows: readonly CellValue[][] | undefined): PlanPayl
       } else if (name === "issuedAt") {
         if (value === undefined || Number.isNaN(Date.parse(value))) return undefined;
         issuedAt = value;
+      } else if (name === "mode") {
+        if (value !== "week" && value !== "rotation") return undefined;
+        mode = value;
+      } else if (name === "version") {
+        const n = num(cell(row, "Value"));
+        if (n === BAD || n === undefined) return undefined;
+        version = n;
       }
       continue;
     }
@@ -391,16 +494,28 @@ export function parsePlanTab(rows: readonly CellValue[][] | undefined): PlanPayl
       const cardKind = text(cell(row, "Card Kind")) ?? "workout";
       if (cardKind !== "workout" && cardKind !== "rest" && cardKind !== "repeat") return undefined;
 
+      const day = text(cell(row, "Day"));
+      const weekday = day === undefined ? undefined : WEEKDAYS.indexOf(day.slice(0, 3) as never);
+      // A day column that says something this app cannot read is corruption,
+      // not an omission: the card would silently land on no day at all.
+      if (day !== undefined && weekday === -1) return undefined;
+
       const exercises = text(cell(row, "Exercises"));
-      const exerciseNames =
+      const lifts =
         exercises === undefined
           ? []
           : exercises
               .split("|")
-              .map((s) => s.trim())
-              .filter((s) => s.length > 0);
+              .map((part) => parseLift(part))
+              .filter((lift): lift is PlanLift => lift !== undefined);
 
-      cards.push({ name, rotationOrder: order, kind: cardKind, exerciseNames });
+      cards.push({
+        name,
+        rotationOrder: order,
+        kind: cardKind,
+        lifts,
+        ...(weekday === undefined || weekday < 0 ? {} : { weekday }),
+      });
       continue;
     }
 
@@ -430,7 +545,21 @@ export function parsePlanTab(rows: readonly CellValue[][] | undefined): PlanPayl
     if (!cardNames.has(pin.cardName.toLowerCase())) return undefined;
   }
 
-  return { phases, cards, pins, issuedBy, issuedAt };
+  // A plan from a newer build carries fields this one would drop on the floor,
+  // and publishing what survived would strip them back out of the sheet. The
+  // caller shows "update Trakt" rather than applying half a programme.
+  if (version > PLAN_FORMAT_VERSION) return undefined;
+
+  return {
+    phases,
+    cards,
+    pins,
+    // A plan with no mode row predates week mode, and a plan written then is a
+    // rotation: cards in a cycle, no weekdays.
+    mode: mode ?? "rotation",
+    issuedBy,
+    issuedAt,
+  };
 }
 
 /**
@@ -533,7 +662,13 @@ export function resolvePlan(
       name: card.name,
       rotationOrder: card.rotationOrder,
       kind: card.kind,
-      plannedExerciseIds: card.exerciseNames.map((n) => resolveExercise(n).id),
+      ...(card.weekday === undefined ? {} : { weekday: card.weekday }),
+      plannedLifts: card.lifts.map((lift) => ({
+        exerciseId: resolveExercise(lift.name).id,
+        ...(lift.sets === undefined ? {} : { sets: lift.sets }),
+        ...(lift.reps === undefined ? {} : { reps: lift.reps }),
+        ...(lift.load === undefined ? {} : { load: lift.load }),
+      })),
       // Where the client is in the split is theirs, not the plan's: a new
       // programme does not mean the last Upper day never happened.
       ...(existing?.lastLoggedAt !== undefined ? { lastLoggedAt: existing.lastLoggedAt } : {}),
@@ -698,7 +833,7 @@ export function diffPlan(current: PlanPayload | undefined, next: PlanPayload): P
         area: "Training",
         subject: card.name,
         kind: "added",
-        detail: card.exerciseNames.join(", ") || "no lifts yet",
+        detail: card.lifts.map(formatLift).join(", ") || "no lifts yet",
       });
       continue;
     }
@@ -720,8 +855,8 @@ export function diffPlan(current: PlanPayload | undefined, next: PlanPayload): P
     }
     // Compared as a joined string, not as sets: the order lifts are listed in
     // is the order they are preloaded in, so reordering them is a real change.
-    const oldLifts = old.exerciseNames.join(", ");
-    const newLifts = card.exerciseNames.join(", ");
+    const oldLifts = old.lifts.map(formatLift).join(", ");
+    const newLifts = card.lifts.map(formatLift).join(", ");
     if (oldLifts !== newLifts) {
       changes.push({
         area: "Training",

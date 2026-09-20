@@ -13,7 +13,7 @@ import {
 } from "./csv";
 import type { DailyLog, Exercise, SplitSlot, WorkoutSession, WorkoutSet } from "./store";
 import type { NutritionPhase, PlannedDay } from "./planning";
-import { buildPlanTab, planFromStore } from "./plan-tab";
+import { buildPlanTab, planFromStore, type PlanningMode } from "./plan-tab";
 
 /**
  * Google Sheets sync: pure logic only.
@@ -163,6 +163,8 @@ export interface SyncSource {
   /** Carried so the plan tab can be written; not part of any merge. */
   nutritionPhases: readonly NutritionPhase[];
   plannedDays: readonly PlannedDay[];
+  /** Carried for the same reason: the plan tab records how the split is arranged. */
+  planningMode: PlanningMode;
   unit: "lbs" | "kg";
 }
 

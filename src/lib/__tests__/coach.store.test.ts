@@ -26,6 +26,7 @@ const DAY = new Date(2026, 8, 12, 9, 30, 0).getTime();
 /** A client's sheet, rendered the way their own app would render it. */
 const BOB_SHEET: SyncSource = {
   unit: "kg",
+  planningMode: "rotation",
   exercises: [{ id: "e1", name: "Front Squat", type: "main" }],
   slots: [{ id: "s1", name: "Legs", rotationOrder: 0 }],
   sessions: [{ id: "sess_bob", splitSlotId: "s1", startedAt: DAY, endedAt: DAY + 3_600_000 }],
