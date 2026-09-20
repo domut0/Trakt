@@ -423,6 +423,51 @@ function indexHeaders(rows: readonly CellValue[][]): Map<string, number> | undef
  * the one deliberate asymmetry. That is forward compatibility: a later version
  * adding a row type must not brick every client that has not updated yet.
  */
+/**
+ * The format version a plan tab declares, or 1 when it declares none.
+ *
+ * Deliberately far more tolerant than `parsePlanTab`: it walks the meta rows
+ * for a version and ignores everything else, so it can still answer for a tab
+ * whose phases or cards this build cannot read. That is the entire point - the
+ * question it exists to answer is "did that fail because the app is old?", and
+ * a parser strict enough to reject the tab cannot answer it.
+ *
+ * Returns undefined only when there is nothing here that resembles a plan tab
+ * at all, which is a different thing from an unreadable one.
+ */
+export function planTabVersion(rows: readonly CellValue[][] | undefined): number | undefined {
+  if (!rows || rows.length === 0) return undefined;
+  const headers = indexHeaders(rows);
+  if (!headers) return undefined;
+
+  const kindCol = headers.get("Kind");
+  const nameCol = headers.get("Name");
+  const valueCol = headers.get("Value");
+  if (kindCol === undefined || nameCol === undefined || valueCol === undefined) return undefined;
+
+  for (const row of rows.slice(1)) {
+    if (String(row[kindCol] ?? "").toLowerCase() !== "meta") continue;
+    if (String(row[nameCol] ?? "") !== "version") continue;
+    const n = Number(String(row[valueCol] ?? "").trim());
+    if (!Number.isFinite(n) || n < 1) return undefined;
+    return n;
+  }
+  // No version row is version 1, the same assumption parsePlanTab makes.
+  return 1;
+}
+
+/**
+ * Whether a plan tab was written by a build newer than this one.
+ *
+ * The caller asks this AFTER `parsePlanTab` returns undefined, to tell the two
+ * reasons for that apart: a plan this app is too old to read, which the person
+ * can fix by updating, and a corrupt tab, which they cannot.
+ */
+export function planNeedsNewerApp(rows: readonly CellValue[][] | undefined): boolean {
+  const version = planTabVersion(rows);
+  return version !== undefined && version > PLAN_FORMAT_VERSION;
+}
+
 export function parsePlanTab(rows: readonly CellValue[][] | undefined): PlanPayload | undefined {
   if (!rows || rows.length === 0) return undefined;
   const headers = indexHeaders(rows);
@@ -565,7 +610,10 @@ export function parsePlanTab(rows: readonly CellValue[][] | undefined): PlanPayl
 
   // A plan from a newer build carries fields this one would drop on the floor,
   // and publishing what survived would strip them back out of the sheet. The
-  // caller shows "update Trakt" rather than applying half a programme.
+  // caller shows "update Trakt" rather than applying half a programme - see
+  // `planNeedsNewerApp`, which is how the caller can tell this refusal from a
+  // refusal for corruption. For a long time it could not, and a plan from a
+  // newer build therefore vanished in silence.
   if (version > PLAN_FORMAT_VERSION) return undefined;
 
   return {

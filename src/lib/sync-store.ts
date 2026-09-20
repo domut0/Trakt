@@ -21,11 +21,17 @@ import {
   type Collision,
   type MergeResult,
 } from "./sync";
-import { isNewerCoachPlan, parsePlanTab, shouldPublishOwnPlan, type PlanPayload } from "./plan-tab";
+import {
+  isNewerCoachPlan,
+  parsePlanTab,
+  planNeedsNewerApp,
+  shouldPublishOwnPlan,
+  type PlanPayload,
+} from "./plan-tab";
 import { loadPendingCoach } from "./pending-coach";
 import type { SyncErrorCode, SyncResponse } from "./sync-protocol";
 import { createSpreadsheet, pullTabs, pushTabs } from "./sync-client-google";
-import { clearGoogleToken, googleClientId } from "./google-auth";
+import { clearGoogleToken, getAccessToken, googleClientId } from "./google-auth";
 
 /**
  * Sheet sync state, deliberately in its own store.
@@ -74,6 +80,17 @@ export interface SyncState {
    */
   pendingCoachPlan?: PlanPayload;
   /**
+   * A plan is waiting in the sheet that this build is too old to read.
+   *
+   * Separate from `pendingCoachPlan` because there is nothing to review: the
+   * payload could not be parsed, and the only thing the person can do about it
+   * is update the app. Before this existed the plan was refused silently - the
+   * parser returned undefined for "too new" and for "corrupt" alike, so the
+   * caller could not tell a coach's new programme from a damaged tab, and
+   * showed neither.
+   */
+  coachPlanNeedsUpdate: boolean;
+  /**
    * Whether the review screen is on top of whatever the person was looking at.
    *
    * In the store rather than in the component because three things open it -
@@ -92,6 +109,18 @@ export interface SyncState {
 
   hydrate: () => Promise<void>;
   connectGoogle: () => Promise<{ ok: boolean; error?: string }>;
+  /**
+   * Re-grant a lapsed Google sign-in, KEEPING the sheet.
+   *
+   * Distinct from `connectGoogle` on purpose, and the distinction is the whole
+   * point of it existing: `connectGoogle` calls `createSpreadsheet`, so wiring
+   * an expired-token banner to it would quietly mint a second sheet, strand the
+   * one that has the history in it, and break the share the coach is reading.
+   *
+   * The browser token model has no refresh token, so a lapsed grant genuinely
+   * needs a tap. This is that tap, and nothing else about the connection moves.
+   */
+  reauthorize: () => Promise<{ ok: boolean; error?: string }>;
   /** True when this build carries an OAuth client id, so the button can exist. */
   googleAvailable: () => boolean;
   disconnect: () => Promise<void>;
@@ -227,6 +256,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   running: false,
   collisions: [],
   pendingCoachPlan: undefined,
+  coachPlanNeedsUpdate: false,
   planReviewOpen: false,
   setPlanReviewOpen: (open) => {
     // Dismissing marks this plan seen for THIS session only: it stays in the
@@ -302,6 +332,41 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     }
 
     set({ config, status: "idle", lastError: undefined, blockedReason: undefined });
+    await get().syncNow();
+    return { ok: true };
+  },
+
+  reauthorize: async () => {
+    const { config } = get();
+    if (!config) return { ok: false, error: "There is no sheet connected." };
+
+    // The cached token is the thing that expired. Dropping it first means the
+    // request below cannot be answered from the cache with the same dead
+    // credential and report success.
+    clearGoogleToken();
+    try {
+      await getAccessToken({ interactive: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      // A dismissed Google dialog lands here too, which is not an error worth
+      // colouring red: the person closed a window, and the banner they opened
+      // it from is still on screen saying what to do.
+      return {
+        ok: false,
+        error:
+          message === "needs-consent"
+            ? "Google sign-in was not completed."
+            : "Couldn't reach Google. Check your connection.",
+      };
+    }
+
+    // `config` is deliberately untouched. The sheet id, the coach's share and
+    // every row in it are all still exactly what they were.
+    set({
+      status: config.enabled ? "idle" : "off",
+      lastError: undefined,
+      blockedReason: undefined,
+    });
     await get().syncNow();
     return { ok: true };
   },
@@ -435,7 +500,11 @@ async function runCycle(config: SyncConfigMeta, set: SetState, get: GetState): P
     // editable columns, it is a document one side hands the other, so it has
     // its own format and its own conflict rule (see plan-tab.ts).
     pulledAnything = true;
-    tabPlan = parsePlanTab(pulled.tabs?.[SHEET_TABS.plan]);
+    const planRows = pulled.tabs?.[SHEET_TABS.plan];
+    tabPlan = parsePlanTab(planRows);
+    // Asked only when the parse failed, and it is the difference between "your
+    // coach sent something and you need to update" and silence.
+    const needsUpdate = tabPlan === undefined && planNeedsNewerApp(planRows);
     const offered = tabPlan && isNewerCoachPlan(tabPlan, useStore.getState().lastAcceptedPlanAt);
     // A plan this session has not put in front of the person yet opens the
     // review itself. That is the whole point of syncing on launch: the plan
@@ -443,7 +512,10 @@ async function runCycle(config: SyncConfigMeta, set: SetState, get: GetState): P
     const unseen = offered === true && tabPlan?.issuedAt !== seenThisSession;
     set({
       pendingCoachPlan: offered ? tabPlan : undefined,
-      ...(unseen ? { planReviewOpen: true } : {}),
+      coachPlanNeedsUpdate: needsUpdate,
+      // A plan that cannot be read opens the review too. It has nothing to
+      // show but the reason, which is the whole message.
+      ...(unseen || needsUpdate ? { planReviewOpen: true } : {}),
     });
 
     // Push against what the sheet actually is now, not what it was when this

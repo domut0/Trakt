@@ -345,6 +345,130 @@ export function addDaysToKey(key: string, n: number): string {
   return new Date(toUtcMs(key) + n * 86_400_000).toISOString().slice(0, 10);
 }
 
+// ---------------------------------------------------------------------------
+// The ribbon: the nutrition timeline, drawn.
+// ---------------------------------------------------------------------------
+
+/**
+ * How wide a stretch of time is drawn.
+ *
+ * The ribbon does NOT fit itself to the screen. A fitted timeline is unusable
+ * the moment one phase is much longer than the others - a bulk running through
+ * all of 2027 beside a twelve-day deload would leave the deload two pixels
+ * wide - and that is exactly the shape a real plan takes. So the ribbon scrolls,
+ * and each stretch is drawn at true scale BETWEEN A FLOOR AND A CEILING:
+ *
+ *   the floor keeps a one-day stretch big enough to read and to tap
+ *   the ceiling stops any one of them from eating the whole ribbon
+ *
+ * A segment that hits the ceiling is drawn with a visible break and prints its
+ * real length, so the scale is broken openly rather than quietly lied about.
+ * That is the whole trick: honest where it can be, and marked where it can't.
+ */
+export const RIBBON = {
+  MIN_W: 52,
+  MAX_W: 168,
+  PX_PER_DAY: 4.5,
+  /** An open-ended phase has no length, so it gets a fixed tail instead. */
+  TAIL_W: 128,
+} as const;
+
+/**
+ * One drawn stretch: either a phase, or the space between two of them.
+ *
+ * A GAP IS A REAL SEGMENT, with a width taken from its real length like any
+ * other. The old ribbon could not have one - phases ran until the next began,
+ * so the timeline was continuous by construction - and drawing the new model
+ * without them would put two phases shoulder to shoulder and claim a plan runs
+ * straight through a month that nothing covers.
+ */
+export interface RibbonSegment {
+  /** The phase this segment draws, or undefined when it is a gap. */
+  phase?: NutritionPhase;
+  /** Left edge, px from the start of the ribbon. */
+  x: number;
+  width: number;
+  /** Days covered, or undefined for an open-ended phase. */
+  days?: number;
+  /** True when the drawn width is smaller than the true duration. */
+  capped: boolean;
+  /** This phase runs until something replaces it. */
+  open: boolean;
+}
+
+/**
+ * Lay the timeline out end to end, gaps included.
+ *
+ * Gaps are measured from the previous phase's END, which is the field that did
+ * not exist when this function was first written. A phase with no end swallows
+ * everything after it, so a gap can only ever follow a closed one.
+ */
+export function layoutRibbon(phases: readonly NutritionPhase[]): RibbonSegment[] {
+  const ordered = sortPhases(phases);
+  const segments: RibbonSegment[] = [];
+  let x = 0;
+
+  const push = (seg: Omit<RibbonSegment, "x">): void => {
+    segments.push({ ...seg, x });
+    x += seg.width;
+  };
+
+  const sized = (days: number): { width: number; capped: boolean } => {
+    const ideal = days * RIBBON.PX_PER_DAY;
+    const width = Math.min(RIBBON.MAX_W, Math.max(RIBBON.MIN_W, ideal));
+    return { width, capped: ideal > width };
+  };
+
+  ordered.forEach((phase, i) => {
+    const prev = ordered[i - 1];
+    // The day after the previous phase ended, up to the day before this one
+    // starts. Only a closed previous phase can leave one.
+    if (prev?.endsOn !== undefined) {
+      const gapDays = daysBetweenKeys(prev.endsOn, phase.startsOn) - 1;
+      if (gapDays > 0) push({ ...sized(gapDays), days: gapDays, open: false });
+    }
+
+    if (phase.endsOn === undefined) {
+      push({ phase, width: RIBBON.TAIL_W, days: undefined, capped: false, open: true });
+      return;
+    }
+    // Inclusive, so a phase that starts and ends on one day is one day long.
+    const days = daysBetweenKeys(phase.startsOn, phase.endsOn) + 1;
+    push({ phase, ...sized(days), days, open: false });
+  });
+
+  return segments;
+}
+
+/** Total drawn width of a laid-out ribbon. */
+export function ribbonWidth(segments: readonly RibbonSegment[]): number {
+  const last = segments[segments.length - 1];
+  return last ? last.x + last.width : 0;
+}
+
+/**
+ * Where a date falls along the ribbon, in px, or undefined when it is outside
+ * the drawn range entirely.
+ *
+ * Inside a capped segment this is only approximately right - it cannot be
+ * otherwise, the segment is drawn shorter than it is - so it is clamped to stay
+ * within the segment rather than running off the end of it.
+ */
+export function ribbonX(segments: readonly RibbonSegment[], date: string): number | undefined {
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const s = segments[i];
+    const start = s.phase?.startsOn;
+    // A gap has no start date of its own; it is located by the segment before
+    // it, so a date inside one resolves against that segment's geometry.
+    if (start === undefined) continue;
+    if (start > date) continue;
+    const into = daysBetweenKeys(start, date);
+    const perDay = s.days ? s.width / s.days : RIBBON.PX_PER_DAY;
+    return s.x + Math.min(s.width, into * perDay);
+  }
+  return undefined;
+}
+
 /**
  * How long a phase is, in the largest unit that still reads as a duration.
  *

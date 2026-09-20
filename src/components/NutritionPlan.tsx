@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import { dayKey, parseDayKey } from "../lib/daily-log";
 import {
   addDaysToKey,
-  daysBetweenKeys,
   durationLabel,
+  layoutRibbon,
+  ribbonWidth,
+  ribbonX,
   sortPhases,
   type NutritionPhase,
 } from "../lib/planning";
@@ -76,6 +78,8 @@ export function NutritionPlan() {
 
   const today = dayKey(new Date());
   const ordered = sortPhases(phases);
+  const segments = layoutRibbon(phases);
+  const total = ribbonWidth(segments);
 
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +104,9 @@ export function NutritionPlan() {
   }, [phases, hydrated, today]);
 
   const selected = ordered.find((p) => p.id === selectedId);
+  // Suppressed until hydration: the server has no phases, so a marker placed
+  // during SSR would be drawn at a position the client immediately disagrees with.
+  const todayX = hydrated ? ribbonX(segments, today) : undefined;
 
   /**
    * A new phase starts the day after the plan currently runs out, or today when
@@ -145,56 +152,101 @@ export function NutritionPlan() {
         </div>
       ) : (
         <>
-          <ul className="mx-4 group-list">
-            {ordered.map((phase, idx) => {
-              const isSelected = phase.id === selectedId;
-              const covering =
-                phase.startsOn <= today && (phase.endsOn === undefined || phase.endsOn >= today);
-              return (
-                <li key={phase.id}>
+          {/* Scrolls rather than fits. See RIBBON in planning.ts for why, and
+              note what is NOT here: a drag. The boundary handles are gone. A
+              drag is an imprecise gesture for an exact date, and it moved two
+              phases at once while showing one. Dates are typed in the editor
+              below; the ribbon is how you read the plan and how you pick the
+              stretch to edit. */}
+          <div className="overflow-x-auto px-4 pb-1">
+            <div className="relative h-[76px]" style={{ width: total + 8 }}>
+              {segments.map((seg, i) => {
+                const phase = seg.phase;
+
+                // A GAP. Bare ground at true scale, drawn as a hairline-bounded
+                // empty track rather than as a segment, because there is nothing
+                // there - that is the fact it exists to state. Not tappable:
+                // there is nothing to select.
+                if (!phase) {
+                  return (
+                    <div
+                      key={`gap-${i}`}
+                      aria-hidden="true"
+                      className="absolute top-0 flex h-[52px] items-center justify-center rounded-md border border-dashed border-rule"
+                      style={{ left: seg.x + 2, width: Math.max(0, seg.width - 4) }}
+                    >
+                      {seg.capped && seg.days !== undefined && (
+                        <span className="t-caption text-ink-3">{durationLabel(seg.days)}</span>
+                      )}
+                    </div>
+                  );
+                }
+
+                const isSelected = phase.id === selectedId;
+                const covering =
+                  phase.startsOn <= today && (phase.endsOn === undefined || phase.endsOn >= today);
+                return (
                   <button
+                    key={phase.id}
                     type="button"
                     onClick={() => {
                       setSelectedId(phase.id);
                       setError(null);
                     }}
                     aria-pressed={isSelected}
-                    // The inked row, which is the mark the week strip and the
-                    // workout list already use for the thing you are on.
-                    className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""} ${
-                      isSelected ? "bg-ink text-paper rounded-md" : "text-ink"
+                    aria-label={`${phase.name}, ${rangeLine(phase)}`}
+                    className={`absolute top-0 flex h-[52px] flex-col justify-center overflow-hidden rounded-md px-2 text-left ${
+                      isSelected ? "bg-ink text-paper" : "bg-surface text-ink"
                     }`}
+                    style={{ left: seg.x + 2, width: Math.max(0, seg.width - 4) }}
                   >
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate t-body">
-                        {phase.name}
-                        {/* Which stretch you are actually in, said once. The
-                            list is otherwise a set of dates you have to read
-                            against today's to answer that. */}
-                        {covering && (
-                          <span
-                            className={`ml-2 t-label ${isSelected ? "text-paper" : "text-ink-3"}`}
-                          >
-                            now
-                          </span>
-                        )}
-                      </span>
+                    <span className="truncate t-label font-medium">{phase.name}</span>
+                    {/* The honesty half of the capping rule: a segment drawn
+                        shorter than it really is prints its real length. */}
+                    {seg.capped && seg.days !== undefined && (
                       <span
-                        className={`truncate t-label ${isSelected ? "text-paper" : "text-ink-2"}`}
+                        className={`truncate t-caption ${isSelected ? "text-paper" : "text-ink-3"}`}
                       >
-                        {rangeLine(phase)}
+                        {durationLabel(seg.days)}
                       </span>
-                    </span>
-                    <span
-                      className={`shrink-0 t-label ${isSelected ? "text-paper" : "text-ink-3"}`}
-                    >
-                      {lengthLine(phase)}
-                    </span>
+                    )}
+                    {seg.open && (
+                      <span
+                        className={`truncate t-caption ${isSelected ? "text-paper" : "text-ink-3"}`}
+                      >
+                        ongoing
+                      </span>
+                    )}
                   </button>
-                </li>
-              );
-            })}
-          </ul>
+                );
+              })}
+
+              {/* The date under each phase's left edge, so the ribbon can be
+                  read as a calendar rather than only as a picture. */}
+              {segments.map((seg, i) =>
+                seg.phase ? (
+                  <span
+                    key={`date-${seg.phase.id}`}
+                    className="absolute top-[56px] t-caption text-ink-3"
+                    style={{ left: seg.x + 2 }}
+                  >
+                    {format(parseDayKey(seg.phase.startsOn), "d MMM")}
+                  </span>
+                ) : (
+                  <span key={`nodate-${i}`} />
+                ),
+              )}
+
+              {/* Today, as a rule straight down the ribbon. */}
+              {todayX !== undefined && (
+                <div
+                  aria-hidden="true"
+                  className="absolute top-0 h-[52px] w-px bg-accent"
+                  style={{ left: todayX }}
+                />
+              )}
+            </div>
+          </div>
 
           {error && <p className="px-4 pt-1 t-label text-signal">{error}</p>}
 
@@ -224,14 +276,6 @@ function rangeLine(phase: NutritionPhase): string {
   const from = format(parseDayKey(phase.startsOn), "d MMM yyyy");
   const to = phase.endsOn ? format(parseDayKey(phase.endsOn), "d MMM yyyy") : "ongoing";
   return `${from} – ${to}`;
-}
-
-/** How long the phase runs, or nothing at all when it has no end to measure to.
- *  An open phase's length is a fact about today rather than about the plan, and
- *  a number that grows every night is not a property of the row it sits on. */
-function lengthLine(phase: NutritionPhase): string {
-  if (phase.endsOn === undefined) return "";
-  return durationLabel(daysBetweenKeys(phase.startsOn, phase.endsOn) + 1);
 }
 
 function NumberField({

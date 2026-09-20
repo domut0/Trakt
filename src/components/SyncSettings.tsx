@@ -59,6 +59,7 @@ export function SyncSettings() {
   const collisions = useSyncStore((s) => s.collisions);
   const dismissCollisions = useSyncStore((s) => s.dismissCollisions);
   const blockedReason = useSyncStore((s) => s.blockedReason);
+  const reauthorize = useSyncStore((s) => s.reauthorize);
   const setCount = useStore((s) => s.sets.length);
   const dayCount = useStore((s) => s.dailyLogs.length);
 
@@ -66,6 +67,8 @@ export function SyncSettings() {
   const [googleError, setGoogleError] = useState<string | undefined>();
   const [connecting, setConnecting] = useState(false);
   const [showDisconnect, setShowDisconnect] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [reconnectError, setReconnectError] = useState<string | undefined>();
 
   if (!config) {
     return (
@@ -148,6 +151,38 @@ export function SyncSettings() {
           label="Sheet sync"
         />
       </div>
+
+      {/* The status line above says "Reconnect to keep syncing", and until now
+          there was nothing on the screen to tap. The instruction was real - a
+          browser Google token has no refresh token, so a lapsed grant genuinely
+          needs one - but the only Reconnect button in this component was on the
+          legacy Apps Script branch, which a normal connection never reaches.
+
+          It calls `reauthorize`, NOT `connectGoogle`. The latter creates a
+          spreadsheet, so the obvious wiring would have made a second sheet and
+          left the one with the history in it behind, along with the coach's
+          share of it. */}
+      {blockedReason === "needs-consent" && (
+        <div className="group-row-sep space-y-3 px-4 py-4">
+          {reconnectError && <p className="t-label text-signal">{reconnectError}</p>}
+          <button
+            type="button"
+            disabled={reconnecting || !googleAvailable()}
+            onClick={() => {
+              setReconnecting(true);
+              setReconnectError(undefined);
+              void reauthorize().then((result) => {
+                setReconnecting(false);
+                if (!result.ok) setReconnectError(result.error);
+              });
+            }}
+            className="min-h-[44px] w-full bg-ink t-body font-medium text-paper rounded-md disabled:opacity-40"
+          >
+            {reconnecting ? "Reconnecting…" : "Reconnect Google"}
+          </button>
+          <p className="t-label text-ink-2">Keeps this sheet. Nothing is created or moved</p>
+        </div>
+      )}
 
       <button
         type="button"

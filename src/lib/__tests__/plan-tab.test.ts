@@ -4,6 +4,7 @@ import {
   diffPlan,
   isNewerCoachPlan,
   parsePlanTab,
+  planNeedsNewerApp,
   planFromStore,
   formatLift,
   parseLift,
@@ -747,6 +748,55 @@ describe("planning mode and weekdays", () => {
     const rows = grid();
     setCell(rows, rowOfKind(rows, "card"), "Day", "Someday");
     expect(parsePlanTab(rows)).toBeUndefined();
+  });
+});
+
+describe("planNeedsNewerApp", () => {
+  it("tells a too-new plan apart from a corrupt one", () => {
+    // The distinction the caller could not make for a long time: parsePlanTab
+    // returns undefined for both, so a coach's new programme and a damaged tab
+    // looked identical and the app showed nothing for either.
+    const rows = grid();
+    const valueCol = headerIndex(rows, "Value");
+    const version = rows.find((r) => r[0] === "meta" && r[1] === "version")!;
+    version[valueCol] = PLAN_FORMAT_VERSION + 1;
+
+    expect(parsePlanTab(rows)).toBeUndefined();
+    expect(planNeedsNewerApp(rows)).toBe(true);
+  });
+
+  it("is false for a plan this build can read", () => {
+    expect(planNeedsNewerApp(grid())).toBe(false);
+  });
+
+  it("is false for a tab that is corrupt rather than new", () => {
+    // A plan whose CARDS are unreadable still declares a version this build
+    // handles, so the answer is "this is broken", not "you are out of date".
+    const rows = grid();
+    const kindCol = headerIndex(rows, "Kind");
+    const nameCol = headerIndex(rows, "Name");
+    for (const row of rows) {
+      if (row[kindCol] === "card") row[nameCol] = undefined;
+    }
+    expect(parsePlanTab(rows)).toBeUndefined();
+    expect(planNeedsNewerApp(rows)).toBe(false);
+  });
+
+  it("still answers for a tab whose rows it cannot parse at all", () => {
+    // The load-bearing property: it must be MORE tolerant than parsePlanTab,
+    // or it cannot answer the question it exists for. A future build's plan
+    // will contain row kinds and columns this one has never heard of.
+    const rows = grid();
+    const valueCol = headerIndex(rows, "Value");
+    const version = rows.find((r) => r[0] === "meta" && r[1] === "version")!;
+    version[valueCol] = 99;
+    const withJunk = [...rows, ["superset", "Nonsense", "not-a-date"]];
+    expect(planNeedsNewerApp(withJunk)).toBe(true);
+  });
+
+  it("says nothing about a tab that is not a plan tab", () => {
+    expect(planNeedsNewerApp(undefined)).toBe(false);
+    expect(planNeedsNewerApp([])).toBe(false);
   });
 });
 

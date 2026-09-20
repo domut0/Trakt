@@ -4,8 +4,6 @@ import { useStore } from "../lib/store";
 import { useCoachStore } from "../lib/coach-store";
 import { ClientBanner } from "./ClientBanner";
 import { Gear } from "./icons";
-import { StartWorkoutSheet } from "./StartWorkoutSheet";
-import { WorkoutChooserSheet } from "./WorkoutChooserSheet";
 import { CoachPlanPrompt } from "./CoachPlanPrompt";
 import { useSyncStore } from "@/lib/sync-store";
 
@@ -97,21 +95,6 @@ function Icon({ name }: { name: TabItem["icon"] }) {
   );
 }
 
-/**
- * The nav bar's Workout action button, filled (not stroked) rather than
- * picking up the outline treatment every routed tab icon uses - it's an
- * action, not a destination. Fill and weight carry that difference now;
- * colour does not, because colour is spoken for (see BottomNav). Sized to
- * match `Icon` above (22x22, viewBox 0 0 24 24).
- */
-function FlameIcon() {
-  return (
-    <svg width={22} height={22} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" />
-    </svg>
-  );
-}
-
 export function ActiveSessionBanner() {
   const activeSessionId = useStore((s) => s.activeSessionId);
   const sessions = useStore((s) => s.sessions);
@@ -144,14 +127,9 @@ export function ActiveSessionBanner() {
   );
 }
 
-export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
+export function BottomNav() {
   const location = useLocation();
-  const router = useRouter();
   const activeSessionId = useStore((s) => s.activeSessionId);
-  // Logging is the one thing coach mode cannot offer: the data on screen is a
-  // client's, and the read-only latch would refuse the write anyway. Better to
-  // say so on the button than to let it open a sheet that silently does nothing.
-  const viewingClient = useCoachStore((s) => s.viewing !== undefined);
   // A plan waiting to be reviewed marks the tab that holds it, so dismissing
   // the card does not hide the fact that something is waiting.
   const planWaiting = useSyncStore((s) => s.pendingCoachPlan !== undefined);
@@ -215,61 +193,19 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
       // runs.
       style={{ paddingBottom: "clamp(8px, env(safe-area-inset-bottom, 0px), 16px)" }}
     >
-      {/* THREE EQUAL COLUMNS, with the button in the middle one.
+      {/* TWO EQUAL COLUMNS.
 
-          An even grid has no halves to be unequal about: every cell is the
-          same width and the middle one is the axis by construction. The
-          labels still differ in width, so the GAPS between words differ -
-          which is why the active tab is marked by colour alone and never by
-          weight, since a bolder label is a wider one and would shift. */}
-      <ul className="mx-auto grid max-w-md grid-cols-3 items-stretch px-2 pt-2">
+          There used to be three, with a filled Workout button in the middle.
+          It has moved onto the day itself - see DayActions - because a tab bar
+          is not on a date, so the one control that meant "log something" could
+          only ever mean "log something NOW". Backdating had to be a second,
+          differently worded button somewhere else, and it was.
+
+          The labels differ in width, so the GAPS between words differ - which
+          is why the active tab is marked by colour alone and never by weight,
+          since a bolder label is a wider one and would shift. */}
+      <ul className="mx-auto grid max-w-md grid-cols-2 items-stretch px-2 pt-2">
         {items.map((it) => renderTab(it))}
-        {/* Last in DOM order rather than placed by grid-column: an explicitly
-            placed item still takes its own auto ROW. */}
-        <li className="flex items-center justify-center">
-          <button
-            onClick={() => {
-              if (viewingClient) return;
-              if (activeSessionId) router.navigate({ to: "/workout" });
-              else onOpenChooser();
-            }}
-            disabled={viewingClient}
-            aria-label={
-              viewingClient
-                ? "Starting a workout is unavailable while viewing a client"
-                : activeSessionId
-                  ? "Return to active workout"
-                  : "Start workout"
-            }
-            // Foreground, not accent. Accent in this bar means exactly one
-            // thing - the tab you are on - so the action button states its rank
-            // with fill and weight instead: a solid glyph and a semibold label
-            // against two muted outlined tabs.
-            className={
-              "flex min-h-[44px] w-full flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-md " +
-              // Muted rather than hidden. A button that vanishes moves the tabs
-              // on either side of it, and the bar's whole geometry is three equal
-              // columns with the action in the middle one.
-              (viewingClient ? "bg-ink-3 text-paper" : "bg-ink text-paper")
-            }
-          >
-            <span className="relative flex items-center justify-center">
-              <FlameIcon />
-              {/* Live-session marker: a badge on the glyph, in the same
-                  dot-and-pulse language as the banner at the top of the
-                  screen. Deliberately not a colour swap - the session is not a
-                  selection, so it must not borrow selection's colour. Reduced
-                  motion is handled globally in styles.css. */}
-              {activeSessionId && (
-                <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-2 w-2">
-                  <span className="absolute inset-0 animate-ping bg-ink rounded-md" />
-                  <span className="relative h-2 w-2 bg-ink ring-2 ring-paper rounded-md" />
-                </span>
-              )}
-            </span>
-            <span className="t-label font-semibold">{activeSessionId ? "Return" : "Workout"}</span>
-          </button>
-        </li>
       </ul>
       {activeSessionId && (
         // A real rule, not ink at 40%. Opacity variants are the thing this
@@ -350,13 +286,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useRestDaySettles();
 
-  // Workout chooser + strength start flow, owned here so the nav's Workout
-  // button works from every tab. StartWorkoutSheet is mounted from AppShell
-  // (not a route) specifically so it survives index.tsx's own mount of it
-  // being removed elsewhere - this is now the flow's only entry point that
-  // doesn't require an active session already existing.
-  const [chooserOpen, setChooserOpen] = useState(false);
-  const [startSheetOpen, setStartSheetOpen] = useState(false);
+  // The chooser and the start sheet are NOT mounted here any more. They
+  // belonged to the shell while a nav button opened them; now the day opens
+  // them, carrying its own date, and DayActions owns both.
 
   return (
     <div className="relative mx-auto flex h-[100dvh] max-w-md flex-col overflow-hidden bg-background">
@@ -418,23 +350,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Mounted once, above everything: a plan can arrive while the person is
           on any tab, and the launch sync opens this itself. */}
       <CoachPlanPrompt />
-      <BottomNav onOpenChooser={() => setChooserOpen(true)} />
-      <WorkoutChooserSheet
-        open={chooserOpen}
-        onClose={() => setChooserOpen(false)}
-        onChooseStrength={() => {
-          setChooserOpen(false);
-          setStartSheetOpen(true);
-        }}
-      />
-      <StartWorkoutSheet
-        open={startSheetOpen}
-        onClose={() => setStartSheetOpen(false)}
-        onStart={() => {
-          setStartSheetOpen(false);
-          router.navigate({ to: "/workout" });
-        }}
-      />
+      <BottomNav />
     </div>
   );
 }

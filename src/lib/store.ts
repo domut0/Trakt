@@ -532,6 +532,22 @@ interface State {
    * rotation is not projected forward, because a free choice after a rest day
    * makes the future genuinely unknowable. */
   pinnedSlotFor: (date: string) => SplitSlot | undefined;
+  /**
+   * The card planned for a given day, pin or plan, or undefined when the day
+   * holds nothing the app is willing to claim.
+   *
+   * A pin always wins - it is the one the person stated outright. After that it
+   * depends on the shape of the split:
+   *
+   *   WEEK MODE answers for any date, past or future, because a repeating week
+   *   is a fact about the calendar.
+   *
+   *   ROTATION MODE answers only for TODAY. A rotation advances when you train,
+   *   so where it will be on Thursday depends on whether you train on Tuesday.
+   *   Projecting it forward would be confidently wrong, which is worse than
+   *   saying nothing - the same rule `plannedDays` exists to work around.
+   */
+  plannedCardFor: (date: string) => SplitSlot | undefined;
 
   reorderSlots: (fromId: string, toId: string) => void;
   /** Full backup restore. Assumes `data` has already been validated by
@@ -2109,6 +2125,22 @@ export const useStore = create<State>((set, get) => ({
   pinnedSlotFor: (date) => {
     const id = pinnedSlotIdFor(get().plannedDays, date);
     return id ? get().slots.find((sl) => sl.id === id) : undefined;
+  },
+
+  plannedCardFor: (date) => {
+    const pinned = get().pinnedSlotFor(date);
+    if (pinned) return kindOf(pinned) === "workout" ? pinned : undefined;
+
+    const { slots, planningMode } = get();
+    if (planningMode === "week") {
+      const card = cardForWeekday(slots, parseDayKey(date).getDay());
+      return card && kindOf(card) === "workout" ? card : undefined;
+    }
+
+    // Rotation: today only. See the note on the declaration.
+    if (date !== dayKey(new Date())) return undefined;
+    const card = get().nextCard();
+    return card && kindOf(card) === "workout" ? card : undefined;
   },
 
   reorderSlots: (fromId, toId) => {
