@@ -182,6 +182,7 @@ describe("destructive writes under the latch", () => {
     dailyLogs: [],
     nutritionPhases: [],
     plannedDays: [],
+    templates: [],
     nextSlotId: undefined,
   };
 

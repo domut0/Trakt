@@ -9,6 +9,7 @@ import type {
   WorkoutSession,
   WorkoutSet,
 } from "./store";
+import type { PlanLift } from "./plan-tab";
 
 /**
  * IndexedDB persistence via Dexie.
@@ -148,6 +149,20 @@ type MetaRecord = SettingsMeta | ActiveSessionMeta | SyncConfigMeta | SyncBaseMe
  * the name to show it under.
  *
  */
+/**
+ * A card worth writing once: a name and its lifts, reusable across clients.
+ *
+ * Lives on this device and in its backups rather than in a sheet. Templates are
+ * the coach's property, not any client's, and a client's sheet is the wrong
+ * place for them; a second tab on the coach's own sheet would be a format
+ * change, which is not worth widening in the same release as prescriptions.
+ */
+export interface WorkoutTemplate {
+  id: string;
+  name: string;
+  lifts: PlanLift[];
+}
+
 export interface CoachClient {
   id: string;
   /** What the coach calls them. Shown in the banner and the client list. */
@@ -170,6 +185,7 @@ class WorkoutDb extends Dexie {
   nutritionPhases!: EntityTable<NutritionPhase, "id">;
   plannedDays!: EntityTable<PlannedDay, "date">;
   coachClients!: EntityTable<CoachClient, "id">;
+  templates!: EntityTable<WorkoutTemplate, "id">;
 
   constructor() {
     super("workout-tracker");
@@ -375,6 +391,12 @@ class WorkoutDb extends Dexie {
     this.version(7).stores({
       coachClients: "id",
     });
+    // v8 adds workout templates: the coach's own reusable cards. Their lifts
+    // are NAMES, not ids, because a template is applied to whoever is on screen
+    // - which in coach mode is a client, whose exercise ids are their own.
+    this.version(8).stores({
+      templates: "id",
+    });
   }
 }
 
@@ -405,6 +427,7 @@ export interface AllData {
   dailyLogs: DailyLog[];
   nutritionPhases: NutritionPhase[];
   plannedDays: PlannedDay[];
+  templates: WorkoutTemplate[];
   settings: SettingsMeta;
   activeSession: ActiveSessionMeta;
 }
@@ -419,6 +442,7 @@ export async function loadAll(): Promise<AllData> {
     dailyLogs,
     nutritionPhases,
     plannedDays,
+    templates,
     settingsMeta,
     activeSessionMeta,
   ] = await Promise.all([
@@ -429,6 +453,7 @@ export async function loadAll(): Promise<AllData> {
     db.dailyLogs.toArray(),
     db.nutritionPhases.toArray(),
     db.plannedDays.toArray(),
+    db.templates.toArray(),
     db.meta.get("settings"),
     db.meta.get("activeSession"),
   ]);
@@ -455,6 +480,7 @@ export async function loadAll(): Promise<AllData> {
     dailyLogs,
     nutritionPhases,
     plannedDays,
+    templates,
     settings,
     activeSession: (activeSessionMeta as ActiveSessionMeta) ?? EMPTY_ACTIVE_SESSION,
   };
@@ -524,6 +550,7 @@ export async function replaceAllData(data: BackupData): Promise<void> {
       db.dailyLogs,
       db.nutritionPhases,
       db.plannedDays,
+      db.templates,
       db.meta,
     ],
     async () => {
@@ -534,6 +561,7 @@ export async function replaceAllData(data: BackupData): Promise<void> {
       await db.dailyLogs.clear();
       await db.nutritionPhases.clear();
       await db.plannedDays.clear();
+      await db.templates.clear();
       await db.exercises.bulkPut(data.exercises);
       await db.slots.bulkPut(data.slots);
       await db.sessions.bulkPut(data.sessions);
@@ -541,6 +569,7 @@ export async function replaceAllData(data: BackupData): Promise<void> {
       await db.dailyLogs.bulkPut(data.dailyLogs);
       await db.nutritionPhases.bulkPut(data.nutritionPhases);
       await db.plannedDays.bulkPut(data.plannedDays);
+      await db.templates.bulkPut(data.templates);
       // Annotated as SettingsMeta rather than inlined: `meta` is a union table,
       // and an inline literal makes Dexie's InsertType resolve against the wrong
       // arm of the union, which is a type error even though the value is valid.
@@ -576,6 +605,18 @@ export async function replaceAllData(data: BackupData): Promise<void> {
 // the coach's own training data while a client's is on screen; adding or
 // renaming a client is not that, and would otherwise be impossible to do from
 // inside the very mode it belongs to.
+
+export async function loadTemplates(): Promise<WorkoutTemplate[]> {
+  return db.templates.toArray();
+}
+
+export async function saveTemplateRecord(template: WorkoutTemplate): Promise<void> {
+  await db.templates.put(template);
+}
+
+export async function deleteTemplateRecord(id: string): Promise<void> {
+  await db.templates.delete(id);
+}
 
 export async function loadCoachClients(): Promise<CoachClient[]> {
   return db.coachClients.toArray();

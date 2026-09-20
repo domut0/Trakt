@@ -384,6 +384,7 @@ describe("the merge base and destructive actions", () => {
       dailyLogs: [],
       nutritionPhases: [],
       plannedDays: [],
+      templates: [],
       nextSlotId: undefined,
       unit: "lbs",
     });

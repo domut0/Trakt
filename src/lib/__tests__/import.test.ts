@@ -70,6 +70,7 @@ beforeEach(async () => {
 const PRE_V4_DEFAULTS = {
   nutritionPhases: [],
   plannedDays: [],
+  templates: [],
   nextSlotId: undefined,
   // The plan rides along on v4 without a version bump, so "an old file" means
   // one with no plan keys at all. `undefined` is what parseBackup hands back
@@ -602,6 +603,7 @@ describe("importData (full backup restore)", () => {
       // A v4 file predates the planning timeline entirely.
       nutritionPhases: [],
       plannedDays: [],
+      templates: [],
       nextSlotId: undefined,
       // Not the default, so a settings record that failed to persist is visible.
       unit: "kg",
@@ -720,6 +722,7 @@ describe("importData (full backup restore)", () => {
         },
       ],
       plannedDays: [{ date: "2026-09-21", splitSlotId: "s1" }],
+      templates: [],
       nextSlotId: undefined,
       unit: "lbs",
     };
@@ -755,6 +758,7 @@ describe("importData (full backup restore)", () => {
       dailyLogs: [],
       nutritionPhases: [],
       plannedDays: [{ date: "2026-09-21", splitSlotId: "s_deleted" }],
+      templates: [],
       nextSlotId: undefined,
       unit: "lbs",
     };
@@ -764,13 +768,65 @@ describe("importData (full backup restore)", () => {
     expect(result.data.plannedDays).toEqual([]);
   });
 
-  it("still has 5 as the current backup format", () => {
+  it("round-trips a v6 backup carrying workout templates", async () => {
+    // Templates are written once and reused for years, so a restore that
+    // dropped them would cost more than it looks: the file is the only copy.
+    const v6Backup = {
+      version: 6,
+      exercises: [{ id: "e1", name: "Bench Press", type: "main" as const }],
+      slots: [{ id: "s1", name: "Upper", rotationOrder: 0, weekday: 1 }],
+      sessions: [],
+      sets: [],
+      dailyLogs: [],
+      nutritionPhases: [],
+      plannedDays: [],
+      templates: [
+        {
+          id: "tpl_upper",
+          name: "Upper A",
+          // Lifts are NAMES: a template is applied to whoever is on screen, and
+          // in coach mode that is a client whose exercise ids are their own.
+          lifts: [
+            { name: "Bench Press", sets: 3, reps: "8-12", load: "RPE 8" },
+            { name: "Face Pull" },
+          ],
+        },
+      ],
+      nextSlotId: undefined,
+      unit: "lbs" as const,
+    };
+
+    const result = parseBackup(JSON.stringify(v6Backup));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data).toEqual(v6Backup);
+
+    await useStore.getState().hydrate();
+    await useStore.getState().importData(result.data);
+
+    useStore.setState({ ...DEFAULT_STATE, hydrated: false });
+    await useStore.getState().hydrate();
+    expect(useStore.getState().templates).toEqual(v6Backup.templates);
+    // The weekday rides along on the slot record, so a week survives a restore.
+    expect(useStore.getState().slots[0].weekday).toBe(1);
+  });
+
+  it("reads a file older than templates as having none, rather than refusing it", () => {
+    const older: Record<string, unknown> = { ...validBackup, version: 5 };
+    delete older.templates;
+    const result = parseBackup(JSON.stringify(older));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.templates).toEqual([]);
+  });
+
+  it("still has 6 as the current backup format", () => {
     // A tripwire, not a fact worth asserting for its own sake. The round-trip
-    // above is pinned to version 5, so it stops covering the CURRENT format the
+    // above is pinned to version 6, so it stops covering the CURRENT format the
     // moment the format moves on - and the newest format is the one whose export
-    // users are actually holding. When this fails, write the v6 fixture; do not
+    // users are actually holding. When this fails, write the v7 fixture; do not
     // just bump the number.
-    expect(BACKUP_VERSION).toBe(5);
+    expect(BACKUP_VERSION).toBe(6);
   });
 
   it("imports a v2 file that has no habit, target or toggle keys and lands on the defaults", async () => {

@@ -8,8 +8,11 @@ import {
   safeWrite,
   seedDb,
   setWriteErrorHandler,
+  deleteTemplateRecord,
+  saveTemplateRecord,
   type ActiveSessionMeta,
   type SettingsMeta,
+  type WorkoutTemplate,
 } from "./db";
 import { dayKey, isDailyLogEmpty } from "./daily-log";
 import {
@@ -30,7 +33,7 @@ import {
   type SplitCardKind,
 } from "./planning";
 import { seedExercises } from "./exercise-library";
-import { resolvePlan, type PlanningMode, type PlanPayload } from "./plan-tab";
+import { resolvePlan, type PlanLift, type PlanningMode, type PlanPayload } from "./plan-tab";
 
 export type ExerciseType = "main" | "accessory" | "cardio";
 
@@ -253,6 +256,12 @@ export interface TargetProfile {
 export interface BackupData {
   version: number;
   exercises: Exercise[];
+  /**
+   * Reusable cards. In the backup because they are written once and reused for
+   * years, and losing a phone should not cost them; a file written before they
+   * existed simply has none.
+   */
+  templates: WorkoutTemplate[];
   slots: SplitSlot[];
   sessions: WorkoutSession[];
   sets: WorkoutSet[];
@@ -293,7 +302,7 @@ export interface BackupData {
  * written before planning existed still imports and lands with no plan, and a
  * version bump would buy nothing: no reader branches on the number, and the
  * one that reports it to the user reads it off the file. */
-export const BACKUP_VERSION = 5;
+export const BACKUP_VERSION = 6;
 
 type CurrentBlock = {
   blockGroupId: string;
@@ -361,6 +370,21 @@ interface State {
   setPlanningMode: (mode: PlanningMode) => void;
   /** Puts a card on a weekday in `week` mode, or takes it off with undefined. */
   setCardWeekday: (slotId: string, weekday: number | undefined) => void;
+  /**
+   * Reusable cards, kept as NAMES rather than exercise ids.
+   *
+   * Not swapped in coach mode: a template belongs to whoever wrote it, and
+   * the point of one is to drop it into a client's plan.
+   */
+  templates: WorkoutTemplate[];
+  /** Saves a card as a template, under its own name unless given another. */
+  saveTemplateFrom: (slotId: string, name?: string) => WorkoutTemplate | undefined;
+  deleteTemplate: (id: string) => void;
+  /**
+   * Writes a template's lifts onto a card, creating any exercise this device
+   * has never heard of - the same name-resolution a coach's plan goes through.
+   */
+  applyTemplate: (templateId: string, slotId: string) => void;
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
@@ -1004,6 +1028,14 @@ function isTargetProfile(v: unknown): v is TargetProfile {
   );
 }
 
+/** A template is a name and a list of named lifts. Anything else is dropped. */
+function isWorkoutTemplate(value: unknown): value is WorkoutTemplate {
+  if (!isPlainObject(value)) return false;
+  if (typeof value.id !== "string" || typeof value.name !== "string") return false;
+  if (!Array.isArray(value.lifts)) return false;
+  return value.lifts.every((lift) => isPlainObject(lift) && typeof lift.name === "string");
+}
+
 export function parseBackup(text: string): ParseBackupResult {
   let parsed: unknown;
   try {
@@ -1071,9 +1103,18 @@ export function parseBackup(text: string): ParseBackupResult {
     ? (rawPins.filter(isPlannedDay).filter((d) => slotIds.has(d.splitSlotId)) as PlannedDay[])
     : [];
 
+  // Read as tolerantly as the planning tables: a file older than templates
+  // has none, and one malformed template should cost that template rather than
+  // the whole restore.
+  const rawTemplates = (parsed as { templates?: unknown }).templates;
+  const templates = Array.isArray(rawTemplates)
+    ? (rawTemplates.filter(isWorkoutTemplate) as WorkoutTemplate[])
+    : [];
+
   return {
     ok: true,
     data: {
+      templates,
       // No `version` means a v1 file. An unrecognised version is kept as-is and
       // imported anyway rather than rejected.
       version: typeof version === "number" ? version : 1,
@@ -1186,6 +1227,7 @@ export const useStore = create<State>((set, get) => ({
   lastAcceptedPlanAt: undefined,
   coachManaged: false,
   planningMode: "week",
+  templates: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
   currentBlock: undefined,
@@ -1256,6 +1298,7 @@ export const useStore = create<State>((set, get) => ({
         // Absent means a plan written before week mode existed, which is a
         // rotation by construction: cards in a cycle, with no weekdays.
         planningMode: data.settings.planningMode ?? "rotation",
+        templates: data.templates,
         // Both default on READ. A settings record written before planning
         // existed has neither key, and no migration is needed to make it mean
         // "no plan" (see the note on `plannedWeek` in db.ts).
@@ -1895,6 +1938,75 @@ export const useStore = create<State>((set, get) => ({
     persistSettingsFrom(get());
   },
 
+  saveTemplateFrom: (slotId, name) => {
+    const slot = get().slots.find((sl) => sl.id === slotId);
+    if (!slot) return undefined;
+    const byId = new Map(get().exercises.map((e) => [e.id, e.name]));
+    // Names, not ids: a template is applied to whoever is on screen, and in
+    // coach mode that is a client whose exercise ids are their own.
+    const lifts = (slot.plannedLifts ?? [])
+      .map(({ exerciseId, sets, reps, load }) => {
+        const liftName = byId.get(exerciseId);
+        if (liftName === undefined) return undefined;
+        return {
+          name: liftName,
+          ...(sets === undefined ? {} : { sets }),
+          ...(reps === undefined ? {} : { reps }),
+          ...(load === undefined ? {} : { load }),
+        };
+      })
+      .filter((lift): lift is PlanLift => lift !== undefined);
+
+    const template: WorkoutTemplate = {
+      id: `tpl_${uid()}`,
+      name: (name ?? slot.name).trim() || slot.name,
+      lifts,
+    };
+    set({ templates: [...get().templates, template] });
+    safeWrite(() => saveTemplateRecord(template));
+    return template;
+  },
+
+  deleteTemplate: (id) => {
+    set({ templates: get().templates.filter((t) => t.id !== id) });
+    safeWrite(() => deleteTemplateRecord(id));
+  },
+
+  applyTemplate: (templateId, slotId) => {
+    if (get().coachManaged) return;
+    const template = get().templates.find((t) => t.id === templateId);
+    if (!template) return;
+
+    // One pass over the names, creating what is missing as an accessory --
+    // the conservative label, matching what an arriving plan does.
+    const created: Exercise[] = [];
+    const byName = new Map(get().exercises.map((e) => [e.name.trim().toLowerCase(), e]));
+    const lifts: PlannedLift[] = template.lifts.map((lift) => {
+      const key = lift.name.trim().toLowerCase();
+      let exercise = byName.get(key);
+      if (!exercise) {
+        exercise = { id: `ex_${uid()}`, name: lift.name.trim(), type: "accessory" };
+        byName.set(key, exercise);
+        created.push(exercise);
+      }
+      return {
+        exerciseId: exercise.id,
+        ...(lift.sets === undefined ? {} : { sets: lift.sets }),
+        ...(lift.reps === undefined ? {} : { reps: lift.reps }),
+        ...(lift.load === undefined ? {} : { load: lift.load }),
+      };
+    });
+
+    const exercises = created.length > 0 ? [...get().exercises, ...created] : get().exercises;
+    const slots = get().slots.map((sl) => (sl.id === slotId ? { ...sl, plannedLifts: lifts } : sl));
+    set({ exercises, slots });
+    const updated = slots.find((sl) => sl.id === slotId);
+    safeWrite(async () => {
+      if (created.length > 0) await db.exercises.bulkPut(created);
+      if (updated) await db.slots.put(updated);
+    });
+  },
+
   setCardWeekday: (slotId, weekday) => {
     if (get().coachManaged) return;
     // One card per day: assigning a day takes it off whatever card held it, or
@@ -1977,6 +2089,7 @@ export const useStore = create<State>((set, get) => ({
       // again, and accepting it restores both.
       lastAcceptedPlanAt: undefined,
       coachManaged: false,
+      templates: data.templates,
     });
   },
 
@@ -1994,6 +2107,7 @@ export const useStore = create<State>((set, get) => ({
       dailyLogs: [],
       nutritionPhases: [],
       plannedDays: [],
+      templates: [],
       nextSlotId: undefined,
       unit: "lbs",
     });
@@ -2013,6 +2127,7 @@ export const useStore = create<State>((set, get) => ({
       currentBlock: undefined,
       lastAcceptedPlanAt: undefined,
       coachManaged: false,
+      templates: [],
     });
   },
 

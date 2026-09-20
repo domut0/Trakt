@@ -41,6 +41,9 @@ export function SlotPlanSheet({
 }) {
   const exercises = useStore((s) => s.exercises);
   const setSlotLifts = useStore((s) => s.setSlotLifts);
+  const templates = useStore((s) => s.templates);
+  const saveTemplateFrom = useStore((s) => s.saveTemplateFrom);
+  const applyTemplateLifts = useStore((s) => s.applyTemplate);
   const addExercise = useStore((s) => s.addExercise);
   const addSplitCard = useStore((s) => s.addSplitCard);
   const updateSplitCard = useStore((s) => s.updateSplitCard);
@@ -49,6 +52,7 @@ export function SlotPlanSheet({
   const [kind, setKind] = useState<SplitCardKind>("workout");
   const [picked, setPicked] = useState<PlannedLift[]>([]);
   const [query, setQuery] = useState("");
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -56,6 +60,7 @@ export function SlotPlanSheet({
     setKind(slot ? kindOf(slot) : "workout");
     setPicked(slot?.plannedLifts ?? []);
     setQuery("");
+    setSaveAsTemplate(false);
   }, [open, slot]);
 
   useSheetDismiss(open, onClose);
@@ -151,7 +156,25 @@ export function SlotPlanSheet({
     const target = slot ?? addSplitCard({ name, kind });
     if (slot) updateSplitCard(slot.id, { name, kind });
     if (kind === "workout" && target) setSlotLifts(target.id, picked);
+    // Saving the card is what makes it a template: a template of an
+    // unsaved card would describe something that does not exist yet.
+    if (saveAsTemplate && target) saveTemplateFrom(target.id, name);
     onClose();
+  };
+
+  /**
+   * Drops a template's lifts into the card being edited.
+   *
+   * Applied to the card rather than to the draft because a template carries
+   * NAMES: resolving them to this device's exercises is the store's job, and
+   * in coach mode "this device" is the client whose plan is on screen.
+   */
+  const applyTemplate = (templateId: string) => {
+    const target = slot ?? addSplitCard({ name, kind });
+    if (!target) return;
+    applyTemplateLifts(templateId, target.id);
+    const applied = useStore.getState().slots.find((sl) => sl.id === target.id);
+    setPicked(applied?.plannedLifts ?? []);
   };
 
   return createPortal(
@@ -349,6 +372,38 @@ export function SlotPlanSheet({
               )}
             </div>
           </div>
+        )}
+
+        {kind === "workout" && templates.length > 0 && (
+          <div className="pt-3">
+            <div className="group-header">
+              <h3 className="t-caption">From a template</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {templates.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  onClick={() => applyTemplate(template.id)}
+                  className="min-h-[44px] rounded-md bg-wash px-3 t-label font-medium text-ink"
+                >
+                  {template.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {kind === "workout" && picked.length > 0 && (
+          <label className="flex min-h-[44px] items-center gap-3 pt-3">
+            <input
+              type="checkbox"
+              checked={saveAsTemplate}
+              onChange={(e) => setSaveAsTemplate(e.target.checked)}
+              className="h-5 w-5 accent-white"
+            />
+            <span className="t-label text-ink-2">Also save as a template</span>
+          </label>
         )}
 
         <div className="mt-5 flex shrink-0 items-center gap-2">

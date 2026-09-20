@@ -61,6 +61,7 @@ function SettingsPage() {
       dailyLogs,
       nutritionPhases,
       plannedDays,
+      templates,
       nextSlotId,
       unit,
     } = useStore.getState();
@@ -74,6 +75,7 @@ function SettingsPage() {
       version: BACKUP_VERSION,
       nutritionPhases,
       plannedDays,
+      templates,
       nextSlotId,
       exercises,
       slots,
