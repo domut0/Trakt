@@ -120,16 +120,16 @@ function Home() {
    * thing directly under it and spending the margin on nothing. A timetable
    * names its page with the date it covers.
    */
-  // A full weekday, then the month before the day: "Sunday, September 13".
-  // The timetable this inherited from set it in tracked caps as an abbreviated
-  // departure ("THU 20 AUG"), and the first pass off that kept its day-month
-  // order. The calendar's day panel has always said "Thursday, August 20", so
-  // the two screens were naming the same date two different ways.
-  const heading = format(parseDayKey(selected), "EEEE, MMMM d");
+  // Abbreviated - "Sat 19 Sep" - because this line now shares its row with
+  // three icons, and a full "Saturday, September 19" ran underneath them. The
+  // calendar's day panel keeps the long form, where it has the width.
+  const heading = format(parseDayKey(selected), "EEE d MMM");
 
   return (
     <AppShell>
-      <header className="pl-4 pr-12 pt-14 pb-2">
+      {/* pr-36 clears the three icons the shell puts in this corner on Today:
+          History, Charts and Settings. */}
+      <header className="pl-4 pr-36 pt-14 pb-2">
         <h1 className="t-title">{heading}</h1>
       </header>
 

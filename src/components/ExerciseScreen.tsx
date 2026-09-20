@@ -208,6 +208,17 @@ export function ExerciseScreen({
                   <button
                     onClick={() => openRow(row)}
                     aria-expanded={isEditing}
+                    // Logged and unlogged rows differ on screen by solid versus
+                    // grey, which is not a difference a screen reader can hear.
+                    // The name says which it is, so "the suggestion" and "what
+                    // you actually lifted" are never the same sentence.
+                    aria-label={
+                      row.set
+                        ? `Set ${row.index}, logged, ${row.set.weight} ${unit} by ${row.set.reps}`
+                        : ghost
+                          ? `Set ${row.index}, not logged, suggested ${ghost}`
+                          : `Set ${row.index}, not logged`
+                    }
                     className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""}`}
                   >
                     {/* The space between the two spans is load-bearing: flex

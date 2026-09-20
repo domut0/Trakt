@@ -751,8 +751,8 @@ async function captureEmptyStates(page) {
   await gotoTab(page, "/charts", 'h1:text("Charts")');
   await shot(page, "04-empty-charts");
 
-  await gotoTab(page, "/", 'h2:text("Daily numbers")');
-  await shot(page, "05-empty-today-numbers");
+  // No second empty-Today shot: with the route slide gone it is byte-identical
+  // to 01, and the harness flags duplicates as a capture that went wrong.
 }
 
 async function captureToday(page) {
@@ -889,32 +889,39 @@ async function captureWorkoutFlow(page) {
   await settle(page, 600);
   await shot(page, "53-workout-active-empty");
 
-  await page.getByRole("button", { name: "Log a set" }).click();
+  // The exercise is the unit now: add one, tap a set row, save it. There is
+  // no bottom sheet and no sets stepper any more.
+  await page.getByRole("button", { name: /Add exercise/ }).click();
   await settle(page, 600);
-  await shot(page, "54-log-set-exercise-picker");
+  await shot(page, "54-workout-exercise-picker");
 
   await page.getByPlaceholder("Search or add exercise").fill("bench");
   await settle(page, 300);
-  await shot(page, "55-log-set-exercise-search");
+  await shot(page, "55-workout-exercise-search");
 
   await page
     .getByRole("button", { name: /^Bench Press/ })
     .first()
     .click();
+  await page.waitForSelector("text=Time between sets", { timeout: 15_000 });
   await settle(page, 500);
-  await shot(page, "56-log-set-sheet");
+  await shot(page, "56-exercise-screen");
 
+  await page.getByRole("button", { name: /^Set 1\b/ }).click();
+  await settle(page, 300);
   await page.getByLabel("Weight", { exact: true }).fill("225");
   await page.getByLabel("Reps", { exact: true }).fill("5");
-  await page.getByLabel("Increase sets").click();
-  await page.getByLabel("Increase sets").click();
   await settle(page, 300);
-  await shot(page, "57-log-set-sheet-filled");
+  await shot(page, "57-exercise-screen-editing");
 
-  await page.getByRole("button", { name: /^Log set 1 of 3$/ }).click();
-  await page.waitForSelector("text=Next set", { timeout: 15_000 });
-  await settle(page, 500);
-  await shot(page, "58-workout-active-in-block");
+  await page.getByRole("button", { name: "Save" }).click();
+  await settle(page, 400);
+  await page.getByRole("button", { name: /Add set/ }).click();
+  await settle(page, 400);
+  await shot(page, "58-exercise-screen-logged");
+
+  await page.getByRole("button", { name: "Done" }).click();
+  await settle(page, 400);
 
   await page.getByRole("button", { name: "View workout" }).click();
   await settle(page, 600);
@@ -984,28 +991,42 @@ async function startWorkout(page, name = "Arms") {
   await settle(page, 400);
 }
 
-/** One set of one exercise, choosing the exercise even when the sheet
- * remembers the last one. */
+/**
+ * One set of one exercise, through the exercise screen.
+ *
+ * The exercise may already be on the workout list (planned) or not (added
+ * here), so this takes whichever route is open.
+ */
 async function logOneSet(page, exercise, weight, reps) {
-  await page.getByRole("button", { name: /Log a set|Log the next set/ }).click();
-  await settle(page, 600);
-  const change = page.getByRole("button", { name: "Change" });
-  if (await change.count()) {
-    await change.click();
-    await settle(page, 400);
+  const onList = page.getByRole("button", { name: new RegExp(`^${exercise}`) }).first();
+  if (await onList.count()) {
+    await onList.click();
+  } else {
+    await page.getByRole("button", { name: /Add exercise/ }).click();
+    await settle(page, 500);
+    await page.getByPlaceholder("Search or add exercise").fill(exercise);
+    await settle(page, 300);
+    await page
+      .getByRole("button", { name: new RegExp(`^${exercise}`) })
+      .first()
+      .click();
   }
-  await page.getByPlaceholder("Search or add exercise").fill(exercise);
-  await settle(page, 300);
+  await page.waitForSelector("text=Time between sets", { timeout: 15_000 });
+  await settle(page, 400);
+
+  // The first row with nothing logged into it.
   await page
-    .getByRole("button", { name: new RegExp(`^${exercise}`) })
+    .getByRole("button", { name: /^Set [0-9]+, not logged/ })
     .first()
     .click();
-  await settle(page, 500);
+  await settle(page, 300);
   await page.getByLabel("Weight", { exact: true }).fill(String(weight));
   await page.getByLabel("Reps", { exact: true }).fill(String(reps));
   await settle(page, 200);
-  await page.getByRole("button", { name: /^Log set/ }).click();
-  await settle(page, 700);
+  await page.getByRole("button", { name: "Save" }).click();
+  await settle(page, 400);
+  await page.getByRole("button", { name: "Done" }).click();
+  await settle(page, 500);
 }
 
 /**
