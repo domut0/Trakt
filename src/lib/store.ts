@@ -25,9 +25,10 @@ import {
   isNutritionPhase,
   isPlannedDay,
   phaseForDate,
-  isUntrackedOn,
+  phasesOverlap,
+  closeOpenPhases,
+  addDaysToKey,
   pinnedSlotIdFor,
-  targetsForDate,
   type NutritionPhase,
   type PlannedDay,
   type SplitCardKind,
@@ -227,7 +228,6 @@ export interface DailyLog {
   steps?: number;
   /** In the app's current global lbs/kg unit; the number is stored as typed, not converted. */
   bodyweight?: number;
-  isUntracked?: boolean;
 }
 
 /**
@@ -454,22 +454,27 @@ interface State {
   updateSession: (sessionId: string, patch: Pick<WorkoutSession, "note">) => void;
 
   // --- Nutrition phases ---------------------------------------------------
-  /** Adds a change-point. Returns undefined when `startsOn` is already taken:
-   * two phases beginning on one day is a contradiction, not something to settle
-   * with a tiebreak nobody would remember. Edit the existing one instead. */
+  /**
+   * Adds a phase. Returns undefined when its dates would overlap one that
+   * already exists, which is the one arrangement the timeline refuses: two rows
+   * both claiming Tuesday is a contradiction for the user to settle, not
+   * something to resolve with a tiebreak nobody would remember.
+   *
+   * An OPEN-ENDED phase is not an obstacle. Starting a new phase inside one
+   * closes it the day before instead of colliding with it, because an absent
+   * end date was never an assertion about the future - it only ever meant
+   * "still running, until something says otherwise". This is that something.
+   */
   addPhase: (phase: Omit<NutritionPhase, "id">) => NutritionPhase | undefined;
   updatePhase: (id: string, patch: Partial<Omit<NutritionPhase, "id">>) => void;
-  /** Move a change-point. Refuses a date another phase already occupies. */
-  setPhaseStart: (id: string, startsOn: string) => boolean;
+  /** Move a phase's dates. Either may be given; `endsOn: undefined` reopens it.
+   * Refuses, returning false, when the result would overlap another phase or
+   * end before it starts. */
+  setPhaseDates: (id: string, dates: { startsOn?: string; endsOn?: string | null }) => boolean;
   deletePhase: (id: string) => void;
-  /** The phase in force on a "yyyy-MM-dd" day key, untracked ones included. */
+  /** The phase covering a "yyyy-MM-dd" day key, or undefined when none does -
+   * which is a real state, not an error, and reads as no targets. */
   phaseForDay: (date: string) => NutritionPhase | undefined;
-  /** The TARGETS in force, which is undefined on an untracked day as well as on
-   * a day before any phase existed. */
-  targetsForDay: (date: string) => NutritionPhase | undefined;
-  /** Untracked by either route: the logged flag, or a planned untracked phase.
-   * The planned half is derived and never written to a DailyLog. */
-  isUntrackedDay: (date: string) => boolean;
 
   // --- The workout split --------------------------------------------------
   /** Appends a card. A repeat needs no name and is never a day. */
@@ -1009,7 +1014,6 @@ function isDailyLog(v: unknown): v is DailyLog {
   if (!isOptionalNumber(v.fat)) return false;
   if (!isOptionalNumber(v.steps)) return false;
   if (!isOptionalNumber(v.bodyweight)) return false;
-  if (v.isUntracked !== undefined && typeof v.isUntracked !== "boolean") return false;
   return true;
 }
 
@@ -1074,17 +1078,17 @@ export function parseBackup(text: string): ParseBackupResult {
   if (!Array.isArray(sets) || !sets.every(isWorkoutSet)) {
     return { ok: false, error: "The backup's sets list is missing or malformed." };
   }
-  // A pre-rename file carries isCheatDay where this version reads isUntracked.
-  // Mapped here rather than in isDailyLog, because a validator that silently
-  // rewrites what it validates is a trap for whoever adds the next field. An
-  // export taken before the rename is the only copy of that data the user has,
-  // so dropping the flag would lose days they deliberately marked.
+  // Both spellings of a flag this app no longer has. A day being untracked was
+  // only ever the absence of numbers wearing a label, and the absence says it
+  // on its own - so the label is dropped on the way in rather than carried as a
+  // field nothing reads. Done here rather than in isDailyLog, because a
+  // validator that silently rewrites what it validates is a trap for whoever
+  // adds the next field.
   if (Array.isArray(dailyLogs)) {
     for (const log of dailyLogs) {
       if (!isPlainObject(log)) continue;
-      if (log.isCheatDay === undefined) continue;
-      if (log.isCheatDay === true) log.isUntracked = true;
       delete log.isCheatDay;
+      delete log.isUntracked;
     }
   }
   // Absent entirely = a pre-v2 backup, which simply had no daily logs. Present
@@ -1108,8 +1112,12 @@ export function parseBackup(text: string): ParseBackupResult {
   // file never contained.
   const rawPhases = (parsed as { nutritionPhases?: unknown }).nutritionPhases;
   const rawPins = (parsed as { plannedDays?: unknown }).plannedDays;
+  // Closed on the way in, for the same reason the stored timeline is closed on
+  // hydration: a file written before phases had end dates describes a
+  // continuous timeline, and reading those rows literally would make every one
+  // of them open-ended and therefore overlapping.
   const nutritionPhases = Array.isArray(rawPhases)
-    ? (rawPhases.filter(isNutritionPhase) as NutritionPhase[])
+    ? closeOpenPhases(rawPhases.filter(isNutritionPhase) as NutritionPhase[])
     : [];
   // A pin naming a slot the file does not contain would preload a workout from
   // a split that no longer exists, so those are dropped with the same tolerance.
@@ -1288,6 +1296,11 @@ export const useStore = create<State>((set, get) => ({
         return;
       }
       const data = await loadAll();
+      // See the note on `nutritionPhases` below. Derived once here so the same
+      // array is both put into state and written back, rather than computed
+      // twice and trusted to agree.
+      const phases = closeOpenPhases(data.nutritionPhases);
+      const migratedPhases = phases.filter((p, i) => p !== data.nutritionPhases[i]);
       // loadAll already backfills targetProfiles/weekdayTargets for records
       // written before targets existed, so these two are safe to trust here.
       set({
@@ -1297,7 +1310,14 @@ export const useStore = create<State>((set, get) => ({
         sets: data.sets,
         dailyLogs: data.dailyLogs,
         unit: data.settings.unit,
-        nutritionPhases: data.nutritionPhases,
+        // MIGRATED HERE rather than in a Dexie upgrade, because it is a
+        // reinterpretation of rows that are already valid rather than a schema
+        // change: before end dates, a phase ran until the next one started, so
+        // the end each row implies is derivable and no data is being recovered.
+        // Idempotent, so running it on every hydration costs a pass over a
+        // handful of rows and removes a whole class of "was the upgrade
+        // applied" question. The write-back below is what makes it stick.
+        nutritionPhases: phases,
         plannedDays: data.plannedDays,
         nextSlotId: data.settings.nextSlotId,
         restSince: data.settings.restSince,
@@ -1314,6 +1334,10 @@ export const useStore = create<State>((set, get) => ({
         currentExerciseId: data.activeSession.currentExerciseId,
         hydrated: true,
       });
+      // Persisted so the derivation happens once rather than on every launch
+      // forever, and so an export taken after this point carries real end
+      // dates rather than leaning on the reader to infer them again.
+      if (migratedPhases.length > 0) safeWrite(() => db.nutritionPhases.bulkPut(migratedPhases));
     } catch (err) {
       console.error("[store] hydrate failed", err);
       set({ hydrated: true }); // don't leave the UI stuck; falls back to empty in-memory state
@@ -1675,11 +1699,29 @@ export const useStore = create<State>((set, get) => ({
 
   addPhase: (phase) => {
     if (get().coachManaged) return undefined;
-    if (get().nutritionPhases.some((p) => p.startsOn === phase.startsOn)) return undefined;
+    if (phase.endsOn !== undefined && phase.endsOn < phase.startsOn) return undefined;
+
     const created: NutritionPhase = { ...phase, id: `np_${uid()}`, name: phase.name.trim() };
-    const next = [...get().nutritionPhases, created];
+
+    // An open-ended phase yields to one that starts inside it, closing the day
+    // before. Any OTHER overlap is refused: those are two deliberate ranges
+    // disagreeing, and only the user knows which one is wrong.
+    const closed: NutritionPhase[] = [];
+    for (const p of get().nutritionPhases) {
+      if (!phasesOverlap(p, created)) {
+        closed.push(p);
+        continue;
+      }
+      if (p.endsOn === undefined && p.startsOn < created.startsOn) {
+        closed.push({ ...p, endsOn: addDaysToKey(created.startsOn, -1) });
+        continue;
+      }
+      return undefined;
+    }
+
+    const next = [...closed, created];
     set({ nutritionPhases: next });
-    safeWrite(() => db.nutritionPhases.put(created));
+    safeWrite(() => db.nutritionPhases.bulkPut(next));
     return created;
   },
 
@@ -1691,14 +1733,23 @@ export const useStore = create<State>((set, get) => ({
     if (updated) safeWrite(() => db.nutritionPhases.put(updated));
   },
 
-  setPhaseStart: (id, startsOn) => {
+  setPhaseDates: (id, dates) => {
     if (get().coachManaged) return false;
-    // Two phases starting on one day is a contradiction rather than something
-    // to resolve with a tiebreak nobody would remember, so it is refused here
-    // as well as in the editor - the ribbon can drag a boundary onto a
-    // neighbour's date, and a drag has no Save button to refuse at.
-    if (get().nutritionPhases.some((p) => p.id !== id && p.startsOn === startsOn)) return false;
-    get().updatePhase(id, { startsOn });
+    const phases = get().nutritionPhases;
+    const current = phases.find((p) => p.id === id);
+    if (!current) return false;
+
+    // `null` reopens the phase; an absent key leaves that end alone. They are
+    // different requests and a single optional string cannot say both.
+    const next: NutritionPhase = {
+      ...current,
+      startsOn: dates.startsOn ?? current.startsOn,
+      endsOn: dates.endsOn === null ? undefined : (dates.endsOn ?? current.endsOn),
+    };
+    if (next.endsOn !== undefined && next.endsOn < next.startsOn) return false;
+    if (phases.some((p) => p.id !== id && phasesOverlap(p, next))) return false;
+
+    get().updatePhase(id, { startsOn: next.startsOn, endsOn: next.endsOn });
     return true;
   },
 
@@ -1709,11 +1760,6 @@ export const useStore = create<State>((set, get) => ({
   },
 
   phaseForDay: (date) => phaseForDate(get().nutritionPhases, date),
-
-  targetsForDay: (date) => targetsForDate(get().nutritionPhases, date),
-
-  isUntrackedDay: (date) =>
-    isUntrackedOn(get().nutritionPhases, date, get().dailyLogFor(date)?.isUntracked),
 
   // --- The workout split --------------------------------------------------
 

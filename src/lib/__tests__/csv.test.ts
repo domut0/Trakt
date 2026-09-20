@@ -193,7 +193,6 @@ describe("dailyLogsToCsv", () => {
         calories: 2400,
         protein: 180,
         bodyweight: 185.5,
-        isUntracked: false,
       },
       {
         date: "2026-08-11",
@@ -201,31 +200,29 @@ describe("dailyLogsToCsv", () => {
       },
       {
         date: "2026-08-12",
-        isUntracked: true,
+        fat: 60,
       },
     ];
 
     const csv = dailyLogsToCsv(logs, "lbs");
     const lines = csv.split("\r\n");
 
-    expect(lines[0]).toBe(
-      "Date,Calories,Protein (g),Carbs (g),Fat (g),Steps,Bodyweight,Unit,Untracked",
-    );
-    // Nine columns, so nine cells on every row. Asserted structurally as well
+    expect(lines[0]).toBe("Date,Calories,Protein (g),Carbs (g),Fat (g),Steps,Bodyweight,Unit");
+    // Eight columns, so eight cells on every row. Asserted structurally as well
     // as literally: hand-counting commas in the literals below is exactly how
     // a fixture ends up short one empty cell and still looks right.
     const cellCount = lines[0].split(",").length;
-    expect(cellCount).toBe(9);
+    expect(cellCount).toBe(8);
     for (const line of lines) {
       expect(line.split(",")).toHaveLength(cellCount);
     }
 
     // Row 1: absent carbs, fat AND steps are three empty cells
-    expect(lines[1]).toBe("2026-08-10,2400,180,,,,185.5,lbs,false");
+    expect(lines[1]).toBe("2026-08-10,2400,180,,,,185.5,lbs");
     // Row 2: steps is 0 (logged zero), not empty cell, while calories/protein/carbs/fat/bodyweight are empty
-    expect(lines[2]).toBe("2026-08-11,,,,,0,,lbs,");
-    // Row 3: untracked day is true, numeric fields absent
-    expect(lines[3]).toBe("2026-08-12,,,,,,,lbs,true");
+    expect(lines[2]).toBe("2026-08-11,,,,,0,,lbs");
+    // Row 3: one field logged, the rest genuinely absent
+    expect(lines[3]).toBe("2026-08-12,,,,60,,,lbs");
   });
 
   it("sorts rows by date ascending regardless of input order", () => {
@@ -255,12 +252,11 @@ describe("dailyLogsToCsv", () => {
         fat: 0,
         steps: 0,
         bodyweight: 0,
-        isUntracked: false,
       },
     ];
 
     const lines = dailyLogsToCsv(logs, "kg").split("\r\n");
-    expect(lines[1]).toBe("2026-08-10,0,0,0,0,0,0,kg,false");
+    expect(lines[1]).toBe("2026-08-10,0,0,0,0,0,0,kg");
   });
 });
 

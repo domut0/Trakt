@@ -70,7 +70,7 @@ const SOURCE: SyncSource = {
       steps: 11000,
       bodyweight: 181.4,
     },
-    { date: "2026-09-13", isUntracked: true },
+    { date: "2026-09-13", steps: 0 },
   ],
   nutritionPhases: [],
   plannedDays: [],
@@ -129,14 +129,16 @@ describe("rebuilding a client's state from their sheet", () => {
     expect(cardio.splitSlotId).toBeUndefined();
   });
 
-  it("recovers daily logs including a zero-information untracked day", () => {
+  it("recovers daily logs, a logged zero included", () => {
     const snap = roundTrip();
     expect(snap.dailyLogs.find((d) => d.date === "2026-09-12")).toMatchObject({
       calories: 2400,
       steps: 11000,
       bodyweight: 181.4,
     });
-    expect(snap.dailyLogs.find((d) => d.date === "2026-09-13")!.isUntracked).toBe(true);
+    // A logged 0 is a value, not an absence, and must survive the round trip
+    // as one - which is the same claim the CSV layer makes about it.
+    expect(snap.dailyLogs.find((d) => d.date === "2026-09-13")!.steps).toBe(0);
   });
 
   it("puts a set on the same calendar day the client logged it", () => {
@@ -162,7 +164,7 @@ describe("the plan inside a client's sheet", () => {
   it("reads the plan back and resolves its cards onto the slots the sets use", () => {
     const tabs = buildSheetTabs(SOURCE, { issuedAt: "2026-09-14T10:00:00.000Z" });
     tabs[SHEET_TABS.plan] = buildPlanTab({
-      phases: [{ startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 }],
+      phases: [{ startsOn: "2026-09-20", name: "Cut", calories: 2200 }],
       cards: [
         { name: "Upper", rotationOrder: 0, kind: "workout", lifts: [{ name: "Bench Press" }] },
       ],

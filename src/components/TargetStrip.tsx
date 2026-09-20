@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { niceCeil } from "../lib/chart-math";
 import { dayKey, parseDayKey } from "../lib/daily-log";
-import { addDaysToKey, daysBetweenKeys, isUntrackedOn, targetsForDate } from "../lib/planning";
+import { addDaysToKey, daysBetweenKeys, phaseForDate } from "../lib/planning";
 import { useDismissOnOutside } from "../hooks/useDismissOnOutside";
 import { useStore } from "../lib/store";
 
@@ -71,10 +71,9 @@ export function TargetStrip() {
     const rows = Array.from({ length: count }, (_, i) => {
       const date = addDaysToKey(today, i - (count - 1));
       const log = dailyLogs.find((l) => l.date === date);
-      const target = targetsForDate(phases, date);
+      const target = phaseForDate(phases, date);
       return {
         date,
-        untracked: isUntrackedOn(phases, date, log?.isUntracked),
         calories: log?.calories,
         steps: log?.steps,
         protein: log?.protein,
@@ -288,7 +287,6 @@ function AxisLabel({
 
 interface DayRow {
   date: string;
-  untracked: boolean;
   calories?: number;
   steps?: number;
   protein?: number;
@@ -314,7 +312,6 @@ function DayCard({ day, left }: { day: DayRow; left: number }) {
         <span className="t-label font-semibold text-ink">
           {format(parseDayKey(day.date), "EEE d MMM")}
         </span>
-        {day.untracked && <span className="shrink-0 t-label text-ink-3">off</span>}
       </div>
       <dl className="mt-1.5 space-y-0.5">
         <Line label="Cals" value={n(day.calories)} />

@@ -26,14 +26,14 @@ const PLAN: PlanPayload = {
     {
       startsOn: "2026-09-20",
       name: "Cut",
-      kind: "targets",
+
       calories: 3000,
       protein: 200,
       carbs: 300,
       fat: 80,
       steps: 24000,
     },
-    { startsOn: "2026-09-19", name: "Off", kind: "untracked" },
+    { startsOn: "2026-09-19", name: "Off" },
   ],
   cards: [
     {
@@ -121,7 +121,7 @@ describe("round trip", () => {
   it("keeps a zero target, which is a value rather than a blank", () => {
     const plan: PlanPayload = {
       ...PLAN,
-      phases: [{ startsOn: "2026-09-20", name: "Rest week", kind: "targets", steps: 0 }],
+      phases: [{ startsOn: "2026-09-20", name: "Rest week", steps: 0 }],
     };
     expect(through(plan)!.phases[0].steps).toBe(0);
   });
@@ -171,7 +171,8 @@ describe("refusing a malformed tab", () => {
     ["a phase with no date", "phase", "Date", undefined],
     ["a phase with a malformed date", "phase", "Date", "20th Sept"],
     ["a phase with no name", "phase", "Name", undefined],
-    ["a phase with an unknown kind", "phase", "Value", "bulking"],
+    ["a phase whose end is malformed", "phase", "End", "20th Sept"],
+    ["a phase that ends before it starts", "phase", "End", "2020-01-01"],
     ["a phase with a non-numeric target", "phase", "Calories", "about 3000"],
     ["a phase with a negative target", "phase", "Calories", -200],
     ["a card with no name", "card", "Name", undefined],
@@ -193,8 +194,8 @@ describe("refusing a malformed tab", () => {
     const plan: PlanPayload = {
       ...PLAN,
       phases: [
-        { startsOn: "2026-09-20", name: "Cut", kind: "targets" },
-        { startsOn: "2026-09-20", name: "Bulk", kind: "targets" },
+        { startsOn: "2026-09-20", name: "Cut" },
+        { startsOn: "2026-09-20", name: "Bulk" },
       ],
       pins: [],
     };
@@ -283,9 +284,7 @@ describe("planFromStore", () => {
       },
       { id: "s2", name: "Rest", rotationOrder: 1, kind: "rest" as const },
     ],
-    nutritionPhases: [
-      { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets" as const, calories: 3000 },
-    ],
+    nutritionPhases: [{ id: "p1", startsOn: "2026-09-20", name: "Cut" as const, calories: 3000 }],
     plannedDays: [{ date: "2026-09-22", splitSlotId: "s1" }],
     planningMode: "rotation" as const,
   };
@@ -389,7 +388,7 @@ describe("resolvePlan", () => {
         id: "p_cut",
         startsOn: "2026-09-20",
         name: "Cut",
-        kind: "targets" as const,
+
         calories: 2800,
       },
     ],
@@ -397,8 +396,8 @@ describe("resolvePlan", () => {
 
   const plan: PlanPayload = {
     phases: [
-      { startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2400, protein: 210 },
-      { startsOn: "2026-10-01", name: "Maintain", kind: "targets", calories: 3000 },
+      { startsOn: "2026-09-20", name: "Cut", calories: 2400, protein: 210 },
+      { startsOn: "2026-10-01", name: "Maintain", calories: 3000 },
     ],
     cards: [
       {
@@ -514,7 +513,7 @@ describe("resolvePlan", () => {
 
 describe("diffPlan", () => {
   const base: PlanPayload = {
-    phases: [{ startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2400, steps: 8000 }],
+    phases: [{ startsOn: "2026-09-20", name: "Cut", calories: 2400, steps: 8000 }],
     cards: [
       { name: "Upper", rotationOrder: 0, kind: "workout", lifts: [{ name: "Bench Press" }] },
       { name: "Lower", rotationOrder: 1, kind: "workout", lifts: [{ name: "Squat" }] },
@@ -549,22 +548,39 @@ describe("diffPlan", () => {
   it("summarises a phase that is entirely new", () => {
     const added: PlanPayload = {
       ...base,
-      phases: [
-        ...base.phases,
-        { startsOn: "2026-10-01", name: "Maintain", kind: "targets", calories: 3000 },
-      ],
+      phases: [...base.phases, { startsOn: "2026-10-01", name: "Maintain", calories: 3000 }],
     };
     const change = diffPlan(base, added).find((c) => c.subject.includes("Maintain"))!;
     expect(change).toMatchObject({ kind: "added", detail: "Calories 3000" });
   });
 
-  it("describes an untracked phase as untracked rather than as no targets", () => {
+  it("describes a phase carrying no targets as having none", () => {
+    // A phase with nothing in it used to be a distinct KIND, "untracked". It is
+    // now just a phase nobody has put numbers on, which is what it always was.
     const added: PlanPayload = {
       ...base,
-      phases: [...base.phases, { startsOn: "2026-10-01", name: "Holiday", kind: "untracked" }],
+      phases: [...base.phases, { startsOn: "2026-10-01", name: "Holiday" }],
     };
     const change = diffPlan(base, added).find((c) => c.subject.includes("Holiday"))!;
-    expect(change.detail).toBe("untracked");
+    expect(change.detail).toBe("no targets");
+  });
+
+  it("reports a changed end date, naming an open end rather than blanking it", () => {
+    const ended: PlanPayload = {
+      ...base,
+      phases: base.phases.map((p) => ({ ...p, endsOn: "2026-12-31" })),
+    };
+    const change = diffPlan(base, ended).find((c) => c.subject.includes("ends"))!;
+    expect(change.detail).toBe("ongoing → 2026-12-31");
+  });
+
+  it("reports a changed note, which is the coach talking to the client", () => {
+    const noted: PlanPayload = {
+      ...base,
+      phases: base.phases.map((p) => ({ ...p, note: "keep protein up on rest days" })),
+    };
+    const change = diffPlan(base, noted).find((c) => c.subject.includes("note"));
+    expect(change).toBeDefined();
   });
 
   it("reports a removed phase", () => {
@@ -737,16 +753,18 @@ describe("planning mode and weekdays", () => {
 describe("the format version", () => {
   it("is written, so an older app can recognise a plan it cannot read", () => {
     const rows = grid();
+    const valueCol = headerIndex(rows, "Value");
     const version = rows.find((r) => r[0] === "meta" && r[1] === "version");
-    expect(version?.[3]).toBe(PLAN_FORMAT_VERSION);
+    expect(version?.[valueCol]).toBe(PLAN_FORMAT_VERSION);
   });
 
   it("refuses a plan from a newer build instead of applying half of it", () => {
     // Applying what it understood and republishing would strip the coach's
     // programming back out of the sheet.
     const rows = grid();
+    const valueCol = headerIndex(rows, "Value");
     const version = rows.find((r) => r[0] === "meta" && r[1] === "version")!;
-    version[3] = PLAN_FORMAT_VERSION + 1;
+    version[valueCol] = PLAN_FORMAT_VERSION + 1;
     expect(parsePlanTab(rows)).toBeUndefined();
   });
 

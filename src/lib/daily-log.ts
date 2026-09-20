@@ -39,16 +39,19 @@ export type DailyLogNumericField = (typeof DAILY_LOG_NUMERIC_FIELDS)[number];
 /**
  * True when a record carries no information worth keeping.
  *
- * Deliberately strict about two cases:
- * - `0` is a real logged value (0 steps is a meaningful thing to record), so a
- *   present zero makes the record NON-empty. Only `undefined` counts as absent.
- * - `isUntracked: false` carries no information either — it is the default — so
- *   it does NOT keep an otherwise-blank record alive. Only `true` does.
+ * Deliberately strict about `0`: it is a real logged value (0 steps is a
+ * meaningful thing to record), so a present zero makes the record NON-empty.
+ * Only `undefined` counts as absent.
+ *
+ * There used to be a second case here, an `isUntracked` flag that kept an
+ * otherwise-blank day alive so the app could tell "deliberately not tracking"
+ * from "nothing logged". Those are the same day. A day with no numbers on it
+ * says so by having no numbers on it, and the flag only ever added a second
+ * way to be empty.
  *
  * `upsertDailyLog` uses this to delete rather than store an empty shell.
  */
 export function isDailyLogEmpty(log: DailyLog): boolean {
-  if (log.isUntracked === true) return false;
   return DAILY_LOG_NUMERIC_FIELDS.every((f) => log[f] === undefined);
 }
 

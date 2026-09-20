@@ -94,7 +94,6 @@ function ChartsPage() {
         return {
           ts,
           val: log[metricKey]!,
-          isUntracked: log.isUntracked,
         };
       })
       .filter((p) => Number.isFinite(p.ts))
@@ -352,8 +351,8 @@ function Chart({
   metricLabel,
   metricKey,
 }: {
-  displayedPoints: { ts: number; val: number; isUntracked?: boolean }[];
-  rawPoints: { ts: number; val: number; isUntracked?: boolean }[];
+  displayedPoints: { ts: number; val: number }[];
+  rawPoints: { ts: number; val: number }[];
   unit: string;
   isCalories: boolean;
   viewMode: ViewMode;
@@ -619,18 +618,6 @@ function Chart({
   const yStep = yTicks.length > 1 ? Math.abs(yTicks[1] - yTicks[0]) : 1;
   const kDecimals = Math.min(2, Math.max(0, -Math.floor(Math.log10(yStep / 1000) + 1e-9)));
 
-  // Untrackeds are marked on the DAILY series only. In 7-day-average mode a
-  // plotted value is a mean ending on that day, not that day's intake, so
-  // marking it would attribute the untracked day to the wrong number. The faint raw
-  // dots behind the smoothed line keep carrying the signal.
-  //
-  // The mark is a ring around the dot, not a different fill: an untracked day is a
-  // label the user chose for their own day, so it annotates the point rather
-  // than repainting it, and the ring reads without depending on hue.
-  const isUntrackedDot = (p: { isUntracked?: boolean }) =>
-    isCalories && viewMode === "daily" && p.isUntracked === true;
-  const hasUntrackedDots = displayedPoints.some(isUntrackedDot);
-
   const formatYLabel = (v: number) => {
     if (v === 0) return "0";
     if (useThousands) return `${(v / 1000).toFixed(kDecimals)}k`;
@@ -646,11 +633,7 @@ function Chart({
       viewBox={`0 0 ${W} ${H}`}
       className="h-[180px] w-full select-none"
       role="img"
-      aria-label={
-        hasUntrackedDots
-          ? `${metricLabel} over time. Untracked days are ringed.`
-          : `${metricLabel} over time`
-      }
+      aria-label={`${metricLabel} over time`}
     >
       <defs>
         {/*
@@ -744,23 +727,16 @@ function Chart({
 
       {/* Raw daily dots drawn faintly behind smoothed line when in 7-day average mode */}
       {viewMode === "avg7" &&
-        rawPoints.map((rp, i) => {
-          // Same annotation as the daily series: an untracked day opens the dot out
-          // into a ring instead of painting it another colour.
-          const untracked = isCalories && rp.isUntracked === true;
-          return (
-            <circle
-              key={`raw-dot-${i}`}
-              cx={x(rp.ts)}
-              cy={y(rp.val)}
-              r={untracked ? 2.5 : 1.5}
-              fill={untracked ? "none" : "var(--color-muted-foreground)"}
-              stroke={untracked ? "var(--color-muted-foreground)" : "none"}
-              strokeWidth={1}
-              opacity={0.35}
-            />
-          );
-        })}
+        rawPoints.map((rp, i) => (
+          <circle
+            key={`raw-dot-${i}`}
+            cx={x(rp.ts)}
+            cy={y(rp.val)}
+            r={1.5}
+            fill="var(--color-muted-foreground)"
+            opacity={0.35}
+          />
+        ))}
 
       {/* Solid line segments and gradient area fills */}
       {segments.map((seg, sIdx) => {
@@ -818,21 +794,6 @@ function Chart({
         />
       ))}
 
-      {/* Untracked rings, drawn around the dot they annotate */}
-      {displayedPoints.map((p, i) =>
-        isUntrackedDot(p) ? (
-          <circle
-            key={`untracked-dot-${i}`}
-            cx={x(p.ts)}
-            cy={y(p.val)}
-            r={isSinglePoint ? 7 : 4.5}
-            fill="none"
-            stroke="var(--color-muted-foreground)"
-            strokeWidth={1}
-          />
-        ) : null,
-      )}
-
       {/* Label for single point state */}
       {isSinglePoint && (
         <text
@@ -869,16 +830,6 @@ function Chart({
             stroke="var(--color-surface)"
             strokeWidth={2}
           />
-          {isUntrackedDot(activePoint) && (
-            <circle
-              cx={x(activePoint.ts)}
-              cy={y(activePoint.val)}
-              r={8}
-              fill="none"
-              stroke="var(--color-muted-foreground)"
-              strokeWidth={1}
-            />
-          )}
           <g>
             <rect
               x={pillX - halfPillW}

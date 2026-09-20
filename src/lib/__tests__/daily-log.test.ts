@@ -41,17 +41,8 @@ describe("isDailyLogEmpty", () => {
         fat: undefined,
         steps: undefined,
         bodyweight: undefined,
-        isUntracked: undefined,
       }),
     ).toBe(true);
-  });
-
-  it("treats isUntracked: false as still empty", () => {
-    expect(isDailyLogEmpty({ ...base, isUntracked: false })).toBe(true);
-  });
-
-  it("treats isUntracked: true as NOT empty", () => {
-    expect(isDailyLogEmpty({ ...base, isUntracked: true })).toBe(false);
   });
 
   it.each([
@@ -63,10 +54,6 @@ describe("isDailyLogEmpty", () => {
     ["bodyweight", { bodyweight: 0 }],
   ] as const)("treats a literal 0 in %s as NOT empty", (_field, patch) => {
     expect(isDailyLogEmpty({ ...base, ...patch })).toBe(false);
-  });
-
-  it("treats a 0 alongside isUntracked: false as NOT empty", () => {
-    expect(isDailyLogEmpty({ ...base, steps: 0, isUntracked: false })).toBe(false);
   });
 
   it.each([

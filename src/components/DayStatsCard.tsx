@@ -195,7 +195,7 @@ export function DayStatsCard({
   /** Turns every figure into an input writing straight to the log. */
   editable?: boolean;
 }): JSX.Element {
-  const targetsForDay = useStore((s) => s.targetsForDay);
+  const phaseForDay = useStore((s) => s.phaseForDay);
   const upsertDailyLog = useStore((s) => s.upsertDailyLog);
   const nutritionPhases = useStore((s) => s.nutritionPhases);
   const unit = useStore((s) => s.unit);
@@ -205,9 +205,9 @@ export function DayStatsCard({
   // phase has to move every day it governs, and the resolver is a store getter
   // that React cannot see through on its own.
   const profile = useMemo(
-    () => targetsForDay(date),
+    () => phaseForDay(date),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [date, nutritionPhases, targetsForDay],
+    [date, nutritionPhases, phaseForDay],
   );
   const dayLog = useMemo(() => dailyLogs.find((l) => l.date === date), [dailyLogs, date]);
 
@@ -369,35 +369,9 @@ export function DayStatsCard({
         status={statusOf("steps", steps, targetSteps)}
       />
 
-      {editable && (
-        // The one row that is not a number. It came over with the fields when
-        // the sheet went: a day you chose not to log has to be sayable
-        // somewhere, and it belongs with the log it describes.
-        <div className="group-row group-row-sep">
-          <span className="t-body text-ink">Untracked</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={dayLog?.isUntracked === true}
-            aria-label="Untracked"
-            onClick={() =>
-              upsertDailyLog(date, {
-                isUntracked: dayLog?.isUntracked === true ? undefined : true,
-              })
-            }
-            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
-              dayLog?.isUntracked ? "bg-ink" : "bg-paper ring-1 ring-inset ring-ink-3"
-            }`}
-          >
-            <span
-              aria-hidden="true"
-              className={`absolute top-1 h-5 w-5 rounded-full transition-all ${
-                dayLog?.isUntracked ? "left-6 bg-paper" : "left-1 bg-ink-3"
-              }`}
-            />
-          </button>
-        </div>
-      )}
+      {/* There was an "Untracked" switch here, the one row on this card that
+          was not a number. It let you declare a day deliberately unlogged -
+          which the day was already declaring by having nothing on it. */}
     </div>
   );
 }

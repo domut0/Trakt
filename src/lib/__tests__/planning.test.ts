@@ -1,53 +1,51 @@
 import { describe, expect, it } from "vitest";
 import {
   advanceSplit,
+  closeOpenPhases,
   firstDayCard,
   isNutritionPhase,
   isPlannedDay,
-  isUntrackedOn,
   phaseForDate,
+  phasesOverlap,
   pinnedSlotIdFor,
   sortPhases,
-  targetsForDate,
   type NutritionPhase,
 } from "../planning";
 
-/** The user's own stated case, which is the thing this model exists to express:
- *  maintenance now, one untracked Saturday, cutting from the Sunday onward. */
+/** The user's own stated case: maintenance for a week, then a cut that is still
+ *  running. The gap between them is deliberate - there is a Saturday in the
+ *  middle that belongs to no phase at all, which the old model could not say. */
 const MAINTENANCE: NutritionPhase = {
   id: "p_maint",
   startsOn: "2026-09-13",
+  endsOn: "2026-09-18",
   name: "Maintenance",
-  kind: "targets",
   calories: 3400,
   steps: 20000,
-};
-const OFF: NutritionPhase = {
-  id: "p_off",
-  startsOn: "2026-09-19",
-  name: "Off",
-  kind: "untracked",
 };
 const CUT: NutritionPhase = {
   id: "p_cut",
   startsOn: "2026-09-20",
   name: "Cut",
-  kind: "targets",
   calories: 3000,
   steps: 24000,
 };
-const PHASES = [CUT, MAINTENANCE, OFF]; // deliberately unsorted
+const PHASES = [CUT, MAINTENANCE]; // deliberately unsorted
 
 describe("phaseForDate", () => {
-  it("resolves the three-row case a day at a time", () => {
-    // The whole point of the model: no end dates, and the timeline still answers
-    // every day correctly because a phase runs until the next one starts.
-    expect(phaseForDate(PHASES, "2026-09-13")?.id).toBe("p_maint"); // starts today
+  it("resolves the timeline a day at a time", () => {
+    expect(phaseForDate(PHASES, "2026-09-13")?.id).toBe("p_maint"); // first day
     expect(phaseForDate(PHASES, "2026-09-16")?.id).toBe("p_maint"); // mid-phase
-    expect(phaseForDate(PHASES, "2026-09-18")?.id).toBe("p_maint"); // last day of it
-    expect(phaseForDate(PHASES, "2026-09-19")?.id).toBe("p_off"); // the Saturday
-    expect(phaseForDate(PHASES, "2026-09-20")?.id).toBe("p_cut"); // Sunday onward
-    expect(phaseForDate(PHASES, "2027-06-01")?.id).toBe("p_cut"); // and forever
+    expect(phaseForDate(PHASES, "2026-09-18")?.id).toBe("p_maint"); // last day, inclusive
+    expect(phaseForDate(PHASES, "2026-09-20")?.id).toBe("p_cut");
+    expect(phaseForDate(PHASES, "2027-06-01")?.id).toBe("p_cut"); // open end runs on
+  });
+
+  it("is undefined in a gap, which is the whole reason for end dates", () => {
+    // The Saturday between the two phases. Under the old model this was
+    // impossible to express: maintenance would have run right up to the cut,
+    // and the app would have claimed a target for a day that had none.
+    expect(phaseForDate(PHASES, "2026-09-19")).toBeUndefined();
   });
 
   it("is undefined before the first phase, which is a real state", () => {
@@ -56,8 +54,14 @@ describe("phaseForDate", () => {
     expect(phaseForDate(PHASES, "2026-09-12")).toBeUndefined();
   });
 
+  it("is undefined after the last phase ends", () => {
+    const ended = [{ ...CUT, endsOn: "2026-12-31" }];
+    expect(phaseForDate(ended, "2026-12-31")?.id).toBe("p_cut");
+    expect(phaseForDate(ended, "2027-01-01")).toBeUndefined();
+  });
+
   it("does not depend on input order", () => {
-    expect(phaseForDate([...PHASES].reverse(), "2026-09-19")?.id).toBe("p_off");
+    expect(phaseForDate([...PHASES].reverse(), "2026-09-16")?.id).toBe("p_maint");
   });
 
   it("returns nothing from an empty timeline", () => {
@@ -65,52 +69,104 @@ describe("phaseForDate", () => {
   });
 });
 
-describe("targetsForDate", () => {
-  it("gives the numbers in force", () => {
-    expect(targetsForDate(PHASES, "2026-09-16")).toMatchObject({ calories: 3400, steps: 20000 });
-    expect(targetsForDate(PHASES, "2026-09-21")).toMatchObject({ calories: 3000, steps: 24000 });
+describe("phasesOverlap", () => {
+  const range = (id: string, startsOn: string, endsOn?: string): NutritionPhase => ({
+    id,
+    startsOn,
+    endsOn,
+    name: id,
   });
 
-  it("gives nothing on an untracked day", () => {
-    // An untracked phase resolves to undefined rather than to empty numbers, so
-    // "no plan" and "deliberately not tracking" look identical to anything
-    // asking what to aim at. They are told apart by isUntrackedOn instead.
-    expect(targetsForDate(PHASES, "2026-09-19")).toBeUndefined();
+  it("is false for ranges that merely touch end to start", () => {
+    // The ordinary case, and the one that must not be refused: a phase ending
+    // on the 18th and the next starting on the 19th share no day.
+    expect(phasesOverlap(range("a", "2026-09-13", "2026-09-18"), range("b", "2026-09-19"))).toBe(
+      false,
+    );
+  });
+
+  it("is true when they share a single day", () => {
+    expect(phasesOverlap(range("a", "2026-09-13", "2026-09-19"), range("b", "2026-09-19"))).toBe(
+      true,
+    );
+  });
+
+  it("is true when one contains the other", () => {
+    expect(
+      phasesOverlap(range("a", "2026-09-01", "2026-12-31"), range("b", "2026-10-01", "2026-10-07")),
+    ).toBe(true);
+  });
+
+  it("treats an open end as running forever", () => {
+    expect(phasesOverlap(range("a", "2026-09-13"), range("b", "2030-01-01", "2030-02-01"))).toBe(
+      true,
+    );
   });
 });
 
-describe("isUntrackedOn", () => {
-  it("reads a planned untracked day without any logged flag", () => {
-    expect(isUntrackedOn(PHASES, "2026-09-19", undefined)).toBe(true);
+describe("closeOpenPhases", () => {
+  it("derives the ends the old change-point model implied", () => {
+    // Exactly what is in IndexedDB for anyone who used the app before end dates
+    // existed: three starts and nothing else.
+    const legacy: NutritionPhase[] = [
+      { id: "a", startsOn: "2026-09-13", name: "Maintenance" },
+      { id: "b", startsOn: "2026-09-19", name: "Off" },
+      { id: "c", startsOn: "2026-09-20", name: "Cut" },
+    ];
+    const closed = closeOpenPhases(legacy);
+    expect(closed.map((p) => [p.startsOn, p.endsOn])).toEqual([
+      ["2026-09-13", "2026-09-18"],
+      ["2026-09-19", "2026-09-19"],
+      // The most recent phase keeps running, which is what it was doing.
+      ["2026-09-20", undefined],
+    ]);
   });
 
-  it("still reads a logged flag on an ordinary day", () => {
-    expect(isUntrackedOn(PHASES, "2026-09-16", true)).toBe(true);
+  it("resolves identically to the old model, day for day", () => {
+    const legacy: NutritionPhase[] = [
+      { id: "a", startsOn: "2026-09-13", name: "Maintenance" },
+      { id: "b", startsOn: "2026-09-19", name: "Off" },
+      { id: "c", startsOn: "2026-09-20", name: "Cut" },
+    ];
+    // The migration's real claim: nobody's plan changes meaning under it.
+    const closed = closeOpenPhases(legacy);
+    for (const [date, id] of [
+      ["2026-09-13", "a"],
+      ["2026-09-18", "a"],
+      ["2026-09-19", "b"],
+      ["2026-09-20", "c"],
+      ["2027-06-01", "c"],
+    ] as const) {
+      expect(phaseForDate(closed, date)?.id, date).toBe(id);
+    }
   });
 
-  it("is false for a tracked day with no flag", () => {
-    expect(isUntrackedOn(PHASES, "2026-09-16", undefined)).toBe(false);
-    expect(isUntrackedOn(PHASES, "2026-09-16", false)).toBe(false);
+  it("leaves an end that is already there alone, and runs clean twice", () => {
+    const once = closeOpenPhases(PHASES);
+    expect(closeOpenPhases(once)).toEqual(once);
+    expect(once.find((p) => p.id === "p_maint")?.endsOn).toBe("2026-09-18");
+    expect(once.find((p) => p.id === "p_cut")?.endsOn).toBeUndefined();
   });
 
-  it("never requires a DailyLog row to exist", () => {
-    // The load-bearing claim. A planned untracked day is DERIVED: nothing is
-    // written for a day the user never opened, so changing the plan later
-    // cannot retroactively rewrite what was recorded.
-    const beforeAnyLogging = isUntrackedOn(PHASES, "2026-09-19", undefined);
-    expect(beforeAnyLogging).toBe(true);
+  it("does not mutate its input", () => {
+    const input: NutritionPhase[] = [
+      { id: "a", startsOn: "2026-09-13", name: "A" },
+      { id: "b", startsOn: "2026-09-20", name: "B" },
+    ];
+    closeOpenPhases(input);
+    expect(input[0].endsOn).toBeUndefined();
   });
 });
 
 describe("sortPhases", () => {
   it("orders by start date, oldest first", () => {
-    expect(sortPhases(PHASES).map((p) => p.id)).toEqual(["p_maint", "p_off", "p_cut"]);
+    expect(sortPhases(PHASES).map((p) => p.id)).toEqual(["p_maint", "p_cut"]);
   });
 
   it("does not mutate its input", () => {
     const input = [...PHASES];
     sortPhases(input);
-    expect(input.map((p) => p.id)).toEqual(["p_cut", "p_maint", "p_off"]);
+    expect(input.map((p) => p.id)).toEqual(["p_cut", "p_maint"]);
   });
 });
 
@@ -131,13 +187,19 @@ describe("pinnedSlotIdFor", () => {
 describe("backup tolerance", () => {
   it("accepts a well-formed phase", () => {
     expect(isNutritionPhase(MAINTENANCE)).toBe(true);
-    expect(isNutritionPhase(OFF)).toBe(true);
+    // Open-ended, which is the normal state of the phase you are in.
+    expect(isNutritionPhase(CUT)).toBe(true);
+    expect(isNutritionPhase({ ...CUT, note: "keep protein up on rest days" })).toBe(true);
   });
 
   it("rejects rows that would poison the timeline", () => {
     expect(isNutritionPhase({ ...MAINTENANCE, startsOn: "13/09/2026" })).toBe(false);
     expect(isNutritionPhase({ ...MAINTENANCE, startsOn: "2026-9-3" })).toBe(false);
-    expect(isNutritionPhase({ ...MAINTENANCE, kind: "bulk" })).toBe(false);
+    expect(isNutritionPhase({ ...MAINTENANCE, endsOn: "18/09/2026" })).toBe(false);
+    // An end before its own start is not a phase, it is a typo that would make
+    // the row cover nothing at all.
+    expect(isNutritionPhase({ ...MAINTENANCE, endsOn: "2026-09-01" })).toBe(false);
+    expect(isNutritionPhase({ ...MAINTENANCE, note: 7 })).toBe(false);
     expect(isNutritionPhase({ ...MAINTENANCE, id: "" })).toBe(false);
     expect(isNutritionPhase({ ...MAINTENANCE, calories: "3400" })).toBe(false);
     expect(isNutritionPhase(null)).toBe(false);

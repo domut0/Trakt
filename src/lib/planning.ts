@@ -1,8 +1,9 @@
 /**
  * Planning, which in this app is two different shapes and not one.
  *
- * NUTRITION IS A CALENDAR. "From Sunday onward I'm cutting" is a date, and it
- * holds until the next change. So it is a timeline of change-points.
+ * NUTRITION IS A CALENDAR. "I'm cutting from Sunday until the meet" is a pair
+ * of dates. So it is a timeline of dated stretches, which may have gaps between
+ * them, because not every week belongs to a plan.
  *
  * TRAINING IS A ROTATION. The user's split is UL×∞, which advances when he
  * TRAINS rather than when the date changes: skip a day and nothing shifts. So it
@@ -14,31 +15,47 @@
  */
 
 /**
- * One change-point on the nutrition timeline.
+ * One stretch of the nutrition timeline, with a beginning and an end.
  *
- * There is deliberately NO END DATE. A phase runs until the next one starts,
- * which is what makes "I'll be cutting from Sunday" a single row rather than a
- * range that has to be maintained, and what makes "repeat this across the weeks"
- * need no repeat feature: the phase already covers every day after it.
+ * It used to be a change-point: a start date and nothing else, each phase
+ * running until the next one began. That made the timeline continuous BY
+ * CONSTRUCTION, which sounds like a virtue and was actually a claim the data
+ * could not back - it meant the app always had an answer for what you were
+ * aiming at, including for the months between two diets when the honest answer
+ * was "nothing". A day covered by no phase is now a real state, and it reads as
+ * no targets.
  *
- * `kind: "untracked"` is a phase carrying no targets. A single untracked
- * Saturday is therefore not a special case - it is an untracked phase that
- * happens to be superseded the next day.
+ * `endsOn` is INCLUSIVE and optional. Absent means ongoing, which is the normal
+ * state of the phase you are currently in: you know when a cut started and not
+ * when it will end, and being made to invent a date would be the app asking for
+ * a fact to satisfy its own schema.
+ *
+ * There is no `kind`. A phase used to be able to be "untracked", carrying no
+ * targets, which was how a deliberate day off was expressed. Not having targets
+ * expresses that on its own.
  */
 export interface NutritionPhase {
   id: string;
   /** Local "yyyy-MM-dd". Zero-padded, so lexicographic order IS date order. */
   startsOn: string;
+  /** Local "yyyy-MM-dd", INCLUSIVE. Absent means the phase is still running. */
+  endsOn?: string;
   name: string;
-  kind: NutritionPhaseKind;
+  /**
+   * Free text hung on the phase, and the reason a phase is worth opening.
+   *
+   * Written by a coach more often than by the person training: "keep protein
+   * up on rest days, we'll reassess after the meet". It travels with the plan,
+   * so it arrives attached to the weeks it is about rather than in a message
+   * that has to be found again later.
+   */
+  note?: string;
   calories?: number;
   protein?: number;
   carbs?: number;
   fat?: number;
   steps?: number;
 }
-
-export type NutritionPhaseKind = "targets" | "untracked";
 
 /**
  * A training day the user has pinned to a date, because sometimes you do know.
@@ -61,15 +78,18 @@ export function sortPhases(phases: readonly NutritionPhase[]): NutritionPhase[] 
 }
 
 /**
- * The phase in force on `date`: the latest one that did not start after it.
+ * The phase covering `date`, or undefined when none does.
  *
- * This is the whole resolution algorithm. `undefined` means the date falls
- * before the first phase ever recorded, which is a real state - history logged
- * before any plan existed - and reads as "no targets", not as an error.
+ * This is the whole resolution algorithm, and `undefined` is a first-class
+ * answer rather than an error: before the first phase was ever recorded, after
+ * one ended, and in the months between two diets, there is genuinely nothing
+ * being aimed at. It reads as "no targets" everywhere it surfaces.
  *
- * Ties cannot happen: `setPhaseStart` refuses a date another phase already
- * occupies, because two phases starting on one day is a contradiction rather
- * than something to resolve with a tiebreak nobody would remember.
+ * An open-ended phase covers every day from its start. Two phases cannot cover
+ * the same day - `addPhase` and the date setters refuse a range that overlaps
+ * an existing one - but the latest start still wins if malformed data ever
+ * arrives from a backup file, because picking the newer instruction is the less
+ * surprising of the two wrong answers.
  */
 export function phaseForDate(
   phases: readonly NutritionPhase[],
@@ -78,45 +98,33 @@ export function phaseForDate(
   let best: NutritionPhase | undefined;
   for (const p of phases) {
     if (p.startsOn > date) continue;
+    if (p.endsOn !== undefined && p.endsOn < date) continue;
     if (!best || p.startsOn > best.startsOn) best = p;
   }
   return best;
 }
 
 /**
- * The targets in force on a date, or undefined when there are none.
+ * Whether two phases would cover any of the same days.
  *
- * An untracked phase resolves to undefined rather than to a phase with empty
- * numbers, so every caller that asks "what am I aiming at" gets one answer for
- * both "no plan" and "deliberately not tracking". The difference between those
- * two matters for whether a day counts as a gap, and that is asked separately
- * through `isUntrackedOn`.
+ * Overlap is refused rather than resolved. Two rows both claiming Tuesday is a
+ * contradiction the user has to settle, and settling it for them with a
+ * tiebreak nobody would remember is how a plan ends up quietly meaning
+ * something other than what it says.
+ *
+ * Open ends are the exception, and they are handled by the caller rather than
+ * here: an absent `endsOn` is not an assertion about the future, so a phase
+ * starting inside an open-ended one closes it instead of colliding with it.
  */
-export function targetsForDate(
-  phases: readonly NutritionPhase[],
-  date: string,
-): NutritionPhase | undefined {
-  const phase = phaseForDate(phases, date);
-  return phase?.kind === "targets" ? phase : undefined;
+export function phasesOverlap(a: NutritionPhase, b: NutritionPhase): boolean {
+  const aEnd = a.endsOn ?? MAX_DAY_KEY;
+  const bEnd = b.endsOn ?? MAX_DAY_KEY;
+  return a.startsOn <= bEnd && b.startsOn <= aEnd;
 }
 
-/**
- * Whether a day is untracked, by either route.
- *
- * A PLANNED untracked day is derived here and never written to a `DailyLog`.
- * Writing the flag on the user's behalf, for a day they never opened, would be
- * the app inventing a record of a decision rather than reflecting one - and it
- * would make a plan change retroactively rewrite history. The stored flag stays
- * a fact the user set; this is the question every screen should actually ask.
- */
-export function isUntrackedOn(
-  phases: readonly NutritionPhase[],
-  date: string,
-  loggedFlag: boolean | undefined,
-): boolean {
-  if (loggedFlag === true) return true;
-  return phaseForDate(phases, date)?.kind === "untracked";
-}
+/** Later than any date a person will type into this app, and still sorting
+ *  lexicographically as a day key. Stands in for "no end". */
+const MAX_DAY_KEY = "9999-12-31";
 
 /** The slot pinned to a date, if any. Pins are never inferred. */
 export function pinnedSlotIdFor(pins: readonly PlannedDay[], date: string): string | undefined {
@@ -136,11 +144,41 @@ export function isNutritionPhase(v: unknown): v is NutritionPhase {
   if (typeof p.id !== "string" || p.id.length === 0) return false;
   if (typeof p.startsOn !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(p.startsOn)) return false;
   if (typeof p.name !== "string") return false;
-  if (p.kind !== "targets" && p.kind !== "untracked") return false;
+  // Optional, and an end before the start is not a phase. A file written by a
+  // build that predates end dates simply has none, which reads as ongoing -
+  // and the import fills them in from the next phase's start, the same way the
+  // stored timeline was migrated.
+  if (p.endsOn !== undefined) {
+    if (typeof p.endsOn !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(p.endsOn)) return false;
+    if (p.endsOn < p.startsOn) return false;
+  }
+  if (p.note !== undefined && typeof p.note !== "string") return false;
   for (const f of ["calories", "protein", "carbs", "fat", "steps"] as const) {
     if (p[f] !== undefined && typeof p[f] !== "number") return false;
   }
   return true;
+}
+
+/**
+ * Give every phase but the last an end, from the one that follows it.
+ *
+ * The timeline used to be continuous by construction, so stored phases carry no
+ * end at all. Read literally under the new rules that makes each of them
+ * open-ended and therefore overlapping every phase after it, which is exactly
+ * the state the editor refuses to let you create. This derives the ends the old
+ * shape implied - the day before the next phase began - and leaves the most
+ * recent phase running, which is what it was.
+ *
+ * Idempotent: a phase that already has an end keeps it.
+ */
+export function closeOpenPhases(phases: readonly NutritionPhase[]): NutritionPhase[] {
+  const sorted = sortPhases(phases);
+  return sorted.map((phase, i) => {
+    if (phase.endsOn !== undefined) return phase;
+    const next = sorted[i + 1];
+    if (!next) return phase;
+    return { ...phase, endsOn: addDaysToKey(next.startsOn, -1) };
+  });
 }
 
 /** Same tolerance, for a pin. */
@@ -307,96 +345,12 @@ export function addDaysToKey(key: string, n: number): string {
   return new Date(toUtcMs(key) + n * 86_400_000).toISOString().slice(0, 10);
 }
 
-// ---------------------------------------------------------------------------
-// The ribbon: the nutrition timeline, laid out.
-// ---------------------------------------------------------------------------
-
-/**
- * How wide a phase is drawn.
- *
- * The ribbon does NOT fit itself to the screen. A fitted timeline is unusable
- * the moment one phase is much longer than the others - bulk for the whole of
- * 2027 beside a twelve-day maintenance block would leave the maintenance block
- * two pixels wide - and it is exactly the shape a real plan takes. So the
- * ribbon scrolls, and each phase is drawn at true scale BETWEEN A FLOOR AND A
- * CEILING:
- *
- *   the floor keeps a one-day untracked Saturday big enough to read and to grab
- *   the ceiling stops any one phase from eating the ribbon
- *
- * A phase that hits the ceiling is drawn with a visible break and prints its
- * real length, so the scale is broken openly rather than quietly lied about.
- * That is the whole trick: honest where it can be, and marked where it can't.
- */
-export const RIBBON = {
-  MIN_W: 52,
-  MAX_W: 168,
-  PX_PER_DAY: 4.5,
-  /** The last phase has no end, so it gets a fixed tail rather than a length. */
-  TAIL_W: 128,
-  /** What the tail counts as when a drag needs a days-per-pixel for it. */
-  TAIL_DAYS: 28,
-} as const;
-
-export interface RibbonSegment {
-  phase: NutritionPhase;
-  /** Left edge, px from the start of the ribbon. */
-  x: number;
-  width: number;
-  /** Days this phase covers, or undefined for the open-ended last one. */
-  days?: number;
-  /** True when the drawn width is smaller than the true duration. */
-  capped: boolean;
-  /** The last phase: it runs until something replaces it. */
-  open: boolean;
-}
-
-export function layoutRibbon(phases: readonly NutritionPhase[]): RibbonSegment[] {
-  const ordered = sortPhases(phases);
-  let x = 0;
-  return ordered.map((phase, i) => {
-    const nextStart = ordered[i + 1]?.startsOn;
-    const open = nextStart === undefined;
-    const days = open ? undefined : Math.max(1, daysBetweenKeys(phase.startsOn, nextStart));
-    const ideal = days === undefined ? RIBBON.TAIL_W : days * RIBBON.PX_PER_DAY;
-    const width =
-      days === undefined ? RIBBON.TAIL_W : Math.min(RIBBON.MAX_W, Math.max(RIBBON.MIN_W, ideal));
-    const seg: RibbonSegment = { phase, x, width, days, capped: ideal > width, open };
-    x += width;
-    return seg;
-  });
-}
-
-/** Total drawn width of a laid-out ribbon. */
-export function ribbonWidth(segments: readonly RibbonSegment[]): number {
-  const last = segments[segments.length - 1];
-  return last ? last.x + last.width : 0;
-}
-
-/**
- * Where a date falls along the ribbon, in px, or undefined when it is before
- * the ribbon starts.
- *
- * Inside a capped segment this is only approximately right - it cannot be
- * otherwise, the segment is drawn shorter than it is - so it is clamped to stay
- * within the segment rather than running off the end of it.
- */
-export function ribbonX(segments: readonly RibbonSegment[], date: string): number | undefined {
-  for (let i = segments.length - 1; i >= 0; i--) {
-    const s = segments[i];
-    if (s.phase.startsOn > date) continue;
-    const into = daysBetweenKeys(s.phase.startsOn, date);
-    const perDay = s.days ? s.width / s.days : RIBBON.PX_PER_DAY;
-    return s.x + Math.min(s.width, into * perDay);
-  }
-  return undefined;
-}
-
 /**
  * How long a phase is, in the largest unit that still reads as a duration.
  *
- * Printed inside any segment whose drawn width is a lie, which is the honesty
- * half of the capping rule above.
+ * "11 weeks" is a length you can hold; "77 days" is arithmetic. Printed beside
+ * a phase's dates, where the dates are the fact and this is the thing you
+ * actually wanted to know from them.
  */
 export function durationLabel(days: number): string {
   if (days < 14) return `${days} day${days === 1 ? "" : "s"}`;

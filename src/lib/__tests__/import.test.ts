@@ -87,7 +87,7 @@ const validBackup: BackupData = {
   sets: [
     { id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1500 },
   ],
-  dailyLogs: [{ date: "2026-03-01", calories: 2400, steps: 0, isUntracked: true }],
+  dailyLogs: [{ date: "2026-03-01", calories: 2400, steps: 0 }],
   unit: "kg",
 };
 
@@ -377,7 +377,7 @@ describe("importData (full backup restore)", () => {
     expect(seeded.sets).toHaveLength(2);
     // Give the seeded state a couple of daily logs so the round-trip covers them.
     useStore.getState().upsertDailyLog("2026-02-10", { calories: 2100, protein: 180 });
-    useStore.getState().upsertDailyLog("2026-02-11", { steps: 0, isUntracked: true });
+    useStore.getState().upsertDailyLog("2026-02-11", { steps: 0 });
     const exported: BackupData = {
       ...PRE_V4_DEFAULTS,
       // A v2-era export. The current format's own round-trip lives in the
@@ -469,7 +469,6 @@ describe("importData (full backup restore)", () => {
       date: "2026-03-01",
       calories: 2400,
       steps: 0,
-      isUntracked: true,
     });
   });
 
@@ -597,7 +596,7 @@ describe("importData (full backup restore)", () => {
       sets: [
         { id: "set1", sessionId: "sess1", exerciseId: "e1", weight: 225, reps: 5, loggedAt: 1500 },
       ],
-      dailyLogs: [{ date: "2026-03-01", calories: 2400, steps: 0, isUntracked: true }],
+      dailyLogs: [{ date: "2026-03-01", calories: 2400, steps: 0 }],
       // A v4 file predates the planning timeline entirely.
       nutritionPhases: [],
       plannedDays: [],
@@ -705,16 +704,16 @@ describe("importData (full backup restore)", () => {
           id: "np_maint",
           startsOn: "2026-09-13",
           name: "Maintenance",
-          kind: "targets",
+
           calories: 3400,
           steps: 20000,
         },
-        { id: "np_off", startsOn: "2026-09-19", name: "Off", kind: "untracked" },
+        { id: "np_off", startsOn: "2026-09-19", name: "Off" },
         {
           id: "np_cut",
           startsOn: "2026-09-20",
           name: "Cut",
-          kind: "targets",
+
           calories: 3000,
           steps: 24000,
         },
@@ -728,7 +727,18 @@ describe("importData (full backup restore)", () => {
     const result = parseBackup(JSON.stringify(v5Backup));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data).toEqual(v5Backup);
+    // NOT verbatim, and deliberately so. This file predates end dates, where a
+    // phase ran until the next one started; read literally under the current
+    // rules every row would be open-ended and therefore overlapping every row
+    // after it. The reader derives the ends the old shape implied, which is the
+    // same migration the stored timeline gets on hydration.
+    expect(result.data.nutritionPhases.map((p) => [p.startsOn, p.endsOn])).toEqual([
+      ["2026-09-13", "2026-09-18"],
+      ["2026-09-19", "2026-09-19"],
+      ["2026-09-20", undefined],
+    ]);
+    expect({ ...result.data, nutritionPhases: [] }).toEqual({ ...v5Backup, nutritionPhases: [] });
+    const expectedPhases = result.data.nutritionPhases;
 
     await useStore.getState().hydrate();
     await useStore.getState().importData(result.data);
@@ -739,7 +749,7 @@ describe("importData (full backup restore)", () => {
     useStore.setState({ ...DEFAULT_STATE, hydrated: false });
     await useStore.getState().hydrate();
     const reloaded = useStore.getState();
-    expect(sortById(reloaded.nutritionPhases)).toEqual(sortById(v5Backup.nutritionPhases));
+    expect(sortById(reloaded.nutritionPhases)).toEqual(sortById(expectedPhases));
     expect(reloaded.plannedDays).toEqual(v5Backup.plannedDays);
     expect(reloaded.slots[0].plannedLifts?.map((l) => l.exerciseId)).toEqual(["e1"]);
   });
@@ -915,29 +925,26 @@ describe("parseBackup: the isCheatDay rename", () => {
       unit: "lbs",
     });
 
-  it("reads a legacy isCheatDay: true as isUntracked", () => {
-    const result = parseBackup(withLogs([{ date: "2026-03-01", isCheatDay: true }]));
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.data.dailyLogs).toEqual([{ date: "2026-03-01", isUntracked: true }]);
+  it("drops both spellings of the dead untracked flag", () => {
+    // The field was renamed once (isCheatDay -> isUntracked) and then removed
+    // outright, so a backup can carry either. Neither has anywhere to land, and
+    // a day carrying only one of them is a day with nothing logged.
+    for (const legacy of [{ isCheatDay: true }, { isUntracked: true }]) {
+      const result = parseBackup(withLogs([{ date: "2026-03-01", ...legacy }]));
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.dailyLogs).toEqual([{ date: "2026-03-01" }]);
+    }
   });
 
-  it("drops a legacy isCheatDay: false rather than storing isUntracked: false", () => {
-    // false was the default and carried no information, so keeping it would
-    // hold an otherwise-blank record alive -- the exact thing isDailyLogEmpty
-    // exists to prevent.
+  it("keeps the numbers on a row that also carried the flag", () => {
+    // The flag goes; everything the day actually recorded stays. Dropping the
+    // whole row would lose real data to a field nobody asked about.
     const result = parseBackup(
       withLogs([{ date: "2026-03-01", calories: 2400, isCheatDay: false }]),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.dailyLogs).toEqual([{ date: "2026-03-01", calories: 2400 }]);
-  });
-
-  it("leaves a post-rename file alone", () => {
-    const result = parseBackup(withLogs([{ date: "2026-03-01", isUntracked: true }]));
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.data.dailyLogs).toEqual([{ date: "2026-03-01", isUntracked: true }]);
   });
 });

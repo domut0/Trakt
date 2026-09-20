@@ -26,7 +26,7 @@ const TABLES_DROPPED_BY_V5 = [
   "recipeIngredients",
 ] as const;
 
-const CURRENT_SCHEMA_VERSION = 8;
+const CURRENT_SCHEMA_VERSION = 9;
 
 describe("Dexie v4 -> v5: the food and habit tables are dropped", () => {
   it("deletes the food and habit stores while leaving training data untouched", async () => {
@@ -102,20 +102,19 @@ describe("Dexie v4 -> v5: the food and habit tables are dropped", () => {
       bodyweight: 181.2,
     });
 
-    // isCheatDay -> isUntracked. Dexie stores whole objects, so without the
-    // upgrade an untouched row keeps the old key forever and every day the user
-    // deliberately marked reverts to ordinary, silently.
+    // v5 renamed isCheatDay to isUntracked; v9 deleted the field outright.
+    // This opens at the CURRENT schema, so both run, and what a v4 database
+    // arrives with is a row carrying NEITHER key. Dexie stores whole objects,
+    // so an upgrade that skipped a row would leave the old key on it forever -
+    // which is the thing worth asserting, in both directions.
     const flagged = (await db.dailyLogs.get("2026-08-08")) as unknown as Record<string, unknown>;
-    expect(flagged.isUntracked).toBe(true);
+    expect("isUntracked" in flagged).toBe(false);
     expect("isCheatDay" in flagged).toBe(false);
 
-    // A false under the old name carried no information - it was the default -
-    // so it becomes no key at all rather than isUntracked: false. Anything else
-    // would keep an otherwise-blank record alive, which isDailyLogEmpty exists
-    // to prevent.
     const notFlagged = (await db.dailyLogs.get("2026-08-09")) as unknown as Record<string, unknown>;
-    expect(notFlagged.isUntracked).toBeUndefined();
+    expect("isUntracked" in notFlagged).toBe(false);
     expect("isCheatDay" in notFlagged).toBe(false);
+    // The numbers the day actually recorded are untouched by any of it.
     expect(notFlagged.calories).toBe(2100);
 
     await useStore.getState().hydrate();
@@ -127,7 +126,12 @@ describe("Dexie v4 -> v5: the food and habit tables are dropped", () => {
     // or duplicated a row rather than merely mis-renaming a key.
     expect([...state.dailyLogs].sort((a, b) => a.date.localeCompare(b.date))).toEqual([
       { date: "2026-08-07", calories: 2400, bodyweight: 181.2 },
-      { date: "2026-08-08", isUntracked: true },
+      // The row that was a cheat day, then an untracked day, and is now a day
+      // with nothing on it - which is what it always recorded. The ROW survives
+      // rather than being deleted: stripping a field is not licence to throw
+      // away the day it was attached to, and a stored empty row is only pruned
+      // when the user next writes to that day.
+      { date: "2026-08-08" },
       { date: "2026-08-09", calories: 2100 },
     ]);
   });

@@ -201,7 +201,6 @@ export function dailyLogColumns(unit: "lbs" | "kg"): ColumnSpec<DailyLog>[] {
     { header: "Steps", accessor: "steps" },
     { header: "Bodyweight", accessor: "bodyweight" },
     { header: "Unit", accessor: () => unit },
-    { header: "Untracked", accessor: "isUntracked" },
   ];
 }
 

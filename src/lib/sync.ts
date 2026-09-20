@@ -76,7 +76,7 @@ export const ID_HEADER = "ID";
  * ignored rather than an edit to be applied. Every `optional*` field treats a
  * blank cell as a genuine clear.
  */
-type FieldKind = "requiredNumber" | "optionalNumber" | "optionalString" | "optionalBoolean";
+type FieldKind = "requiredNumber" | "optionalNumber" | "optionalString";
 
 interface FieldSpec {
   header: string;
@@ -101,7 +101,6 @@ const EDITABLE_DAILY_FIELDS = {
   fat: { header: "Fat (g)", kind: "optionalNumber" },
   steps: { header: "Steps", kind: "optionalNumber" },
   bodyweight: { header: "Bodyweight", kind: "optionalNumber" },
-  isUntracked: { header: "Untracked", kind: "optionalBoolean" },
 } as const satisfies Record<string, FieldSpec>;
 
 type EditableSet = { -readonly [K in keyof typeof EDITABLE_SET_FIELDS]?: CellValue };
@@ -265,15 +264,6 @@ function coerce(value: CellValue, kind: FieldKind): CellValue {
 
   if (kind === "optionalString") {
     return raw === undefined ? undefined : String(raw);
-  }
-
-  if (kind === "optionalBoolean") {
-    if (raw === undefined) return undefined;
-    if (typeof raw === "boolean") return raw;
-    const text = String(raw).trim().toLowerCase();
-    if (text === "true" || text === "yes") return true;
-    if (text === "false" || text === "no") return false;
-    return undefined;
   }
 
   // Both numeric kinds. A cell typed as text ("225 lbs") is not a number the

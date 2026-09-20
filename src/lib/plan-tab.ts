@@ -1,5 +1,5 @@
 import type { CellValue } from "./csv";
-import type { NutritionPhaseKind, SplitCardKind } from "./planning";
+import type { SplitCardKind } from "./planning";
 import type { Exercise, SplitSlot } from "./store";
 import type { NutritionPhase, PlannedDay } from "./planning";
 
@@ -64,14 +64,17 @@ export type PlanningMode = "week" | "rotation";
  * the coach's programming back out. An app that meets a higher number refuses
  * the plan and says to update, rather than half-applying it.
  */
-export const PLAN_FORMAT_VERSION = 2;
+export const PLAN_FORMAT_VERSION = 3;
 
 /** A nutrition phase, keyed by its start date rather than an id. */
 export interface PlanPhase {
   /** Local "yyyy-MM-dd". The identity of the phase. */
   startsOn: string;
+  /** Local "yyyy-MM-dd", INCLUSIVE. Absent means the phase is still running. */
+  endsOn?: string;
   name: string;
-  kind: NutritionPhaseKind;
+  /** The coach's own words about these weeks, carried with the weeks. */
+  note?: string;
   calories?: number;
   protein?: number;
   carbs?: number;
@@ -131,6 +134,11 @@ const HEADERS = [
   "Kind",
   "Name",
   "Date",
+  // A phase's last day. Named "End" against "Date" rather than "Start Date" /
+  // "End Date" because "Date" is the column every row kind uses for whatever
+  // single date it has, and renaming it would rewrite rows that have nothing
+  // to do with phases.
+  "End",
   "Value",
   "Calories",
   "Protein (g)",
@@ -244,7 +252,11 @@ export function buildPlanTab(plan: PlanPayload): CellValue[][] {
     at(row, "Kind", "phase");
     at(row, "Name", phase.name);
     at(row, "Date", phase.startsOn);
-    at(row, "Value", phase.kind);
+    at(row, "End", phase.endsOn);
+    // The note rides in "Value", which is where a phase's kind used to sit.
+    // Reusing the cell rather than adding a thirteenth column keeps the sheet
+    // the same width, and a phase now has exactly one free-text field.
+    at(row, "Value", phase.note);
     for (const [field, header] of MACRO_HEADERS) {
       at(row, header, phase[field] as CellValue);
     }
@@ -310,8 +322,9 @@ export function planFromStore(
   return {
     phases: source.nutritionPhases.map((p) => ({
       startsOn: p.startsOn,
+      endsOn: p.endsOn,
       name: p.name,
-      kind: p.kind,
+      note: p.note,
       calories: p.calories,
       protein: p.protein,
       carbs: p.carbs,
@@ -459,18 +472,23 @@ export function parsePlanTab(rows: readonly CellValue[][] | undefined): PlanPayl
 
     if (kind === "phase") {
       const startsOn = text(cell(row, "Date"));
+      const endsOn = text(cell(row, "End"));
       const name = text(cell(row, "Name"));
-      const phaseKind = text(cell(row, "Value"));
+      const note = text(cell(row, "Value"));
       if (startsOn === undefined || !DAY_KEY.test(startsOn)) return undefined;
       if (name === undefined) return undefined;
-      if (phaseKind !== "targets" && phaseKind !== "untracked") return undefined;
+      // An end is optional -- an ongoing phase has none -- but a malformed or
+      // backwards one is a plan that cannot be applied, not a field to ignore.
+      if (endsOn !== undefined && (!DAY_KEY.test(endsOn) || endsOn < startsOn)) return undefined;
       // Two phases starting on one day is a contradiction, not something to
       // resolve with a tiebreak nobody would remember -- the same reason
-      // `setPhaseStart` refuses it.
+      // `setPhaseDates` refuses it.
       if (seenPhaseDates.has(startsOn)) return undefined;
       seenPhaseDates.add(startsOn);
 
-      const phase: PlanPhase = { startsOn, name, kind: phaseKind };
+      const phase: PlanPhase = { startsOn, name };
+      if (endsOn !== undefined) phase.endsOn = endsOn;
+      if (note !== undefined) phase.note = note;
       for (const [field, header] of MACRO_HEADERS) {
         const n = num(cell(row, header));
         if (n === BAD) return undefined;
@@ -678,8 +696,9 @@ export function resolvePlan(
   const phases: NutritionPhase[] = plan.phases.map((phase) => ({
     id: phaseByStart.get(phase.startsOn)?.id ?? newId(),
     startsOn: phase.startsOn,
+    endsOn: phase.endsOn,
     name: phase.name,
-    kind: phase.kind,
+    note: phase.note,
     calories: phase.calories,
     protein: phase.protein,
     carbs: phase.carbs,
@@ -792,12 +811,23 @@ export function diffPlan(current: PlanPayload | undefined, next: PlanPayload): P
         detail: arrow(old.name, phase.name),
       });
     }
-    if (old.kind !== phase.kind) {
+    if (old.endsOn !== phase.endsOn) {
       changes.push({
         area: "Nutrition",
-        subject: `${phase.name}, from ${startsOn}`,
+        subject: `${phase.name}, ends`,
         kind: "changed",
-        detail: arrow(old.kind, phase.kind),
+        // "ongoing" rather than a blank: a phase losing its end date is a real
+        // change to what the plan says, and an arrow pointing at nothing reads
+        // as a rendering fault.
+        detail: arrow(old.endsOn ?? "ongoing", phase.endsOn ?? "ongoing"),
+      });
+    }
+    if (old.note !== phase.note) {
+      changes.push({
+        area: "Nutrition",
+        subject: `${phase.name} · note`,
+        kind: "changed",
+        detail: arrow(old.note, phase.note),
       });
     }
     for (const [field, label] of MACRO_LABELS) {
@@ -899,7 +929,6 @@ export function diffPlan(current: PlanPayload | undefined, next: PlanPayload): P
 
 /** A phase's targets on one line, for the "added" case where there is no before. */
 function summarisePhase(phase: PlanPhase): string {
-  if (phase.kind === "untracked") return "untracked";
   const parts = MACRO_LABELS.filter(([field]) => phase[field] !== undefined).map(
     ([field, label]) => `${label} ${phase[field]}`,
   );

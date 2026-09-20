@@ -52,8 +52,6 @@ export function CalendarView() {
   const slots = useStore((s) => s.slots);
   const exercises = useStore((s) => s.exercises);
   const sets = useStore((s) => s.sets);
-  // Same reason as Today: a day tracked only through food entries must not
-  // render as an untracked day on the calendar.
   const dailyLogs = useStore((s) => s.dailyLogs);
   const unit = useStore((s) => s.unit);
 
@@ -197,13 +195,7 @@ export function CalendarView() {
               log.fat !== undefined);
           const showSteps = log?.steps !== undefined;
           const showBodyweight = log?.bodyweight !== undefined;
-          // An untracked day is a label the user put on their own day, so it counts
-          // as a logged day in its own right. It used to be invisible unless
-          // macros happened to be logged too, which made a day someone
-          // deliberately marked look exactly like a day they never opened.
-          const isUntracked = log?.isUntracked === true;
-          const hasAnyDot =
-            workouts.length > 0 || showNutrition || showSteps || showBodyweight || isUntracked;
+          const hasAnyDot = workouts.length > 0 || showNutrition || showSteps || showBodyweight;
           const isSelected = cell.key === selectedKey;
           const todayCell = isToday(cell.date);
           // The dots are the only thing distinguishing one cell from another,
@@ -216,7 +208,6 @@ export function CalendarView() {
           if (showNutrition) logged.push("macros");
           if (showSteps) logged.push("steps");
           if (showBodyweight) logged.push("bodyweight");
-          if (isUntracked) logged.push("untracked day");
           return (
             <button
               key={cell.key}
@@ -250,13 +241,6 @@ export function CalendarView() {
                     />
                   ))}
                   {showNutrition && <span className="h-1.5 w-1.5 rounded-full bg-nutrition" />}
-                  {/* Annotates the day, never replaces a dot: the food dot keeps
-                      its nutrition colour and the untracked day adds a hollow mark
-                      beside it. Outline against filled, so the mark is not
-                      carried by hue. */}
-                  {isUntracked && (
-                    <span className="h-1.5 w-1.5 rounded-full border border-muted-foreground" />
-                  )}
                   {showSteps && <span className="h-1.5 w-1.5 rounded-full bg-steps" />}
                   {showBodyweight && <span className="h-1.5 w-1.5 rounded-full bg-bodyweight" />}
                 </span>

@@ -58,9 +58,11 @@ describe("daily logs (schema + write-through)", () => {
     // db.upgrade.test.ts: Dexie sets `verno` from the version() declarations, so
     // comparing it against itself could never fail. Bump it by hand, and when
     // you do, check that a new table has not quietly started out non-empty.
-    expect(db.verno).toBe(8);
+    expect(db.verno).toBe(9);
     // The check the comment above asks for: v7 added `coachClients`, and a new
     // table starting out with rows in it would mean a migration wrote there.
+    // v9 added no table at all - it only strips a dead field off dailyLogs -
+    // so there is nothing new to check here for it.
     expect(await db.coachClients.count()).toBe(0);
     // The store and the DB have to agree. Checking only the store would pass if
     // hydrate had invented an empty array over a table that actually had rows.
@@ -81,7 +83,6 @@ describe("daily logs (schema + write-through)", () => {
       fat: 70,
       steps: 9421,
       bodyweight: 186.5,
-      isUntracked: true,
     });
     await flush();
 
@@ -95,7 +96,6 @@ describe("daily logs (schema + write-through)", () => {
       fat: 70,
       steps: 9421,
       bodyweight: 186.5,
-      isUntracked: true,
     });
   });
 
@@ -157,7 +157,6 @@ describe("daily logs (schema + write-through)", () => {
       fat: undefined,
       steps: undefined,
       bodyweight: undefined,
-      isUntracked: undefined,
     });
     await flush();
 
@@ -170,23 +169,11 @@ describe("daily logs (schema + write-through)", () => {
 
   it("does not create a record when an upsert on a fresh day is empty", async () => {
     await useStore.getState().hydrate();
-    useStore.getState().upsertDailyLog("2026-08-07", { calories: undefined, isUntracked: false });
+    useStore.getState().upsertDailyLog("2026-08-07", { calories: undefined });
     await flush();
 
     expect(useStore.getState().dailyLogs).toEqual([]);
     expect(await db.dailyLogs.count()).toBe(0);
-  });
-
-  it("keeps a untracked-day-only record alive with no numbers at all", async () => {
-    await useStore.getState().hydrate();
-    useStore.getState().upsertDailyLog("2026-08-07", { isUntracked: true });
-    await flush();
-
-    await reload();
-    expect(useStore.getState().dailyLogFor("2026-08-07")).toEqual({
-      date: "2026-08-07",
-      isUntracked: true,
-    });
   });
 
   it("keeps days independent of one another", async () => {

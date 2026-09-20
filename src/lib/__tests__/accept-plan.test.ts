@@ -18,7 +18,7 @@ function flush() {
 const DAY = new Date(2026, 8, 12, 9, 0, 0).getTime();
 
 const PLAN: PlanPayload = {
-  phases: [{ startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200, steps: 12000 }],
+  phases: [{ startsOn: "2026-09-20", name: "Cut", calories: 2200, steps: 12000 }],
   cards: [
     {
       name: "Upper",
@@ -63,9 +63,7 @@ beforeEach(async () => {
       },
     ],
     dailyLogs: [],
-    nutritionPhases: [
-      { id: "p_old", startsOn: "2026-01-01", name: "Maintain", kind: "targets", calories: 3000 },
-    ],
+    nutritionPhases: [{ id: "p_old", startsOn: "2026-01-01", name: "Maintain", calories: 3000 }],
     plannedDays: [{ date: "2026-09-19", splitSlotId: "s_legs" }],
     nextSlotId: "s_legs",
     restSince: undefined,
@@ -219,9 +217,9 @@ describe("a coach-managed plan", () => {
     s.moveSplitCard(upper.id, 1);
     s.reorderSlots(upper.id, s.slots[1].id);
     s.setSlotLifts(upper.id, []);
-    expect(s.addPhase({ startsOn: "2026-12-01", name: "Gain", kind: "targets" })).toBeUndefined();
+    expect(s.addPhase({ startsOn: "2026-12-01", name: "Gain" })).toBeUndefined();
     s.updatePhase(phase.id, { calories: 9999 });
-    expect(s.setPhaseStart(phase.id, "2026-11-01")).toBe(false);
+    expect(s.setPhaseDates(phase.id, { startsOn: "2026-11-01" })).toBe(false);
     s.deletePhase(phase.id);
     s.pinDay("2026-09-30", upper.id);
     s.unpinDay("2026-09-22");

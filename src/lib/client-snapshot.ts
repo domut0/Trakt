@@ -311,8 +311,9 @@ export function buildClientSnapshot(
         const n = num(dailyRows.get(row, header));
         if (n !== undefined) (log[field] as number) = n;
       }
-      const untracked = bool(dailyRows.get(row, "Untracked"));
-      if (untracked !== undefined) log.isUntracked = untracked;
+      // No "Untracked" column is read. A sheet written by an older build still
+      // has one; it is ignored rather than migrated, because the flag it
+      // carries has no field left to land in and no screen left to show it.
       dailyLogs.push(log);
     }
   }

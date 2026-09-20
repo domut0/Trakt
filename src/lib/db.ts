@@ -397,6 +397,28 @@ class WorkoutDb extends Dexie {
     this.version(8).stores({
       templates: "id",
     });
+    // v9 drops the untracked flag, which is the end of a field that has now
+    // been renamed once and deleted once. It said "I chose not to log today",
+    // and the day it was written on already said that by being blank. Two ways
+    // to spell an empty day is one too many, and the flag was the one that
+    // needed a toggle, a calendar mark, a ring on the chart and a phase kind to
+    // hold it up.
+    //
+    // A real pass over every row rather than a read-time omission: Dexie stores
+    // whole objects, so an untouched row would carry the key forever and an
+    // export taken later would still contain a field nothing can read. Both
+    // spellings go, because a database that skipped v5 still holds the old one.
+    this.version(9)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table("dailyLogs")
+          .toCollection()
+          .modify((log: Record<string, unknown>) => {
+            delete log.isUntracked;
+            delete log.isCheatDay;
+          });
+      });
   }
 }
 

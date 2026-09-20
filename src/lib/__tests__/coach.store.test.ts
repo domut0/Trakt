@@ -276,9 +276,7 @@ describe("a Google-backed client", () => {
   /** An edit the coach makes through the ordinary Plan screen. */
   function editPlan() {
     useStore.setState({
-      nutritionPhases: [
-        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
-      ],
+      nutritionPhases: [{ id: "p1", startsOn: "2026-09-20", name: "Cut", calories: 2200 }],
     });
   }
 
@@ -468,9 +466,7 @@ describe("writing a plan back to a client", () => {
     // Exactly what the Plan tab does: coach mode put the client's plan in the
     // store, so editing the store IS editing the client's plan.
     useStore.setState({
-      nutritionPhases: [
-        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
-      ],
+      nutritionPhases: [{ id: "p1", startsOn: "2026-09-20", name: "Cut", calories: 2200 }],
     });
 
     const changes = useCoachStore.getState().pendingChanges();
@@ -484,9 +480,7 @@ describe("writing a plan back to a client", () => {
     await useCoachStore.getState().enterClientView("c_bob");
 
     useStore.setState({
-      nutritionPhases: [
-        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
-      ],
+      nutritionPhases: [{ id: "p1", startsOn: "2026-09-20", name: "Cut", calories: 2200 }],
     });
     expect(await useCoachStore.getState().saveClientPlan()).toBe(true);
 
@@ -504,9 +498,7 @@ describe("writing a plan back to a client", () => {
     await useCoachStore.getState().enterClientView("c_bob");
 
     useStore.setState({
-      nutritionPhases: [
-        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
-      ],
+      nutritionPhases: [{ id: "p1", startsOn: "2026-09-20", name: "Cut", calories: 2200 }],
     });
     await useCoachStore.getState().saveClientPlan();
 
@@ -520,9 +512,7 @@ describe("writing a plan back to a client", () => {
     stubClientSheet(BOB_SHEET, { writeStatus: 500 });
 
     useStore.setState({
-      nutritionPhases: [
-        { id: "p1", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2200 },
-      ],
+      nutritionPhases: [{ id: "p1", startsOn: "2026-09-20", name: "Cut", calories: 2200 }],
     });
 
     expect(await useCoachStore.getState().saveClientPlan()).toBe(false);
@@ -544,9 +534,7 @@ describe("opening a client with an existing plan", () => {
     // a change -- whether their sheet has a plan tab or only implied cards.
     stubClientSheet({
       ...BOB_SHEET,
-      nutritionPhases: [
-        { id: "p_cut", startsOn: "2026-09-20", name: "Cut", kind: "targets", calories: 2100 },
-      ],
+      nutritionPhases: [{ id: "p_cut", startsOn: "2026-09-20", name: "Cut", calories: 2100 }],
       plannedDays: [{ date: "2026-09-22", splitSlotId: "s1" }],
     });
 

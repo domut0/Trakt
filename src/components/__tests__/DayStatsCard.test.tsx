@@ -39,7 +39,7 @@ function seedStore({
     id: PHASE_ID,
     startsOn: "1970-01-01",
     name: "Test phase",
-    kind: "targets",
+
     ...(calories !== undefined ? { calories } : {}),
     ...(protein !== undefined ? { protein } : {}),
     ...(carbs !== undefined ? { carbs } : {}),
@@ -235,12 +235,13 @@ describe("DayStatsCard, editable", () => {
     expect(caloriesField().value).toBe("2180");
   });
 
-  it("toggles the untracked flag", () => {
+  it("has no switches on it at all", () => {
+    // There was an "Untracked" toggle here, the one control on this card that
+    // was not a number. A day with nothing logged already says it was not
+    // tracked, so the flag only ever gave an empty day a second way to be
+    // empty.
     render(<DayStatsCard date={today} editable />);
-    fireEvent.click(screen.getByRole("switch", { name: "Untracked" }));
-    expect(useStore.getState().dailyLogs.find((l) => l.date === today)?.isUntracked).toBe(true);
-    fireEvent.click(screen.getByRole("switch", { name: "Untracked" }));
-    expect(useStore.getState().dailyLogs.find((l) => l.date === today)).toBeUndefined();
+    expect(screen.queryAllByRole("switch")).toHaveLength(0);
   });
 
   it("stays a readout when it is not editable", () => {

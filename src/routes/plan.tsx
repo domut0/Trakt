@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { NutritionRibbon } from "../components/NutritionRibbon";
+import { NutritionPlan } from "../components/NutritionPlan";
 import { TargetStrip } from "../components/TargetStrip";
 import { SlotPlanSheet } from "../components/SlotPlanSheet";
 import { SplitCardList } from "../components/SplitCardList";
@@ -95,7 +95,7 @@ function PlanPage() {
       {/* Inert while a coach manages the plan: readable, not editable. The
           store refuses these edits anyway; this is so nothing looks tappable. */}
       <div inert={locked}>
-        <NutritionRibbon />
+        <NutritionPlan />
         <TargetStrip />
 
         {/* ---- The workout split ----------------------------------------- */}

@@ -45,7 +45,7 @@ function setsTab(rows: Array<Record<string, CellValue>>): CellValue[][] {
 }
 
 function dailyTab(rows: Array<Record<string, CellValue>>): CellValue[][] {
-  const headers = ["Date", "Calories", "Protein (g)", "Carbs (g)", "Steps", "Untracked"];
+  const headers = ["Date", "Calories", "Protein (g)", "Carbs (g)", "Steps"];
   return [headers, ...rows.map((r) => headers.map((h) => r[h]))];
 }
 
@@ -222,18 +222,6 @@ describe("mergeFromSheet: clearing and required fields", () => {
     });
     expect(result.dailyPatches).toEqual([{ date: "2026-08-12", patch: { steps: 0 } }]);
   });
-
-  it("reads a checkbox as a boolean and accepts TRUE/FALSE text", () => {
-    const untrackedLocal = source({ dailyLogs: [{ date: "2026-08-12", calories: 2400 }] });
-    const untrackedBase = buildBase(untrackedLocal, 1);
-
-    for (const cell of [true, "TRUE", "yes"] as CellValue[]) {
-      const result = mergeFromSheet(untrackedBase, untrackedLocal, {
-        [SHEET_TABS.daily]: dailyTab([{ Date: "2026-08-12", Calories: 2400, Untracked: cell }]),
-      });
-      expect(result.dailyPatches).toEqual([{ date: "2026-08-12", patch: { isUntracked: true } }]);
-    }
-  });
 });
 
 describe("mergeFromSheet: structural cases", () => {
@@ -382,9 +370,7 @@ describe("buildSheetTabs", () => {
       sessions: [
         { id: "sess_1", splitSlotId: "s_hb", startedAt: T, endedAt: T + 3600_000, note: "good" },
       ],
-      dailyLogs: [
-        { date: "2026-08-12", calories: 2400, protein: 180, steps: 0, isUntracked: false },
-      ],
+      dailyLogs: [{ date: "2026-08-12", calories: 2400, protein: 180, steps: 0 }],
     });
     const tabs = buildSheetTabs(state, undefined);
     const result = mergeFromSheet(buildBase(state, 1), state, tabs);

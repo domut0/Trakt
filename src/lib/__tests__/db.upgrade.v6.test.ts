@@ -9,7 +9,7 @@ import { useStore } from "../store";
 // for every test after it. One upgrade-from-scratch claim per file is the only
 // arrangement that holds.
 
-const CURRENT_SCHEMA_VERSION = 8;
+const CURRENT_SCHEMA_VERSION = 9;
 
 /** The v5 schema, which is what every install carrying the weekly-template
  *  planning model is sitting on. */
@@ -68,7 +68,6 @@ describe("Dexie v5 -> v6: the weekly template becomes a timeline and a rotation"
     const phases = await db.nutritionPhases.toArray();
     expect(phases).toHaveLength(1);
     expect(phases[0]).toMatchObject({
-      kind: "targets",
       calories: 3400,
       protein: 210,
       steps: 20000,

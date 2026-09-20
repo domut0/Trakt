@@ -23,7 +23,7 @@ import { useStore } from "../store";
  * actually landed on disk and what the store hydrated to. Those are the test's
  * real subject; this constant is just the canary.
  */
-const CURRENT_SCHEMA_VERSION = 8;
+const CURRENT_SCHEMA_VERSION = 9;
 
 /** Every table the app still expects to exist once an old database is upgraded. */
 const TABLES_ADDED_AFTER_V1 = ["dailyLogs"] as const;
