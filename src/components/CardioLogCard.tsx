@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { format } from "date-fns";
+import { dayKey, parseDayKey } from "../lib/daily-log";
 import { useStore, type Exercise } from "../lib/store";
 
 /**
@@ -32,6 +34,8 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
   const [setupNote, setSetupNote] = useState("");
   const [duration, setDuration] = useState("");
   const [distance, setDistance] = useState("");
+  const today = dayKey(new Date());
+  const [on, setOn] = useState(today);
 
   const missingPresets = useMemo(
     () =>
@@ -66,6 +70,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
     setSetupNote("");
     setDuration("");
     setDistance("");
+    setOn(today);
   };
 
   // Shared by preset taps and the typed "Add" row. Re-checks the live store
@@ -95,6 +100,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
       durationMinutes: dur != null && !Number.isNaN(dur) ? dur : undefined,
       distance: dist != null && !Number.isNaN(dist) ? dist : undefined,
       setupNote: setupNote.trim() || suggestedNote,
+      on: on === today ? undefined : on,
     });
     onDone();
   };
@@ -157,6 +163,22 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
   return (
     <div>
       <div className="mx-auto mb-1 h-1 w-10 bg-border" />
+      <div className="mt-3 flex items-baseline justify-between gap-3">
+        <h2 className="t-caption text-ink-2">
+          {on === today ? "Today's session" : format(parseDayKey(on), "EEEE d MMM")}
+        </h2>
+        {/* Mirroring StartWorkoutSheet: a workout you forgot to log is the
+            ordinary case, so backdating is available inline rather than
+            through a second past-workout flow. */}
+        <input
+          type="date"
+          value={on}
+          max={today}
+          onChange={(e) => setOn(e.target.value || today)}
+          aria-label="Cardio date"
+          className="min-h-[44px] rounded-md bg-wash px-2 t-label text-ink-2 outline-none"
+        />
+      </div>
       <div className="mt-3 group-list">
         <button
           onClick={() => setPickingExercise(true)}

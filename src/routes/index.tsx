@@ -4,8 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { DayStatsCard } from "../components/DayStatsCard";
 import { WeekStrip } from "../components/WeekStrip";
 import { CoachPlanCard } from "../components/CoachPlanPrompt";
-import { dayKey, isDailyLogEmpty, parseDayKey } from "../lib/daily-log";
-import { useStore, type DailyLog } from "../lib/store";
+import { dayKey, parseDayKey } from "../lib/daily-log";
 
 /**
  * The day view. One date, three cards: a week strip that moves it, a stats card
@@ -42,23 +41,6 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-/** The day before `key`, as a day key. Built through a Date so month and year
- * boundaries and DST are the platform's problem rather than string arithmetic. */
-function previousDayKey(key: string): string {
-  const d = parseDayKey(key);
-  d.setDate(d.getDate() - 1);
-  return dayKey(d);
-}
-
-function formatPreviousSummary(log: DailyLog): string {
-  const parts: string[] = [];
-  if (log.calories !== undefined) parts.push(`${log.calories.toLocaleString()} cal`);
-  if (log.protein !== undefined) parts.push(`${log.protein}g P`);
-  if (log.carbs !== undefined) parts.push(`${log.carbs}g C`);
-  if (log.fat !== undefined) parts.push(`${log.fat}g F`);
-  return parts.join(" · ");
-}
-
 function Home() {
   const { date } = Route.useSearch();
   const navigate = useNavigate({ from: "/" });
@@ -67,38 +49,6 @@ function Home() {
   // midnight, and a stale key would silently edit yesterday.
   const todayKey = dayKey(new Date());
   const selected = date ?? todayKey;
-
-  const upsertDailyLog = useStore((s) => s.upsertDailyLog);
-  // The projection, not the raw table: a day logged purely through food entries
-  // has no typed macros, so reading s.dailyLogs here would report it as
-  // untracked while the stats card directly above showed its calories.
-  const dailyLogs = useStore((s) => s.dailyLogs);
-
-  const selectedLog = dailyLogs.find((l) => l.date === selected);
-  const previousKey = previousDayKey(selected);
-  const previousLog = dailyLogs.find((l) => l.date === previousKey && !isDailyLogEmpty(l));
-
-  /**
-   * The backfill shortcut, kept from the old Today screen but generalised.
-   *
-   * It used to be "copy yesterday" and only ever ran on today. Now that the
-   * screen has a date, it copies the day BEFORE whichever day you are looking
-   * at, which is the same idea and works while backfilling a gap. It appears
-   * only when this day has nothing and the one before it has something, so it
-   * can never overwrite anything.
-   *
-   * NOT on a future day. It is a backfill tool, and offering to write today's
-   * macros into tomorrow contradicts the stats card directly above it, which
-   * deliberately shows a future day its targets and no values at all.
-   */
-  const canCopyPrevious =
-    selected <= todayKey &&
-    (selectedLog === undefined || isDailyLogEmpty(selectedLog)) &&
-    previousLog !== undefined &&
-    (previousLog.calories !== undefined ||
-      previousLog.protein !== undefined ||
-      previousLog.carbs !== undefined ||
-      previousLog.fat !== undefined);
 
   /**
    * `replace`, never push. Tapping through a week would otherwise leave seven
@@ -160,29 +110,6 @@ function Home() {
           <h2 className="t-caption">Daily numbers</h2>
         </div>
         <DayStatsCard date={selected} editable />
-
-        {canCopyPrevious && (
-          <button
-            type="button"
-            onClick={() =>
-              upsertDailyLog(selected, {
-                calories: previousLog.calories,
-                protein: previousLog.protein,
-                carbs: previousLog.carbs,
-                fat: previousLog.fat,
-              })
-            }
-            className="mt-3 flex min-h-[44px] w-full items-center justify-between rounded-lg bg-surface px-4 text-left transition-colors active:opacity-70"
-          >
-            <span className="flex min-w-0 flex-1 items-center gap-3 pr-3">
-              <span className="shrink-0 t-action t-label">Copy the day before</span>
-              <span className="truncate t-label text-ink-2">
-                {formatPreviousSummary(previousLog)}
-              </span>
-            </span>
-            <span className="shrink-0 t-action t-label">Copy</span>
-          </button>
-        )}
       </section>
 
       <div className="pb-8" />

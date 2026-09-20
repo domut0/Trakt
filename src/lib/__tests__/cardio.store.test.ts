@@ -74,6 +74,22 @@ describe("logCardio", () => {
     expect(sess.distance).toBe(3.1);
   });
 
+  it("lands a backdated bout on the requested day at midday", () => {
+    // Backdating sets endedAt to midday local time on the target date, and
+    // back-computes startedAt from the duration.
+    const on = "2026-08-01";
+    const id = useStore.getState().logCardio({
+      exerciseId: "treadmill",
+      durationMinutes: 30,
+      on,
+    });
+    const sess = sessionById(id)!;
+
+    const expectedEndedAt = new Date(2026, 7, 1, 12, 0, 0, 0).getTime();
+    expect(sess.endedAt).toBe(expectedEndedAt);
+    expect(sess.startedAt).toBe(expectedEndedAt - 30 * 60_000);
+  });
+
   it("creates a completed cardio session with no split slot and no sets", () => {
     const setsBefore = useStore.getState().sets.length;
     const id = useStore.getState().logCardio({

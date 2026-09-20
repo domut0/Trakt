@@ -97,6 +97,20 @@ export function CalendarView() {
   const [adding, setAdding] = useState(false);
   const router = useRouter();
 
+  const now = new Date();
+  const isCurrentMonth =
+    viewedMonth.getFullYear() === now.getFullYear() && viewedMonth.getMonth() === now.getMonth();
+  const canGoToToday = !isCurrentMonth || !selectedIsToday;
+
+  // Return to the current month and select today. Rendered only when it would
+  // do something — either the calendar is scrolled away from the present month,
+  // or a different day within the month is selected. The month label sits on an
+  // absolute centre so showing or hiding this button never jostles the header.
+  const goToToday = () => {
+    setViewedMonth(startOfMonth(new Date()));
+    setPickedKey(todayKey);
+  };
+
   const monthLabel = format(viewedMonth, "MMMM yyyy");
   const cells = useMemo(() => {
     // `getDay` is 0=Sunday..6=Saturday; the grid's first column is Monday, so
@@ -115,7 +129,7 @@ export function CalendarView() {
 
   return (
     <>
-      <div className="mx-4 mb-3 flex items-center justify-between">
+      <div className="relative mx-4 mb-3 flex items-center justify-between">
         <button
           onClick={() => setViewedMonth((m) => startOfMonth(subMonths(m, 1)))}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-2 active:bg-wash"
@@ -125,16 +139,30 @@ export function CalendarView() {
         </button>
         {/* Announced on change: stepping the month replaces the whole grid below
             but moves no focus, so without this the change is silent. */}
-        <span aria-live="polite" className="t-body font-semibold tracking-tight text-ink">
+        <span
+          aria-live="polite"
+          className="pointer-events-none absolute inset-x-0 text-center t-body font-semibold tracking-tight text-ink"
+        >
           {monthLabel}
         </span>
-        <button
-          onClick={() => setViewedMonth((m) => startOfMonth(addMonths(m, 1)))}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-2 active:bg-wash"
-          aria-label="Next month"
-        >
-          <span aria-hidden="true">›</span>
-        </button>
+        <div className="flex items-center">
+          {canGoToToday && (
+            <button
+              type="button"
+              onClick={goToToday}
+              className="flex min-h-[44px] items-center px-2 t-label font-medium t-action"
+            >
+              Today
+            </button>
+          )}
+          <button
+            onClick={() => setViewedMonth((m) => startOfMonth(addMonths(m, 1)))}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-2 active:bg-wash"
+            aria-label="Next month"
+          >
+            <span aria-hidden="true">›</span>
+          </button>
+        </div>
       </div>
 
       {/* Hidden from assistive tech: as single letters these are ambiguous

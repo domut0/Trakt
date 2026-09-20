@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useCanGoBack, useRouter } from "@tanstack/react-router";
 import { AppShell } from "../components/AppShell";
 import { CalendarView } from "../components/CalendarView";
 
@@ -28,9 +28,28 @@ export const Route = createFileRoute("/history")({
  * a second, quieter product living behind a switch most people never flipped.
  */
 function HistoryPage() {
+  const router = useRouter();
+  const canGoBack = useCanGoBack();
+
+  // History or deep-link fallback: when reached from a direct link or refresh,
+  // there is no in-app history entry to pop, so return to Today. Otherwise, step
+  // back to wherever the user arrived from.
+  const goBack = () => {
+    if (canGoBack) router.history.back();
+    else router.navigate({ to: "/" });
+  };
+
   return (
     <AppShell>
-      <header className="pl-4 pr-12 pb-4 pt-14">
+      <div className="flex items-center justify-between px-4 pt-14 pb-2">
+        <button
+          onClick={goBack}
+          className="-my-[11px] flex min-h-[44px] items-center t-body font-medium t-action"
+        >
+          Back
+        </button>
+      </div>
+      <header className="px-4 pb-4">
         <h1 className="t-title text-ink">History</h1>
       </header>
       <CalendarView />

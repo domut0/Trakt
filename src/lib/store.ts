@@ -419,6 +419,7 @@ interface State {
     durationMinutes?: number;
     distance?: number;
     setupNote?: string;
+    on?: string;
   }) => string;
   deleteSet: (setId: string) => void;
   /** Delete an entire logged workout: the session and every set in it. Recomputes
@@ -1454,12 +1455,16 @@ export const useStore = create<State>((set, get) => ({
     persistActiveMeta({ activeSessionId: sessionId, currentExerciseId: exerciseId });
   },
 
-  logCardio: ({ exerciseId, durationMinutes, distance, setupNote }) => {
-    const endedAt = Date.now();
-    // The bout finished now, so a duration tells us when it STARTED: 28 minutes
-    // logged at 08:30 began at 08:02. Back-computing here is what lets cardio
-    // land on the timeline at the right time despite being entered after the
-    // fact. No duration means there is nothing to subtract.
+  logCardio: ({ exerciseId, durationMinutes, distance, setupNote, on }) => {
+    // A backdated bout ended at midday on its own day rather than at the
+    // current time of day: nobody remembers the exact minute, midday sorts
+    // cleanly on that date, and every day-bucketing surface reads startedAt.
+    // When no date is given, it finished now.
+    const endedAt = on ? parseDayKey(on).setHours(12, 0, 0, 0) : Date.now();
+    // A duration tells us when it STARTED: 28 minutes ending at midday began at
+    // 11:32. Back-computing here is what lets cardio land on the timeline at the
+    // right time despite being entered after the fact. No duration means there
+    // is nothing to subtract.
     const startedAt =
       durationMinutes != null ? endedAt - Math.round(durationMinutes * 60_000) : endedAt;
     const note = setupNote?.trim();

@@ -91,7 +91,7 @@ describe("WorkoutLog", () => {
 
     // The count is on the row before anything is logged, because 0 of 3 is a
     // fact about the workout rather than an empty state.
-    expect(screen.getByRole("button", { name: /^Bench Press/ })).toHaveTextContent("0/3");
+    expect(screen.getByRole("button", { name: /^Bench Press/ })).toHaveTextContent("0/3 sets");
 
     openExercise("Bench Press");
     expect(screen.getByRole("button", { name: /^Set 1\b/ })).toBeInTheDocument();
@@ -104,7 +104,7 @@ describe("WorkoutLog", () => {
     save();
     done();
 
-    expect(screen.getByRole("button", { name: /^Bench Press/ })).toHaveTextContent("1/3");
+    expect(screen.getByRole("button", { name: /^Bench Press/ })).toHaveTextContent("1/3 sets");
   });
 
   it("pre-fills a tapped row with its ghost, so Save logs exactly what was offered", () => {
@@ -245,7 +245,29 @@ describe("WorkoutLog", () => {
     done();
 
     expect(loggedToday()).toHaveLength(1);
-    expect(screen.getByRole("button", { name: /^Bench Press/ })).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: /^Bench Press/ })).toHaveTextContent("1 sets");
+  });
+
+  it('labels the set counter as "0/1 sets" for a planned lift and "2 sets" when added by hand', () => {
+    // Column header convention: always plural "sets", even for a single set.
+    setup([{ exerciseId: BENCH.id, sets: 1, reps: "5" }]);
+    expect(screen.getByRole("button", { name: /^Bench Press/ })).toHaveTextContent("0/1 sets");
+
+    // Add a second lift manually (not in the plan) and log two sets.
+    fireEvent.click(screen.getByRole("button", { name: /Add exercise/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Barbell Row/ }));
+    tapRow(1);
+    type("Weight", "135");
+    type("Reps", "5");
+    save();
+    fireEvent.click(screen.getByRole("button", { name: /Add set/ }));
+    tapRow(2);
+    type("Weight", "135");
+    type("Reps", "5");
+    save();
+    done();
+
+    expect(screen.getByRole("button", { name: /^Barbell Row/ })).toHaveTextContent("2 sets");
   });
 });
 

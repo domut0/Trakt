@@ -131,13 +131,13 @@ export function WorkoutLog({
                   >
                     {/* The space between the two spans is load-bearing: flex
                         `gap` is not text, so without it the row's accessible
-                        name runs together as "Bench Press0/3". */}
+                        name runs together as "Bench Press 0/3 sets". */}
                     <span className="min-w-0 truncate t-body">{exercise.name}</span>{" "}
                     <span
                       className={`shrink-0 tnum t-body ${isCurrent ? "text-paper" : "text-ink-2"}`}
                     >
                       {logged}
-                      {lift?.sets !== undefined ? `/${lift.sets}` : ""}
+                      {lift?.sets !== undefined ? `/${lift.sets}` : ""} sets
                     </span>
                   </button>
                 </li>
