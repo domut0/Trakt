@@ -50,7 +50,6 @@ describe("StartWorkoutSheet", () => {
       plannedDays: [],
       activeSessionId: undefined,
       currentExerciseId: undefined,
-      currentBlock: undefined,
     });
   });
 

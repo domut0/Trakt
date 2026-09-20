@@ -57,6 +57,7 @@ export function ExerciseScreen({
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
   const [rpe, setRpe] = useState("");
+  const [note, setNote] = useState("");
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -121,6 +122,10 @@ export function ExerciseScreen({
       setReps(row.ghost.reps != null ? String(row.ghost.reps) : "");
       setRpe(row.ghost.rpe != null ? String(row.ghost.rpe) : "");
     }
+    // Carried forward rather than blank: the setup is the same bench at the
+    // same pin height until somebody changes it, and this is the only place it
+    // can be changed.
+    setNote(row.set?.setupNote ?? setupNote ?? "");
   };
 
   const parsedWeight = parseFloat(weight);
@@ -132,18 +137,22 @@ export function ExerciseScreen({
     const typedRpe = rpe.trim() ? parseFloat(rpe) : NaN;
     const rpeValue = Number.isFinite(typedRpe) ? typedRpe : undefined;
     if (row.set) {
-      updateSet(row.set.id, { weight: parsedWeight, reps: parsedReps, rpe: rpeValue });
+      updateSet(row.set.id, {
+        weight: parsedWeight,
+        reps: parsedReps,
+        rpe: rpeValue,
+        setupNote: note.trim() || undefined,
+      });
     } else {
-      // The setup note rides along from whatever this lift was last logged
-      // with, so the per-set snapshot that `prefillFor` buckets on keeps being
-      // written even though this screen has no field for typing one.
+      // The note is a per-set snapshot, which is what `prefillFor` buckets on:
+      // "Heavy Bench" at pin 4 and the same bar at pin 6 are different setups
+      // and must not prefill each other.
       logSet({
         exerciseId,
         weight: parsedWeight,
         reps: parsedReps,
         rpe: rpeValue,
-        setupNote,
-        targetSets: 1,
+        setupNote: note.trim() || undefined,
       });
     }
     setEditing(null);
@@ -259,6 +268,24 @@ export function ExerciseScreen({
                       >
                         Save
                       </button>
+                    </div>
+                  )}
+                  {isEditing && (
+                    /* Words rather than a figure, so it gets its own line
+                       instead of squeezing three number fields into a third
+                       of the screen each. */
+                    <div className="group-row-sep px-4 pb-3">
+                      <input
+                        type="text"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="Seat, pins, grip"
+                        aria-label="Setup note"
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        className="min-h-[44px] w-full rounded-md bg-wash px-3 t-label text-ink outline-none placeholder:text-ink-3"
+                      />
                     </div>
                   )}
                 </li>

@@ -14,7 +14,6 @@ const DEFAULT_STATE = {
   sets: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
-  currentBlock: undefined,
   hydrated: false,
 };
 
@@ -108,7 +107,7 @@ describe("Dexie persistence (hydrate + write-through)", () => {
     const exercise = useStore.getState().exercises[0];
 
     const sessionId = useStore.getState().startWorkout("Reload Test Slot");
-    useStore.getState().logSet({ exerciseId: exercise.id, weight: 135, reps: 5, targetSets: 1 });
+    useStore.getState().logSet({ exerciseId: exercise.id, weight: 135, reps: 5 });
     useStore.getState().setUnit("kg");
     await flush();
 
@@ -129,7 +128,7 @@ describe("Dexie persistence (hydrate + write-through)", () => {
     await useStore.getState().hydrate();
     const exercise = useStore.getState().exercises[0];
     const sessionId = useStore.getState().startWorkout("Delete Test Slot");
-    useStore.getState().logSet({ exerciseId: exercise.id, weight: 100, reps: 10, targetSets: 1 });
+    useStore.getState().logSet({ exerciseId: exercise.id, weight: 100, reps: 10 });
     await flush();
     const loggedSet = useStore.getState().sets.find((s) => s.sessionId === sessionId)!;
 

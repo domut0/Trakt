@@ -76,7 +76,6 @@ beforeEach(async () => {
     plannedDays: [],
     activeSessionId: undefined,
     currentExerciseId: undefined,
-    currentBlock: undefined,
     hydrated: true,
   });
 });
@@ -138,7 +137,7 @@ describe("mutating store actions under the latch", () => {
       () => {
         const ex = useStore.getState().addExercise("Deadlift", "main");
         useStore.getState().startWorkout("Pull");
-        useStore.getState().logSet({ exerciseId: ex.id, weight: 225, reps: 5, targetSets: 3 });
+        useStore.getState().logSet({ exerciseId: ex.id, weight: 225, reps: 5 });
       },
     ],
     [

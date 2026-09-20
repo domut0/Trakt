@@ -304,15 +304,6 @@ export interface BackupData {
  * one that reports it to the user reads it off the file. */
 export const BACKUP_VERSION = 6;
 
-type CurrentBlock = {
-  blockGroupId: string;
-  targetSets: number;
-  loggedInBlock: number;
-  weight: number;
-  reps: number;
-  rpe?: number;
-};
-
 interface State {
   unit: "lbs" | "kg";
   exercises: Exercise[];
@@ -387,7 +378,6 @@ interface State {
   applyTemplate: (templateId: string, slotId: string) => void;
   activeSessionId?: string;
   currentExerciseId?: string;
-  currentBlock?: CurrentBlock;
   /** True once the client-side IndexedDB load (or first-run seed) has completed. */
   hydrated: boolean;
   /** True when the most recent IndexedDB write failed. Ephemeral UI state only:
@@ -406,9 +396,7 @@ interface State {
     reps: number;
     rpe?: number;
     setupNote?: string;
-    targetSets: number;
   }) => void;
-  logNextInBlock: (overrides?: { reps?: number }) => void;
   /** Record a completed cardio bout in one shot, after the fact — there is no
    * start/end flow and no stopwatch. Creates a session that is already ended,
    * with no Split Slot and no sets, and returns its id.
@@ -1149,18 +1137,13 @@ export function parseBackup(text: string): ParseBackupResult {
 // client-side user interaction — never during SSR render.
 // ---------------------------------------------------------------------------
 
-function persistActiveMeta(meta: {
-  activeSessionId?: string;
-  currentExerciseId?: string;
-  currentBlock?: CurrentBlock;
-}) {
+function persistActiveMeta(meta: { activeSessionId?: string; currentExerciseId?: string }) {
   // Annotated before the put for the same reason as persistSettingsFrom: `meta`
   // is a union table, and an inline literal resolves against the wrong arm.
   const record: ActiveSessionMeta = {
     key: "activeSession",
     activeSessionId: meta.activeSessionId,
     currentExerciseId: meta.currentExerciseId,
-    currentBlock: meta.currentBlock,
   };
   safeWrite(() => db.meta.put(record));
 }
@@ -1230,7 +1213,6 @@ export const useStore = create<State>((set, get) => ({
   templates: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
-  currentBlock: undefined,
   hydrated: false,
   writeFailed: false,
 
@@ -1274,7 +1256,6 @@ export const useStore = create<State>((set, get) => ({
           planningMode: "week",
           activeSessionId: undefined,
           currentExerciseId: undefined,
-          currentBlock: undefined,
           hydrated: true,
         });
         return;
@@ -1304,7 +1285,6 @@ export const useStore = create<State>((set, get) => ({
         // "no plan" (see the note on `plannedWeek` in db.ts).
         activeSessionId: data.activeSession.activeSessionId,
         currentExerciseId: data.activeSession.currentExerciseId,
-        currentBlock: data.activeSession.currentBlock,
         hydrated: true,
       });
     } catch (err) {
@@ -1340,13 +1320,11 @@ export const useStore = create<State>((set, get) => ({
       sessions: [...get().sessions, session],
       activeSessionId: sessionId,
       currentExerciseId: undefined,
-      currentBlock: undefined,
     });
     safeWrite(() => db.sessions.put(session));
     persistActiveMeta({
       activeSessionId: sessionId,
       currentExerciseId: undefined,
-      currentBlock: undefined,
     });
     return sessionId;
   },
@@ -1379,7 +1357,6 @@ export const useStore = create<State>((set, get) => ({
       ...cursorTo(updatedSlots, consumedSplit),
       activeSessionId: undefined,
       currentExerciseId: undefined,
-      currentBlock: undefined,
     });
     const updatedSession = updatedSessions.find((s) => s.id === id);
     if (updatedSession) safeWrite(() => db.sessions.put(updatedSession));
@@ -1390,7 +1367,6 @@ export const useStore = create<State>((set, get) => ({
     persistActiveMeta({
       activeSessionId: undefined,
       currentExerciseId: undefined,
-      currentBlock: undefined,
     });
     // The cursor moved, so the settings record has to move with it. Every other
     // cursor mover persists; this one did not, and the advance was lost on the
@@ -1400,11 +1376,10 @@ export const useStore = create<State>((set, get) => ({
   },
 
   setCurrentExercise: (exerciseId) => {
-    set({ currentExerciseId: exerciseId, currentBlock: undefined });
+    set({ currentExerciseId: exerciseId });
     persistActiveMeta({
       activeSessionId: get().activeSessionId,
       currentExerciseId: exerciseId,
-      currentBlock: undefined,
     });
   },
 
@@ -1415,7 +1390,7 @@ export const useStore = create<State>((set, get) => ({
     return ex;
   },
 
-  logSet: ({ exerciseId, weight, reps, rpe, setupNote, targetSets }) => {
+  logSet: ({ exerciseId, weight, reps, rpe, setupNote }) => {
     const sessionId = get().activeSessionId;
     if (!sessionId) return;
     const blockGroupId = uid();
@@ -1435,51 +1410,9 @@ export const useStore = create<State>((set, get) => ({
       blockGroupId,
       loggedAt: Date.now(),
     };
-    const currentBlock: CurrentBlock | undefined =
-      targetSets > 1
-        ? { blockGroupId, targetSets, loggedInBlock: 1, weight, reps, rpe }
-        : undefined;
-    set({
-      sets: [...get().sets, newSet],
-      currentExerciseId: exerciseId,
-      currentBlock,
-    });
+    set({ sets: [...get().sets, newSet], currentExerciseId: exerciseId });
     safeWrite(() => db.sets.put(newSet));
-    persistActiveMeta({ activeSessionId: sessionId, currentExerciseId: exerciseId, currentBlock });
-  },
-
-  logNextInBlock: (overrides) => {
-    const { activeSessionId, currentBlock, sets } = get();
-    if (!activeSessionId || !currentBlock) return;
-    const lastLogged = [...sets]
-      .filter((s) => s.sessionId === activeSessionId)
-      .sort((a, b) => b.loggedAt - a.loggedAt)[0];
-    const tbs = lastLogged ? Math.round((Date.now() - lastLogged.loggedAt) / 1000) : undefined;
-    const exerciseId = lastLogged?.exerciseId ?? get().currentExerciseId!;
-    const newSet: WorkoutSet = {
-      id: uid(),
-      sessionId: activeSessionId,
-      exerciseId,
-      weight: currentBlock.weight,
-      reps: overrides?.reps ?? currentBlock.reps,
-      rpe: currentBlock.rpe,
-      setupNote: lastLogged?.setupNote,
-      timeBetweenSetsSeconds: tbs,
-      blockGroupId: currentBlock.blockGroupId,
-      loggedAt: Date.now(),
-    };
-    const nextCount = currentBlock.loggedInBlock + 1;
-    const updatedBlock: CurrentBlock = { ...currentBlock, loggedInBlock: nextCount };
-    set({
-      sets: [...sets, newSet],
-      currentBlock: updatedBlock,
-    });
-    safeWrite(() => db.sets.put(newSet));
-    persistActiveMeta({
-      activeSessionId,
-      currentExerciseId: get().currentExerciseId,
-      currentBlock: updatedBlock,
-    });
+    persistActiveMeta({ activeSessionId: sessionId, currentExerciseId: exerciseId });
   },
 
   logCardio: ({ exerciseId, durationMinutes, distance, setupNote }) => {
@@ -1560,7 +1493,6 @@ export const useStore = create<State>((set, get) => ({
       persistActiveMeta({
         activeSessionId: undefined,
         currentExerciseId: undefined,
-        currentBlock: undefined,
       });
     }
   },
@@ -2082,7 +2014,6 @@ export const useStore = create<State>((set, get) => ({
       // reader on "never planned" - the same state the file's author was in.
       activeSessionId: undefined,
       currentExerciseId: undefined,
-      currentBlock: undefined,
       // Neither is in a backup, and `replaceAllData` has just written a settings
       // record without them. Cleared here too, or the store would disagree with
       // disk until a reload. A coach plan still in the sheet is simply offered
@@ -2124,7 +2055,6 @@ export const useStore = create<State>((set, get) => ({
       unit: "lbs",
       activeSessionId: undefined,
       currentExerciseId: undefined,
-      currentBlock: undefined,
       lastAcceptedPlanAt: undefined,
       coachManaged: false,
       templates: [],

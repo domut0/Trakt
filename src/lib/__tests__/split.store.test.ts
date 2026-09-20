@@ -30,7 +30,6 @@ async function reset() {
     nextSlotId: undefined,
     activeSessionId: undefined,
     currentExerciseId: undefined,
-    currentBlock: undefined,
   });
 }
 

@@ -45,7 +45,6 @@ function setup(lifts: PlannedLift[], history: WorkoutSet[] = []) {
     sets: history,
     activeSessionId: SESSION.id,
     currentExerciseId: undefined,
-    currentBlock: undefined,
   });
   render(<WorkoutLog sessionId={SESSION.id} lifts={lifts} stopwatch="0:00" />);
 }
@@ -247,5 +246,72 @@ describe("WorkoutLog", () => {
 
     expect(loggedToday()).toHaveLength(1);
     expect(screen.getByRole("button", { name: /^Bench Press/ })).toHaveTextContent("1");
+  });
+});
+
+describe("what the review added", () => {
+  it("offers what you just did, before it offers last week", () => {
+    // The lived-in behaviour of every version of this app: go up to 105 on set
+    // one and set two offers 105, not last week's 90.
+    setup(
+      [{ exerciseId: BENCH.id, sets: 3, reps: "5" }],
+      [pastSet(BENCH.id, 90, 5, 101), pastSet(BENCH.id, 90, 5, 102)],
+    );
+    openExercise("Bench Press");
+
+    tapRow(1);
+    expect(editorValue("Weight")).toBe("90");
+    type("Weight", "105");
+    save();
+
+    tapRow(2);
+    expect(editorValue("Weight")).toBe("105");
+  });
+
+  it("still lets the prescription override what you just did, because it is an instruction", () => {
+    setup([{ exerciseId: BENCH.id, sets: 3, reps: "5", load: "100" }]);
+    openExercise("Bench Press");
+
+    tapRow(1);
+    type("Weight", "120");
+    save();
+
+    tapRow(2);
+    expect(editorValue("Weight")).toBe("100");
+  });
+
+  it("records a setup note typed against the set, not only one inherited", () => {
+    // The only place a per-set setup can be typed. prefillFor buckets on it, so
+    // the same bar at two pin heights does not prefill across.
+    setup([{ exerciseId: BENCH.id, sets: 2, reps: "5" }]);
+    openExercise("Bench Press");
+
+    tapRow(1);
+    type("Weight", "100");
+    type("Setup note", "Pin 4");
+    save();
+
+    expect(loggedToday()[0].setupNote).toBe("Pin 4");
+
+    // And it carries forward to the next set, since the setup does not change
+    // between them unless somebody changes it.
+    tapRow(2);
+    expect(editorValue("Setup note")).toBe("Pin 4");
+  });
+
+  it("corrects a note on a set already logged", () => {
+    setup([{ exerciseId: BENCH.id, sets: 1, reps: "5" }]);
+    openExercise("Bench Press");
+    tapRow(1);
+    type("Weight", "100");
+    type("Setup note", "Pin 4");
+    save();
+
+    tapRow(1);
+    type("Setup note", "Pin 6");
+    save();
+
+    expect(loggedToday()).toHaveLength(1);
+    expect(loggedToday()[0].setupNote).toBe("Pin 6");
   });
 });

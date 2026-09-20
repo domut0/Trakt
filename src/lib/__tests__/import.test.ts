@@ -20,7 +20,6 @@ const DEFAULT_STATE = {
   // read anything at all.
   activeSessionId: undefined,
   currentExerciseId: undefined,
-  currentBlock: undefined,
   hydrated: false,
 };
 
@@ -369,8 +368,8 @@ describe("importData (full backup restore)", () => {
     // wrote would be asserting that three empty arrays survive a JSON trip.
     const benchId = useStore.getState().exercises[0].id;
     useStore.getState().startWorkout("Heavy Bench");
-    useStore.getState().logSet({ exerciseId: benchId, weight: 225, reps: 3, targetSets: 2 });
-    useStore.getState().logNextInBlock({ reps: 2 });
+    useStore.getState().logSet({ exerciseId: benchId, weight: 225, reps: 3 });
+    useStore.getState().logSet({ exerciseId: benchId, weight: 225, reps: 2 });
     useStore.getState().endWorkout();
     const seeded = useStore.getState();
     expect(seeded.slots).toHaveLength(1);
@@ -499,7 +498,6 @@ describe("importData (full backup restore)", () => {
 
     expect(state.activeSessionId).toBeUndefined();
     expect(state.currentExerciseId).toBeUndefined();
-    expect(state.currentBlock).toBeUndefined();
 
     const activeSessionMeta = await db.meta.get("activeSession");
     expect(activeSessionMeta).toEqual({ key: "activeSession" });

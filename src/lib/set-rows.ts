@@ -84,10 +84,14 @@ function firstInteger(text: string): number | undefined {
  * and never fewer than one - an exercise with nothing prescribed and nothing
  * logged still needs something to tap.
  *
- * Ghosts are decided PER FIELD: the prescription wins, and last time fills
- * whatever the prescription left blank. So "3 × 8-12" with no load ghosts the
- * range from the card and the weight from last week, and a card that also names
- * a weight overrides last week's on that field alone.
+ * Ghosts are decided PER FIELD, in three steps: the prescription wins, then
+ * what you have already done to this lift TODAY, then last time at this row.
+ *
+ * The middle step is what the app has always done and what a lifter expects:
+ * go up to 105 on set one and set two offers 105, not last week's 100. The
+ * prescription still overrides it, because that is an instruction rather than
+ * a guess - and last week still fills any field neither of the other two
+ * named, which is what makes a first set land on real numbers at all.
  */
 export function buildSetRows({
   lift,
@@ -105,6 +109,9 @@ export function buildSetRows({
   minRows?: number;
 }): SetRow[] {
   const prescribed = parseLoad(lift?.load);
+  // The most recent set of this lift today, which is the shape of the session
+  // as it is actually going.
+  const soFar = logged.length > 0 ? logged[logged.length - 1] : undefined;
   const repsLabel = lift?.reps?.trim() || undefined;
   const prescribedReps = repsLabel ? firstInteger(repsLabel) : undefined;
   const count = Math.max(lift?.sets ?? 0, logged.length, minRows, 1);
@@ -123,10 +130,11 @@ export function buildSetRows({
       ghost: set
         ? {}
         : {
-            weight: prescribed.weight ?? back?.weight,
-            repsLabel: repsLabel ?? (back ? String(back.reps) : undefined),
-            reps: prescribedReps ?? back?.reps,
-            rpe: prescribed.rpe ?? back?.rpe,
+            weight: prescribed.weight ?? soFar?.weight ?? back?.weight,
+            repsLabel:
+              repsLabel ?? (soFar ? String(soFar.reps) : back ? String(back.reps) : undefined),
+            reps: prescribedReps ?? soFar?.reps ?? back?.reps,
+            rpe: prescribed.rpe ?? soFar?.rpe ?? back?.rpe,
           },
     });
   }

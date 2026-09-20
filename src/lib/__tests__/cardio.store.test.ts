@@ -17,7 +17,6 @@ const DEFAULT_STATE = {
   dailyLogs: [],
   activeSessionId: undefined,
   currentExerciseId: undefined,
-  currentBlock: undefined,
   hydrated: false,
 };
 
@@ -105,7 +104,6 @@ describe("logCardio", () => {
 
     expect(state.activeSessionId).toBeUndefined();
     expect(state.currentExerciseId).toBeUndefined();
-    expect(state.currentBlock).toBeUndefined();
   });
 
   it("does not disturb an in-progress strength workout", () => {
