@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChartsRouteImport } from './routes/charts'
-import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as PlanRouteImport } from './routes/plan'
@@ -29,11 +28,6 @@ const IndexRoute = IndexRouteImport.update({
 const ChartsRoute = ChartsRouteImport.update({
   id: '/charts',
   path: '/charts',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ConnectRoute = ConnectRouteImport.update({
-  id: '/connect',
-  path: '/connect',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoryRoute = HistoryRouteImport.update({
@@ -80,7 +74,6 @@ const SessionIdRoute = SessionIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/charts': typeof ChartsRoute
-  '/connect': typeof ConnectRoute
   '/history': typeof HistoryRoute
   '/join': typeof JoinRoute
   '/plan': typeof PlanRoute
@@ -93,7 +86,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/charts': typeof ChartsRoute
-  '/connect': typeof ConnectRoute
   '/history': typeof HistoryRoute
   '/join': typeof JoinRoute
   '/plan': typeof PlanRoute
@@ -107,7 +99,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/charts': typeof ChartsRoute
-  '/connect': typeof ConnectRoute
   '/history': typeof HistoryRoute
   '/join': typeof JoinRoute
   '/plan': typeof PlanRoute
@@ -122,7 +113,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/charts'
-    | '/connect'
     | '/history'
     | '/join'
     | '/plan'
@@ -135,7 +125,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/charts'
-    | '/connect'
     | '/history'
     | '/join'
     | '/plan'
@@ -148,7 +137,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/charts'
-    | '/connect'
     | '/history'
     | '/join'
     | '/plan'
@@ -162,7 +150,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChartsRoute: typeof ChartsRoute
-  ConnectRoute: typeof ConnectRoute
   HistoryRoute: typeof HistoryRoute
   JoinRoute: typeof JoinRoute
   PlanRoute: typeof PlanRoute
@@ -187,13 +174,6 @@ declare module '@tanstack/react-router' {
       path: '/charts'
       fullPath: '/charts'
       preLoaderRoute: typeof ChartsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/connect': {
-      id: '/connect'
-      path: '/connect'
-      fullPath: '/connect'
-      preLoaderRoute: typeof ConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/history': {
@@ -258,7 +238,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChartsRoute: ChartsRoute,
-  ConnectRoute: ConnectRoute,
   HistoryRoute: HistoryRoute,
   JoinRoute: JoinRoute,
   PlanRoute: PlanRoute,

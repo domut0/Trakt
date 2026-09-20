@@ -8,7 +8,7 @@ import {
 } from "./db";
 import { useStore } from "./store";
 import { buildClientSnapshot, type ClientSnapshot } from "./client-snapshot";
-import { pullFromSheet, putPlanOnSheet, type SyncFail, type SyncResponse } from "./sync-client";
+import type { SyncFail } from "./sync-protocol";
 import { pullTabs, putPlanTab } from "./sync-client-google";
 import {
   buildPlanTab,
@@ -161,23 +161,7 @@ function coachErrorFor(code: SyncFail["error"]): CoachError {
 async function pullClientTabs(
   client: CoachClient,
 ): Promise<{ ok: true; tabs: Record<string, CellValue[][]> } | { ok: false; error: CoachError }> {
-  if (client.kind === "appsScript") {
-    if (!client.url || !client.secret) return { ok: false, error: "not-configured" };
-    const reply = await pullFromSheet({
-      url: client.url,
-      secret: client.secret,
-      // A coach reads; they never push, so the device id is only ever echoed
-      // back. `pull` carries no device check, which is what makes reading a
-      // client's sheet possible without claiming it.
-      deviceId: "coach",
-    });
-    if (!reply.ok) {
-      return { ok: false, error: reply.error === "unreadable" ? "unreadable" : "unreachable" };
-    }
-    return { ok: true, tabs: reply.tabs ?? {} };
-  }
-  if (client.kind === "google") {
-    if (!client.spreadsheetId) return { ok: false, error: "not-configured" };
+  if (client.spreadsheetId) {
     // Interactive, because opening a client is always a tap. A silent request
     // fails once the coach reloads or the hour-long token lapses, and coach
     // mode has no Reconnect button of its own to recover with.
@@ -185,6 +169,8 @@ async function pullClientTabs(
     if (!reply.ok) return { ok: false, error: coachErrorFor(reply.error) };
     return { ok: true, tabs: reply.tabs ?? {} };
   }
+  // A client with no sheet is one saved by a version that had another way of
+  // reaching them; there is nothing to read.
   return { ok: false, error: "not-configured" };
 }
 
@@ -274,29 +260,18 @@ export const useCoachStore = create<CoachState>((set, get) => ({
     if (!viewing || get().saving) return false;
     const client = viewing.client;
 
-    // Which sheet, and how to reach it, settled once up front so the send below
-    // has nothing left to check.
-    let send: (tab: CellValue[][]) => Promise<SyncResponse>;
-    let errorFor: (code: SyncFail["error"]) => CoachError;
-    if (client.kind === "appsScript" && client.url && client.secret) {
-      const target = { url: client.url, secret: client.secret, deviceId: "coach" };
-      send = (tab) => putPlanOnSheet(target, tab);
-      errorFor = () => "unreachable";
-    } else if (client.kind === "google" && client.spreadsheetId) {
-      const id = client.spreadsheetId;
-      send = (tab) => putPlanTab(id, tab);
-      errorFor = coachErrorFor;
-    } else {
+    if (!client.spreadsheetId) {
       set({ lastError: "not-configured" });
       return false;
     }
+    const spreadsheetId = client.spreadsheetId;
 
     set({ saving: true, lastError: undefined });
     try {
       const plan = currentPlanFromStore();
-      const reply = await send(buildPlanTab(plan));
+      const reply = await putPlanTab(spreadsheetId, buildPlanTab(plan));
       if (!reply.ok) {
-        set({ saving: false, lastError: errorFor(reply.error) });
+        set({ saving: false, lastError: coachErrorFor(reply.error) });
         return false;
       }
       // The new plan becomes the baseline, so Save goes quiet until the coach

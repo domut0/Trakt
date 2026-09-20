@@ -1,7 +1,7 @@
 import type { CellValue } from "./csv";
 import { getAccessToken } from "./google-auth";
 import { SHEET_TABS } from "./sync";
-import type { SyncErrorCode, SyncResponse } from "./sync-client";
+import type { SyncErrorCode, SyncResponse } from "./sync-protocol";
 
 /**
  * The Sheets API transport: the same sheet, reached directly instead of through

@@ -1,7 +1,6 @@
-import { beforeEach } from "vitest";
+import { beforeEach, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import "fake-indexeddb/auto";
-import { setSyncFetch } from "../lib/sync-client";
 
 // Sheet sync is the app's only network call, and nothing in this suite should
 // ever make a real one. Installing a throwing default means a test that forgets
@@ -10,7 +9,7 @@ import { setSyncFetch } from "../lib/sync-client";
 //
 // Reset per test so one test's stub cannot leak into the next.
 beforeEach(() => {
-  setSyncFetch(() => {
-    throw new Error("Unstubbed network call. Provide a fetch with setSyncFetch() in this test.");
+  vi.stubGlobal("fetch", () => {
+    throw new Error('Unstubbed network call. Stub fetch with vi.stubGlobal("fetch", ...).');
   });
 });

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCoachStore } from "../lib/coach-store";
-import { isLikelyExecUrl } from "../lib/sync-client";
 import {
   pickerAvailable,
   pickSharedSpreadsheet,
@@ -119,7 +118,7 @@ export function CoachSettings() {
           )}
 
           {adding ? (
-            <AddClientForm onDone={() => setAdding(false)} />
+            <AddByPickerForm onDone={() => setAdding(false)} />
           ) : (
             <button
               type="button"
@@ -197,23 +196,9 @@ function CoachProfileForm({ onDone }: { onDone: () => void }) {
 }
 
 /**
- * Adding a client.
- *
- * The Picker is the way in: the client shares their sheet with the coach, and
- * picking it is what grants this app access to it (see google-picker.ts). The
- * Apps Script form stays for sheets set up by hand, one tap away rather than
- * alongside, since a coach choosing between the two up front is choosing
- * between words they do not know.
+ * Adding a client: the client shares their sheet, and picking it is what grants
+ * this app access to it (see google-picker.ts).
  */
-function AddClientForm({ onDone }: { onDone: () => void }) {
-  const [byLink, setByLink] = useState(!pickerAvailable());
-  return byLink ? (
-    <AddByLinkForm onDone={onDone} />
-  ) : (
-    <AddByPickerForm onDone={onDone} onUseLink={() => setByLink(true)} />
-  );
-}
-
 const PICK_ERRORS: Record<PickFailure, string> = {
   "needs-consent": "Google sign-in was closed before it finished",
   "script-blocked": "Couldn't load Google. Check your connection or content blocker",
@@ -221,7 +206,7 @@ const PICK_ERRORS: Record<PickFailure, string> = {
   "no-client-id": "This build has no Google client id",
 };
 
-function AddByPickerForm({ onDone, onUseLink }: { onDone: () => void; onUseLink: () => void }) {
+function AddByPickerForm({ onDone }: { onDone: () => void }) {
   const addClient = useCoachStore((s) => s.addClient);
   const [name, setName] = useState("");
   const [sheet, setSheet] = useState<PickedSheet | undefined>();
@@ -290,67 +275,13 @@ function AddByPickerForm({ onDone, onUseLink }: { onDone: () => void; onUseLink:
           Cancel
         </button>
       </div>
-      <button type="button" onClick={onUseLink} className="min-h-[44px] t-label text-ink-2">
-        Use an Apps Script link instead
-      </button>
-    </div>
-  );
-}
-
-/** Adding a client by their Apps Script deployment, for sheets set up by hand. */
-function AddByLinkForm({ onDone }: { onDone: () => void }) {
-  const addClient = useCoachStore((s) => s.addClient);
-  const [name, setName] = useState("");
-  const [url, setUrl] = useState("");
-  const [secret, setSecret] = useState("");
-  const [error, setError] = useState<string | undefined>();
-
-  const submit = async () => {
-    if (name.trim() === "") return setError("Give them a name.");
-    if (!isLikelyExecUrl(url)) {
-      // The easy mistake is pasting the editor URL instead of the deployment's.
-      return setError("That does not look like a deployment URL. It should end in /exec.");
-    }
-    if (secret.trim() === "") return setError("Paste their sheet's secret.");
-
-    const client: CoachClient = {
-      id: `cc_${crypto.randomUUID()}`,
-      name: name.trim(),
-      kind: "appsScript",
-      url: url.trim(),
-      secret: secret.trim(),
-    };
-    await addClient(client);
-    onDone();
-  };
-
-  return (
-    <div className="group-row-sep space-y-3 px-4 py-4">
-      <Field label="Name" value={name} onChange={setName} placeholder="Bob" />
-      <Field label="Sheet URL" value={url} onChange={setUrl} placeholder="https://…/exec" />
-      <Field label="Secret" value={secret} onChange={setSecret} placeholder="Their sheet secret" />
-      {error && <p className="t-label text-signal">{error}</p>}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => void submit()}
-          className="min-h-[44px] flex-1 bg-ink t-body font-medium text-paper rounded-md"
-        >
-          Add
-        </button>
-        <button type="button" onClick={onDone} className="min-h-[44px] flex-1 t-body text-ink-2">
-          Cancel
-        </button>
-      </div>
     </div>
   );
 }
 
 /**
- * Inviting a new client.
- *
- * The coach's email is the address the client's app will share their sheet
- * with, so it must be the Google account the coach signs in to Trakt with.
+ * Inviting a new client. One field: who it is for. Who it is FROM comes from
+ * the coach profile, so the two names can never be swapped.
  */
 function InviteForm({ onDone }: { onDone: () => void }) {
   const profile = loadCoachProfile();

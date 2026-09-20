@@ -1,20 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  decodeInvite,
-  encodeInvite,
-  INVITE_VERSION,
-  inviteUrl,
-  type ConnectPayload,
-  type JoinPayload,
-} from "../invite";
-
-const CONNECT: ConnectPayload = {
-  v: INVITE_VERSION,
-  kind: "connect",
-  url: "https://script.google.com/macros/s/AKfycbTEST/exec",
-  secret: "a-long-random-secret",
-  label: "Bob's sheet",
-};
+import { decodeInvite, encodeInvite, INVITE_VERSION, inviteUrl, type JoinPayload } from "../invite";
 
 const JOIN: JoinPayload = {
   v: INVITE_VERSION,
@@ -25,8 +10,8 @@ const JOIN: JoinPayload = {
 };
 
 describe("round trip", () => {
-  it("carries a connect payload", () => {
-    expect(decodeInvite(encodeInvite(CONNECT))).toEqual(CONNECT);
+  it("carries a join payload", () => {
+    expect(decodeInvite(encodeInvite(JOIN))).toEqual(JOIN);
   });
 
   it("carries a join payload", () => {
@@ -45,11 +30,11 @@ describe("round trip", () => {
 
   it("produces a fragment safe to paste through a messaging app", () => {
     // base64url: no +, / or = to be mangled by link detectors.
-    expect(encodeInvite(CONNECT)).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(encodeInvite(JOIN)).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
   it("stays short enough to text", () => {
-    expect(inviteUrl("https://trakt.app", CONNECT).length).toBeLessThan(400);
+    expect(inviteUrl("https://trakt.app", JOIN).length).toBeLessThan(400);
   });
 });
 
@@ -59,14 +44,14 @@ describe("refusing anything else", () => {
     ["an empty fragment", ""],
     ["a bare hash", "#"],
     ["a fragment from something else", "section-3"],
-    ["truncated base64", encodeInvite(CONNECT).slice(0, 12)],
+    ["truncated base64", encodeInvite(JOIN).slice(0, 12)],
     ["valid base64 that is not JSON", btoa("hello there").replace(/=+$/, "")],
   ])("refuses %s", (_label, fragment) => {
     expect(decodeInvite(fragment)).toBeUndefined();
   });
 
   it("refuses a payload from a future version rather than half-applying it", () => {
-    const future = encodeInvite({ ...CONNECT, v: INVITE_VERSION + 1 });
+    const future = encodeInvite({ ...JOIN, v: INVITE_VERSION + 1 });
     expect(decodeInvite(future)).toBeUndefined();
   });
 
@@ -75,11 +60,16 @@ describe("refusing anything else", () => {
     expect(decodeInvite(odd)).toBeUndefined();
   });
 
-  it.each([
-    ["no url", { ...CONNECT, url: "" }],
-    ["no secret", { ...CONNECT, secret: "" }],
-  ])("refuses a connect payload with %s", (_label, payload) => {
-    expect(decodeInvite(encodeInvite(payload as ConnectPayload))).toBeUndefined();
+  it("refuses a connect payload, which this version no longer speaks", () => {
+    // The Apps Script transport is gone, so an old /connect link decodes to
+    // nothing rather than to a connection the app cannot make.
+    const old = encodeInvite({
+      v: INVITE_VERSION,
+      kind: "connect",
+      url: "https://script.google.com/macros/s/AKfycbTEST/exec",
+      secret: "a-long-random-secret",
+    } as never);
+    expect(decodeInvite(old)).toBeUndefined();
   });
 
   it("refuses a join payload with no coach name", () => {
@@ -93,25 +83,24 @@ describe("refusing anything else", () => {
 });
 
 describe("inviteUrl", () => {
-  it("routes a connect payload to /connect and a join to /join", () => {
-    expect(inviteUrl("https://trakt.app", CONNECT)).toContain("/connect#");
+  it("routes to /join", () => {
     expect(inviteUrl("https://trakt.app", JOIN)).toContain("/join#");
   });
 
   it("puts the payload in the fragment, never the query string", () => {
-    // A query string reaches the server and lands in access logs; for a connect
-    // link that is the difference between texting a credential and publishing it.
-    const url = inviteUrl("https://trakt.app", CONNECT);
+    // A query string reaches the server and lands in access logs. An invite
+    // carries no credential, but it does carry two people's names.
+    const url = inviteUrl("https://trakt.app", JOIN);
     expect(url).not.toContain("?");
-    expect(url.split("#")[1]).toBe(encodeInvite(CONNECT));
+    expect(url.split("#")[1]).toBe(encodeInvite(JOIN));
   });
 
   it("does not double the slash on an origin that has one", () => {
     expect(inviteUrl("https://trakt.app/", JOIN)).toContain("https://trakt.app/join#");
   });
 
-  it("never puts a secret anywhere but the fragment", () => {
-    const url = inviteUrl("https://trakt.app", CONNECT);
-    expect(url.split("#")[0]).not.toContain(CONNECT.secret);
+  it("never puts a name anywhere but the fragment", () => {
+    const url = inviteUrl("https://trakt.app", JOIN);
+    expect(url.split("#")[0]).not.toContain(JOIN.clientName!);
   });
 });

@@ -103,21 +103,19 @@ export interface DeviceIdMeta {
 export interface SyncConfigMeta {
   key: "syncConfig";
   /**
-   * How the sheet is reached.
+   * How the sheet is reached. Only `"google"` syncs.
    *
-   * Absent reads as `"appsScript"`, so every install that connected before the
-   * Sheets API transport existed needs no migration -- the same convention
-   * `WorkoutSession.kind` and `SplitSlot.kind` already use. Non-indexed, so no
-   * Dexie version bump either.
+   * A record with no `kind` was written by the Apps Script setup, which this
+   * version no longer speaks. It is kept, not migrated or deleted: Settings
+   * reads it to offer a reconnect, and the person's old sheet is still theirs.
    */
   kind?: "appsScript" | "google";
-  /** google only: the spreadsheet this app created and owns access to. */
+  /** The spreadsheet this app created and holds a grant on. */
   spreadsheetId?: string;
-  /** appsScript only: the web app /exec URL. Empty on a google connection. */
+  /** Legacy, from the Apps Script setup: its /exec URL and secret. */
   url: string;
-  /** appsScript only. Empty on a google connection, which authenticates by token. */
   secret: string;
-  /** Identifies this install to the script, which refuses a push from another. */
+  /** This install, kept across reconnects so a reset is not a new browser. */
   deviceId: string;
   enabled: boolean;
   /** Filled in from the script's reply, so Settings can link to the sheet. */
@@ -147,19 +145,15 @@ type MetaRecord = SettingsMeta | ActiveSessionMeta | SyncConfigMeta | SyncBaseMe
  * coach's device holds about a client is how to reach their spreadsheet, plus
  * the name to show it under.
  *
- * `kind` mirrors `SyncConfigMeta`: a sheet reached through the Apps Script has
- * a url and a secret, one reached through the Sheets API has a spreadsheet id.
  */
 export interface CoachClient {
   id: string;
   /** What the coach calls them. Shown in the banner and the client list. */
   name: string;
+  /** Only "google" now. Kept so a client saved by an older version still reads. */
   kind: "google" | "appsScript";
-  /** google: the spreadsheet this app was granted access to via the Picker. */
+  /** The spreadsheet this app was granted access to via the Picker. */
   spreadsheetId?: string;
-  /** appsScript: the /exec deployment and its secret. */
-  url?: string;
-  secret?: string;
   /** When their data was last pulled, so the banner can say how stale it is. */
   lastPulledAt?: number;
 }

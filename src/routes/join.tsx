@@ -2,7 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { decodeInvite, type JoinPayload } from "../lib/invite";
 import { loadPendingCoach, savePendingCoach } from "../lib/pending-coach";
-import { Frame, Primary } from "./connect";
+import { Frame, Primary } from "../components/Frame";
 
 export const Route = createFileRoute("/join")({
   head: () => ({

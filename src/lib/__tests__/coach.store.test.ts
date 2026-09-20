@@ -4,7 +4,7 @@ import { useCoachStore } from "../coach-store";
 import { useStore } from "../store";
 import { useSyncStore } from "../sync-store";
 import { buildSheetTabs, SHEET_TABS, type SyncSource } from "../sync";
-import { setSyncFetch } from "../sync-client";
+import type { CellValue } from "../csv";
 import { clearGoogleToken, setGoogleTokenSource } from "../google-auth";
 
 /**
@@ -17,9 +17,8 @@ import { clearGoogleToken, setGoogleTokenSource } from "../google-auth";
 const CLIENT: CoachClient = {
   id: "c_bob",
   name: "Bob",
-  kind: "appsScript",
-  url: "https://script.google.com/macros/s/AKfycbBOB/exec",
-  secret: "bob-secret",
+  kind: "google",
+  spreadsheetId: "bob-sheet",
 };
 
 const DAY = new Date(2026, 8, 12, 9, 30, 0).getTime();
@@ -60,21 +59,63 @@ const COACH_STATE = {
   hydrated: true,
 };
 
-function stubClientSheet(source: SyncSource = BOB_SHEET) {
-  setSyncFetch(() =>
-    Promise.resolve(
-      new Response(
-        JSON.stringify({
-          ok: true,
-          revision: 1,
-          tabs: buildSheetTabs(source, { issuedAt: "2026-09-10T08:00:00.000Z" }),
-        }),
-      ),
-    ),
-  );
+/** The tab order `pullTabs` asks for; replies are matched to it by index. */
+const TAB_ORDER = [
+  SHEET_TABS.sets,
+  SHEET_TABS.sessions,
+  SHEET_TABS.daily,
+  SHEET_TABS.cardio,
+  SHEET_TABS.plan,
+  SHEET_TABS.meta,
+];
+
+interface Sent {
+  url: string;
+  method: string;
+  body: Record<string, unknown>;
+}
+
+/**
+ * A client's sheet, reached the way the Sheets API reaches it: a batchGet to
+ * read, then batchClear and batchUpdate to write.
+ */
+function stubClientSheet(
+  source: SyncSource = BOB_SHEET,
+  { writeStatus = 200 }: { writeStatus?: number } = {},
+): Sent[] {
+  const sent: Sent[] = [];
+  vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    sent.push({
+      url,
+      method,
+      body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {},
+    });
+    if (method === "GET") {
+      const tabs = buildSheetTabs(source, { issuedAt: "2026-09-10T08:00:00.000Z" }) as Record<
+        string,
+        CellValue[][]
+      >;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ valueRanges: TAB_ORDER.map((name) => ({ values: tabs[name] ?? [] })) }),
+        ),
+      );
+    }
+    return Promise.resolve(new Response("{}", { status: writeStatus }));
+  });
+  return sent;
+}
+
+/** What a write sent, keyed by tab. */
+function pushedTabs(sent: Sent[]): Record<string, unknown> {
+  const update = sent.filter((x) => x.url.includes("values:batchUpdate")).pop();
+  const data = (update?.body.data ?? []) as Array<{ range: string; values: unknown }>;
+  return Object.fromEntries(data.map((d) => [d.range, d.values]));
 }
 
 beforeEach(async () => {
+  setGoogleTokenSource(() => Promise.resolve("fake-token"));
   setDbReadOnlyOff();
   await db.coachClients.clear();
   useCoachStore.setState({
@@ -148,7 +189,7 @@ describe("entering a client's view", () => {
   });
 
   it("reports an unreachable sheet without touching the coach's state", async () => {
-    setSyncFetch(() => Promise.reject(new Error("offline")));
+    vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
     const ok = await useCoachStore.getState().enterClientView("c_bob");
 
     expect(ok).toBe(false);
@@ -388,15 +429,17 @@ describe("sync while viewing a client", () => {
     await useCoachStore.getState().enterClientView("c_bob");
 
     let pushed = false;
-    setSyncFetch(() => {
+    vi.stubGlobal("fetch", () => {
       pushed = true;
-      return Promise.resolve(new Response(JSON.stringify({ ok: true, revision: 1 })));
+      return Promise.resolve(new Response("{}"));
     });
     useSyncStore.setState({
       config: {
         key: "syncConfig",
-        url: "https://script.google.com/macros/s/AKfycbCOACH/exec",
-        secret: "coach-secret",
+        kind: "google",
+        spreadsheetId: "coach-sheet",
+        url: "",
+        secret: "",
         deviceId: "dev_coach",
         enabled: true,
       },
@@ -411,24 +454,6 @@ describe("sync while viewing a client", () => {
 });
 
 describe("writing a plan back to a client", () => {
-  /** Captures what was POSTed, so the test can assert on the request itself. */
-  function captureSave(reply: unknown = { ok: true, revision: 1 }) {
-    const sent: Array<Record<string, unknown>> = [];
-    setSyncFetch((_url, init) => {
-      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
-      sent.push(body);
-      if (body.action === "pull") {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({ ok: true, revision: 1, tabs: buildSheetTabs(BOB_SHEET, undefined) }),
-          ),
-        );
-      }
-      return Promise.resolve(new Response(JSON.stringify(reply)));
-    });
-    return sent;
-  }
-
   it("reports nothing to save before the coach has changed anything", async () => {
     stubClientSheet();
     await useCoachStore.getState().enterClientView("c_bob");
@@ -454,9 +479,8 @@ describe("writing a plan back to a client", () => {
   });
 
   it("sends only the plan tab, never the client's log", async () => {
-    stubClientSheet();
+    const sent = stubClientSheet();
     await useCoachStore.getState().enterClientView("c_bob");
-    const sent = captureSave();
 
     useStore.setState({
       nutritionPhases: [
@@ -465,18 +489,18 @@ describe("writing a plan back to a client", () => {
     });
     expect(await useCoachStore.getState().saveClientPlan()).toBe(true);
 
-    const save = sent.find((b) => b.action === "putPlan")!;
-    expect(save).toBeDefined();
-    // A coach must never rewrite a client's log, nor claim their sheet.
-    expect(sent.some((b) => b.action === "push")).toBe(false);
-    expect(Object.keys(save.tabs as object)).toEqual(["plan"]);
-    expect(JSON.stringify(save.tabs)).toContain("coach");
+    // A coach must never rewrite a client's log, nor claim their sheet: one
+    // tab cleared, the same one written, and it carries the coach attribution.
+    const written = pushedTabs(sent);
+    expect(Object.keys(written)).toEqual(["plan"]);
+    const clear = sent.filter((x) => x.url.includes("values:batchClear")).pop()!;
+    expect(clear.body.ranges).toEqual(["plan"]);
+    expect(JSON.stringify(written)).toContain("coach");
   });
 
   it("goes quiet after a successful save, rather than staying lit on sent work", async () => {
     stubClientSheet();
     await useCoachStore.getState().enterClientView("c_bob");
-    captureSave();
 
     useStore.setState({
       nutritionPhases: [
@@ -491,7 +515,8 @@ describe("writing a plan back to a client", () => {
   it("keeps the changes pending when the sheet refuses", async () => {
     stubClientSheet();
     await useCoachStore.getState().enterClientView("c_bob");
-    captureSave({ ok: false, error: "busy" });
+    // The save fails; the read that opened the client did not.
+    stubClientSheet(BOB_SHEET, { writeStatus: 500 });
 
     useStore.setState({
       nutritionPhases: [
@@ -506,7 +531,7 @@ describe("writing a plan back to a client", () => {
   });
 
   it("saves nothing when no client is open", async () => {
-    const sent = captureSave();
+    const sent = stubClientSheet();
     expect(await useCoachStore.getState().saveClientPlan()).toBe(false);
     expect(sent).toEqual([]);
   });

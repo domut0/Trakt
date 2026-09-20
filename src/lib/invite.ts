@@ -23,16 +23,6 @@
 
 export const INVITE_VERSION = 1;
 
-export interface ConnectPayload {
-  v: number;
-  kind: "connect";
-  /** The Apps Script /exec deployment. */
-  url: string;
-  secret: string;
-  /** Shown on the confirmation screen, so the client knows what they tapped. */
-  label?: string;
-}
-
 export interface JoinPayload {
   v: number;
   kind: "join";
@@ -42,7 +32,7 @@ export interface JoinPayload {
   clientName?: string;
 }
 
-export type InvitePayload = ConnectPayload | JoinPayload;
+export type InvitePayload = JoinPayload;
 
 // --- base64url ------------------------------------------------------------
 //
@@ -95,18 +85,6 @@ export function decodeInvite(fragment: string | undefined): InvitePayload | unde
   // so refusing is safer than half-applying it.
   if (p.v !== INVITE_VERSION) return undefined;
 
-  if (p.kind === "connect") {
-    if (typeof p.url !== "string" || p.url === "") return undefined;
-    if (typeof p.secret !== "string" || p.secret === "") return undefined;
-    return {
-      v: INVITE_VERSION,
-      kind: "connect",
-      url: p.url,
-      secret: p.secret,
-      ...(typeof p.label === "string" ? { label: p.label } : {}),
-    };
-  }
-
   if (p.kind === "join") {
     if (typeof p.coachName !== "string" || p.coachName === "") return undefined;
     return {
@@ -123,6 +101,5 @@ export function decodeInvite(fragment: string | undefined): InvitePayload | unde
 
 /** A full link, for the coach to send. */
 export function inviteUrl(origin: string, payload: InvitePayload): string {
-  const path = payload.kind === "connect" ? "/connect" : "/join";
-  return `${origin.replace(/\/$/, "")}${path}#${encodeInvite(payload)}`;
+  return `${origin.replace(/\/$/, "")}/join#${encodeInvite(payload)}`;
 }

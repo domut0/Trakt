@@ -23,14 +23,7 @@ import {
 } from "./sync";
 import { isNewerCoachPlan, parsePlanTab, shouldPublishOwnPlan, type PlanPayload } from "./plan-tab";
 import { loadPendingCoach } from "./pending-coach";
-import {
-  isLikelyExecUrl,
-  pullFromSheet,
-  pushToSheet,
-  type SyncConnection,
-  type SyncErrorCode,
-  type SyncResponse,
-} from "./sync-client";
+import type { SyncErrorCode, SyncResponse } from "./sync-protocol";
 import { createSpreadsheet, pullTabs, pushTabs } from "./sync-client-google";
 import { clearGoogleToken, googleClientId } from "./google-auth";
 
@@ -98,13 +91,6 @@ export interface SyncState {
   blockedReason?: SyncErrorCode;
 
   hydrate: () => Promise<void>;
-  connect: (url: string, secret: string) => Promise<{ ok: boolean; error?: string }>;
-  /**
-   * Creates a spreadsheet in the user's own Drive and syncs to it.
-   *
-   * The whole point of the Sheets transport: no Apps Script editor, no deploy
-   * dialogs, no URL to copy. One consent screen and the sheet exists.
-   */
   connectGoogle: () => Promise<{ ok: boolean; error?: string }>;
   /** True when this build carries an OAuth client id, so the button can exist. */
   googleAvailable: () => boolean;
@@ -113,7 +99,7 @@ export interface SyncState {
   markPending: () => void;
   syncNow: () => Promise<void>;
   /** Claims a sheet currently owned by another install. Replaces its contents. */
-  takeOverSheet: () => Promise<void>;
+
   dismissCollisions: () => void;
 }
 
@@ -135,53 +121,31 @@ function applyMerge(result: MergeResult): void {
   for (const { date, patch } of result.dailyPatches) store.upsertDailyLog(date, patch);
 }
 
-function connectionFrom(config: SyncConfigMeta): SyncConnection {
-  return { url: config.url, secret: config.secret, deviceId: config.deviceId };
+/**
+ * Whether this connection can still sync.
+ *
+ * A config with no `spreadsheetId` was made by the Apps Script setup, which
+ * this version no longer speaks. It is not an error state to recover from in
+ * code: the sheet is still in the person's Drive, and reconnecting makes a new
+ * one from the device, which holds everything.
+ */
+function isConnected(config: SyncConfigMeta): boolean {
+  return config.kind === "google" && (config.spreadsheetId ?? "") !== "";
 }
 
-/**
- * Which transport a connection uses.
- *
- * An absent `kind` is an Apps Script connection made before the Sheets API
- * transport existed, so the default is what keeps every one of those working.
- */
-function isGoogle(config: SyncConfigMeta): boolean {
-  return config.kind === "google";
-}
-
-/**
- * Pull and push, dispatched on transport.
- *
- * The two live here rather than behind one client module because they are the
- * only two places the transports differ at all. Everything downstream -- the
- * merge, the base snapshot, the collision reporting -- reads the same tabs
- * whichever produced them, which is the property worth protecting: a sheet
- * written by one transport is readable by the other.
- */
 function pullFor(config: SyncConfigMeta): Promise<SyncResponse> {
-  return isGoogle(config)
-    ? pullTabs(config.spreadsheetId ?? "")
-    : pullFromSheet(connectionFrom(config));
+  return pullTabs(config.spreadsheetId ?? "");
 }
 
 function pushFor(
   config: SyncConfigMeta,
-  input: {
-    tabs: Record<string, CellValue[][]>;
-    expectedRevision: number;
-    force: boolean;
-    unit: "lbs" | "kg";
-    takeover?: boolean;
-  },
+  input: { tabs: Record<string, CellValue[][]> },
 ): Promise<SyncResponse> {
-  if (isGoogle(config)) {
-    // No revision, no device ownership and no takeover: those exist because an
-    // Apps Script deployment is a shared endpoint several installs could post
-    // to. A spreadsheet reached with this device's own OAuth token has no such
-    // ambiguity -- the grant IS the identity.
-    return pushTabs(config.spreadsheetId ?? "", input.tabs);
-  }
-  return pushToSheet(connectionFrom(config), input);
+  // No revision, no device ownership and no takeover: those existed because an
+  // Apps Script deployment was a shared endpoint several installs could post
+  // to. A spreadsheet reached with this device's own OAuth token has no such
+  // ambiguity -- the grant IS the identity.
+  return pushTabs(config.spreadsheetId ?? "", input.tabs);
 }
 
 /** Long enough that guessing it is not a way in, short enough to paste. */
@@ -213,22 +177,16 @@ async function ensureDeviceId(): Promise<string> {
   return created;
 }
 
-/** Maps a script or transport failure onto what the user can do about it. */
+/** Maps a transport failure onto what the user can do about it. */
 function describeFailure(error: string): { status: SyncStatus; message: string } {
   switch (error) {
     case "bad-secret":
+      // 403 from the Sheets API: the grant no longer covers this file, which is
+      // what a client un-sharing their sheet looks like from here.
       return {
         status: "blocked",
-        message: "The sheet rejected this app's secret. Re-paste the script and reconnect.",
+        message: "This sheet is no longer shared with this account.",
       };
-    case "other-device":
-      return {
-        status: "blocked",
-        message: "This sheet is already connected to another device.",
-      };
-    case "stale":
-      // Only reachable in push-only mode if something else wrote the sheet.
-      return { status: "error", message: "The sheet changed while syncing. Trying again shortly." };
     case "busy":
       return { status: "error", message: "The sheet was busy. Trying again shortly." };
     case "timeout":
@@ -291,40 +249,6 @@ export const useSyncStore = create<SyncState>((set, get) => ({
       // A settings row the app cannot read must not stop the app from starting.
       set({ hydrated: true, status: "off" });
     }
-  },
-
-  connect: async (url, secret) => {
-    const trimmed = url.trim();
-    if (!isLikelyExecUrl(trimmed)) {
-      return {
-        ok: false,
-        error: "That does not look like a deployment URL. It should end in /exec.",
-      };
-    }
-    if (!secret.trim()) {
-      return { ok: false, error: "Paste the secret from the script." };
-    }
-
-    let config: SyncConfigMeta;
-    try {
-      config = {
-        key: "syncConfig",
-        url: trimmed,
-        secret: secret.trim(),
-        deviceId: await ensureDeviceId(),
-        enabled: true,
-      };
-      await saveSyncConfig(config);
-      // A fresh connection knows nothing about what is in the sheet, so the
-      // first sync must be a publish rather than a merge.
-      await clearSyncBase();
-    } catch {
-      return { ok: false, error: "Couldn't save the connection to this device." };
-    }
-
-    set({ config, status: "idle", lastError: undefined, blockedReason: undefined });
-    await get().syncNow();
-    return { ok: true };
   },
 
   googleAvailable: () => googleClientId() !== undefined,
@@ -425,6 +349,18 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     const { config, running } = get();
     if (!config?.enabled || running) return;
 
+    // An Apps Script connection, which this version no longer speaks. Blocked
+    // rather than errored: retrying cannot help, and Settings offers the
+    // reconnect that can.
+    if (!isConnected(config)) {
+      set({
+        status: "blocked",
+        blockedReason: "unreadable",
+        lastError: "Sheet sync has moved to Google sign-in. Reconnect in Settings.",
+      });
+      return;
+    }
+
     // The store's default state is empty arrays until IndexedDB has loaded.
     // Pushing that would publish an empty sheet, and once a base exists it would
     // read as the user having deleted their entire history.
@@ -447,7 +383,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
 
     set({ running: true, status: "syncing" });
     try {
-      await runCycle(config, set, get, 0);
+      await runCycle(config, set, get);
     } catch {
       // Nothing here may throw into React. A sync failure is not a data-loss
       // event and must never interrupt logging.
@@ -457,30 +393,8 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     }
   },
 
-  takeOverSheet: async () => {
-    const { config, running } = get();
-    if (!config || running) return;
-    if (!useStore.getState().hydrated) return;
-
-    set({ running: true, status: "syncing" });
-    try {
-      // A takeover republishes wholesale, so whatever ancestor was recorded
-      // against the previous owner's sheet is meaningless. Dropping it also
-      // makes the cycle below force, which is what claiming the sheet means.
-      await clearSyncBase();
-      await runCycle(config, set, get, 0, { takeover: true });
-    } catch {
-      set({ status: "error", lastError: "Sync failed.", pending: true });
-    } finally {
-      set({ running: false });
-    }
-  },
-
   dismissCollisions: () => set({ collisions: [] }),
 }));
-
-/** How many times a stale push is retried before giving up for this cycle. */
-const MAX_STALE_RETRIES = 1;
 
 type SetState = (partial: Partial<SyncState>) => void;
 type GetState = () => SyncState;
@@ -492,13 +406,7 @@ type GetState = () => SyncState;
  * app BEFORE the push rewrites the tabs. Reversing the two would overwrite the
  * user's edits with the values they had just replaced.
  */
-async function runCycle(
-  config: SyncConfigMeta,
-  set: SetState,
-  get: GetState,
-  attempt: number,
-  options: { takeover?: boolean } = {},
-): Promise<void> {
+async function runCycle(config: SyncConfigMeta, set: SetState, get: GetState): Promise<void> {
   let base = await loadSyncBase();
   let collisions: Collision[] = [];
   // Undefined until a pull happens. On the very first sync there is nothing in
@@ -555,22 +463,9 @@ async function runCycle(
 
   const response = await pushFor(config, {
     tabs: buildSheetTabs(app, publishOwnPlan ? { issuedAt: new Date().toISOString() } : undefined),
-    expectedRevision: base?.revision ?? 0,
-    // Without a base there is nothing to be stale against: this is the first
-    // publish, and the app is the only thing that has ever written here.
-    force: base === undefined,
-    unit: app.unit,
-    takeover: options.takeover,
   });
 
   if (!response.ok) {
-    // Someone typed in the sheet between the pull and the push. The window is
-    // about a second, but it is exactly when the user is looking at the sheet,
-    // so re-running the cycle folds their edit in rather than losing it.
-    if (response.error === "stale" && attempt < MAX_STALE_RETRIES) {
-      await runCycle(config, set, get, attempt + 1, options);
-      return;
-    }
     const { status, message } = describeFailure(response.error);
     set({
       status,

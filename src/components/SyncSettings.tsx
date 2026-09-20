@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import scriptSource from "../../google-apps-script/sync.gs?raw";
 import { useStore } from "@/lib/store";
-import { generateSecret, useSyncStore } from "@/lib/sync-store";
+import { useSyncStore } from "@/lib/sync-store";
 import { ShareWithCoach } from "./ShareWithCoach";
 import { Toggle } from "./Toggle";
 
@@ -13,9 +12,15 @@ import { Toggle } from "./Toggle";
  * a small state machine and settings.tsx is already 600 lines.
  */
 
-/** The script, with the generated secret substituted in so there is nothing to edit. */
-function scriptWithSecret(secret: string): string {
-  return scriptSource.replace("__SECRET__", secret);
+/**
+ * Whether this config is one this version can sync.
+ *
+ * An Apps Script connection is not broken data, it is a connection to a
+ * transport the app no longer speaks -- so it is offered a reconnect rather
+ * than an error.
+ */
+function isGoogleConfig(config: { kind?: string; spreadsheetId?: string }): boolean {
+  return config.kind === "google" && (config.spreadsheetId ?? "") !== "";
 }
 
 /** A discarded cell, shown back to the user. Blank must read as blank, not as nothing. */
@@ -46,7 +51,6 @@ export function SyncSettings() {
   const lastSyncedAt = useSyncStore((s) => s.lastSyncedAt);
   const lastError = useSyncStore((s) => s.lastError);
   const pending = useSyncStore((s) => s.pending);
-  const connect = useSyncStore((s) => s.connect);
   const connectGoogle = useSyncStore((s) => s.connectGoogle);
   const googleAvailable = useSyncStore((s) => s.googleAvailable);
   const disconnect = useSyncStore((s) => s.disconnect);
@@ -55,182 +59,77 @@ export function SyncSettings() {
   const collisions = useSyncStore((s) => s.collisions);
   const dismissCollisions = useSyncStore((s) => s.dismissCollisions);
   const blockedReason = useSyncStore((s) => s.blockedReason);
-  const takeOverSheet = useSyncStore((s) => s.takeOverSheet);
   const setCount = useStore((s) => s.sets.length);
   const dayCount = useStore((s) => s.dailyLogs.length);
 
   const [showSetup, setShowSetup] = useState(false);
-  // `connecting` is shared with the Apps Script form below: only one connection
-  // attempt can be in flight, and two flags would be two things to keep in step.
   const [googleError, setGoogleError] = useState<string | undefined>();
-  const [secret, setSecret] = useState("");
-  const [url, setUrl] = useState("");
-  const [formError, setFormError] = useState<string>();
-  const [copied, setCopied] = useState(false);
-  const [showScript, setShowScript] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [showDisconnect, setShowDisconnect] = useState(false);
-  const [showTakeover, setShowTakeover] = useState(false);
-
-  const openSetup = () => {
-    // Generated here rather than at render: crypto is fine on the server, but
-    // a value made during SSR would differ from the one the client renders.
-    setSecret(generateSecret());
-    setShowSetup(true);
-  };
-
-  const copyScript = async () => {
-    try {
-      await navigator.clipboard.writeText(scriptWithSecret(secret));
-      setCopied(true);
-    } catch {
-      // Clipboard access is refused in plenty of mobile contexts. Showing the
-      // text to select by hand beats a dead end.
-      setShowScript(true);
-    }
-  };
-
-  const submit = async () => {
-    setConnecting(true);
-    setFormError(undefined);
-    const result = await connect(url, secret);
-    setConnecting(false);
-    if (!result.ok) {
-      setFormError(result.error);
-      return;
-    }
-    setShowSetup(false);
-    setUrl("");
-  };
 
   if (!config) {
     return (
       <>
-        {!showSetup ? (
-          <>
-            {/* The one-tap path, first, because it is the one anyone should
-                use. The Apps Script flow below it is ten minutes at a desktop
-                and only exists for builds with no OAuth client configured, and
-                for sheets already set up that way. */}
-            {googleAvailable() && (
-              <>
-                <button
-                  type="button"
-                  disabled={connecting}
-                  onClick={() => {
-                    setConnecting(true);
-                    setGoogleError(undefined);
-                    void connectGoogle().then((result) => {
-                      setConnecting(false);
-                      if (!result.ok) setGoogleError(result.error);
-                    });
-                  }}
-                  className="group-row w-full text-left"
-                >
-                  <div>
-                    <div className="t-body">
-                      {connecting ? "Connecting…" : "Connect Google Sheet"}
-                    </div>
-                    <div className="t-label text-ink-2">
-                      Creates one in your own Drive. Trakt can only see the file it makes.
-                    </div>
-                  </div>
-                  <span className="t-action" aria-hidden="true">
-                    →
-                  </span>
-                </button>
-                {googleError && (
-                  <div className="group-row-sep px-4 py-3 t-label text-signal">{googleError}</div>
-                )}
-              </>
-            )}
-
-            <button
-              type="button"
-              onClick={openSetup}
-              className={"group-row w-full text-left" + (googleAvailable() ? " group-row-sep" : "")}
-            >
-              <div>
-                <div className="t-body">
-                  {googleAvailable() ? "Connect a sheet set up by hand" : "Set up sheet sync"}
-                </div>
-                <div className="t-label text-ink-2">
-                  {googleAvailable()
-                    ? "The Apps Script route. Needs a computer."
-                    : "Keep a Google Sheet up to date with your log."}
-                </div>
-              </div>
-              <span className="t-action" aria-hidden="true">
-                →
-              </span>
-            </button>
-          </>
-        ) : (
-          <div className="space-y-4 p-4">
-            <ol className="space-y-2 t-label text-ink-2">
-              <li>1. Open a Google Sheet, then Extensions, then Apps Script.</li>
-              <li>2. Delete what is in the editor, then paste the script below.</li>
-              <li>3. Deploy, New deployment, Web app. Execute as me, anyone with the link.</li>
-              <li>4. Copy the web app URL and paste it here.</li>
-            </ol>
-
-            <button
-              type="button"
-              onClick={copyScript}
-              className="min-h-11 w-full bg-wash py-2.5 t-body font-medium text-ink"
-            >
-              {copied ? "Script copied" : "Copy script"}
-            </button>
-
-            {showScript && (
-              <textarea
-                readOnly
-                aria-label="Apps Script source"
-                value={scriptWithSecret(secret)}
-                className="h-40 w-full bg-wash p-3 t-label text-ink-2"
-              />
-            )}
-
-            <div>
-              <label htmlFor="sync-url" className="t-label text-ink-2">
-                Web app URL
-              </label>
-              <input
-                id="sync-url"
-                type="url"
-                inputMode="url"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-                placeholder="https://script.google.com/macros/s/.../exec"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="mt-1 min-h-11 w-full bg-wash px-3 t-body"
-              />
-            </div>
-
-            {formError && <div className="t-label text-signal">{formError}</div>}
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowSetup(false)}
-                className="min-h-11 flex-1 bg-wash py-2.5 t-body font-medium text-ink-2"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={submit}
-                disabled={connecting}
-                className="min-h-11 flex-1 bg-ink py-2.5 t-body font-medium text-paper rounded-md"
-              >
-                {connecting ? "Connecting" : "Connect"}
-              </button>
+        <button
+          type="button"
+          disabled={connecting || !googleAvailable()}
+          onClick={() => {
+            setConnecting(true);
+            setGoogleError(undefined);
+            void connectGoogle().then((result) => {
+              setConnecting(false);
+              if (!result.ok) setGoogleError(result.error);
+            });
+          }}
+          className="group-row w-full text-left"
+        >
+          <div>
+            <div className="t-body">{connecting ? "Connecting…" : "Connect Google Sheet"}</div>
+            <div className="t-label text-ink-2">
+              Creates one in your own Drive. Trakt can only see the file it makes
             </div>
           </div>
+          <span className="t-action" aria-hidden="true">
+            →
+          </span>
+        </button>
+        {googleError && (
+          <div className="group-row-sep px-4 py-3 t-label text-signal">{googleError}</div>
         )}
       </>
+    );
+  }
+
+  // A connection made by the Apps Script setup, which this version no longer
+  // speaks. Nothing is lost by reconnecting: the device holds every set, and
+  // the old sheet stays in Drive untouched.
+  if (!isGoogleConfig(config)) {
+    return (
+      <div className="group-row-sep space-y-3 px-4 py-4">
+        <div className="t-body">Sheet sync has moved to Google sign-in</div>
+        <p className="t-label text-ink-2">
+          Reconnecting makes a new sheet in your Drive from this phone. Your old sheet stays where
+          it is
+        </p>
+        {googleError && <p className="t-label text-signal">{googleError}</p>}
+        <button
+          type="button"
+          disabled={connecting || !googleAvailable()}
+          onClick={() => {
+            setConnecting(true);
+            setGoogleError(undefined);
+            void disconnect().then(() =>
+              connectGoogle().then((result) => {
+                setConnecting(false);
+                if (!result.ok) setGoogleError(result.error);
+              }),
+            );
+          }}
+          className="min-h-[44px] w-full bg-ink t-body font-medium text-paper rounded-md"
+        >
+          {connecting ? "Connecting…" : "Reconnect with Google"}
+        </button>
+      </div>
     );
   }
 
@@ -278,55 +177,6 @@ export function SyncSettings() {
 
       {config.kind === "google" && config.spreadsheetId && (
         <ShareWithCoach spreadsheetId={config.spreadsheetId} />
-      )}
-
-      {blockedReason === "other-device" && (
-        <div className="group-row-sep space-y-3 p-4">
-          <div className="t-label text-ink-2">
-            This sheet belongs to another install. Each one tracks what it last pushed, so two
-            writing to one sheet would overwrite each other.
-          </div>
-          {!showTakeover ? (
-            <button
-              type="button"
-              onClick={() => setShowTakeover(true)}
-              className="min-h-11 w-full bg-wash py-2.5 t-body font-medium text-ink"
-            >
-              Take over this sheet
-            </button>
-          ) : (
-            <>
-              {/* The counts are the point. A fresh install taking over replaces
-                  the sheet with nothing, and "0 sets" is what makes that
-                  obvious before the tap rather than after. */}
-              <div className="t-label text-signal">
-                This replaces the sheet's contents with this device's data:{" "}
-                {setCount.toLocaleString()} {setCount === 1 ? "set" : "sets"} and{" "}
-                {dayCount.toLocaleString()} {dayCount === 1 ? "day" : "days"} logged. The other
-                install stops syncing to it.
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowTakeover(false)}
-                  className="min-h-11 flex-1 bg-wash py-2.5 t-body font-medium text-ink-2"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void takeOverSheet();
-                    setShowTakeover(false);
-                  }}
-                  className="min-h-11 flex-1 bg-signal py-2.5 t-body font-medium text-white rounded-md"
-                >
-                  Take over
-                </button>
-              </div>
-            </>
-          )}
-        </div>
       )}
 
       {collisions.length > 0 && (
