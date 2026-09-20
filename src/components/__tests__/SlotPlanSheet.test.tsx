@@ -33,28 +33,61 @@ describe("SlotPlanSheet", () => {
     });
   });
 
+  describe("the preset library", () => {
+    it("offers presets this device has never logged", () => {
+      // Coach mode is why: the store then holds a CLIENT's exercises, rebuilt
+      // from their sheet, so it lists only what they have already done.
+      useStore.setState({ exercises: [SQUAT] });
+      renderSheet();
+      fireEvent.change(search(), { target: { value: "Face Pull" } });
+
+      expect(screen.getByRole("button", { name: /^Face Pull/ })).toBeInTheDocument();
+      // Offered from the library, so there is nothing to create.
+      expect(screen.queryByRole("button", { name: /^Add / })).not.toBeInTheDocument();
+    });
+
+    it("picking one makes it a real exercise, as typing the name would", () => {
+      useStore.setState({ exercises: [SQUAT] });
+      renderSheet();
+      fireEvent.change(search(), { target: { value: "Face Pull" } });
+      fireEvent.click(screen.getByRole("button", { name: /^Face Pull/ }));
+
+      const created = useStore.getState().exercises.find((e) => e.name === "Face Pull");
+      expect(created).toBeDefined();
+      expect(screen.getByRole("button", { name: /Remove Face Pull/ })).toBeInTheDocument();
+    });
+
+    it("never shows a preset the device already has, under either spelling", () => {
+      useStore.setState({ exercises: [{ ...SQUAT, name: "back squat" }] });
+      renderSheet();
+      fireEvent.change(search(), { target: { value: "Back Squat" } });
+
+      expect(screen.getAllByRole("button", { name: /^back squat/i })).toHaveLength(1);
+    });
+  });
+
   describe("creating an exercise", () => {
     it("offers to add a name the library does not have", () => {
       // The gap this closes: planning a card around a lift you have not done
       // before is the ordinary case, and the only way through it used to be to
       // abandon the card and go log a set of it somewhere.
       renderSheet();
-      fireEvent.change(search(), { target: { value: "Pendlay Row" } });
+      fireEvent.change(search(), { target: { value: "Jefferson Curl" } });
 
-      const add = screen.getByRole("button", { name: /Add .*Pendlay Row/ });
+      const add = screen.getByRole("button", { name: /Add .*Jefferson Curl/ });
       fireEvent.click(add);
 
-      const created = useStore.getState().exercises.find((e) => e.name === "Pendlay Row");
+      const created = useStore.getState().exercises.find((e) => e.name === "Jefferson Curl");
       expect(created).toBeDefined();
       expect(created?.type).toBe("accessory");
     });
 
     it("puts the new exercise straight into the chosen list", () => {
       renderSheet();
-      fireEvent.change(search(), { target: { value: "Pendlay Row" } });
-      fireEvent.click(screen.getByRole("button", { name: /Add .*Pendlay Row/ }));
+      fireEvent.change(search(), { target: { value: "Jefferson Curl" } });
+      fireEvent.click(screen.getByRole("button", { name: /Add .*Jefferson Curl/ }));
 
-      expect(screen.getByRole("button", { name: "Remove Pendlay Row" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove Jefferson Curl" })).toBeInTheDocument();
       // And the box is cleared, so the next name can be typed without selecting
       // and deleting the last one.
       expect((search() as HTMLInputElement).value).toBe("");
@@ -71,7 +104,7 @@ describe("SlotPlanSheet", () => {
       // offer a duplicate the moment the first copy was ticked.
       renderSheet();
       fireEvent.change(search(), { target: { value: "Bench" } });
-      fireEvent.click(screen.getByRole("button", { name: /Bench Press/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Bench Press/ }));
 
       fireEvent.change(search(), { target: { value: "Bench Press" } });
       expect(screen.queryByRole("button", { name: /^Add / })).not.toBeInTheDocument();
@@ -94,8 +127,8 @@ describe("SlotPlanSheet", () => {
   describe("ordering the chosen lifts", () => {
     it("moves one up, because the order is what the workout opens on", () => {
       renderSheet();
-      fireEvent.click(screen.getByRole("button", { name: /Back Squat/ }));
-      fireEvent.click(screen.getByRole("button", { name: /Bench Press/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Back Squat/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Bench Press/ }));
 
       fireEvent.click(screen.getByRole("button", { name: "Move Bench Press up" }));
       fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -106,8 +139,8 @@ describe("SlotPlanSheet", () => {
 
     it("cannot move the ends off the list", () => {
       renderSheet();
-      fireEvent.click(screen.getByRole("button", { name: /Back Squat/ }));
-      fireEvent.click(screen.getByRole("button", { name: /Bench Press/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Back Squat/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Bench Press/ }));
 
       expect(screen.getByRole("button", { name: "Move Back Squat up" })).toBeDisabled();
       expect(screen.getByRole("button", { name: "Move Bench Press down" })).toBeDisabled();

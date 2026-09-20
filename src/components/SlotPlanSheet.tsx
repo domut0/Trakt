@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { seedExercises } from "../lib/exercise-library";
 import { createPortal } from "react-dom";
 import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { kindOf, type SplitCardKind } from "../lib/planning";
@@ -72,10 +73,26 @@ export function SlotPlanSheet({
     [liftable, picked],
   );
 
-  /** Everything not already chosen, filtered by the search box. */
+  /**
+   * Everything not already chosen, filtered by the search box: this device's
+   * exercises first, then the preset library for anything it has never heard of.
+   *
+   * The presets matter most in coach mode, where the store holds a CLIENT's
+   * exercises - rebuilt from their sheet, so it contains only what they have
+   * logged or been prescribed. Without this a coach writing "Face Pull" for the
+   * first time had to type it from memory. A preset is not a record until it is
+   * picked; choosing one creates it, exactly as typing the name would.
+   */
   const library = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const pool = liftable.filter((e) => !picked.includes(e.id));
+    const known = new Set(liftable.map((e) => e.name.trim().toLowerCase()));
+    const pool: Array<Exercise & { preset?: true }> = liftable.filter(
+      (e) => !picked.includes(e.id),
+    );
+    for (const preset of seedExercises) {
+      if (preset.type === "cardio" || known.has(preset.name.trim().toLowerCase())) continue;
+      pool.push({ ...preset, preset: true });
+    }
     return (q ? pool.filter((e) => e.name.toLowerCase().includes(q)) : pool).slice(0, 40);
   }, [liftable, query, picked]);
 
@@ -93,7 +110,11 @@ export function SlotPlanSheet({
    */
   const typed = query.trim();
   const canCreate =
-    typed.length > 0 && !exercises.some((e) => e.name.toLowerCase() === typed.toLowerCase());
+    typed.length > 0 &&
+    !exercises.some((e) => e.name.toLowerCase() === typed.toLowerCase()) &&
+    // Nor a preset the list is already offering, or "Face Pull" would appear
+    // twice: once to pick, once to create.
+    !seedExercises.some((e) => e.name.toLowerCase() === typed.toLowerCase());
 
   const create = () => {
     // Accessory, matching the log sheet's picker. It is the type that assumes
@@ -248,7 +269,9 @@ export function SlotPlanSheet({
                 <button
                   key={e.id}
                   type="button"
-                  onClick={() => add(e.id)}
+                  // A preset has no record behind it yet, so picking it makes
+                  // one. Its id here is the library's, never the store's.
+                  onClick={() => add(e.preset ? addExercise(e.name, e.type).id : e.id)}
                   className={`group-row w-full text-left ${i === 0 ? "" : "group-row-sep"}`}
                 >
                   <span className="min-w-0 truncate t-body text-ink">{e.name}</span>
