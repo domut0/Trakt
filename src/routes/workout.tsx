@@ -1,14 +1,11 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Check, Plus } from "../components/icons";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { DeleteWorkoutButton } from "../components/DeleteWorkoutButton";
 import { Flap } from "../components/Flap";
-import { LastSessionCard } from "../components/LastSessionCard";
-import { LogSetSheet } from "../components/LogSetSheet";
 import { SessionView } from "../components/SessionView";
+import { WorkoutLog } from "../components/WorkoutLog";
 import { WorkoutSummaryScreen } from "../components/WorkoutSummaryScreen";
-import { dayKey } from "../lib/daily-log";
-import { useStore, type Exercise, type PlannedLift } from "../lib/store";
+import { useStore } from "../lib/store";
 import { buildWorkoutSummary, type WorkoutSummaryData } from "../lib/workout-summary";
 
 export const Route = createFileRoute("/workout")({
@@ -40,16 +37,6 @@ function fmtTime(s: number) {
   return `${m}:${String(r).padStart(2, "0")}`;
 }
 
-/** "3 x 8-12 · RPE 8", or nothing when no numbers were prescribed. */
-function prescriptionOf(lift: PlannedLift): string {
-  const parts: string[] = [];
-  if (lift.sets !== undefined && lift.reps) parts.push(`${lift.sets} x ${lift.reps}`);
-  else if (lift.sets !== undefined) parts.push(`${lift.sets} sets`);
-  else if (lift.reps) parts.push(lift.reps);
-  if (lift.load) parts.push(lift.load);
-  return parts.join(" · ");
-}
-
 function WorkoutPage() {
   const router = useRouter();
   const activeSessionId = useStore((s) => s.activeSessionId);
@@ -59,13 +46,8 @@ function WorkoutPage() {
   const exercises = useStore((s) => s.exercises);
   const unit = useStore((s) => s.unit);
   const currentExerciseId = useStore((s) => s.currentExerciseId);
-  const currentBlock = useStore((s) => s.currentBlock);
   const endWorkout = useStore((s) => s.endWorkout);
-  const logNextInBlock = useStore((s) => s.logNextInBlock);
-  const lastSetupNoteFor = useStore((s) => s.lastSetupNoteFor);
-  const setCurrentExercise = useStore((s) => s.setCurrentExercise);
 
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [showView, setShowView] = useState(false);
   /**
    * The finished workout, once End has been pressed. Held here rather than
@@ -75,21 +57,15 @@ function WorkoutPage() {
   const [summary, setSummary] = useState<WorkoutSummaryData | null>(null);
 
   /*
-    There is no "Set logged" toast on this screen any more, and it is not a
-    removal so much as a replacement.
+    There is no log bar on this screen any more, and no "Sets: N" stepper
+    behind it.
 
-    It was a floating inked block pinned above the log bar. Once the set list
-    began stacking upward from that bar, any fixed position over the list
-    collides with it eventually: at bottom-52 it sat on the two newest rows by
-    the third or fourth set, and two inked blocks at the same weight merge into
-    one shape rather than overlapping. Moving it anywhere else on this layout
-    only changes which set count breaks it.
-
-    The row IS the confirmation now. A logged set mounts a new row directly
-    above the button that made it, at the thumb, and that row lands with the
-    app's flap. That is better feedback than a label that says a thing
-    happened, because it shows the thing that happened, it is permanent, and it
-    cannot collide with the list it is part of.
+    Both belonged to a model where the unit being logged was a SET and the
+    exercise was a setting on the sheet that logged it - which is how the sheet
+    could open on the previous lift, and why logging three straight sets needed
+    a target count declared up front and then counted down. The unit is the
+    exercise now. Its sets are rows inside it, a row is tapped to log or to
+    correct it, and nothing has to be told in advance how many there will be.
   */
 
   // No active session means there is nothing to log, so this route sends the
@@ -107,33 +83,9 @@ function WorkoutPage() {
   const lastLoggedAt = sessSets[sessSets.length - 1]?.loggedAt;
   const elapsedSinceLast = useElapsed(lastLoggedAt);
   const currentExercise = exercises.find((e) => e.id === currentExerciseId);
-
-  /**
-   * The lifts this workout's SLOT is for, in the order they were chosen, or null
-   * when the slot has none. Null is the common case until the user plans one.
-   *
-   * Read off the slot rather than off a weekday, because the rotation this plans
-   * has no weekdays in it: UL×infinity advances when you train. That also makes
-   * the lookup independent of the date entirely, so a workout begun at 11pm
-   * cannot lose its plan at midnight - there is no date in the question any more.
-   *
-   * Lifts whose exercise has since been deleted are dropped here rather than
-   * stored pruned, so deleting an exercise never has to walk every slot.
-   */
-  const planned = useMemo(() => {
-    if (!session?.splitSlotId) return null;
-    const slot = slots.find((sl) => sl.id === session.splitSlotId);
-    if (!slot?.plannedLifts?.length) return null;
-    const lifts = slot.plannedLifts
-      .map((lift) => {
-        const exercise = exercises.find((e) => e.id === lift.exerciseId);
-        return exercise ? { ...lift, exercise } : undefined;
-      })
-      .filter((l): l is PlannedLift & { exercise: Exercise } => l !== undefined);
-    return lifts.length > 0 ? { name: slot.name, lifts } : null;
-  }, [slots, session, exercises]);
-  const currentSetupNote = currentExerciseId ? lastSetupNoteFor(currentExerciseId) : undefined;
-  const inBlock = !!currentBlock && currentBlock.loggedInBlock < currentBlock.targetSets;
+  // Formatted once, so this screen and the exercise screen show one clock
+  // rather than two that tick a second apart.
+  const stopwatch = sessSets.length === 0 ? "0:00" : fmtTime(elapsedSinceLast);
 
   const goHome = () => router.navigate({ to: "/" });
 
@@ -231,200 +183,20 @@ function WorkoutPage() {
               removed a product decision to save six characters. The column got
               wider instead. */}
           <div className="t-caption text-ink-3">Time between sets</div>
-          <div className="mt-1 t-stat text-ink">
-            {sessSets.length === 0 ? "0:00" : fmtTime(elapsedSinceLast)}
-          </div>
+          <div className="mt-1 t-stat text-ink">{stopwatch}</div>
         </div>
       </div>
 
-      {currentSetupNote && (
-        <div className="mx-4 mt-2 rounded-md bg-wash px-4 py-2 t-label text-ink-2">
-          {currentSetupNote}
-        </div>
-      )}
-
-      {/* Directly under the lift it describes, above whichever list this screen
-          is showing. The setup note comes first because it is an instruction for
-          the set you are about to do; this is a reading for the one you are
-          about to choose. */}
-      <LastSessionCard exerciseId={currentExerciseId} excludeSessionId={activeSessionId} />
-
       {/*
-        The sets you have actually logged, newest first.
+        The workout's exercises, and what each one opens.
 
-        This space used to be empty paper. The plan feature is opt-in and most
-        days are unplanned, which the memo above calls the overwhelmingly common
-        case, so the default state of the app's most-used screen was a header, a
-        button, and roughly 350px of nothing. Worse, the set you had just logged
-        was invisible: the only way to see it was to open "View workout", which
-        is a full-screen overlay you have to dismiss to log the next one.
-
-        A workout is a record being written, so the record is on the page while
-        you write it. Newest first because the set you just logged is the one you
-        are checking, and it is the row the log button is nearest to.
-
-        Only rendered when there is no plan. With a plan the same space is the
-        plan list, which is an offer about what comes NEXT and outranks a
-        transcript of what already happened.
+        This space used to hold two different lists - a transcript of logged
+        sets on an unplanned day, a plan list on a planned one - and a log bar
+        under whichever was showing. One list does both jobs now: a plan puts
+        rows in it before you start, and anything logged or added off-plan
+        joins them. The count on the right is the transcript.
       */}
-      {/*
-        Stacked UP from the log bar, not down from the header.
-
-        The rows grow towards the button rather than away from it, so the set
-        you just logged is always the row nearest your thumb and the blank
-        paper collects at the top where nothing needs it. Logging the first
-        set of a session otherwise put one row under the header and left the
-        whole 700px middle empty between it and the control that made it.
-      */}
-      {!planned && sessSets.length > 0 && (
-        <section className="flex min-h-0 flex-1 flex-col justify-end overflow-y-auto">
-          <ul>
-            {[...sessSets].reverse().map((set, idx) => {
-              const ex = exercises.find((e) => e.id === set.exerciseId);
-              return (
-                <li
-                  key={set.id}
-                  className={`flex items-baseline justify-between gap-3 px-4 py-2.5 ${
-                    idx > 0 ? "group-row-sep" : "anim-flap-row"
-                  }`}
-                >
-                  <span className="min-w-0 flex-1 truncate t-body text-ink">
-                    {ex?.name ?? "Unknown exercise"}
-                  </span>
-                  <span className="shrink-0 tnum t-body text-ink">
-                    {set.weight} {unit} × {set.reps}
-                    {set.rpe != null && <span className="t-label text-ink-2"> @ {set.rpe}</span>}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-
-      {/*
-        Planned lifts, when the day has a plan.
-
-        An OFFER, never a checklist. Nothing here gates the log button, the
-        picker still reaches every exercise in the library, and an accessory that
-        is not in the plan is logged exactly as it always was. Tapping a row only
-        moves the current exercise, which is how a lift is taken out of order or
-        stepped past: the plan never has to be satisfied, or dismissed, to log
-        anything.
-
-        `min-h-0` with its own scroller so a long hand-edited plan shortens
-        instead of pushing the bottom row off a small screen.
-      */}
-      {planned && (
-        <section className="section-gap min-h-0 flex-1 overflow-y-auto px-4">
-          <div className="group-header">
-            <h2 className="t-caption">Planned</h2>
-            {planned.name.trim() && (
-              <span className="truncate t-label text-ink-2">{planned.name}</span>
-            )}
-          </div>
-          <ul className="group-list">
-            {planned.lifts.map((lift, idx) => {
-              const ex = lift.exercise;
-              const logged = sessSets.filter((s) => s.exerciseId === ex.id).length;
-              const isCurrent = ex.id === currentExerciseId;
-              return (
-                <li key={ex.id}>
-                  <button
-                    onClick={() => setCurrentExercise(ex.id)}
-                    aria-pressed={isCurrent}
-                    /*
-                      The lift you are on is an INKED ROW, which is the same mark
-                      the week strip uses for the day you are on. One vocabulary
-                      for "you are here" across the app, and on a two-ink page it
-                      is the only unambiguous one: the previous version said it
-                      with accent-coloured semibold text, which next to a plain
-                      row is emphasis rather than position.
-                    */
-                    className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""} ${
-                      isCurrent ? "rounded-md bg-ink text-paper" : "text-ink"
-                    }`}
-                  >
-                    <span className="flex min-w-0 items-center gap-3">
-                      {/* Same filled-versus-open square as a ticked habit. */}
-                      <span
-                        aria-hidden="true"
-                        className={`h-[14px] w-[14px] shrink-0 rounded-sm ${
-                          logged > 0
-                            ? isCurrent
-                              ? "bg-paper"
-                              : "bg-ink"
-                            : isCurrent
-                              ? "border-paper border-[1.5px]"
-                              : "mark-open"
-                        }`}
-                      />
-                      <span className="min-w-0">
-                        <span className="block truncate t-body">{ex.name}</span>
-                        {/* What was prescribed, where it was prescribed. Blank
-                            for a lift nobody put numbers against. */}
-                        {prescriptionOf(lift) && (
-                          <span
-                            className={`block truncate t-label ${isCurrent ? "text-paper opacity-80" : "text-ink-2"}`}
-                          >
-                            {prescriptionOf(lift)}
-                          </span>
-                        )}
-                      </span>
-                    </span>
-                    {logged > 0 && (
-                      <span
-                        className={`shrink-0 tnum t-label ${isCurrent ? "text-paper" : "text-ink-2"}`}
-                      >
-                        {logged}
-                        {lift.sets ? `/${lift.sets}` : ""}{" "}
-                        {logged === 1 && !lift.sets ? "set" : "sets"}
-                      </span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-
-      {/* Bottom row: session summary (left) + View workout (right) */}
-      {/*
-        Primary action, and it sits in the bottom third on purpose.
-
-        A full-width inked bar rather than an 88px disc. Three reasons and none
-        of them is taste: nothing in this world is round; a bar is roughly four
-        times the tap area of the disc it replaces, which is what a sweaty hand
-        at arm's length actually needs; and the disc's own label had to sit
-        underneath it, so the button and the words describing it were two
-        objects. Here the button says what it does.
-      */}
-      <div className="mt-auto px-4 pb-4">
-        <button
-          onClick={() => {
-            if (inBlock) {
-              logNextInBlock();
-            } else {
-              setSheetOpen(true);
-            }
-          }}
-          aria-label={inBlock ? "Log the next set in this block" : "Log a set"}
-          className="flex min-h-[72px] w-full items-center justify-between gap-3 bg-ink px-4 text-paper rounded-md"
-        >
-          <span className="min-w-0 text-left">
-            <span className="block t-heading">{inBlock ? "Next set" : "Log set"}</span>
-            {inBlock && currentBlock && (
-              <span className="mt-0.5 block truncate tnum t-label">
-                {currentBlock.loggedInBlock + 1} of {currentBlock.targetSets} ·{" "}
-                {currentBlock.weight} × {currentBlock.reps}
-                {currentBlock.rpe != null ? ` @ ${currentBlock.rpe}` : ""}
-              </span>
-            )}
-          </span>
-          <Plus size={26} className="shrink-0" />
-        </button>
-      </div>
+      <WorkoutLog sessionId={session.id} lifts={slot.plannedLifts ?? []} stopwatch={stopwatch} />
 
       <div
         className="flex items-end justify-between gap-4 px-4 pt-3"
@@ -454,8 +226,6 @@ function WorkoutPage() {
           View workout
         </button>
       </div>
-
-      <LogSetSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
 
       {showView && (
         <div
