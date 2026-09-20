@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCoachStore } from "../lib/coach-store";
 import { isLikelyExecUrl } from "../lib/sync-client";
 import {
@@ -34,6 +34,10 @@ export function CoachSettings() {
 
   const [adding, setAdding] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  // Re-read whenever the form closes: it is localStorage, not state anything
+  // subscribes to.
+  const profile = useMemo(() => loadCoachProfile(), [editingProfile]);
 
   useEffect(() => {
     void hydrate();
@@ -92,6 +96,28 @@ export function CoachSettings() {
             </div>
           )}
 
+          {editingProfile ? (
+            <CoachProfileForm onDone={() => setEditingProfile(false)} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditingProfile(true)}
+              className="group-row group-row-sep w-full text-left"
+            >
+              <span className="min-w-0">
+                <span className="block t-body text-ink">
+                  {profile.name.trim() === "" ? "Your coach profile" : profile.name}
+                </span>
+                <span className="block truncate t-label text-ink-2">
+                  {profile.email.trim() === ""
+                    ? "The name and address your clients see"
+                    : profile.email}
+                </span>
+              </span>
+              <Chevron className="shrink-0 text-ink-2" size={16} />
+            </button>
+          )}
+
           {adding ? (
             <AddClientForm onDone={() => setAdding(false)} />
           ) : (
@@ -120,6 +146,53 @@ export function CoachSettings() {
         </>
       )}
     </>
+  );
+}
+
+/**
+ * The coach's own name and address, typed once.
+ *
+ * The name is what every client sees - on the invite, beside their shared
+ * sheet, and on their locked Plan tab - and the address is the Google account
+ * their sheet gets shared with, so it must be the one this app signs in as.
+ */
+function CoachProfileForm({ onDone }: { onDone: () => void }) {
+  const saved = loadCoachProfile();
+  const [name, setName] = useState(saved.name);
+  const [email, setEmail] = useState(saved.email);
+  const [error, setError] = useState<string | undefined>();
+
+  const save = () => {
+    if (name.trim() === "") return setError("Add your name");
+    if (!isLikelyEmail(email)) return setError("That email does not look right");
+    saveCoachProfile({ name: name.trim(), email: email.trim() });
+    onDone();
+  };
+
+  return (
+    <div className="group-row-sep space-y-3 px-4 py-4">
+      <Field label="Your name" value={name} onChange={setName} placeholder="Marcus" />
+      <Field
+        label="Your Google email"
+        value={email}
+        onChange={setEmail}
+        placeholder="you@gmail.com"
+      />
+      <p className="t-label text-ink-2">Clients share their sheet with this address</p>
+      {error && <p className="t-label text-signal">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={save}
+          className="min-h-[44px] flex-1 bg-ink t-body font-medium text-paper rounded-md"
+        >
+          Save
+        </button>
+        <button type="button" onClick={onDone} className="min-h-[44px] flex-1 t-body text-ink-2">
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -280,31 +353,26 @@ function AddByLinkForm({ onDone }: { onDone: () => void }) {
  * with, so it must be the Google account the coach signs in to Trakt with.
  */
 function InviteForm({ onDone }: { onDone: () => void }) {
-  const [profile] = useState(loadCoachProfile);
+  const profile = loadCoachProfile();
   const [clientName, setClientName] = useState("");
-  const [coachName, setCoachName] = useState(profile.name);
-  const [coachEmail, setCoachEmail] = useState(profile.email);
   const [error, setError] = useState<string | undefined>();
   const [status, setStatus] = useState<"copied" | "manual" | undefined>();
   const [manualUrl, setManualUrl] = useState<string | undefined>();
 
+  const ready = profile.name.trim() !== "" && isLikelyEmail(profile.email);
+
   const submit = async () => {
-    const name = coachName.trim();
-    const email = coachEmail.trim();
     const theirName = clientName.trim();
     setStatus(undefined);
     setManualUrl(undefined);
-
-    if (name === "") return setError("Add your name");
-    if (!isLikelyEmail(email)) return setError("That email does not look right");
+    if (!ready) return setError("Fill in your coach profile first");
     setError(undefined);
-    saveCoachProfile({ name, email });
 
     const url = inviteUrl(window.location.origin, {
       v: INVITE_VERSION,
       kind: "join",
-      coachName: name,
-      coachEmail: email,
+      coachName: profile.name.trim(),
+      coachEmail: profile.email.trim(),
       ...(theirName ? { clientName: theirName } : {}),
     });
 
@@ -330,13 +398,12 @@ function InviteForm({ onDone }: { onDone: () => void }) {
   return (
     <div className="group-row-sep space-y-3 px-4 py-4">
       <Field label="Their name" value={clientName} onChange={setClientName} placeholder="Bob" />
-      <Field label="Your name" value={coachName} onChange={setCoachName} placeholder="Marcus" />
-      <Field
-        label="Your Google email"
-        value={coachEmail}
-        onChange={setCoachEmail}
-        placeholder="you@gmail.com"
-      />
+      {/* Who it will say it is from. The one thing worth checking before it is
+          sent, and the reason the profile exists rather than three fields
+          retyped per invite. */}
+      <p className="truncate t-label text-ink-2">
+        {ready ? `Sent as ${profile.name} · ${profile.email}` : "No coach profile yet"}
+      </p>
       {error && <p className="t-label text-signal">{error}</p>}
       {status === "copied" && <p className="t-label text-ink-2">Link copied</p>}
       {status === "manual" && <p className="t-label text-ink-2">Copy this link</p>}

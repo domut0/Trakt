@@ -13,6 +13,8 @@ const KEY = "trakt.pendingCoach";
 export interface PendingCoach {
   name: string;
   email?: string;
+  /** What the coach called this person, used to name the sheet they create. */
+  clientName?: string;
   /** Set once the sheet has been shared with them. */
   sharedAt?: number;
 }
@@ -26,6 +28,7 @@ export function loadPendingCoach(): PendingCoach | undefined {
     return {
       name: parsed.name,
       ...(typeof parsed.email === "string" ? { email: parsed.email } : {}),
+      ...(typeof parsed.clientName === "string" ? { clientName: parsed.clientName } : {}),
       ...(typeof parsed.sharedAt === "number" ? { sharedAt: parsed.sharedAt } : {}),
     };
   } catch {

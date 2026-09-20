@@ -5,9 +5,14 @@ describe("the pending coach", () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => vi.restoreAllMocks());
 
-  it("round-trips, including the shared mark", () => {
-    savePendingCoach({ name: "Marcus", email: "m@gmail.com", sharedAt: 5 });
-    expect(loadPendingCoach()).toEqual({ name: "Marcus", email: "m@gmail.com", sharedAt: 5 });
+  it("round-trips, including the shared mark and the invited name", () => {
+    savePendingCoach({ name: "Marcus", email: "m@gmail.com", clientName: "Bob", sharedAt: 5 });
+    expect(loadPendingCoach()).toEqual({
+      name: "Marcus",
+      email: "m@gmail.com",
+      clientName: "Bob",
+      sharedAt: 5,
+    });
   });
 
   it("is absent when nothing, or nothing readable, is stored", () => {

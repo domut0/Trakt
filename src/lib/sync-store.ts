@@ -22,6 +22,7 @@ import {
   type MergeResult,
 } from "./sync";
 import { isNewerCoachPlan, parsePlanTab, shouldPublishOwnPlan, type PlanPayload } from "./plan-tab";
+import { loadPendingCoach } from "./pending-coach";
 import {
   isLikelyExecUrl,
   pullFromSheet,
@@ -335,7 +336,13 @@ export const useSyncStore = create<SyncState>((set, get) => ({
       return { ok: false, error: "This build has no Google client id configured." };
     }
 
-    const title = `Trakt — ${new Date().toISOString().slice(0, 10)}`;
+    // Named after the person whose sheet it is, when their coach's invite said
+    // so: every client's sheet is otherwise called the same thing, and the
+    // coach picks between them by date in the Picker.
+    const invitedName = loadPendingCoach()?.clientName?.trim();
+    const title = invitedName
+      ? `Trakt — ${invitedName}`
+      : `Trakt — ${new Date().toISOString().slice(0, 10)}`;
     const created = await createSpreadsheet(title);
     if (!created.ok) {
       const { message } = describeFailure(created.error);

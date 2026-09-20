@@ -44,6 +44,7 @@ function JoinPage() {
       savePendingCoach({
         name: join.coachName,
         ...(join.coachEmail ? { email: join.coachEmail } : {}),
+        ...(join.clientName ? { clientName: join.clientName } : {}),
         ...(same && known.sharedAt !== undefined ? { sharedAt: known.sharedAt } : {}),
       });
     }
