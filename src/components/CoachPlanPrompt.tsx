@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useSyncStore } from "../lib/sync-store";
 import { useStore } from "../lib/store";
@@ -17,17 +17,15 @@ import { useToast } from "./Toast";
  * offered again next time, because a client who taps past this by accident has
  * not decided anything.
  */
-export function CoachPlanPrompt() {
+/** What the pending plan would change, or an empty list when there is none. */
+function usePendingChanges() {
   const pending = useSyncStore((s) => s.pendingCoachPlan);
-  const acceptCoachPlan = useStore((s) => s.acceptCoachPlan);
   const phases = useStore((s) => s.nutritionPhases);
   const slots = useStore((s) => s.slots);
   const plannedDays = useStore((s) => s.plannedDays);
   const exercises = useStore((s) => s.exercises);
-  const showToast = useToast();
-  const [open, setOpen] = useState(false);
 
-  const changes = useMemo(() => {
+  return useMemo(() => {
     if (!pending) return [];
     const current = planFromStore(
       { slots, exercises, nutritionPhases: phases, plannedDays },
@@ -36,6 +34,16 @@ export function CoachPlanPrompt() {
     );
     return diffPlan(current, pending);
   }, [pending, slots, exercises, phases, plannedDays]);
+}
+
+/**
+ * The card that says a plan is waiting. Shown on Today and on Plan, because a
+ * plan nobody noticed is the failure this feature exists to prevent.
+ */
+export function CoachPlanCard() {
+  const pending = useSyncStore((s) => s.pendingCoachPlan);
+  const setOpen = useSyncStore((s) => s.setPlanReviewOpen);
+  const changes = usePendingChanges();
 
   if (!pending) return null;
 
@@ -58,7 +66,26 @@ export function CoachPlanPrompt() {
         </span>
         <span className="shrink-0 t-label font-medium">Review →</span>
       </button>
+    </>
+  );
+}
 
+/**
+ * The review screen itself, mounted once by the shell so any tab can raise it -
+ * including the launch sync, which opens it the moment a plan arrives.
+ */
+export function CoachPlanPrompt() {
+  const pending = useSyncStore((s) => s.pendingCoachPlan);
+  const open = useSyncStore((s) => s.planReviewOpen);
+  const setOpen = useSyncStore((s) => s.setPlanReviewOpen);
+  const acceptCoachPlan = useStore((s) => s.acceptCoachPlan);
+  const showToast = useToast();
+  const changes = usePendingChanges();
+
+  if (!pending) return null;
+
+  return (
+    <>
       {/* Portalled to the body, like every other overlay here. AppShell leaves a
           transform on <main> after a route animation, and a transformed
           ancestor becomes the containing block for position: fixed -- which put

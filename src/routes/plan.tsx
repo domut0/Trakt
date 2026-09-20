@@ -7,7 +7,7 @@ import { TargetStrip } from "../components/TargetStrip";
 import { SlotPlanSheet } from "../components/SlotPlanSheet";
 import { SplitCardList } from "../components/SplitCardList";
 import { SaveChangesBar } from "../components/SaveChangesBar";
-import { CoachPlanPrompt } from "../components/CoachPlanPrompt";
+import { CoachPlanCard } from "../components/CoachPlanPrompt";
 import { CoachManagedBanner } from "../components/CoachManagedBanner";
 import { usePlanLocked } from "../lib/plan-lock";
 import { Plus } from "../components/icons";
@@ -78,8 +78,9 @@ function PlanPage() {
       <SaveChangesBar />
 
       {/* The client's side: renders nothing unless their sheet holds a
-          coach-issued plan they have not absorbed. */}
-      <CoachPlanPrompt />
+          coach-issued plan they have not absorbed. The review screen itself is
+          mounted by the shell, so it can open over any tab. */}
+      <CoachPlanCard />
       <CoachManagedBanner />
 
       {/* Inert while a coach manages the plan: readable, not editable. The

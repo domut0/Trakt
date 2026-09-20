@@ -4,7 +4,7 @@ import { SyncEngine } from "../SyncEngine";
 import { ToastProvider } from "../Toast";
 import { useStore } from "../../lib/store";
 import { useSyncStore } from "../../lib/sync-store";
-import type { SyncConfig } from "../../lib/sync-store";
+import type { SyncConfigMeta } from "../../lib/db";
 
 /**
  * The launch sync. Everything else in SyncEngine reacts to something -- an
@@ -20,7 +20,7 @@ const CONFIG = {
   secret: "",
   deviceId: "d1",
   enabled: true,
-} as unknown as SyncConfig;
+} as unknown as SyncConfigMeta;
 
 function mount() {
   return render(

@@ -6,6 +6,8 @@ import { ClientBanner } from "./ClientBanner";
 import { Gear } from "./icons";
 import { StartWorkoutSheet } from "./StartWorkoutSheet";
 import { WorkoutChooserSheet } from "./WorkoutChooserSheet";
+import { CoachPlanPrompt } from "./CoachPlanPrompt";
+import { useSyncStore } from "@/lib/sync-store";
 
 type TabPath = "/" | "/plan" | "/history" | "/charts";
 type TabItem = {
@@ -156,6 +158,9 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
   // client's, and the read-only latch would refuse the write anyway. Better to
   // say so on the button than to let it open a sheet that silently does nothing.
   const viewingClient = useCoachStore((s) => s.viewing !== undefined);
+  // A plan waiting to be reviewed marks the tab that holds it, so dismissing
+  // the card does not hide the fact that something is waiting.
+  const planWaiting = useSyncStore((s) => s.pendingCoachPlan !== undefined);
   if (location.pathname === "/workout") return null;
   const items = TABS;
   const currentIndex = items.findIndex((it) => it.to === location.pathname);
@@ -189,7 +194,15 @@ export function BottomNav({ onOpenChooser }: { onOpenChooser: () => void }) {
           }`}
           aria-current={active ? "page" : undefined}
         >
-          <Icon name={it.icon} />
+          <span className="relative">
+            <Icon name={it.icon} />
+            {planWaiting && it.to === "/plan" && (
+              <span
+                aria-hidden="true"
+                className="absolute -right-1.5 -top-0.5 h-2 w-2 rounded-full bg-accent"
+              />
+            )}
+          </span>
           <span className="t-label font-medium">{it.label}</span>
         </Link>
       </li>
@@ -389,6 +402,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
         {children}
       </main>
+      {/* Mounted once, above everything: a plan can arrive while the person is
+          on any tab, and the launch sync opens this itself. */}
+      <CoachPlanPrompt />
       <BottomNav onOpenChooser={() => setChooserOpen(true)} />
       <WorkoutChooserSheet
         open={chooserOpen}

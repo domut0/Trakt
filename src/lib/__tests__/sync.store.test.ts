@@ -758,6 +758,33 @@ describe("the plan tab", () => {
     expect(pending?.phases[0]).toMatchObject({ name: "Cut", calories: 2200 });
   });
 
+  it("opens the review itself, so a plan cannot sit unnoticed", async () => {
+    // With the launch sync, this is how a plan announces itself: the person
+    // opens the app and the review is in front of them.
+    await withBase();
+    stubFetch({ ok: true, revision: 4, tabs: { plan: PLAN_TAB } });
+
+    await useSyncStore.getState().syncNow();
+
+    expect(useSyncStore.getState().planReviewOpen).toBe(true);
+  });
+
+  it("does not reopen the review it was just dismissed from, until the next launch", async () => {
+    // Dismissing is not deciding: the plan stays pending, the card and the tab
+    // dot stay, and the next launch offers it again. What it must not do is
+    // reappear over the app every time a sync runs.
+    await withBase();
+    stubFetch({ ok: true, revision: 4, tabs: { plan: PLAN_TAB } });
+    await useSyncStore.getState().syncNow();
+    useSyncStore.getState().setPlanReviewOpen(false);
+
+    stubFetch({ ok: true, revision: 5, tabs: { plan: PLAN_TAB } });
+    await useSyncStore.getState().syncNow();
+
+    expect(useSyncStore.getState().planReviewOpen).toBe(false);
+    expect(useSyncStore.getState().pendingCoachPlan).toBeDefined();
+  });
+
   it("does not re-offer a plan already accepted, and resumes publishing its own", async () => {
     // Re-reading the same tab on every sync has to be idempotent, or the app
     // would nag about the same plan forever.

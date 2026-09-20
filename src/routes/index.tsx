@@ -3,6 +3,7 @@ import { format, isValid } from "date-fns";
 import { AppShell } from "../components/AppShell";
 import { DayStatsCard } from "../components/DayStatsCard";
 import { WeekStrip } from "../components/WeekStrip";
+import { CoachPlanCard } from "../components/CoachPlanPrompt";
 import { dayKey, isDailyLogEmpty, parseDayKey } from "../lib/daily-log";
 import { useStore, type DailyLog } from "../lib/store";
 
@@ -131,6 +132,10 @@ function Home() {
       <header className="pl-4 pr-12 pt-14 pb-2">
         <h1 className="t-title">{heading}</h1>
       </header>
+
+      {/* First thing on the screen people open the app to. Renders nothing
+          unless a coach plan is waiting. */}
+      <CoachPlanCard />
 
       <div className="px-4">
         <WeekStrip selectedDate={selected} onSelectDate={selectDate} />

@@ -80,6 +80,16 @@ export interface SyncState {
    */
   pendingCoachPlan?: PlanPayload;
   /**
+   * Whether the review screen is on top of whatever the person was looking at.
+   *
+   * In the store rather than in the component because three things open it -
+   * the card on Today, the card on Plan, and the sync that finds the plan in
+   * the first place - and a plan nobody noticed is the failure this feature
+   * exists to prevent.
+   */
+  planReviewOpen: boolean;
+  setPlanReviewOpen: (open: boolean) => void;
+  /**
    * Why sync is blocked, as a code rather than the prose in `lastError`.
    * The UI branches on this; matching on a message string would silently stop
    * working the moment the wording changed.
@@ -244,6 +254,13 @@ function describeFailure(error: string): { status: SyncStatus; message: string }
   }
 }
 
+/**
+ * The plan this session has already shown, by its issued instant. Module-level
+ * because it is not state anything renders and must not survive a relaunch:
+ * a dismissed plan is offered again the next time the app opens.
+ */
+let seenThisSession: string | undefined;
+
 export const useSyncStore = create<SyncState>((set, get) => ({
   status: "off",
   pending: false,
@@ -251,6 +268,14 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   running: false,
   collisions: [],
   pendingCoachPlan: undefined,
+  planReviewOpen: false,
+  setPlanReviewOpen: (open) => {
+    // Dismissing marks this plan seen for THIS session only: it stays in the
+    // sheet, the cards stay on screen, and the next launch offers it again,
+    // because tapping past something is not deciding about it.
+    if (!open) seenThisSession = get().pendingCoachPlan?.issuedAt;
+    set({ planReviewOpen: open });
+  },
 
   hydrate: async () => {
     if (get().hydrated) return;
@@ -497,7 +522,14 @@ async function runCycle(
     pulledAnything = true;
     tabPlan = parsePlanTab(pulled.tabs?.[SHEET_TABS.plan]);
     const offered = tabPlan && isNewerCoachPlan(tabPlan, useStore.getState().lastAcceptedPlanAt);
-    set({ pendingCoachPlan: offered ? tabPlan : undefined });
+    // A plan this session has not put in front of the person yet opens the
+    // review itself. That is the whole point of syncing on launch: the plan
+    // arrives and says so, rather than waiting to be found on the Plan tab.
+    const unseen = offered === true && tabPlan?.issuedAt !== seenThisSession;
+    set({
+      pendingCoachPlan: offered ? tabPlan : undefined,
+      ...(unseen ? { planReviewOpen: true } : {}),
+    });
 
     // Push against what the sheet actually is now, not what it was when this
     // base was written, so a push that failed earlier does not read as stale
