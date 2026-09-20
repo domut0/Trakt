@@ -6,6 +6,24 @@ Written 2026-09-20. This is the implementation handoff for
 
 Branch: `claude/client-onboarding-tutorial-3xllkw`.
 
+**Revised 2026-09-20, after phases 1 and 2 shipped and the app moved under it.**
+The same day this was written, the Workout button left the bottom bar. That is
+not a detail: STEP 1 OF THE TUTORIAL WAS "Tap Workout at the bottom", and the
+thing it pointed at no longer exists. Everything below has been corrected
+against `main` at `1769428`. Three things moved:
+
+- The bottom bar is TWO TABS, Today and Plan. There is no centre action button.
+  Logging starts from **"Add activity"**, which sits under the day's own card on
+  Today and on History, and is rendered by `src/components/DayActions.tsx`.
+- `chooserOpen` and `startSheetOpen` are local state in `DayActions`, NOT in
+  `AppShell`. AppShell no longer mounts either sheet.
+- Returning to a live workout is the banner across the top, not a nav button.
+
+If you are reading this more than a few days later, re-check the marker table in
+phase 7 against the real files before trusting it. The rest of the spec - the
+sandbox, the latch order, the fixture, the nine steps as a shape - is unchanged
+and still correct.
+
 ---
 
 ## 0. Read first
@@ -29,7 +47,7 @@ decision you would otherwise undo by accident:
 - Sentence case in all UI copy. **No em dashes in UI copy** (hyphen, or reword).
 - State is carried by mark, never by hue alone.
 - `prefers-reduced-motion` is handled globally in `styles.css`, not per component.
-- Behaviour changes come with tests. The suite is 677 tests and dense.
+- Behaviour changes come with tests. The suite is 973 tests and dense.
 
 **Verify with:** `npm test`, `npm run typecheck`, `npm run lint`, and
 `npm run screenshots` (the best instrument in the repo; it fails loudly on a
@@ -93,7 +111,7 @@ Do not relitigate these. They were argued and settled.
    │                                                       │
    │                        ◉  ← TutorialCursor (dot)      │  z-[56]
    ├───────────────────────────────────────────────────────┤
-   │  Tap Workout at the bottom.            Show me        │  TutorialRail z-[55]
+   │  Tap Add activity.                     Show me        │  TutorialRail z-[55]
    └───────────────────────────────────────────────────────┘
                                    │ step 9 done, or Skip
                                    ▼
@@ -299,7 +317,7 @@ subscriber for the duration and invite a component to read the wrong one.
 **What the latch already does for you, with no extra code:**
 
 - `safeWrite` (`db.ts:772`) returns early, so no store action reaches IndexedDB.
-- `sync-store.ts:374` already refuses to push while the latch is set. The
+- `sync-store.ts:439` already refuses to push while the latch is set. The
   `pending` flag survives and flushes after teardown, which is correct.
 - Because the arrays are restored, prefill (`lastSessionFor`), record detection,
   `predictedNextSlotName` and the rotation cursor are all untouched.
@@ -328,7 +346,9 @@ The card:
 | Incline DB Curl | `tut_curl`     | `accessory` | 2    | `12` | _(none)_            |
 
 - Slot: `{ id: TUTORIAL_SLOT_ID, name: "Tutorial", rotationOrder: 0 }`. No
-  `kind`, which reads as `workout`.
+  `kind`, which reads as `workout`. Leave `plannedCardio` and `weekday` off it
+  too: a cardio line would put a finisher on the practice workout, and a weekday
+  would make the card claim a day in week mode.
 - **Ids are literal strings, not `uid()`.** They must be stable so the demo
   markers and the tests can name them. `uid` is private to `store.ts` anyway.
 - The third lift has **no load on purpose**, so the user sees a row with nothing
@@ -336,8 +356,14 @@ The card:
 - `load` is free text and `parseLoad` reads the number out of it, so `"60 kg"`
   ghosts 60 into the weight field. Check `src/lib/set-rows.ts` if unsure.
 
-`tutorialStoreState` must return **every** key in `SWAPPED_KEYS`. Empty arrays
-for `sessions`, `sets`, `dailyLogs`, `nutritionPhases`, `plannedDays`.
+`tutorialStoreState` must return **every** key in `SWAPPED_KEYS`, which now
+lives in `src/lib/store-swap.ts` (phase 2 moved it). Empty arrays for
+`sessions`, `sets`, `dailyLogs`, `nutritionPhases`, `plannedDays`.
+
+An empty `nutritionPhases` is a deliberate choice and it is now a legal state
+rather than a degenerate one: phases have real end dates, a day covered by none
+resolves to no targets, and the practice day showing no targets is correct. Do
+not invent a phase to fill it.
 `activeSessionId`, `currentExerciseId`, `nextSlotId`, `restSince`,
 `lastAcceptedPlanAt` all `undefined`. `coachManaged: false`. `unit` passed
 through, so a kg user practises in kg.
@@ -483,7 +509,7 @@ The nine, in order:
 
 | #   | id              | Line                                                                                   | target             | done when                           |
 | --- | --------------- | -------------------------------------------------------------------------------------- | ------------------ | ----------------------------------- |
-| 1   | `open-chooser`  | `Tap Workout at the bottom.`                                                           | `nav-workout`      | `chooserOpen`                       |
+| 1   | `open-chooser`  | `Tap Add activity.`                                                                    | `add-activity`     | `chooserOpen`                       |
 | 2   | `pick-strength` | `Pick Strength.`                                                                       | `chooser-strength` | `startSheetOpen`                    |
 | 3   | `start`         | `Start Tutorial.`                                                                      | `start-confirm`    | `activeSessionId !== undefined`     |
 | 4   | `open-lift`     | `These are your lifts, in order. Open Bench Press.`                                    | `lift-row-first`   | `exerciseScreenOpen`                |
@@ -514,7 +540,7 @@ these files except the attribute and the rail padding noted above.
 
 | Marker             | File                                     | Element                                      |
 | ------------------ | ---------------------------------------- | -------------------------------------------- |
-| `nav-workout`      | `src/components/AppShell.tsx`            | The Workout button in `BottomNav`            |
+| `add-activity`     | `src/components/DayActions.tsx`          | The "Add activity" button                    |
 | `chooser-strength` | `src/components/WorkoutChooserSheet.tsx` | The Strength button                          |
 | `start-confirm`    | `src/components/StartWorkoutSheet.tsx`   | The row or button that starts the named slot |
 | `lift-row-first`   | `src/components/WorkoutLog.tsx`          | The first row's button (`idx === 0`)         |
@@ -524,9 +550,15 @@ these files except the attribute and the rail padding noted above.
 | `exercise-back`    | `src/components/ExerciseScreen.tsx`      | The Back button                              |
 | `workout-end`      | `src/routes/workout.tsx`                 | The End button                               |
 
-`chooserOpen` and `startSheetOpen` currently live as local `useState` in
-`AppShell`. Lift them into `tutorial-store` reads, or pass them down — either is
-fine, but the step predicates must be able to see them.
+`chooserOpen` and `startSheetOpen` live as local `useState` in `DayActions`
+(they moved out of `AppShell` with the button). Lift them into `tutorial-store`
+reads, or pass them down — either is fine, but the step predicates must be able
+to see them.
+
+`DayActions` also carries a third, `cardioOpen`, which opens the same chooser
+straight onto its cardio screen for a planned cardio day. The tutorial never
+takes that path - the fixture card is a strength card - but a predicate reading
+"is the chooser open" must account for the chooser being open in either mode.
 
 ### Phase 8 — `src/components/GettingStartedCard.tsx` and `src/routes/join.tsx`
 
@@ -644,7 +676,7 @@ Change it here and nowhere else. Sentence case. No em dashes.
 | Checklist row 4 | `Try a tutorial workout`                                                               |
 | Join button     | `Continue`                                                                             |
 | Settings row    | `Tutorial workout`                                                                     |
-| Step 1          | `Tap Workout at the bottom.`                                                           |
+| Step 1          | `Tap Add activity.`                                                                    |
 | Step 2          | `Pick Strength.`                                                                       |
 | Step 3          | `Start Tutorial.`                                                                      |
 | Step 4          | `These are your lifts, in order. Open Bench Press.`                                    |
