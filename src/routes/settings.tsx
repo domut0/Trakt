@@ -5,7 +5,8 @@ import { AppShell } from "../components/AppShell";
 import { CoachSettings } from "../components/CoachSettings";
 import { SyncSettings } from "../components/SyncSettings";
 import { Toggle } from "../components/Toggle";
-import { dailyLogsToCsv, setsToCsv } from "../lib/csv";
+import { dailyLogsToCsv } from "../lib/csv";
+import { useTutorialStore } from "../lib/tutorial-store";
 import {
   BACKUP_VERSION,
   parseBackup,
@@ -91,18 +92,6 @@ function SettingsPage() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `workout-log-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportSetsCsv = () => {
-    const { sets, sessions, exercises, slots, unit } = useStore.getState();
-    const csv = setsToCsv(sets, sessions, exercises, slots, unit);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `abtn-sets-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -207,27 +196,34 @@ function SettingsPage() {
 
       <Section title="Coaching" delay={110}>
         <CoachSettings />
+        {/* No second line. The row says what it opens, and this page had three
+            description lines deleted from it for saying less than their label
+            did. `start` refuses on its own terms - mid-workout, or while a
+            coach is viewing a client - so a refusal is silence here rather than
+            a disabled row that has to explain itself. */}
+        <button
+          type="button"
+          onClick={() => {
+            if (useTutorialStore.getState().start()) void router.navigate({ to: "/" });
+          }}
+          className="group-row group-row-sep w-full text-left"
+        >
+          <div className="t-body">Tutorial workout</div>
+          <Chevron className="shrink-0 text-ink-2" size={16} />
+        </button>
       </Section>
 
-      <Section title="Data" delay={120}>
+      <Section title="Google sheet" delay={120}>
+        <SyncSettings />
+      </Section>
+
+      {/* LAST, because it is the section you need least often. It used to sit
+          third, above the sheet, on no better reasoning than that it was
+          written first. Exporting a backup is a thing you do twice a year;
+          the unit toggle and the sheet are things you come here for. */}
+      <Section title="Data" delay={160}>
         <button type="button" onClick={exportJson} className="group-row w-full text-left">
           <div className="t-body">Export backup</div>
-          <Chevron className="shrink-0 text-ink-2" size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={exportSetsCsv}
-          className="group-row group-row-sep w-full text-left"
-        >
-          <div className="t-body">Export sets (CSV)</div>
-          <Chevron className="shrink-0 text-ink-2" size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={exportDailyLogsCsv}
-          className="group-row group-row-sep w-full text-left"
-        >
-          <div className="t-body">Export daily log (CSV)</div>
           <Chevron className="shrink-0 text-ink-2" size={16} />
         </button>
         <label className="group-row group-row-sep w-full cursor-pointer text-left">
@@ -240,15 +236,18 @@ function SettingsPage() {
           />
           <Chevron className="shrink-0 text-ink-2" size={16} />
         </label>
+        <button
+          type="button"
+          onClick={exportDailyLogsCsv}
+          className="group-row group-row-sep w-full text-left"
+        >
+          <div className="t-body">Export daily log (CSV)</div>
+          <Chevron className="shrink-0 text-ink-2" size={16} />
+        </button>
 
         {importError && (
           <div className="group-row-sep px-4 py-3 t-label text-signal">{importError}</div>
         )}
-
-        <a href="/privacy" className="group-row group-row-sep w-full text-left">
-          <div className="t-body">Privacy</div>
-          <Chevron className="shrink-0 text-ink-2" size={16} />
-        </a>
 
         {pendingImport && (
           <div className="group-row-sep space-y-3 p-4">
@@ -297,18 +296,19 @@ function SettingsPage() {
         {importSuccess && (
           <div className="group-row-sep px-4 py-3 t-label text-ink-2">Backup imported</div>
         )}
-      </Section>
 
-      <Section title="Google sheet" delay={160}>
-        <SyncSettings />
-      </Section>
-
-      <Section title="Reset" delay={200}>
+        {/* Clearing everything lives WITH the data it clears. It had a section
+            of its own called "Reset", which is a heading for one destructive
+            button - the row says what it does, and a heading above it only
+            said it again in a different word. */}
         {!showClearConfirm ? (
           <button
             type="button"
             onClick={() => setShowClearConfirm(true)}
-            className="group-row w-full text-left"
+            // Ruled off from the rows above it, which it was not when it had a
+            // section to itself. It is the fourth row of a list now, and the
+            // one row in it you must not hit by accident.
+            className="group-row group-row-sep w-full text-left"
           >
             <div className="t-body text-signal">Clear all data</div>
             <span className="text-signal" aria-hidden="true"></span>
@@ -339,9 +339,13 @@ function SettingsPage() {
         )}
       </Section>
 
-      <p className="px-4 pt-6 t-label text-ink-2">
-        v0.1 · local first · no accounts, sync optional
-      </p>
+      {/* Quiet, and at the very bottom. It is a legal page nobody opens twice,
+          and it does not need a row and a chevron to be reachable. */}
+      <div className="px-4 pb-8 pt-6">
+        <a href="/privacy" className="t-label text-ink-3">
+          Privacy
+        </a>
+      </div>
     </AppShell>
   );
 }

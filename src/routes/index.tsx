@@ -5,6 +5,8 @@ import { DayActions } from "../components/DayActions";
 import { DayStatsCard } from "../components/DayStatsCard";
 import { WeekStrip } from "../components/WeekStrip";
 import { CoachPlanCard } from "../components/CoachPlanPrompt";
+import { GettingStartedCard } from "../components/GettingStartedCard";
+import { TutorialClosingCard } from "../components/TutorialClosingCard";
 import { dayKey, parseDayKey } from "../lib/daily-log";
 
 /**
@@ -87,6 +89,9 @@ function Home() {
       {/* First thing on the screen people open the app to. Renders nothing
           unless a coach plan is waiting. */}
       <CoachPlanCard />
+
+      <GettingStartedCard />
+      <TutorialClosingCard />
 
       <div className="px-4">
         <WeekStrip selectedDate={selected} onSelectDate={selectDate} />

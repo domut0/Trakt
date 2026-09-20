@@ -19,6 +19,8 @@ export interface TutorialState {
   doneAt?: number;
   /** Set when the Getting started card is dismissed. */
   cardDismissedAt?: number;
+  /** Set when the Tutorial done closing card is dismissed. */
+  closingCardDismissedAt?: number;
   /** True once navigator.standalone or display-mode:standalone was ever seen. */
   installedSeen?: boolean;
 }
@@ -36,6 +38,9 @@ export function loadTutorialState(): TutorialState | undefined {
       ...(typeof parsed.doneAt === "number" ? { doneAt: parsed.doneAt } : {}),
       ...(typeof parsed.cardDismissedAt === "number"
         ? { cardDismissedAt: parsed.cardDismissedAt }
+        : {}),
+      ...(typeof parsed.closingCardDismissedAt === "number"
+        ? { closingCardDismissedAt: parsed.closingCardDismissedAt }
         : {}),
       ...(typeof parsed.installedSeen === "boolean" ? { installedSeen: parsed.installedSeen } : {}),
     };

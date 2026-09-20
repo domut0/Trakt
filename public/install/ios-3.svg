@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 480" width="100%" height="100%">
+  <defs>
+    <style>
+      @keyframes pulse {
+        0% { transform: scale(0.9); opacity: 0.8; }
+        50% { transform: scale(1.15); opacity: 0.35; }
+        100% { transform: scale(0.9); opacity: 0.8; }
+      }
+      @keyframes ripple {
+        0% { r: 14px; opacity: 0.7; }
+        100% { r: 24px; opacity: 0; }
+      }
+      .cursor-dot {
+        transform-origin: center;
+        animation: pulse 1.6s ease-in-out infinite;
+      }
+      .cursor-ring {
+        transform-origin: center;
+        animation: ripple 1.6s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .cursor-dot, .cursor-ring { animation: none; }
+      }
+    </style>
+    <clipPath id="phone-screen-3">
+      <rect x="20" y="10" width="280" height="460" rx="36" />
+    </clipPath>
+  </defs>
+
+  <!-- Phone chassis -->
+  <rect x="20" y="10" width="280" height="460" rx="36" fill="#000000" stroke="#2c2c2e" stroke-width="3" />
+
+  <g clip-path="url(#phone-screen-3)">
+    <!-- App background (dimmed) -->
+    <rect x="20" y="10" width="280" height="460" fill="#000000" />
+    <rect x="120" y="20" width="80" height="18" rx="9" fill="#1c1c1e" />
+    <rect x="20" y="10" width="280" height="460" fill="#000000" opacity="0.6" />
+
+    <!-- Scrolled iOS Share sheet panel -->
+    <rect x="28" y="110" width="264" height="360" rx="20" fill="#1c1c1e" stroke="#2c2c2e" stroke-width="1.5" />
+
+    <!-- Sheet grabber pill -->
+    <rect x="140" y="120" width="40" height="4" rx="2" fill="#8e8e93" />
+
+    <!-- Previous rows scrolled up (grey placeholder) -->
+    <rect x="44" y="140" width="232" height="38" rx="10" fill="#2c2c2e" opacity="0.5" />
+    <rect x="56" y="151" width="16" height="16" rx="4" fill="#38383a" />
+    <rect x="82" y="154" width="70" height="10" rx="3" fill="#38383a" />
+
+    <!-- Target Row: Add to Home Screen -->
+    <g id="add-to-home-screen-row">
+      <rect x="44" y="188" width="232" height="48" rx="12" fill="#2c2c2e" stroke="#38383a" stroke-width="1.5" />
+
+      <!-- Plus in rounded square icon -->
+      <rect x="56" y="200" width="24" height="24" rx="6" fill="#1c1c1e" />
+      <path d="M 68 206 L 68 218 M 62 212 L 74 212" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+
+      <!-- Row label: Add to Home Screen -->
+      <text x="90" y="217" fill="#ffffff" font-size="14" font-family="system-ui, -apple-system, sans-serif" font-weight="600">
+        Add to Home Screen
+      </text>
+
+      <!-- Chevron -->
+      <path d="M 256 208 L 260 212 L 256 216" fill="none" stroke="#8e8e93" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+
+    <!-- Subsequent rows (grey placeholder) -->
+    <rect x="44" y="246" width="232" height="38" rx="10" fill="#2c2c2e" opacity="0.5" />
+    <rect x="56" y="257" width="16" height="16" rx="4" fill="#38383a" />
+    <rect x="82" y="260" width="90" height="10" rx="3" fill="#38383a" />
+
+    <rect x="44" y="294" width="232" height="38" rx="10" fill="#2c2c2e" opacity="0.5" />
+    <rect x="56" y="305" width="16" height="16" rx="4" fill="#38383a" />
+    <rect x="82" y="308" width="80" height="10" rx="3" fill="#38383a" />
+
+    <rect x="44" y="342" width="232" height="38" rx="10" fill="#2c2c2e" opacity="0.5" />
+    <rect x="56" y="353" width="16" height="16" rx="4" fill="#38383a" />
+    <rect x="82" y="356" width="60" height="10" rx="3" fill="#38383a" />
+
+    <!-- Cursor dot animating over the Add to Home Screen row at (175, 212) -->
+    <g transform="translate(175, 212)">
+      <circle class="cursor-ring" cx="0" cy="0" r="14" fill="none" stroke="#ffffff" stroke-width="1.5" />
+      <circle class="cursor-dot" cx="0" cy="0" r="14" fill="#ffffff" fill-opacity="0.3" stroke="#ffffff" stroke-width="1.5" />
+    </g>
+  </g>
+</svg>

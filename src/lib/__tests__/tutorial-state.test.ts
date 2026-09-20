@@ -20,6 +20,7 @@ describe("tutorial state", () => {
       joinedAt: 1000,
       doneAt: 2000,
       cardDismissedAt: 3000,
+      closingCardDismissedAt: 4000,
       installedSeen: true,
     };
     saveTutorialState(state);

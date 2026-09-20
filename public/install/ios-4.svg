@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 480" width="100%" height="100%">
+  <defs>
+    <style>
+      @keyframes pulse {
+        0% { transform: scale(0.9); opacity: 0.8; }
+        50% { transform: scale(1.15); opacity: 0.35; }
+        100% { transform: scale(0.9); opacity: 0.8; }
+      }
+      @keyframes ripple {
+        0% { r: 14px; opacity: 0.7; }
+        100% { r: 24px; opacity: 0; }
+      }
+      .cursor-dot {
+        transform-origin: center;
+        animation: pulse 1.6s ease-in-out infinite;
+      }
+      .cursor-ring {
+        transform-origin: center;
+        animation: ripple 1.6s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .cursor-dot, .cursor-ring { animation: none; }
+      }
+    </style>
+    <clipPath id="phone-screen-4">
+      <rect x="20" y="10" width="280" height="460" rx="36" />
+    </clipPath>
+  </defs>
+
+  <!-- Phone chassis -->
+  <rect x="20" y="10" width="280" height="460" rx="36" fill="#000000" stroke="#2c2c2e" stroke-width="3" />
+
+  <g clip-path="url(#phone-screen-4)">
+    <!-- App background (dimmed) -->
+    <rect x="20" y="10" width="280" height="460" fill="#000000" />
+    <rect x="120" y="20" width="80" height="18" rx="9" fill="#1c1c1e" />
+    <rect x="20" y="10" width="280" height="460" fill="#000000" opacity="0.65" />
+
+    <!-- Add to Home Screen confirmation modal -->
+    <rect x="28" y="55" width="264" height="415" rx="20" fill="#1c1c1e" stroke="#2c2c2e" stroke-width="1.5" />
+
+    <!-- Modal navigation bar -->
+    <!-- Cancel button -->
+    <text x="44" y="90" fill="#aeaeb2" font-size="14" font-family="system-ui, -apple-system, sans-serif">
+      Cancel
+    </text>
+
+    <!-- Modal title -->
+    <text x="160" y="90" fill="#ffffff" font-size="14" font-weight="600" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif">
+      Add to Home Screen
+    </text>
+
+    <!-- Add button (TARGET) -->
+    <text x="274" y="90" fill="#ffffff" font-size="14" font-weight="700" text-anchor="end" font-family="system-ui, -apple-system, sans-serif">
+      Add
+    </text>
+
+    <line x1="28" y1="106" x2="292" y2="106" stroke="#2c2c2e" stroke-width="1" />
+
+    <!-- Preview card container -->
+    <rect x="44" y="126" width="232" height="74" rx="14" fill="#2c2c2e" />
+
+    <!-- App icon square -->
+    <rect x="58" y="139" width="48" height="48" rx="12" fill="#000000" stroke="#38383a" stroke-width="1.5" />
+    <text x="82" y="171" fill="#ffffff" font-size="22" font-weight="700" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif">
+      T
+    </text>
+
+    <!-- App name in edit box -->
+    <text x="118" y="161" fill="#ffffff" font-size="15" font-weight="600" font-family="system-ui, -apple-system, sans-serif">
+      Trakt
+    </text>
+    <text x="118" y="177" fill="#aeaeb2" font-size="11" font-family="system-ui, -apple-system, sans-serif">
+      trakt.app
+    </text>
+
+    <!-- Informational text -->
+    <rect x="44" y="220" width="200" height="8" rx="3" fill="#38383a" opacity="0.6" />
+    <rect x="44" y="236" width="160" height="8" rx="3" fill="#38383a" opacity="0.6" />
+
+    <!-- Cursor dot animating over the "Add" button at (262, 86) -->
+    <g transform="translate(262, 86)">
+      <circle class="cursor-ring" cx="0" cy="0" r="14" fill="none" stroke="#ffffff" stroke-width="1.5" />
+      <circle class="cursor-dot" cx="0" cy="0" r="14" fill="#ffffff" fill-opacity="0.3" stroke="#ffffff" stroke-width="1.5" />
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 480" width="100%" height="100%">
+  <defs>
+    <style>
+      @keyframes scrollCue {
+        0% { transform: translateY(0); opacity: 0.8; }
+        60% { transform: translateY(-38px); opacity: 0.9; }
+        100% { transform: translateY(-44px); opacity: 0; }
+      }
+      @keyframes ripple {
+        0% { r: 14px; opacity: 0.7; }
+        100% { r: 24px; opacity: 0; }
+      }
+      .scroll-arrow {
+        animation: scrollCue 2s ease-in-out infinite;
+      }
+      .cursor-scroll {
+        animation: scrollCue 2s ease-in-out infinite;
+      }
+      .cursor-ring {
+        transform-origin: center;
+        animation: ripple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .scroll-arrow, .cursor-scroll, .cursor-ring { animation: none; }
+      }
+    </style>
+    <clipPath id="phone-screen-2">
+      <rect x="20" y="10" width="280" height="460" rx="36" />
+    </clipPath>
+  </defs>
+
+  <!-- Phone chassis -->
+  <rect x="20" y="10" width="280" height="460" rx="36" fill="#000000" stroke="#2c2c2e" stroke-width="3" />
+
+  <g clip-path="url(#phone-screen-2)">
+    <!-- App background (dimmed) -->
+    <rect x="20" y="10" width="280" height="460" fill="#000000" />
+    <rect x="120" y="20" width="80" height="18" rx="9" fill="#1c1c1e" />
+    <rect x="44" y="60" width="232" height="90" rx="16" fill="#1c1c1e" opacity="0.4" />
+
+    <!-- Backdrop shadow for share sheet -->
+    <rect x="20" y="10" width="280" height="460" fill="#000000" opacity="0.5" />
+
+    <!-- iOS Share sheet panel -->
+    <rect x="28" y="150" width="264" height="320" rx="20" fill="#1c1c1e" stroke="#2c2c2e" stroke-width="1.5" />
+
+    <!-- Sheet grabber pill -->
+    <rect x="140" y="159" width="40" height="4" rx="2" fill="#8e8e93" />
+
+    <!-- Share sheet header preview -->
+    <rect x="44" y="174" width="34" height="34" rx="8" fill="#2c2c2e" />
+    <text x="86" y="188" fill="#ffffff" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Trakt</text>
+    <text x="86" y="201" fill="#aeaeb2" font-size="10" font-family="system-ui, -apple-system, sans-serif">trakt.app</text>
+
+    <line x1="44" y1="218" x2="276" y2="218" stroke="#2c2c2e" stroke-width="1" />
+
+    <!-- List rows -->
+    <!-- Row 1: Copy link -->
+    <rect x="44" y="228" width="232" height="40" rx="10" fill="#2c2c2e" />
+    <rect x="56" y="240" width="16" height="16" rx="4" fill="#38383a" />
+    <text x="82" y="253" fill="#aeaeb2" font-size="12" font-family="system-ui, -apple-system, sans-serif">Copy</text>
+
+    <!-- Row 2: Add to Reading List -->
+    <rect x="44" y="276" width="232" height="40" rx="10" fill="#2c2c2e" />
+    <rect x="56" y="288" width="16" height="16" rx="4" fill="#38383a" />
+    <text x="82" y="301" fill="#aeaeb2" font-size="12" font-family="system-ui, -apple-system, sans-serif">Add to Reading List</text>
+
+    <!-- Row 3: Add Bookmark -->
+    <rect x="44" y="324" width="232" height="40" rx="10" fill="#2c2c2e" />
+    <rect x="56" y="336" width="16" height="16" rx="4" fill="#38383a" />
+    <text x="82" y="349" fill="#aeaeb2" font-size="12" font-family="system-ui, -apple-system, sans-serif">Add Bookmark</text>
+
+    <!-- Row 4: Add to Favorites -->
+    <rect x="44" y="372" width="232" height="40" rx="10" fill="#2c2c2e" />
+    <rect x="56" y="384" width="16" height="16" rx="4" fill="#38383a" />
+    <text x="82" y="397" fill="#aeaeb2" font-size="12" font-family="system-ui, -apple-system, sans-serif">Add to Favorites</text>
+
+    <!-- Scrolling drag indicator / upward movement cue -->
+    <g class="scroll-arrow">
+      <path d="M 160 360 L 160 300 M 153 308 L 160 300 L 167 308" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8" />
+    </g>
+
+    <!-- Cursor dot animating upward along with scroll cue -->
+    <g class="cursor-scroll" transform="translate(160, 350)">
+      <circle class="cursor-ring" cx="0" cy="0" r="14" fill="none" stroke="#ffffff" stroke-width="1.5" />
+      <circle cx="0" cy="0" r="14" fill="#ffffff" fill-opacity="0.3" stroke="#ffffff" stroke-width="1.5" />
+    </g>
+  </g>
+</svg>
