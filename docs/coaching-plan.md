@@ -34,6 +34,15 @@ Decisions taken while finishing it:
 - **Templates are the coach's, not a client's**: device-local, in the backup,
   and carried as NAMES so they resolve against whoever is on screen.
 
+**The version row protects the NEXT change, not this one.** A build older than
+`PLAN_FORMAT_VERSION` 2 predates the row entirely, so it cannot refuse a v2
+plan: it skips the meta row it does not recognise and reads the Exercises cell
+literally, turning "Bench Press 3x8-12 @RPE 8" into an exercise of that name.
+Nobody is on an older build - clients are onboarded on this one - but open the
+app once on every device you own after deploying, before coaching anyone from
+it. A future format change should carry per-lift data as its own row kind
+instead, since an unrecognised `Kind` is already skipped rather than misread.
+
 Still untested on real hardware: silent token renewal in an installed iOS PWA.
 
 ## The premise

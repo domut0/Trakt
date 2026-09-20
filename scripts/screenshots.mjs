@@ -780,6 +780,15 @@ async function capturePlan(page) {
   await settle(page, 300);
   await shot(page, "61-plan-scrolled");
 
+  // Week mode, which is what a new install lands in. The seed is a rotation -
+  // it predates the two modes - so this switches, captures, and switches back
+  // rather than leaving every later capture in the other model.
+  await page.getByRole("button", { name: "Week", exact: true }).click();
+  await settle(page, 400);
+  await shot(page, "64-plan-week");
+  await page.getByRole("button", { name: "Rotation", exact: true }).click();
+  await settle(page, 400);
+
   // A split card's actions, which a tap opens. This replaced a long-press.
   await page.getByText("Heavy Bench", { exact: true }).click();
   await settle(page, 300);
