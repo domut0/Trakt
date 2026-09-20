@@ -289,7 +289,10 @@ function SettingsPage() {
           <button
             type="button"
             onClick={() => setShowClearConfirm(true)}
-            className="group-row w-full text-left"
+            // Ruled off from the rows above it, which it was not when it had a
+            // section to itself. It is the fourth row of a list now, and the
+            // one row in it you must not hit by accident.
+            className="group-row group-row-sep w-full text-left"
           >
             <div className="t-body text-signal">Clear all data</div>
             <span className="text-signal" aria-hidden="true"></span>
