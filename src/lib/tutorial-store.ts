@@ -54,6 +54,11 @@ export interface TutorialStoreState {
   active: boolean;
   /** 0-based index into the 9 steps. */
   step: number;
+  chooserOpen: boolean;
+  startSheetOpen: boolean;
+
+  setChooserOpen: (open: boolean) => void;
+  setStartSheetOpen: (open: boolean) => void;
 
   start: () => boolean; // false if refused
   skip: () => void;
@@ -81,7 +86,7 @@ function teardown(set: (state: Partial<TutorialStoreState>) => void): void {
   } finally {
     // AFTER the restore, always. Even if the restore throws, the latch must come off.
     setDbReadOnly(undefined);
-    set({ active: false, step: 0 });
+    set({ active: false, step: 0, chooserOpen: false, startSheetOpen: false });
     markTutorialDone();
   }
 }
@@ -89,6 +94,11 @@ function teardown(set: (state: Partial<TutorialStoreState>) => void): void {
 export const useTutorialStore = create<TutorialStoreState>((set, get) => ({
   active: false,
   step: 0,
+  chooserOpen: false,
+  startSheetOpen: false,
+
+  setChooserOpen: (chooserOpen) => set({ chooserOpen }),
+  setStartSheetOpen: (startSheetOpen) => set({ startSheetOpen }),
 
   start: () => {
     // 1. Refuse, before touching anything
@@ -105,7 +115,7 @@ export const useTutorialStore = create<TutorialStoreState>((set, get) => ({
       ownState = captureOwnState();
       // 4. Swap
       useStore.setState(tutorialStoreState(main.unit));
-      set({ active: true, step: 0 });
+      set({ active: true, step: 0, chooserOpen: false, startSheetOpen: false });
       return true;
     } catch {
       // Never leave the latch on with the user's own data back in the store.
@@ -116,7 +126,7 @@ export const useTutorialStore = create<TutorialStoreState>((set, get) => ({
         }
       } finally {
         setDbReadOnly(undefined);
-        set({ active: false, step: 0 });
+        set({ active: false, step: 0, chooserOpen: false, startSheetOpen: false });
       }
       return false;
     }
@@ -132,6 +142,11 @@ export const useTutorialStore = create<TutorialStoreState>((set, get) => ({
 
   advance: () => {
     if (!get().active) return;
+    // Step index 8 is the 9th step ("end"). Advancing past it finishes the tutorial.
+    if (get().step >= 8) {
+      teardown(set);
+      return;
+    }
     set((s) => ({ step: s.step + 1 }));
   },
 }));

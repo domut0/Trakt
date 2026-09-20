@@ -97,6 +97,7 @@ export function WorkoutChooserSheet({
             <div className="mt-5 flex items-center justify-center gap-10 py-2">
               <button
                 type="button"
+                data-tutorial="chooser-strength"
                 onClick={onChooseStrength}
                 aria-label="Log strength training workout"
                 className="flex flex-col items-center gap-2"

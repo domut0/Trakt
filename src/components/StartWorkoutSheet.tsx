@@ -121,12 +121,17 @@ export function StartWorkoutSheet({
 
         {shown.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            {shown.map((s) => {
+            {shown.map((s, idx) => {
               const isSuggested = s.name === suggestedName;
               return (
                 <button
                   key={s.id}
                   type="button"
+                  data-tutorial={
+                    s.name === "Tutorial" || (shown.length === 1 && idx === 0)
+                      ? "start-confirm"
+                      : undefined
+                  }
                   onClick={() => handleStart(s.name)}
                   className={
                     "flex min-h-[44px] items-center rounded-md px-4 t-body font-medium transition-colors " +

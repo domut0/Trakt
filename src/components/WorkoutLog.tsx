@@ -120,6 +120,7 @@ export function WorkoutLog({
                   <button
                     onClick={() => open(exercise.id)}
                     aria-pressed={isCurrent}
+                    data-tutorial={idx === 0 ? "lift-row-first" : undefined}
                     /*
                       The lift you are on is an INKED ROW, which is the same mark
                       the week strip uses for the day you are on. One vocabulary

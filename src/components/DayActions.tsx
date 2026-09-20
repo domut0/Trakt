@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Plus } from "./icons";
 import { useStore } from "../lib/store";
 import { useCoachStore } from "../lib/coach-store";
+import { useTutorialStore } from "../lib/tutorial-store";
 import { dayKey } from "../lib/daily-log";
 import { isCardioSession } from "../lib/store";
 import { kindOf } from "../lib/planning";
@@ -42,6 +43,22 @@ export function DayActions({ date }: { date: string }) {
   const [startOpen, setStartOpen] = useState(false);
   /** The chooser, opened straight onto cardio for a planned cardio day. */
   const [cardioOpen, setCardioOpen] = useState(false);
+
+  const tutorialActive = useTutorialStore((s) => s.active);
+  const setTutorialChooserOpen = useTutorialStore((s) => s.setChooserOpen);
+  const setTutorialStartOpen = useTutorialStore((s) => s.setStartSheetOpen);
+
+  useEffect(() => {
+    if (tutorialActive) {
+      setTutorialChooserOpen(chooserOpen || cardioOpen);
+    }
+  }, [tutorialActive, chooserOpen, cardioOpen, setTutorialChooserOpen]);
+
+  useEffect(() => {
+    if (tutorialActive) {
+      setTutorialStartOpen(startOpen);
+    }
+  }, [tutorialActive, startOpen, setTutorialStartOpen]);
 
   const todayKey = dayKey(new Date());
 
@@ -88,6 +105,7 @@ export function DayActions({ date }: { date: string }) {
     <>
       <button
         type="button"
+        data-tutorial="add-activity"
         onClick={() => setChooserOpen(true)}
         disabled={viewingClient}
         aria-label={

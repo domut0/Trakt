@@ -153,6 +153,7 @@ function WorkoutPage() {
         </h1>
         <button
           onClick={handleEnd}
+          data-tutorial="workout-end"
           className="-my-3 flex min-h-[44px] items-center justify-self-end t-action t-body"
         >
           End
@@ -202,7 +203,9 @@ function WorkoutPage() {
 
       <div
         className="flex items-end justify-between gap-4 px-4 pt-3"
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
+        style={{
+          paddingBottom: "calc(max(env(safe-area-inset-bottom), 24px) + var(--rail-h, 0px))",
+        }}
       >
         <div className="min-w-0">
           <div className="t-caption text-ink-3">This workout</div>

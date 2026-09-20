@@ -197,6 +197,7 @@ export function ExerciseScreen({
         <div className="flex items-center justify-between px-4 pt-14 pb-2">
           <button
             onClick={() => onDone(complete)}
+            data-tutorial="exercise-back"
             className="-my-[11px] flex min-h-[44px] items-center t-body font-medium t-action"
           >
             Back
@@ -273,7 +274,7 @@ export function ExerciseScreen({
           // inset itself.
           style={{
             marginBottom: keyboardOffset,
-            paddingBottom: "max(env(safe-area-inset-bottom), 24px)",
+            paddingBottom: "calc(max(env(safe-area-inset-bottom), 24px) + var(--rail-h, 0px))",
           }}
         >
           <ul className="group-list">
@@ -285,6 +286,9 @@ export function ExerciseScreen({
                   <button
                     onClick={() => openRow(row)}
                     aria-expanded={isEditing}
+                    data-tutorial={
+                      row.index === 1 ? "set-row-1" : row.index === 2 ? "set-row-2" : undefined
+                    }
                     // Logged and unlogged rows differ on screen by solid versus
                     // grey, which is not a difference a screen reader can hear.
                     // The name says which it is, so "the suggestion" and "what
@@ -352,6 +356,7 @@ export function ExerciseScreen({
                       <button
                         onClick={() => save(row)}
                         disabled={!canSave}
+                        data-tutorial="set-save"
                         className="min-h-[44px] shrink-0 bg-ink px-4 t-body font-semibold text-paper disabled:opacity-40 rounded-md"
                       >
                         Save

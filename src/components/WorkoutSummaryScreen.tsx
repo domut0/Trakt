@@ -103,7 +103,11 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
   const otherRecords = data.records.slice(1);
 
   return (
-    <div className="mx-auto flex h-[100dvh] max-w-md flex-col bg-paper">
+    // Marked so the tutorial's last step can see that the summary is up. The
+    // rail was inferring it from the URL plus the absence of the End button,
+    // which is true of several other states as well - including the instant
+    // between ending a workout and this screen mounting.
+    <div data-summary-screen className="mx-auto flex h-[100dvh] max-w-md flex-col bg-paper">
       {/* The content scrolls in its own region so the way out below it is
           always on screen and never sits on top of the last record. */}
       <div className="flex-1 overflow-y-auto">

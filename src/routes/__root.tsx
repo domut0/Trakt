@@ -15,6 +15,7 @@ import { PwaUpdatePrompt } from "../components/PwaUpdatePrompt";
 import { WriteErrorBanner } from "../components/WriteErrorBanner";
 import { SyncEngine } from "../components/SyncEngine";
 import { ToastProvider } from "../components/Toast";
+import { TutorialRail } from "../components/TutorialRail";
 
 /**
  * Both of the screens below previously styled themselves with `bg-primary`,
@@ -194,6 +195,7 @@ function RootComponent() {
         <SyncEngine />
         <PwaUpdatePrompt />
         <WriteErrorBanner />
+        <TutorialRail />
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
       </ToastProvider>
