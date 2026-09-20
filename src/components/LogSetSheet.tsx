@@ -319,7 +319,7 @@ export function LogSetSheet({
                       inputRefs.current[0]?.focus();
                     }
                   }}
-                  placeholder={suggestedNote ?? "Add notes: seat, pins, grip..."}
+                  placeholder={suggestedNote ?? "Seat, pins, grip"}
                   className="t-body w-full bg-transparent text-right outline-none placeholder:text-ink-2"
                 />
               </div>

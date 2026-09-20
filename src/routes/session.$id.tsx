@@ -22,7 +22,7 @@ function SessionPage() {
   if (!session) {
     return (
       <AppShell>
-        <div className="px-4 py-20 text-center t-body text-ink-2">Session not found.</div>
+        <div className="px-4 py-20 text-center t-body text-ink-2">Session not found</div>
       </AppShell>
     );
   }
@@ -36,7 +36,7 @@ function SessionPage() {
   if (!isCardio && session.splitSlotId == null) {
     return (
       <AppShell>
-        <div className="px-4 py-20 text-center t-body text-ink-2">Session not found.</div>
+        <div className="px-4 py-20 text-center t-body text-ink-2">Session not found</div>
       </AppShell>
     );
   }

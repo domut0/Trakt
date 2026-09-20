@@ -136,7 +136,7 @@ export function CoachPlanPrompt() {
                   // the prompt goes away the moment the client acts on it.
                   useSyncStore.setState({ pendingCoachPlan: undefined });
                   setOpen(false);
-                  showToast({ message: "New plan applied.", durationMs: 4000 });
+                  showToast({ message: "New plan applied", durationMs: 4000 });
                 }}
                 className="min-h-[44px] flex-1 bg-ink t-body font-semibold text-paper rounded-md"
               >

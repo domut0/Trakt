@@ -100,9 +100,7 @@ function ExercisePage() {
             {exercise.type === "cardio" ? (
               <>
                 <h3 className="t-heading">Not tracked here</h3>
-                <p className="mt-1 t-label text-ink-2">
-                  Cardio is logged as duration and distance, so it shows up on the History tab.
-                </p>
+                <p className="mt-1 t-label text-ink-2">Cardio shows on History</p>
               </>
             ) : (
               <h3 className="t-heading">Never logged</h3>

@@ -65,10 +65,10 @@ function JoinPage() {
 
   return (
     <Frame title={`${payload.coachName} invited you to Trakt`}>
-      {payload.clientName && <p className="t-body text-ink">Hi {payload.clientName}.</p>}
+      {payload.clientName && <p className="t-body text-ink">Hi {payload.clientName}</p>}
       <p className="t-body text-ink-2">
-        Trakt logs four numbers and a workout. Your data lives on your phone, in a spreadsheet in
-        your own Google Drive.
+        Trakt logs four numbers and a workout. Your data stays on your phone and in your own Google
+        Drive.
       </p>
 
       <ol className="space-y-3 py-2">
