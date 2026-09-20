@@ -22,12 +22,17 @@ Decisions taken while finishing it:
 - **A client shares their sheet as EDITOR**, not reader: the coach's app writes
   the plan tab. Coach mode's read-only latch is what keeps it to that tab.
 - **A card a coach's plan drops goes quietly**, with no count on the review
-  screen. Its past sessions keep the card's name (`WorkoutSession.slotName`),
-  which also fixed hand-deleted cards turning history into "Untitled".
+  screen. Its past sessions keep the card's name (`WorkoutSession.slotName`).
 - **Opening a client, saving a plan and sharing are interactive** token
   requests, because each is a tap and coach mode has no Reconnect button.
 - **The lock is latch first**: every plan-editing store action refuses while
   `coachManaged` is set, and the Plan tab is `inert` so nothing looks tappable.
+- **A plan carries prescriptions, a planning mode and a version.** Sets, reps
+  and load per lift, with reps and load as TEXT ("8-12", "RPE 8"); `week` or
+  `rotation`; and `PLAN_FORMAT_VERSION`, which an older build refuses outright
+  rather than half-applying and then republishing without the prescriptions.
+- **Templates are the coach's, not a client's**: device-local, in the backup,
+  and carried as NAMES so they resolve against whoever is on screen.
 
 Still untested on real hardware: silent token renewal in an installed iOS PWA.
 

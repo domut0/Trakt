@@ -175,10 +175,14 @@ in this app is almost always a mistake.** Use a card, or use space.
 - **Row** (`group-row`): 48px minimum, space-between, 12px/16px.
 - **Card label** (`group-header`): sentence case, `ink-2`, 16px inset, 8px below.
   No rule.
-- **Bottom bar**: five equal grid columns, the action button in the third by
-  source order. Never two flex halves around it — that centres the button but
-  makes the tabs unequal, because each sits in the middle of half of whatever
-  the button left over.
+- **Bottom bar**: three equal grid columns — Today, Plan, and the action
+  button between them — the button last by source order. Never two flex
+  halves around it: that centres the button but makes the tabs unequal,
+  because each sits in the middle of half of whatever the button left over.
+  History and Charts are not tabs; they are icons in Today's corner, with
+  Settings. The corner is where you go elsewhere, on every screen.
+- **Active tab**: colour only, never weight. A bolder label is a wider one,
+  and a tab that changes width when you select it moves its neighbours.
 - **Chip row**: plain `ink-2` text; the selected chip is `bg-ink text-paper` at
   12px radius. Used for the metric and range pickers and the Daily/7-day toggle,
   which all look the same on purpose.
@@ -217,7 +221,7 @@ in this app is almost always a mistake.** Use a card, or use space.
   a phase changes. Tapping a column opens that day's card — date, cals, steps,
   macros — beside the bar, flipping side near the end. Nothing is converted
   between the halves: the app has no TDEE and must not imply one.
-- **Editable figure** (Today, History → day panel): the card *is* the editor.
+- **Editable figure** (Today, History → day panel): the card _is_ the editor.
   The figure is an input in `t-stat`, transparent, right-aligned, sized to its
   own content; the target beside it and the status mark after it are unchanged.
   The raw string lives in the parent and only for the focused field, so an
@@ -271,6 +275,26 @@ punctuation, because it is one.
 - Re-propose the light theme, or a theme toggle.
 - Write a second line under a label that already says it.
 - Put a period on a fragment.
+
+## Motion
+
+Motion is for something that genuinely enters or leaves, and nothing else.
+
+- **Sheets** slide up from the bottom: the gesture says where the sheet came
+  from and where a swipe-down will send it.
+- **The toast** slides and fades, because it appears unbidden and its whole
+  job is to be noticed.
+- **Route changes** are a 280ms opacity fade. There is no horizontal slide:
+  a 24px travel on every tab tap was the most template-like motion in the
+  app, and — the practical half — an `animation-fill-mode: both` keyframe
+  that ends on a transform leaves that transform on the element forever,
+  which makes it the containing block for every `position: fixed` descendant.
+  That is not a theory: it put the Accept button of a coach's plan off the
+  bottom of the client's screen. **Any full-screen or fixed overlay is
+  rendered through `createPortal` to `document.body`**, so no ancestor can
+  do it again.
+- **Nothing animates on arrival.** Sections used to fade up as a page
+  mounted; after the second visit that is not delight, it is latency.
 
 ## Known open
 
