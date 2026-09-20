@@ -40,6 +40,9 @@ describe("StartWorkoutSheet", () => {
   beforeEach(() => {
     useStore.setState({
       hydrated: true,
+      // The suggestion these cover is the rotation cursor; week mode answers
+      // "what is next" from the calendar instead.
+      planningMode: "rotation",
       exercises: [SQUAT, BENCH],
       slots: [],
       sessions: [],

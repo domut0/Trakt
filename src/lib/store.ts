@@ -13,6 +13,8 @@ import {
 } from "./db";
 import { dayKey, isDailyLogEmpty } from "./daily-log";
 import {
+  cardForWeekday,
+  convertSplit,
   advanceSplit,
   firstDayCard,
   kindOf,
@@ -357,6 +359,8 @@ interface State {
    */
   planningMode: PlanningMode;
   setPlanningMode: (mode: PlanningMode) => void;
+  /** Puts a card on a weekday in `week` mode, or takes it off with undefined. */
+  setCardWeekday: (slotId: string, weekday: number | undefined) => void;
   activeSessionId?: string;
   currentExerciseId?: string;
   currentBlock?: CurrentBlock;
@@ -1777,7 +1781,10 @@ export const useStore = create<State>((set, get) => ({
   },
 
   nextCard: () => {
-    const { slots, nextSlotId } = get();
+    const { slots, nextSlotId, planningMode } = get();
+    // In week mode "next" is simply what today holds: no cursor, no
+    // consumption, and nothing to drift out of step with the calendar.
+    if (planningMode === "week") return cardForWeekday(slots, new Date().getDay());
     const pointed = nextSlotId ? slots.find((sl) => sl.id === nextSlotId) : undefined;
     // A stale cursor - the card was deleted, or an import replaced the split -
     // falls back to the top rather than leaving the screen with no answer.
@@ -1877,9 +1884,27 @@ export const useStore = create<State>((set, get) => ({
   },
 
   setPlanningMode: (mode) => {
-    if (get().coachManaged) return;
-    set({ planningMode: mode });
+    if (get().coachManaged || get().planningMode === mode) return;
+    // The cards are rearranged, never rewritten: a week becomes a cycle in the
+    // order the days ran, and a cycle becomes a week from Monday. Every session
+    // logged against a card stays attached to it, because the card keeps its id.
+    const slots = convertSplit(get().slots, mode);
+    const nextSlotId = mode === "rotation" ? firstDayCard(slots)?.id : undefined;
+    set({ planningMode: mode, slots, ...cursorTo(slots, nextSlotId) });
+    safeWrite(() => db.slots.bulkPut(slots));
     persistSettingsFrom(get());
+  },
+
+  setCardWeekday: (slotId, weekday) => {
+    if (get().coachManaged) return;
+    // One card per day: assigning a day takes it off whatever card held it, or
+    // two cards would claim the same morning and nothing could answer "today".
+    const slots = get().slots.map((sl) => {
+      if (sl.id === slotId) return { ...sl, weekday };
+      return weekday !== undefined && sl.weekday === weekday ? { ...sl, weekday: undefined } : sl;
+    });
+    set({ slots });
+    safeWrite(() => db.slots.bulkPut(slots));
   },
 
   unlinkCoach: () => {

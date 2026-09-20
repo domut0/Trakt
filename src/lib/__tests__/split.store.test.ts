@@ -2,6 +2,7 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../db";
 import { useStore } from "../store";
+import { kindOf } from "../planning";
 
 /**
  * The workout split as the store runs it: cards, order, and the cursor.
@@ -17,6 +18,8 @@ async function reset() {
   await db.open();
   useStore.setState({
     hydrated: true,
+    // These are the rotation mechanics; week mode has no cursor to test.
+    planningMode: "rotation",
     slots: [],
     sessions: [],
     sets: [],
@@ -274,5 +277,79 @@ describe("ending a workout consumes its card", () => {
     useStore.getState().setNextCard(rest.id);
     useStore.getState().takeRestDay(rest.id);
     expect(useStore.getState().nextCard()?.id).toBe(upper.id);
+  });
+});
+
+describe("week mode", () => {
+  /** Monday-to-Sunday indexes, matching Date.getDay(). */
+  const MON = 1;
+  const WED = 3;
+
+  it("answers 'what is next' from the calendar, not from a cursor", () => {
+    const { upper, lower } = buildUL();
+    useStore.setState({ planningMode: "week" });
+    const today = new Date().getDay();
+    useStore.getState().setCardWeekday(upper.id, today);
+    useStore.getState().setCardWeekday(lower.id, (today + 1) % 7);
+
+    expect(useStore.getState().nextCard()?.id).toBe(upper.id);
+  });
+
+  it("shows nothing on a day with nothing on it, rather than rolling one forward", () => {
+    // A weekly plan means "Upper on Mondays". Rolling a missed day forward is
+    // the rotation again, wearing a calendar's clothes.
+    const { upper } = buildUL();
+    useStore.setState({ planningMode: "week" });
+    useStore.getState().setCardWeekday(upper.id, (new Date().getDay() + 2) % 7);
+
+    expect(useStore.getState().nextCard()).toBeUndefined();
+  });
+
+  it("gives a day to one card only, so nothing can claim the same morning", () => {
+    const { upper, lower } = buildUL();
+    useStore.setState({ planningMode: "week" });
+    useStore.getState().setCardWeekday(upper.id, MON);
+    useStore.getState().setCardWeekday(lower.id, MON);
+
+    const slots = useStore.getState().slots;
+    expect(slots.find((s) => s.id === upper.id)?.weekday).toBeUndefined();
+    expect(slots.find((s) => s.id === lower.id)?.weekday).toBe(MON);
+  });
+
+  it("keeps every card and its history when the mode changes", async () => {
+    const { upper, lower } = buildUL();
+    useStore.setState({
+      planningMode: "rotation",
+      sessions: [{ id: "sess_1", splitSlotId: upper.id, startedAt: 1 }],
+    });
+
+    useStore.getState().setPlanningMode("week");
+    const week = useStore.getState().slots;
+    // Repeats are dropped: "start again" is what a week already means.
+    expect(week.map((s) => s.id)).toContain(upper.id);
+    expect(week.find((s) => s.id === upper.id)?.weekday).toBe(MON);
+    expect(week.some((s) => kindOf(s) === "repeat")).toBe(false);
+    expect(useStore.getState().sessions[0].splitSlotId).toBe(upper.id);
+
+    useStore.getState().setCardWeekday(lower.id, WED);
+    useStore.getState().setPlanningMode("rotation");
+    const back = useStore.getState().slots;
+    expect(back.map((s) => s.name)).toEqual(["Upper", "Lower", "Rest"]);
+    expect(back.every((s) => s.weekday === undefined)).toBe(true);
+    expect(useStore.getState().nextCard()?.id).toBe(upper.id);
+
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect((await db.slots.get(upper.id))?.weekday).toBeUndefined();
+  });
+
+  it("refuses both while a coach manages the plan", () => {
+    const { upper } = buildUL();
+    useStore.setState({ planningMode: "week", coachManaged: true });
+    useStore.getState().setCardWeekday(upper.id, MON);
+    useStore.getState().setPlanningMode("rotation");
+
+    expect(useStore.getState().slots.find((s) => s.id === upper.id)?.weekday).toBeUndefined();
+    expect(useStore.getState().planningMode).toBe("week");
+    useStore.setState({ coachManaged: false });
   });
 });

@@ -6,6 +6,7 @@ import { NutritionRibbon } from "../components/NutritionRibbon";
 import { TargetStrip } from "../components/TargetStrip";
 import { SlotPlanSheet } from "../components/SlotPlanSheet";
 import { SplitCardList } from "../components/SplitCardList";
+import { WeekPlanner } from "../components/WeekPlanner";
 import { SaveChangesBar } from "../components/SaveChangesBar";
 import { CoachPlanCard } from "../components/CoachPlanPrompt";
 import { CoachManagedBanner } from "../components/CoachManagedBanner";
@@ -34,11 +35,17 @@ export const Route = createFileRoute("/plan")({
  * "cutting from Sunday onward" is one change-point that covers every day after
  * it. The ribbon draws that timeline and is also how it is edited.
  *
- * TRAINING IS A ROTATION. It advances when you train rather than when the date
- * changes, so it has no dates and is shown in cycle order. It is deliberately
- * NOT projected onto future days: after a rest day the next slot is a free
- * choice, which makes the future genuinely unknowable, and a plan that is
- * confidently wrong is worse than none. Pin a day when you actually do know.
+ * TRAINING IS ONE OF TWO THINGS, and which one is part of the plan.
+ *
+ * A WEEK is seven days, each holding a card, repeating. It is the default and
+ * what most people mean by a programme. A missed day is a missed day: nothing
+ * rolls forward, or by Friday the app would be showing Tuesday's workout.
+ *
+ * A ROTATION advances when you train rather than when the date changes, so it
+ * has no dates and is shown in cycle order. It is what Upper/Lower x infinity
+ * needs, and it is deliberately NOT projected onto future days: after a rest
+ * day the next card is a free choice, which makes the future genuinely
+ * unknowable. Pin a day when you actually do know.
  */
 function PlanPage() {
   const slots = useStore((s) => s.slots);
@@ -48,6 +55,8 @@ function PlanPage() {
   const next = useStore((s) => s.nextCard());
   const hydrated = useStore((s) => s.hydrated);
   const locked = usePlanLocked();
+  const planningMode = useStore((s) => s.planningMode);
+  const setPlanningMode = useStore((s) => s.setPlanningMode);
 
   const [editingSlot, setEditingSlot] = useState<SplitSlot | undefined>();
   const [cardOpen, setCardOpen] = useState(false);
@@ -90,41 +99,72 @@ function PlanPage() {
         <TargetStrip />
 
         {/* ---- The workout split ----------------------------------------- */}
-        <section className="px-4 section-gap anim-fade-up">
-          <div className="group-header">
-            <h2 className="t-caption">Workout split</h2>
-            {!locked && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingSlot(undefined);
+        {planningMode === "week" ? (
+          <WeekPlanner
+            onEdit={(slot) => {
+              setEditingSlot(slot);
+              setCardOpen(true);
+            }}
+          />
+        ) : (
+          <section className="px-4 section-gap anim-fade-up">
+            <div className="group-header">
+              <h2 className="t-caption">Workout split</h2>
+              {!locked && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingSlot(undefined);
+                    setCardOpen(true);
+                  }}
+                  aria-label="Add a card to the split"
+                  className="flex min-h-[44px] items-center text-ink"
+                >
+                  <Plus size={18} />
+                </button>
+              )}
+            </div>
+
+            {/* Directly under the heading, where the user asked for it: what you do
+            next is the one thing this section is read for. */}
+            {next && <p className="px-4 pb-2 t-label text-ink-2">Next: {next.name}</p>}
+
+            {rotation.length === 0 ? (
+              <div className="group-list px-4 py-5">
+                <p className="t-body text-ink-2">No cards yet</p>
+              </div>
+            ) : (
+              <SplitCardList
+                onEdit={(slot) => {
+                  setEditingSlot(slot);
                   setCardOpen(true);
                 }}
-                aria-label="Add a card to the split"
-                className="flex min-h-[44px] items-center text-ink"
-              >
-                <Plus size={18} />
-              </button>
+              />
             )}
+          </section>
+        )}
+
+        {/* The two ways to arrange a split, as one setting that decides which
+            screen this is. A rotation advances when you train; a week repeats.
+            Switching rearranges the cards and creates or deletes nothing, so
+            every session logged against a card stays attached to it. */}
+        <div className="px-4 pt-2">
+          <div className="flex gap-1 rounded-md bg-wash p-1">
+            {(["week", "rotation"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setPlanningMode(mode)}
+                aria-pressed={planningMode === mode}
+                className={`min-h-[44px] flex-1 rounded-md t-label font-medium ${
+                  planningMode === mode ? "bg-ink text-paper" : "text-ink-2"
+                }`}
+              >
+                {mode === "week" ? "Week" : "Rotation"}
+              </button>
+            ))}
           </div>
-
-          {/* Directly under the heading, where the user asked for it: what you do
-            next is the one thing this section is read for. */}
-          {next && <p className="px-4 pb-2 t-label text-ink-2">Next: {next.name}</p>}
-
-          {rotation.length === 0 ? (
-            <div className="group-list px-4 py-5">
-              <p className="t-body text-ink-2">No cards yet</p>
-            </div>
-          ) : (
-            <SplitCardList
-              onEdit={(slot) => {
-                setEditingSlot(slot);
-                setCardOpen(true);
-              }}
-            />
-          )}
-        </section>
+        </div>
 
         {/* ---- Pinned ---- */}
         {futurePins.length > 0 && (

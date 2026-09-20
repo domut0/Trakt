@@ -25,6 +25,8 @@ async function buildUL() {
   await db.open();
   useStore.setState({
     hydrated: true,
+    // These are the rotation mechanics; week mode has no cursor to test.
+    planningMode: "rotation",
     slots: [],
     sessions: [],
     sets: [],

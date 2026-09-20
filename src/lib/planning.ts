@@ -230,6 +230,55 @@ export function advanceSplit<T extends SplitCardLike>(
   return undefined;
 }
 
+/**
+ * The card a weekday holds, in `week` mode.
+ *
+ * A weekly plan means "Upper on Mondays", so a day with nothing on it is a day
+ * with nothing on it: a missed Monday does not roll forward to Tuesday. Rolling
+ * it forward would be the rotation again, wearing a calendar's clothes, and by
+ * Friday the app would be showing Tuesday's workout.
+ */
+export function cardForWeekday<T extends SplitCardLike & { weekday?: number }>(
+  cards: readonly T[],
+  weekday: number,
+): T | undefined {
+  return cards.find((c) => c.weekday === weekday && kindOf(c) !== "repeat");
+}
+
+/**
+ * The same cards, rearranged for the other planning mode.
+ *
+ * Nothing is created or deleted: switching mode changes how the split is
+ * ARRANGED, never what is in it, so every card - and every session logged
+ * against it - survives the trip either way.
+ *
+ * To `week`: day cards land on consecutive days from Monday, because a week has
+ * to start somewhere and Monday is where a programme is usually written from.
+ * Repeats are dropped, since "start again" is what a week already means.
+ * To `rotation`: cards take cycle order from the days they were on, and the
+ * weekday is cleared.
+ */
+export function convertSplit<T extends SplitCardLike & { weekday?: number }>(
+  cards: readonly T[],
+  to: "week" | "rotation",
+): T[] {
+  if (to === "rotation") {
+    const ordered = [...cards]
+      .filter((c) => kindOf(c) !== "repeat")
+      .sort((a, b) => (a.weekday ?? 7) - (b.weekday ?? 7) || a.rotationOrder - b.rotationOrder);
+    return ordered.map((card, i) => ({ ...card, rotationOrder: i, weekday: undefined }));
+  }
+
+  // Monday first, wrapping to Sunday: 1..6 then 0.
+  const week = [1, 2, 3, 4, 5, 6, 0];
+  const days = orderedSplit(cards).filter((c) => kindOf(c) !== "repeat");
+  return days.map((card, i) => ({
+    ...card,
+    rotationOrder: i,
+    weekday: i < week.length ? week[i] : undefined,
+  }));
+}
+
 /** The first day card, for a split with no cursor yet. */
 export function firstDayCard<T extends SplitCardLike>(cards: readonly T[]): T | undefined {
   return orderedSplit(cards).find((c) => kindOf(c) !== "repeat");
