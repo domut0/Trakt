@@ -7,6 +7,7 @@ import {
   type CoachClient,
 } from "./db";
 import { useStore } from "./store";
+import { captureOwnState, type Swapped } from "./store-swap";
 import { buildClientSnapshot, type ClientSnapshot } from "./client-snapshot";
 import type { SyncFail } from "./sync-protocol";
 import { pullTabs, putPlanTab } from "./sync-client-google";
@@ -44,42 +45,6 @@ import type { CellValue } from "./csv";
  * coach's own sheet. Keeping them apart makes that impossible rather than
  * merely guarded against.
  */
-
-/**
- * The slice of main-store state a client's snapshot replaces.
- *
- * Listed explicitly rather than spread, so that a field added to the store
- * later is a compile error here if it should travel, and silently left alone if
- * it should not.
- */
-const SWAPPED_KEYS = [
-  "exercises",
-  "slots",
-  "sessions",
-  "sets",
-  "dailyLogs",
-  "nutritionPhases",
-  "plannedDays",
-  "unit",
-  "activeSessionId",
-  "currentExerciseId",
-  "nextSlotId",
-  "restSince",
-  "lastAcceptedPlanAt",
-  // Swapped so the COACH can edit a client's plan even when the coach is
-  // coached themselves -- and so the client's own flag never reaches here.
-  "coachManaged",
-] as const;
-
-type SwappedKey = (typeof SWAPPED_KEYS)[number];
-type Swapped = Pick<ReturnType<typeof useStore.getState>, SwappedKey>;
-
-function captureOwnState(): Swapped {
-  const state = useStore.getState();
-  const out = {} as Record<string, unknown>;
-  for (const key of SWAPPED_KEYS) out[key] = state[key];
-  return out as Swapped;
-}
 
 /** A snapshot as main-store state. Workout-in-progress fields are always clear:
  * a client's live session is not something a coach can be inside. */
