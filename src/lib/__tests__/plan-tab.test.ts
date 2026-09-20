@@ -4,6 +4,7 @@ import {
   diffPlan,
   isNewerCoachPlan,
   parsePlanTab,
+  planNeedsNewerApp,
   planFromStore,
   formatLift,
   parseLift,
@@ -747,6 +748,138 @@ describe("planning mode and weekdays", () => {
     const rows = grid();
     setCell(rows, rowOfKind(rows, "card"), "Day", "Someday");
     expect(parsePlanTab(rows)).toBeUndefined();
+  });
+});
+
+describe("cardio in a plan", () => {
+  it("round-trips a cardio card", () => {
+    const plan: PlanPayload = {
+      ...PLAN,
+      cards: [
+        ...PLAN.cards,
+        {
+          name: "Conditioning",
+          rotationOrder: 3,
+          kind: "cardio",
+          lifts: [],
+          cardio: { name: "Treadmill", durationMinutes: 25, distance: 3.1 },
+        },
+      ],
+    };
+    const back = through(plan);
+    const card = back?.cards.find((c) => c.name === "Conditioning");
+    expect(card?.kind).toBe("cardio");
+    expect(card?.cardio).toEqual({ name: "Treadmill", durationMinutes: 25, distance: 3.1 });
+  });
+
+  it("round-trips a finisher on a workout card", () => {
+    // The other shape, and the reason cardio is a FIELD rather than only a
+    // kind: lifts, and then twenty minutes on the bike.
+    const plan: PlanPayload = {
+      ...PLAN,
+      cards: PLAN.cards.map((c) =>
+        c.name === "Upper" ? { ...c, cardio: { name: "Bike", durationMinutes: 20 } } : c,
+      ),
+    };
+    const back = through(plan);
+    const upper = back?.cards.find((c) => c.name === "Upper");
+    expect(upper?.kind).toBe("workout");
+    expect(upper?.cardio).toEqual({ name: "Bike", durationMinutes: 20 });
+    // The lifts are untouched by it.
+    expect(upper?.lifts.map((l) => l.name)).toEqual(["Bench Press", "Row"]);
+  });
+
+  it("keeps an activity with neither measure", () => {
+    // "Do some cardio" is a legitimate thing for a plan to say, and demanding
+    // a duration would make one up.
+    const plan: PlanPayload = {
+      ...PLAN,
+      cards: PLAN.cards.map((c) => (c.name === "Upper" ? { ...c, cardio: { name: "Row" } } : c)),
+    };
+    expect(through(plan)?.cards.find((c) => c.name === "Upper")?.cardio).toEqual({ name: "Row" });
+  });
+
+  it("drops numbers that name no activity", () => {
+    // A duration with nothing to attach it to is not a prescription anybody
+    // can follow, so the row reads as having no cardio at all.
+    const rows = buildPlanTab(PLAN);
+    const kindCol = headerIndex(rows, "Kind");
+    const minsCol = headerIndex(rows, "Minutes");
+    const row = rows.find((r) => r[kindCol] === "card")!;
+    row[minsCol] = 30;
+    expect(parsePlanTab(rows)?.cards[0].cardio).toBeUndefined();
+  });
+
+  it("refuses a card whose cardio minutes are not a number", () => {
+    const rows = buildPlanTab(PLAN);
+    const kindCol = headerIndex(rows, "Kind");
+    const cardioCol = headerIndex(rows, "Cardio");
+    const minsCol = headerIndex(rows, "Minutes");
+    const row = rows.find((r) => r[kindCol] === "card")!;
+    row[cardioCol] = "Treadmill";
+    row[minsCol] = "about twenty";
+    expect(parsePlanTab(rows)).toBeUndefined();
+  });
+
+  it("reports a changed cardio line in the diff", () => {
+    const before: PlanPayload = PLAN;
+    const after: PlanPayload = {
+      ...PLAN,
+      cards: PLAN.cards.map((c) =>
+        c.name === "Upper" ? { ...c, cardio: { name: "Bike", durationMinutes: 20 } } : c,
+      ),
+    };
+    const change = diffPlan(before, after).find((c) => c.subject.includes("cardio"));
+    expect(change?.detail).toBe("none → Bike, 20 min");
+  });
+});
+
+describe("planNeedsNewerApp", () => {
+  it("tells a too-new plan apart from a corrupt one", () => {
+    // The distinction the caller could not make for a long time: parsePlanTab
+    // returns undefined for both, so a coach's new programme and a damaged tab
+    // looked identical and the app showed nothing for either.
+    const rows = grid();
+    const valueCol = headerIndex(rows, "Value");
+    const version = rows.find((r) => r[0] === "meta" && r[1] === "version")!;
+    version[valueCol] = PLAN_FORMAT_VERSION + 1;
+
+    expect(parsePlanTab(rows)).toBeUndefined();
+    expect(planNeedsNewerApp(rows)).toBe(true);
+  });
+
+  it("is false for a plan this build can read", () => {
+    expect(planNeedsNewerApp(grid())).toBe(false);
+  });
+
+  it("is false for a tab that is corrupt rather than new", () => {
+    // A plan whose CARDS are unreadable still declares a version this build
+    // handles, so the answer is "this is broken", not "you are out of date".
+    const rows = grid();
+    const kindCol = headerIndex(rows, "Kind");
+    const nameCol = headerIndex(rows, "Name");
+    for (const row of rows) {
+      if (row[kindCol] === "card") row[nameCol] = undefined;
+    }
+    expect(parsePlanTab(rows)).toBeUndefined();
+    expect(planNeedsNewerApp(rows)).toBe(false);
+  });
+
+  it("still answers for a tab whose rows it cannot parse at all", () => {
+    // The load-bearing property: it must be MORE tolerant than parsePlanTab,
+    // or it cannot answer the question it exists for. A future build's plan
+    // will contain row kinds and columns this one has never heard of.
+    const rows = grid();
+    const valueCol = headerIndex(rows, "Value");
+    const version = rows.find((r) => r[0] === "meta" && r[1] === "version")!;
+    version[valueCol] = 99;
+    const withJunk = [...rows, ["superset", "Nonsense", "not-a-date"]];
+    expect(planNeedsNewerApp(withJunk)).toBe(true);
+  });
+
+  it("says nothing about a tab that is not a plan tab", () => {
+    expect(planNeedsNewerApp(undefined)).toBe(false);
+    expect(planNeedsNewerApp([])).toBe(false);
   });
 });
 

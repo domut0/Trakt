@@ -730,7 +730,7 @@ async function importBackup(page, backup, label) {
 async function captureEmptyStates(page) {
   await importBackup(page, buildEmptyBackup(), "empty / fresh install");
 
-  await gotoTab(page, "/", 'h2:text("Daily numbers")');
+  await gotoTab(page, "/", 'button:text("Add activity")');
   await shot(page, "01-empty-today");
 
   await gotoTab(page, "/history", 'h1:text("History")');
@@ -745,7 +745,7 @@ async function captureEmptyStates(page) {
 }
 
 async function captureToday(page) {
-  await gotoTab(page, "/", 'h2:text("Daily numbers")');
+  await gotoTab(page, "/", 'button:text("Add activity")');
   await shot(page, "10-today-populated");
 
   // Typing goes straight into the card now - there is no sheet to open, so the
@@ -858,9 +858,9 @@ async function captureSettings(page) {
 }
 
 async function captureWorkoutFlow(page) {
-  await gotoTab(page, "/", 'h2:text("Daily numbers")');
+  await gotoTab(page, "/", 'button:text("Add activity")');
 
-  await page.getByRole("button", { name: "Start workout" }).click();
+  await page.getByRole("button", { name: "Add activity" }).click();
   await settle(page, 500);
   await shot(page, "50-workout-chooser-sheet");
 
@@ -870,7 +870,7 @@ async function captureWorkoutFlow(page) {
   await page.keyboard.press("Escape");
   await settle(page, 300);
 
-  await page.getByRole("button", { name: "Start workout" }).click();
+  await page.getByRole("button", { name: "Add activity" }).click();
   await settle(page, 400);
   await page.getByRole("button", { name: "Log strength training workout" }).click();
   await settle(page, 500);
@@ -935,7 +935,12 @@ async function captureWorkoutFlow(page) {
   await shot(page, "5a-today-with-active-session-banner");
 
   // Ending a workout lands on its summary now, so the flow finishes there.
-  await page.getByRole("button", { name: /Return to active workout/ }).click();
+  //
+  // Back in through the BANNER. The nav bar's flame button used to double as
+  // "Return to active workout"; it has gone, along with the rest of that
+  // button, and the banner across the top is now the only way back in - which
+  // it always was on every screen the bar did not cover.
+  await page.getByRole("button", { name: /Workout in progress/ }).click();
   await page.waitForSelector("text=Time between sets", { timeout: 15_000 });
   // 225x5 does not beat the seeded history (the heavy bench block finishes its
   // sixth week at 230), so this is deliberately the no-records summary: the
@@ -945,7 +950,7 @@ async function captureWorkoutFlow(page) {
   await settle(page, 600);
   await shot(page, "5b-workout-summary-no-records");
   await page.getByRole("button", { name: "Done" }).click();
-  await page.waitForSelector('h2:text("Daily numbers")', { timeout: 15_000 });
+  await page.waitForSelector('button:text("Add activity")', { timeout: 15_000 });
   await settle(page, 500);
 
   // The same screen when the workout beat something. Two records, so the
@@ -958,7 +963,7 @@ async function captureWorkoutFlow(page) {
   await settle(page, 600);
   await shot(page, "5c-workout-summary-record");
   await page.getByRole("button", { name: "Done" }).click();
-  await page.waitForSelector('h2:text("Daily numbers")', { timeout: 15_000 });
+  await page.waitForSelector('button:text("Add activity")', { timeout: 15_000 });
   await settle(page, 500);
 
   // An empty workout has no summary: ending one is a cancel, and it goes
@@ -966,7 +971,7 @@ async function captureWorkoutFlow(page) {
   // since the picture is just the Today screen.
   await startWorkout(page);
   await endWorkoutAt(page, 3);
-  await page.waitForSelector('h2:text("Daily numbers")', { timeout: 15_000 });
+  await page.waitForSelector('button:text("Add activity")', { timeout: 15_000 });
   if (await page.locator("text=Finished").count()) {
     throw new Error("Ending a workout with nothing logged should not show a summary.");
   }
@@ -975,7 +980,7 @@ async function captureWorkoutFlow(page) {
 
 /** Start workout -> strength -> Start, landing on the live workout screen. */
 async function startWorkout(page, name = "Arms") {
-  await page.getByRole("button", { name: "Start workout" }).click();
+  await page.getByRole("button", { name: "Add activity" }).click();
   await settle(page, 400);
   await page.getByRole("button", { name: "Log strength training workout" }).click();
   await settle(page, 500);
@@ -1046,7 +1051,7 @@ async function endWorkoutAt(page, minutes) {
 }
 
 async function captureSessionDetail(page) {
-  await gotoTab(page, "/", 'h2:text("Daily numbers")');
+  await gotoTab(page, "/", 'button:text("Add activity")');
   await scrollMain(page, 99_999);
   const sessionRow = page.locator("section", { hasText: "Workouts" }).getByRole("button").first();
   if (await sessionRow.count()) {

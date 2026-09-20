@@ -43,6 +43,23 @@ app once on every device you own after deploying, before coaching anyone from
 it. A future format change should carry per-lift data as its own row kind
 instead, since an unrecognised `Kind` is already skipped rather than misread.
 
+**The version is 4 as of 2026-09-20, and the refusal is now visible.** Two
+changes moved it in one day: phases gained an end date and a note (v3), and
+cards gained cardio (v4). Both are additive, and both are exactly the kind of
+change the version row exists for - an older build would drop the new fields and
+republish the plan without them.
+
+What changed alongside it is that the refusal now SAYS something. `parsePlanTab`
+returned undefined for a too-new plan and for a corrupt one alike, so the caller
+could not tell them apart and showed neither, while the comment above that line
+claimed it showed "update Trakt". `planNeedsNewerApp` answers that question
+separately and deliberately more tolerantly than the parser - it has to be, or
+it could not read a version out of a tab whose rows it cannot parse - and
+`coachPlanNeedsUpdate` drives a screen telling the client to update. Nothing is
+written and the sheet is untouched.
+
+The per-lift-row idea below still stands for the change after this one.
+
 Still untested on real hardware: silent token renewal in an installed iOS PWA.
 
 ## The premise

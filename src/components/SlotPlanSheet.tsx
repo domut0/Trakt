@@ -41,6 +41,7 @@ export function SlotPlanSheet({
 }) {
   const exercises = useStore((s) => s.exercises);
   const setSlotLifts = useStore((s) => s.setSlotLifts);
+  const setSlotCardio = useStore((s) => s.setSlotCardio);
   const templates = useStore((s) => s.templates);
   const saveTemplateFrom = useStore((s) => s.saveTemplateFrom);
   const applyTemplateLifts = useStore((s) => s.applyTemplate);
@@ -53,6 +54,9 @@ export function SlotPlanSheet({
   const [picked, setPicked] = useState<PlannedLift[]>([]);
   const [query, setQuery] = useState("");
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+  const [cardioId, setCardioId] = useState<string | undefined>(undefined);
+  const [minutes, setMinutes] = useState("");
+  const [distance, setDistance] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -61,6 +65,15 @@ export function SlotPlanSheet({
     setPicked(slot?.plannedLifts ?? []);
     setQuery("");
     setSaveAsTemplate(false);
+    setCardioId(slot?.plannedCardio?.exerciseId);
+    setMinutes(
+      slot?.plannedCardio?.durationMinutes === undefined
+        ? ""
+        : String(slot.plannedCardio.durationMinutes),
+    );
+    setDistance(
+      slot?.plannedCardio?.distance === undefined ? "" : String(slot.plannedCardio.distance),
+    );
   }, [open, slot]);
 
   useSheetDismiss(open, onClose);
@@ -148,14 +161,45 @@ export function SlotPlanSheet({
       return next;
     });
 
-  /** Both toggles off means a normal workout card, so turning one on turns the
-   *  other off rather than producing a card that is two things. */
-  const setToggle = (which: "rest" | "repeat", on: boolean) => setKind(on ? which : "workout");
+  /** Every toggle off means a normal workout card, so turning one on turns the
+   *  others off rather than producing a card that is two things. */
+  const setToggle = (which: "rest" | "repeat" | "cardio", on: boolean) =>
+    setKind(on ? which : "workout");
+
+  /** Cardio activities only. A bout produces no sets, so the strength picker
+   *  filters these out and this one is the other half of that split. */
+  const cardioOptions = exercises.filter((e) => e.type === "cardio");
+
+  // "" means not set, never 0. A typed 0 would be a bout of no length, which is
+  // not a thing to prescribe.
+  const asNumber = (raw: string): number | undefined => {
+    const t = raw.trim();
+    if (t === "") return undefined;
+    const n = Number(t);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+  const minutesValue = asNumber(minutes);
+  const distanceValue = asNumber(distance);
 
   const save = () => {
     const target = slot ?? addSplitCard({ name, kind });
     if (slot) updateSplitCard(slot.id, { name, kind });
     if (kind === "workout" && target) setSlotLifts(target.id, picked);
+    // Written for a workout card AND a cardio one, because the two shapes are
+    // both real: a conditioning day, and twenty minutes on the bike after the
+    // lifts. A rest or a repeat carries neither.
+    if (target && (kind === "workout" || kind === "cardio")) {
+      setSlotCardio(
+        target.id,
+        cardioId === undefined
+          ? undefined
+          : {
+              exerciseId: cardioId,
+              ...(minutesValue === undefined ? {} : { durationMinutes: minutesValue }),
+              ...(distanceValue === undefined ? {} : { distance: distanceValue }),
+            },
+      );
+    }
     // Saving the card is what makes it a template: a template of an
     // unsaved card would describe something that does not exist yet.
     if (saveAsTemplate && target) saveTemplateFrom(target.id, name);
@@ -214,6 +258,15 @@ export function SlotPlanSheet({
           </div>
 
           <div className="group-row group-row-sep">
+            <span className="t-body font-medium text-ink">Cardio day</span>
+            <Switch
+              on={kind === "cardio"}
+              label="Cardio day"
+              onChange={(v) => setToggle("cardio", v)}
+            />
+          </div>
+
+          <div className="group-row group-row-sep">
             <span className="t-body font-medium text-ink">Repeat</span>
             <Switch
               on={kind === "repeat"}
@@ -222,6 +275,75 @@ export function SlotPlanSheet({
             />
           </div>
         </div>
+
+        {(kind === "workout" || kind === "cardio") && (
+          /* On a workout card this is a FINISHER - lifts, then twenty minutes
+             on the bike. On a cardio card it is the whole day. Same editor
+             either way, because it is the same prescription; what differs is
+             whether there are lifts above it. */
+          <div className="mt-4 shrink-0">
+            <div className="group-header">
+              <h3 className="t-caption">{kind === "cardio" ? "Activity" : "Cardio finisher"}</h3>
+            </div>
+            <div className="group-list">
+              <div className="group-row">
+                <label htmlFor="card-cardio" className="t-body font-medium text-ink">
+                  Activity
+                </label>
+                <select
+                  id="card-cardio"
+                  value={cardioId ?? ""}
+                  onChange={(e) => setCardioId(e.target.value || undefined)}
+                  className="min-h-[44px] bg-transparent text-right t-body text-ink outline-none"
+                >
+                  {/* Blank is a real choice on a cardio card: "do some cardio"
+                      without saying which is a legitimate thing to plan. */}
+                  <option value="">None</option>
+                  {cardioOptions.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {cardioId !== undefined && (
+                <>
+                  <div className="group-row group-row-sep">
+                    <label htmlFor="card-cardio-mins" className="t-body font-medium text-ink">
+                      Minutes
+                    </label>
+                    <input
+                      id="card-cardio-mins"
+                      type="number"
+                      inputMode="numeric"
+                      value={minutes}
+                      onChange={(e) => setMinutes(e.target.value)}
+                      placeholder="—"
+                      className="min-h-[44px] w-24 bg-transparent text-right t-body text-ink outline-none placeholder:text-ink-3"
+                    />
+                  </div>
+                  <div className="group-row group-row-sep">
+                    <label htmlFor="card-cardio-dist" className="t-body font-medium text-ink">
+                      Distance
+                    </label>
+                    <input
+                      id="card-cardio-dist"
+                      type="number"
+                      inputMode="decimal"
+                      value={distance}
+                      onChange={(e) => setDistance(e.target.value)}
+                      placeholder="—"
+                      className="min-h-[44px] w-24 bg-transparent text-right t-body text-ink outline-none placeholder:text-ink-3"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            {/* Neither number implies the other. "20 minutes on the bike" and
+                "5k, however long it takes" are both complete instructions. */}
+          </div>
+        )}
 
         {kind === "repeat" && (
           // The one place a sentence is warranted: a repeat is the only card

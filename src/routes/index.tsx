@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format, isValid } from "date-fns";
 import { AppShell } from "../components/AppShell";
+import { DayActions } from "../components/DayActions";
 import { DayStatsCard } from "../components/DayStatsCard";
 import { WeekStrip } from "../components/WeekStrip";
 import { CoachPlanCard } from "../components/CoachPlanPrompt";
@@ -106,10 +107,11 @@ function Home() {
             targets - so the sheet's whole contribution was a Save button and a
             second copy of the screen behind it. Typing here writes straight
             through. */}
-        <div className="group-header">
-          <h2 className="t-caption">Daily numbers</h2>
-        </div>
+        {/* No "Daily numbers" heading. The card is six labelled rows of
+            numbers under a date; a caption saying they are numbers was the
+            screen narrating itself. */}
         <DayStatsCard date={selected} editable />
+        <DayActions date={selected} />
       </section>
 
       <div className="pb-8" />

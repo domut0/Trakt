@@ -77,11 +77,57 @@ export function CoachPlanCard() {
  */
 export function CoachPlanPrompt() {
   const pending = useSyncStore((s) => s.pendingCoachPlan);
+  const needsUpdate = useSyncStore((s) => s.coachPlanNeedsUpdate);
   const open = useSyncStore((s) => s.planReviewOpen);
   const setOpen = useSyncStore((s) => s.setPlanReviewOpen);
   const acceptCoachPlan = useStore((s) => s.acceptCoachPlan);
   const showToast = useToast();
   const changes = usePendingChanges();
+
+  /**
+   * A plan this build is too old to read.
+   *
+   * Its own screen rather than a variant of the review below, because there is
+   * nothing to review: the payload never parsed, so there is no list of changes
+   * and no Accept. It says what happened and leaves the sheet alone.
+   *
+   * No "Not now" either. Dismissing implies a choice, and the only thing that
+   * clears this is updating the app - so the way out is the same gesture as
+   * leaving any other screen, and it comes straight back on the next sync.
+   */
+  if (needsUpdate && !pending) {
+    if (!open || typeof document === "undefined") return null;
+    return createPortal(
+      <div className="fixed inset-0 z-50 flex flex-col bg-paper">
+        <header className="px-4 pb-3 pt-14">
+          <h1 className="t-title text-ink">Update Trakt</h1>
+          <p className="t-label text-ink-2">From your coach</p>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4">
+          <p className="t-body text-ink">Your coach sent a plan that this version cannot read.</p>
+          <p className="mt-3 t-label text-ink-2">
+            Close Trakt and open it again to pick up the newest version. The plan stays in your
+            sheet until then, and nothing you have logged is affected.
+          </p>
+        </div>
+
+        <div
+          className="px-4 pt-2"
+          style={{ paddingBottom: "max(env(safe-area-inset-bottom), 16px)" }}
+        >
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="min-h-[44px] w-full bg-ink t-body font-semibold text-paper rounded-md"
+          >
+            OK
+          </button>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
 
   if (!pending) return null;
 

@@ -64,7 +64,7 @@ export type PlanningMode = "week" | "rotation";
  * the coach's programming back out. An app that meets a higher number refuses
  * the plan and says to update, rather than half-applying it.
  */
-export const PLAN_FORMAT_VERSION = 3;
+export const PLAN_FORMAT_VERSION = 4;
 
 /** A nutrition phase, keyed by its start date rather than an id. */
 export interface PlanPhase {
@@ -90,12 +90,26 @@ export interface PlanLift {
   load?: string;
 }
 
+/**
+ * Cardio a card prescribes, named rather than pointed at, like a lift.
+ *
+ * Carried on ANY card kind: a cardio card's whole content, or a finisher on a
+ * training day.
+ */
+export interface PlanCardio {
+  name: string;
+  durationMinutes?: number;
+  distance?: number;
+}
+
 /** A split card, keyed by name, with its lifts carried as names. */
 export interface PlanCard {
   name: string;
   rotationOrder: number;
   kind: SplitCardKind;
   lifts: PlanLift[];
+  /** What this card prescribes on the bike or the treadmill, if anything. */
+  cardio?: PlanCardio;
   /** 0 = Sunday. Present in `week` mode, absent in `rotation`. */
   weekday?: number;
 }
@@ -147,6 +161,12 @@ const HEADERS = [
   "Steps",
   "Order",
   "Card Kind",
+  // Cardio, as three columns rather than one encoded cell. This sheet is a
+  // document a coach edits by hand, and "Treadmill · 20min · 5km" is a format
+  // to get wrong; three cells are three things to type.
+  "Cardio",
+  "Minutes",
+  "Distance",
   "Day",
   "Exercises",
 ] as const;
@@ -269,6 +289,9 @@ export function buildPlanTab(plan: PlanPayload): CellValue[][] {
     at(row, "Name", card.name);
     at(row, "Order", card.rotationOrder);
     at(row, "Card Kind", card.kind);
+    at(row, "Cardio", card.cardio?.name);
+    at(row, "Minutes", card.cardio?.durationMinutes);
+    at(row, "Distance", card.cardio?.distance);
     at(row, "Day", card.weekday === undefined ? undefined : WEEKDAYS[card.weekday]);
     // An empty list writes a blank cell rather than an empty string, so a card
     // with no lifts round-trips as absent rather than as one nameless exercise.
@@ -336,6 +359,21 @@ export function planFromStore(
       rotationOrder: s.rotationOrder,
       kind: s.kind ?? "workout",
       ...(s.weekday === undefined ? {} : { weekday: s.weekday }),
+      // Dropped rather than sent half-formed when the exercise is gone: a
+      // cardio line naming nothing is not something a client can act on.
+      ...(() => {
+        const c = s.plannedCardio;
+        if (!c) return {};
+        const name = exerciseNameById.get(c.exerciseId);
+        if (name === undefined) return {};
+        return {
+          cardio: {
+            name,
+            ...(c.durationMinutes === undefined ? {} : { durationMinutes: c.durationMinutes }),
+            ...(c.distance === undefined ? {} : { distance: c.distance }),
+          },
+        };
+      })(),
       lifts: (s.plannedLifts ?? [])
         .map(({ exerciseId, sets, reps, load }): PlanLift | undefined => {
           const name = exerciseNameById.get(exerciseId);
@@ -423,6 +461,51 @@ function indexHeaders(rows: readonly CellValue[][]): Map<string, number> | undef
  * the one deliberate asymmetry. That is forward compatibility: a later version
  * adding a row type must not brick every client that has not updated yet.
  */
+/**
+ * The format version a plan tab declares, or 1 when it declares none.
+ *
+ * Deliberately far more tolerant than `parsePlanTab`: it walks the meta rows
+ * for a version and ignores everything else, so it can still answer for a tab
+ * whose phases or cards this build cannot read. That is the entire point - the
+ * question it exists to answer is "did that fail because the app is old?", and
+ * a parser strict enough to reject the tab cannot answer it.
+ *
+ * Returns undefined only when there is nothing here that resembles a plan tab
+ * at all, which is a different thing from an unreadable one.
+ */
+export function planTabVersion(rows: readonly CellValue[][] | undefined): number | undefined {
+  if (!rows || rows.length === 0) return undefined;
+  const headers = indexHeaders(rows);
+  if (!headers) return undefined;
+
+  const kindCol = headers.get("Kind");
+  const nameCol = headers.get("Name");
+  const valueCol = headers.get("Value");
+  if (kindCol === undefined || nameCol === undefined || valueCol === undefined) return undefined;
+
+  for (const row of rows.slice(1)) {
+    if (String(row[kindCol] ?? "").toLowerCase() !== "meta") continue;
+    if (String(row[nameCol] ?? "") !== "version") continue;
+    const n = Number(String(row[valueCol] ?? "").trim());
+    if (!Number.isFinite(n) || n < 1) return undefined;
+    return n;
+  }
+  // No version row is version 1, the same assumption parsePlanTab makes.
+  return 1;
+}
+
+/**
+ * Whether a plan tab was written by a build newer than this one.
+ *
+ * The caller asks this AFTER `parsePlanTab` returns undefined, to tell the two
+ * reasons for that apart: a plan this app is too old to read, which the person
+ * can fix by updating, and a corrupt tab, which they cannot.
+ */
+export function planNeedsNewerApp(rows: readonly CellValue[][] | undefined): boolean {
+  const version = planTabVersion(rows);
+  return version !== undefined && version > PLAN_FORMAT_VERSION;
+}
+
 export function parsePlanTab(rows: readonly CellValue[][] | undefined): PlanPayload | undefined {
   if (!rows || rows.length === 0) return undefined;
   const headers = indexHeaders(rows);
@@ -510,7 +593,14 @@ export function parsePlanTab(rows: readonly CellValue[][] | undefined): PlanPayl
       if (order === BAD || order === undefined) return undefined;
 
       const cardKind = text(cell(row, "Card Kind")) ?? "workout";
-      if (cardKind !== "workout" && cardKind !== "rest" && cardKind !== "repeat") return undefined;
+      if (
+        cardKind !== "workout" &&
+        cardKind !== "rest" &&
+        cardKind !== "repeat" &&
+        cardKind !== "cardio"
+      ) {
+        return undefined;
+      }
 
       const day = text(cell(row, "Day"));
       const weekday = day === undefined ? undefined : WEEKDAYS.indexOf(day.slice(0, 3) as never);
@@ -527,11 +617,28 @@ export function parsePlanTab(rows: readonly CellValue[][] | undefined): PlanPayl
               .map((part) => parseLift(part))
               .filter((lift): lift is PlanLift => lift !== undefined);
 
+      // Named, or nothing. A duration with no activity is not a prescription
+      // anybody can follow, so the numbers are read only once there is
+      // something to attach them to.
+      const cardioName = text(cell(row, "Cardio"));
+      let cardio: PlanCardio | undefined;
+      if (cardioName !== undefined) {
+        const minutes = num(cell(row, "Minutes"));
+        const dist = num(cell(row, "Distance"));
+        if (minutes === BAD || dist === BAD) return undefined;
+        cardio = {
+          name: cardioName,
+          ...(minutes === undefined ? {} : { durationMinutes: minutes }),
+          ...(dist === undefined ? {} : { distance: dist }),
+        };
+      }
+
       cards.push({
         name,
         rotationOrder: order,
         kind: cardKind,
         lifts,
+        ...(cardio === undefined ? {} : { cardio }),
         ...(weekday === undefined || weekday < 0 ? {} : { weekday }),
       });
       continue;
@@ -565,7 +672,10 @@ export function parsePlanTab(rows: readonly CellValue[][] | undefined): PlanPayl
 
   // A plan from a newer build carries fields this one would drop on the floor,
   // and publishing what survived would strip them back out of the sheet. The
-  // caller shows "update Trakt" rather than applying half a programme.
+  // caller shows "update Trakt" rather than applying half a programme - see
+  // `planNeedsNewerApp`, which is how the caller can tell this refusal from a
+  // refusal for corruption. For a long time it could not, and a plan from a
+  // newer build therefore vanished in silence.
   if (version > PLAN_FORMAT_VERSION) return undefined;
 
   return {
@@ -662,10 +772,13 @@ export function resolvePlan(
   const phaseByStart = new Map(target.nutritionPhases.map((p) => [p.startsOn, p]));
 
   const createdExercises: Exercise[] = [];
-  const resolveExercise = (name: string): Exercise => {
+  const resolveExercise = (name: string, type: Exercise["type"] = "accessory"): Exercise => {
     const existing = exerciseByName.get(key(name));
     if (existing) return existing;
-    const created: Exercise = { id: newId(), name: name.trim(), type: "accessory" };
+    // The TYPE matters beyond bookkeeping: the two exercise pickers filter on
+    // it, and a treadmill created as an accessory would appear in the strength
+    // picker and be missing from the cardio one.
+    const created: Exercise = { id: newId(), name: name.trim(), type };
     // Registered immediately so a name repeated across two cards resolves to
     // one record rather than creating a duplicate on the second mention.
     exerciseByName.set(key(name), created);
@@ -681,6 +794,19 @@ export function resolvePlan(
       rotationOrder: card.rotationOrder,
       kind: card.kind,
       ...(card.weekday === undefined ? {} : { weekday: card.weekday }),
+      // Same resolution the lifts get: a name becomes an exercise, creating one
+      // if this client has never done it.
+      ...(card.cardio === undefined
+        ? {}
+        : {
+            plannedCardio: {
+              exerciseId: resolveExercise(card.cardio.name, "cardio").id,
+              ...(card.cardio.durationMinutes === undefined
+                ? {}
+                : { durationMinutes: card.cardio.durationMinutes }),
+              ...(card.cardio.distance === undefined ? {} : { distance: card.cardio.distance }),
+            },
+          }),
       plannedLifts: card.lifts.map((lift) => ({
         exerciseId: resolveExercise(lift.name).id,
         ...(lift.sets === undefined ? {} : { sets: lift.sets }),
@@ -863,7 +989,10 @@ export function diffPlan(current: PlanPayload | undefined, next: PlanPayload): P
         area: "Training",
         subject: card.name,
         kind: "added",
-        detail: card.lifts.map(formatLift).join(", ") || "no lifts yet",
+        detail:
+          [card.lifts.map(formatLift).join(", "), formatCardio(card.cardio)]
+            .filter(Boolean)
+            .join(" · ") || "no lifts yet",
       });
       continue;
     }
@@ -893,6 +1022,16 @@ export function diffPlan(current: PlanPayload | undefined, next: PlanPayload): P
         subject: `${card.name} · lifts`,
         kind: "changed",
         detail: arrow(oldLifts || "none", newLifts || "none"),
+      });
+    }
+    const oldCardio = formatCardio(old.cardio);
+    const newCardio = formatCardio(card.cardio);
+    if (oldCardio !== newCardio) {
+      changes.push({
+        area: "Training",
+        subject: `${card.name} · cardio`,
+        kind: "changed",
+        detail: arrow(oldCardio || "none", newCardio || "none"),
       });
     }
   }
@@ -925,6 +1064,15 @@ export function diffPlan(current: PlanPayload | undefined, next: PlanPayload): P
   }
 
   return changes;
+}
+
+/** "Treadmill, 20 min, 5 km", with whatever is missing simply absent. */
+export function formatCardio(cardio: PlanCardio | undefined): string {
+  if (!cardio) return "";
+  const parts = [cardio.name];
+  if (cardio.durationMinutes !== undefined) parts.push(`${cardio.durationMinutes} min`);
+  if (cardio.distance !== undefined) parts.push(`${cardio.distance}`);
+  return parts.join(", ");
 }
 
 /** A phase's targets on one line, for the "added" case where there is no before. */
