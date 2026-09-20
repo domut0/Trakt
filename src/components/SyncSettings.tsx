@@ -88,9 +88,6 @@ export function SyncSettings() {
         >
           <div>
             <div className="t-body">{connecting ? "Connecting…" : "Connect Google Sheet"}</div>
-            <div className="t-label text-ink-2">
-              Creates one in your own Drive. Trakt can only see the file it makes
-            </div>
           </div>
           <span className="t-action" aria-hidden="true">
             →
@@ -180,7 +177,6 @@ export function SyncSettings() {
           >
             {reconnecting ? "Reconnecting…" : "Reconnect Google"}
           </button>
-          <p className="t-label text-ink-2">Keeps this sheet. Nothing is created or moved</p>
         </div>
       )}
 

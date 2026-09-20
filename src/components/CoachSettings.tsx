@@ -47,7 +47,6 @@ export function CoachSettings() {
       <div className="group-row">
         <div className="min-w-0">
           <div className="t-body">Coach mode</div>
-          <div className="t-label text-ink-2">Read a client&rsquo;s log and write their plan</div>
         </div>
         <Toggle checked={enabled} onChange={() => setEnabled(!enabled)} label="Coach mode" />
       </div>

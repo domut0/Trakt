@@ -101,7 +101,6 @@ export function CoachPlanPrompt() {
       <div className="fixed inset-0 z-50 flex flex-col bg-paper">
         <header className="px-4 pb-3 pt-14">
           <h1 className="t-title text-ink">Update Trakt</h1>
-          <p className="t-label text-ink-2">From your coach</p>
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4">
