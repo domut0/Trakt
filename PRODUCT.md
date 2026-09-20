@@ -83,15 +83,15 @@ Built and working today:
 - A date-parameterised day view: a week strip and one card of the day's six numbers.
   Every row always renders, "Not recorded" when it has nothing, so the shape of the
   screen does not change as it fills in.
-- Daily numbers: bodyweight, calories, protein, carbs, fat, steps, and an **untracked**
-  flag meaning a day deliberately not logged rather than one missed.
+- Daily numbers: bodyweight, calories, protein, carbs, fat, steps.
 - A weekly training plan, a calendar history, charts for bodyweight, steps and calories,
   a two-way Google Sheet mirror, JSON export/import, clear-all-data.
 
 Deleted in September 2026 and not to be rebuilt without a decision: food logging (foods,
 meals, recipes, barcode scanning, MyFitnessPal import), habits, the plate and 1RM
-calculators, the 24-hour day timeline, per-weekday target profiles, and every feature
-toggle in Settings.
+calculators, the 24-hour day timeline, per-weekday target profiles, every feature
+toggle in Settings, and the **untracked** flag - a day deliberately not logged is a
+day with nothing on it, which the day already says by being empty.
 
 Technical constraints future work must respect:
 
@@ -112,8 +112,6 @@ Terminology that is settled and must not fork:
 - **Daily numbers**, never "daily log", "daily summary" or "today's numbers".
 - **Workout**, never "session", on any user-facing surface. The internal type stays
   `WorkoutSession`.
-- **Untracked**, never "cheat day". The flag is a claim about LOGGING, not about food:
-  a day you chose not to record. The two come apart constantly.
 
 Settled:
 

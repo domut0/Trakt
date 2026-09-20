@@ -27,12 +27,6 @@ network.
 **What it deliberately is not: a food tracker.** It never asks what you ate. It
 asks for numbers you already know.
 
-## Marking a day untracked
-
-A day you chose not to log is not the same as a day you forgot. Marking a day
-untracked records that difference, and the weekly counts and charts read it —
-an untracked day is a deliberate break, not a gap.
-
 ## Running it
 
 ```bash

@@ -177,12 +177,12 @@ const SESSION_NOTES = {
 };
 
 /**
- * The nutrition timeline: three change-points, which is the user's own stated
- * case and the thing the model exists to express.
+ * The nutrition timeline: three dated stretches, which is the user's own
+ * stated case and the thing the model exists to express.
  *
- * No end dates. A phase runs until the next one starts, which is why "cutting
- * from the Sunday onward" is one row rather than a range somebody maintains,
- * and why the single untracked Saturday needs no special case at all.
+ * Deliberately NOT continuous. Maintenance ends, a single day belongs to no
+ * phase at all, and the cut then runs open-ended - so the captures carry a gap,
+ * a closed range and an ongoing one, which are the three shapes a row can take.
  *
  * Dated relative to FROZEN_NOW (Thu 20 Aug 2026) so the captures always show a
  * timeline with a past phase, a current one and two still ahead.
@@ -191,8 +191,8 @@ const NUTRITION_PHASES = [
   {
     id: "np_maint",
     startsOn: "2026-07-10",
+    endsOn: "2026-08-21",
     name: "Maintenance",
-    kind: "targets",
     calories: 2700,
     protein: 200,
     carbs: 300,
@@ -200,12 +200,12 @@ const NUTRITION_PHASES = [
     steps: 20000,
     goalMode: "maintain",
   },
-  { id: "np_off", startsOn: "2026-08-22", name: "Off", kind: "untracked" },
+  // 2026-08-22 belongs to no phase. That is the gap.
   {
     id: "np_cut",
     startsOn: "2026-08-23",
     name: "Cut",
-    kind: "targets",
+    note: "Keep protein up on rest days. Reassess after the meet.",
     calories: 2400,
     protein: 210,
     carbs: 210,
@@ -300,8 +300,8 @@ function buildFullBackup() {
     }
 
     // --- daily log ------------------------------------------------------
-    // Two untracked days and one partial day, because nobody logs 42 for 42 and
-    // the charts need to show what a gap looks like.
+    // Two days with nothing at all and one partial day, because nobody logs 42
+    // for 42 and the charts need to show what a gap looks like.
     if (offset === 9 || offset === 23) continue;
 
     const isTrainingDay = !!split;
@@ -342,26 +342,15 @@ function buildFullBackup() {
       const fat = 74 + Math.round((rand() - 0.5) * 22);
       const steps = (isTrainingDay ? 10200 : 8100) + Math.round((rand() - 0.5) * 3400);
       log = { date: key, calories, protein, carbs, fat, steps, bodyweight };
-      // A couple of declared untracked days, on Saturdays. The offsets must BE
-      // Saturdays or this never fires: against the frozen Thu 20 Aug 2026, the
-      // original 8 and 29 are both Wednesdays, so this branch was dead and no
-      // screenshot ever contained a untracked day with macros on it. That is
-      // precisely the case where the untracked dot used to replace the food dot.
+      // A couple of big Saturdays. The offsets must BE Saturdays or this never
+      // fires: against the frozen Thu 20 Aug 2026, the original 8 and 29 are
+      // both Wednesdays, so the branch was dead for a long time and nothing
+      // caught it.
       if (wd === 5 && (offset === 12 || offset === 26)) {
         log.calories = 3480;
         log.carbs = 410;
         log.fat = 118;
-        log.isUntracked = true;
       }
-    }
-    // An untracked day carrying NO numbers, deliberately next to an untracked day so
-    // the two cells can be compared directly in the calendar grid. This is the
-    // case that was broken: the untracked flag did not count towards hasAnyDot, so
-    // a day the user had explicitly marked drew nothing at all and looked
-    // exactly like a day they never opened. Keep it in the seed so a regression
-    // shows up in a screenshot rather than in a bug report.
-    if (offset === 10) {
-      log = { date: key, isUntracked: true };
     }
     dailyLogs.push(log);
   }
@@ -929,7 +918,8 @@ async function captureWorkoutFlow(page) {
   await settle(page, 400);
   await shot(page, "58-exercise-screen-logged");
 
-  await page.getByRole("button", { name: "Done" }).click();
+  // "Back", not "Done": the exercise screen commits nothing on the way out.
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await settle(page, 400);
 
   await page.getByRole("button", { name: "View workout" }).click();
@@ -1034,7 +1024,7 @@ async function logOneSet(page, exercise, weight, reps) {
   await settle(page, 200);
   await page.getByRole("button", { name: "Save" }).click();
   await settle(page, 400);
-  await page.getByRole("button", { name: "Done" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await settle(page, 500);
 }
 

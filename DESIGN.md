@@ -190,14 +190,20 @@ in this app is almost always a mistake.** Use a card, or use space.
 - **Marks**: `mark-done` (filled square), `mark-open` (the same square, ringed,
   same footprint so a list does not reflow), `mark-over` (struck rule in the
   signal), `mark-error` (filled flag in the signal).
-- **Ribbon segment** (Plan → Nutrition): a phase drawn at 4.5px/day between a
-  52px floor and a 168px ceiling, on a ribbon that scrolls rather than fits. The
-  selected one is `bg-ink text-paper`; an untracked one is a dashed `ink-3`
-  outline over `paper`; the last one has no end, so it carries a dashed right
-  edge and the word "onward". **A segment drawn shorter than it really is prints
-  a dashed break inside its right edge and states its real length** — the width
-  is a claim about a duration, and where the claim cannot be kept the drawing
-  has to say so.
+- **Phase row** (Plan → Nutrition): name, then its dates under them in
+  `ink-2`, then its length right-aligned in `ink-3`. The selected one is
+  `bg-ink text-paper`, the same inked row the week strip and the workout list
+  use for the thing you are on. The phase covering today carries the word "now"
+  after its name; an open-ended one reads "– ongoing" and states no length,
+  because a length that grows every night is a fact about today rather than
+  about the row. **Rows that do not touch are a gap, and a gap is a real
+  thing** — days belonging to no phase, which the plan is allowed to have.
+
+  This replaced a RIBBON: a proportional timeline whose segment widths claimed
+  a duration, with a dashed break where the claim could not be kept. It was the
+  better-looking thing and the worse one to use — a drag is an imprecise
+  gesture for an exact date, it could not draw a gap, and moving one boundary
+  silently resized two phases.
 - **Last session** (Workout): a `surface` card under the current lift. Set
   number in `ink-3` in a fixed 16px column so the weights line up, figure in
   `ink`, RPE quiet after it; date right-aligned in the header, "Today" and
@@ -208,9 +214,6 @@ in this app is almost always a mistake.** Use a card, or use space.
   under the card — Edit card / Do this today / Delete — attached to it with no
   separator, because they belong to it. Never a long press: this list has twice
   hidden a control behind a gesture and been wrong both times.
-- **Boundary handle**: a 3px `ink` bar in a 24px target, on every change-point
-  after the first. Dragging it moves that date; the ribbon's layout is frozen
-  for the duration of the drag and the landing date rides above the handle.
 - **Against target** (Plan): a scrolling chart, one column per day, back to the
   first day ever logged. Calories rise from a centre line in `ink-3`, steps
   fall from it in `ink`, **each on its own absolute axis** — not as a fraction
@@ -235,7 +238,7 @@ in this app is almost always a mistake.** Use a card, or use space.
 
 **A label that explains itself gets no second line.** "Export backup / Download
 all data as JSON". "Clear all data / Wipe all workouts and start fresh".
-"Untracked / A day you chose not to log, rather than one you missed." In every
+"Export data / Save a copy of everything". In every
 pair the second line only restates the first, and a screen of those reads as
 machine-written even when each sentence is individually defensible. Five of them
 were deleted from Settings in one pass.

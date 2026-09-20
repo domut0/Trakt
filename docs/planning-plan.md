@@ -4,6 +4,25 @@ Written 2026-09-13. Supersedes the weekly-template planning in
 `docs/trakt-plan.md` and the `plannedWeek` / `targetProfiles` / `weekdayTargets`
 model it inherited.
 
+> **Two things below are no longer true, changed 2026-09-20. The training half
+> of this document stands entirely; both corrections are to the nutrition half.**
+>
+> **A phase has an end date.** `NutritionPhase.endsOn` is inclusive and
+> optional, where absent means ongoing. Phases therefore do NOT run until the
+> next one starts, the timeline is not continuous, and a day covered by no phase
+> is a real state that resolves to no targets. Overlaps are refused; an
+> open-ended phase yields to one starting inside it. Stored phases are migrated
+> by deriving the end each one already implied, so no existing plan changed
+> meaning. The reasoning is in the `NutritionPhase` doc comment in
+> `src/lib/planning.ts`, which is the live version of this section.
+>
+> **There is no `kind`, and nothing is "untracked".** The whole untracked
+> feature is gone — the phase kind, the `DailyLog` flag, the toggle, the
+> calendar mark, the chart ring and both sheet columns. A phase carrying no
+> targets is simply a phase nobody has put numbers on, which is what an
+> untracked one always was. A phase also carries a free-text `note`, which
+> travels with the plan to a client.
+
 ## The diagnosis
 
 The Plan tab was a seven-slot weekday array, and both of the things it needed to
