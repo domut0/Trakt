@@ -65,7 +65,8 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, reason: AuthFail
   });
 }
 
-export type AuthFailure = "needs-consent" | "no-client-id" | "script-blocked" | "timeout";
+export type AuthFailure =
+  "needs-consent" | "no-client-id" | "script-blocked" | "popup-blocked" | "timeout";
 
 interface TokenResponse {
   access_token?: string;
@@ -75,6 +76,12 @@ interface TokenResponse {
 
 interface TokenClient {
   requestAccessToken: (overrides?: { prompt?: string }) => void;
+}
+
+/** What the caller of an in-flight `requestAccessToken` is waiting on. */
+interface Pending {
+  resolve: (token: string) => void;
+  reject: (err: Error) => void;
 }
 
 interface GoogleIdentity {
@@ -99,6 +106,30 @@ declare global {
 let cached: { token: string; expiresAt: number } | undefined;
 let scriptPromise: Promise<void> | undefined;
 
+/**
+ * The token client, built once and kept.
+ *
+ * THIS IS THE FIX FOR "IT TAKES THREE TAPS". `requestAccessToken` opens a
+ * popup, and a browser only allows that while the page holds transient user
+ * activation - roughly five seconds from the tap that caused it. Building the
+ * client meant loading accounts.google.com/gsi/client first, and on a phone on
+ * mobile data that load routinely outlives the activation, so the popup was
+ * blocked before it ever appeared. GIS reports a blocked popup through the same
+ * error callback as a closed one, so it read as "the user declined" and the
+ * only cure on offer was tapping again - by which time the script was cached
+ * and it worked.
+ *
+ * So the script and the client are built AHEAD of the tap, by `warmGoogleAuth`,
+ * and the tap itself does nothing but call `requestAccessToken`.
+ */
+let tokenClient: TokenClient | undefined;
+
+/** The request the shared client's callbacks belong to, if any. */
+let pending: Pending | undefined;
+
+/** The request in flight, so two callers never race the one set of callbacks. */
+let inflight: Promise<string> | undefined;
+
 /** A seam, matching `setSyncFetch`. Tests install a fake rather than a global stub. */
 type TokenSource = (interactive: boolean) => Promise<string>;
 let tokenSourceImpl: TokenSource | undefined;
@@ -106,6 +137,9 @@ let tokenSourceImpl: TokenSource | undefined;
 export function setGoogleTokenSource(fn: TokenSource | undefined): void {
   tokenSourceImpl = fn;
   cached = undefined;
+  tokenClient = undefined;
+  pending = undefined;
+  inflight = undefined;
 }
 
 export function clearGoogleToken(): void {
@@ -172,46 +206,122 @@ export async function getAccessToken({ interactive }: { interactive: boolean }):
   if (!clientId) throw new Error("no-client-id" satisfies AuthFailure);
 
   await withTimeout(loadGis(), GIS_LOAD_TIMEOUT_MS, "script-blocked");
+
+  const client = ensureTokenClient(clientId);
+  if (!client) throw new Error("script-blocked" satisfies AuthFailure);
+
+  const timeout = interactive ? INTERACTIVE_TOKEN_TIMEOUT_MS : SILENT_TOKEN_TIMEOUT_MS;
+
+  try {
+    return await withTimeout(requestToken(client, interactive), timeout, "timeout");
+  } catch (err) {
+    // One retry, and only for the one failure a retry can actually fix. The
+    // first attempt may have spent its user activation loading the script; by
+    // now everything is in memory and the window opens on the spot. A decline
+    // is not retried - asking twice is the app arguing with an answer.
+    const blocked = err instanceof Error && err.message === "popup-blocked";
+    if (!blocked || !interactive) throw err;
+    return withTimeout(requestToken(client, true), timeout, "timeout");
+  }
+}
+
+/**
+ * Loads the script and builds the token client before anyone taps anything.
+ *
+ * Call it from wherever a sign-in is about to be offered -- the Settings screen,
+ * the tutorial chapter that drives someone there -- not at boot: this app is
+ * offline-first and nothing on the path to logging a set may wait on a
+ * third-party script.
+ *
+ * Deliberately returns nothing and throws nothing. A failure here costs the
+ * warm start and no more; the real attempt reports for itself.
+ */
+export function warmGoogleAuth(): void {
+  if (tokenSourceImpl) return;
+  const clientId = googleClientId();
+  if (!clientId) return;
+  if (tokenClient) return;
+  void loadGis()
+    .then(() => {
+      ensureTokenClient(clientId);
+    })
+    .catch(() => {
+      // See above: warming is best-effort by design.
+    });
+}
+
+/**
+ * The one token client, built on first use and kept for the page's life.
+ *
+ * Its two callbacks are fixed at construction, so they answer whichever request
+ * is in flight rather than closing over one -- which is what `pending` is.
+ */
+function ensureTokenClient(clientId: string): TokenClient | undefined {
+  if (tokenClient) return tokenClient;
   const oauth2 = window.google?.accounts?.oauth2;
-  if (!oauth2) throw new Error("script-blocked" satisfies AuthFailure);
+  if (!oauth2) return undefined;
+
+  tokenClient = oauth2.initTokenClient({
+    client_id: clientId,
+    scope: DRIVE_FILE_SCOPE,
+    callback: (response) => {
+      const waiting = pending;
+      pending = undefined;
+      if (!waiting) return;
+      const token = response.access_token;
+      if (response.error || !token) {
+        waiting.reject(new Error("needs-consent" satisfies AuthFailure));
+        return;
+      }
+      cached = { token, expiresAt: Date.now() + (response.expires_in ?? 3600) * 1000 };
+      waiting.resolve(token);
+    },
+    // Fires when the popup is closed or blocked, which the success callback
+    // never reports -- without it an interactive request hangs forever.
+    error_callback: (error) => {
+      const waiting = pending;
+      pending = undefined;
+      if (!waiting) return;
+      // A window the browser refused to open is not a person deciding not to
+      // sign in, and the two used to arrive here as the same error. Only one of
+      // them is worth retrying, and only one of them is the user's fault.
+      const blocked = error?.type === "popup_failed_to_open";
+      waiting.reject(
+        new Error((blocked ? "popup-blocked" : "needs-consent") satisfies AuthFailure),
+      );
+    },
+  });
+  return tokenClient;
+}
+
+/**
+ * One request at a time.
+ *
+ * The client's callbacks are shared, so two overlapping requests would both be
+ * answered by whichever one the callback happened to find. A second caller gets
+ * the first one's promise, which is the answer it was going to get anyway.
+ */
+function requestToken(client: TokenClient, interactive: boolean): Promise<string> {
+  if (inflight) return inflight;
 
   const request = new Promise<string>((resolve, reject) => {
-    let settled = false;
-    const finish = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      fn();
-    };
-
-    const client = oauth2.initTokenClient({
-      client_id: clientId,
-      scope: DRIVE_FILE_SCOPE,
-      callback: (response) => {
-        const token = response.access_token;
-        if (response.error || !token) {
-          return finish(() => reject(new Error("needs-consent" satisfies AuthFailure)));
-        }
-        cached = { token, expiresAt: Date.now() + (response.expires_in ?? 3600) * 1000 };
-        finish(() => resolve(token));
-      },
-      // Fires when the popup is closed or blocked, which the success callback
-      // never reports -- without it an interactive request hangs forever.
-      error_callback: () => {
-        finish(() => reject(new Error("needs-consent" satisfies AuthFailure)));
-      },
-    });
-
-    // An empty prompt asks Google to renew without showing anything, and fails
-    // when consent is actually needed -- which is exactly right for a
-    // background sync, since throwing a Google popup at someone mid-workout is
-    // not a thing this app does. A deliberate tap passes no override, so the
-    // account picker and consent screen appear when they have to.
-    client.requestAccessToken(interactive ? undefined : { prompt: "" });
+    pending = { resolve, reject };
+    try {
+      // An empty prompt asks Google to renew without showing anything, and
+      // fails when consent is actually needed -- which is exactly right for a
+      // background sync, since throwing a Google popup at someone mid-workout
+      // is not a thing this app does. A deliberate tap passes no override, so
+      // the account picker and consent screen appear when they have to.
+      client.requestAccessToken(interactive ? undefined : { prompt: "" });
+    } catch {
+      pending = undefined;
+      reject(new Error("popup-blocked" satisfies AuthFailure));
+    }
+  }).finally(() => {
+    inflight = undefined;
+    pending = undefined;
   });
 
-  return withTimeout(
-    request,
-    interactive ? INTERACTIVE_TOKEN_TIMEOUT_MS : SILENT_TOKEN_TIMEOUT_MS,
-    "timeout",
-  );
+  inflight = request;
+  return request;
 }

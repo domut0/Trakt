@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useStore } from "@/lib/store";
 import { useSyncStore } from "@/lib/sync-store";
+import { warmGoogleAuth } from "@/lib/google-auth";
 import { ShareWithCoach } from "./ShareWithCoach";
 import { Toggle } from "./Toggle";
 
@@ -62,6 +63,25 @@ export function SyncSettings() {
   const reauthorize = useSyncStore((s) => s.reauthorize);
   const setCount = useStore((s) => s.sets.length);
   const dayCount = useStore((s) => s.dailyLogs.length);
+
+  /**
+   * Load Google's script and build its token client now, while nobody is
+   * waiting on it.
+   *
+   * Connecting used to take three taps. `requestAccessToken` opens a popup, and
+   * a browser allows that only while the page holds transient user activation -
+   * a few seconds from the tap. Fetching gsi/client first routinely outlasted
+   * that on mobile data, so the popup was blocked before it appeared, and the
+   * blocked popup arrived as "the user declined". By the third tap the script
+   * was cached and it worked.
+   *
+   * Here, it is warm before the button is ever pressed. Not at boot: this app
+   * is offline-first and nothing on the path to logging a set waits on a
+   * third-party script. Being on the Settings screen is the signal.
+   */
+  useEffect(() => {
+    warmGoogleAuth();
+  }, []);
 
   const [showSetup, setShowSetup] = useState(false);
   const [googleError, setGoogleError] = useState<string | undefined>();

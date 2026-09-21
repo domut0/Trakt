@@ -230,6 +230,14 @@ function describeFailure(error: string): { status: SyncStatus; message: string }
         status: "blocked",
         message: "Google sign-in has expired. Reconnect to keep syncing.",
       };
+    case "popup-blocked":
+      // Not an expired grant and not the network. The browser declined to open
+      // the sign-in window, which the user clears by allowing popups or simply
+      // by tapping again now that nothing has to be fetched first.
+      return {
+        status: "blocked",
+        message: "Your browser blocked the Google sign-in window. Allow popups, then try again.",
+      };
     case "empty-plan":
       return { status: "error", message: "There was no plan to send." };
     case "unreadable":
