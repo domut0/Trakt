@@ -2,8 +2,13 @@ import { useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Chevron } from "./icons";
 import { TutorialRing } from "./TutorialRing";
-import { takeHandoff } from "../lib/onboarding-handoff";
-import { useInstallMode } from "../lib/install-prompt";
+import {
+  clearHandoff,
+  consumeTutorialStart,
+  pendingHandoff,
+  startPending,
+} from "../lib/onboarding-handoff";
+import { installMode, useInstallMode } from "../lib/install-prompt";
 import { useStore } from "../lib/store";
 import { loadTutorialState, saveTutorialState, updateTutorialState } from "../lib/tutorial-state";
 import { useTutorialStore } from "../lib/tutorial-store";
@@ -32,6 +37,17 @@ import { useTutorialStore } from "../lib/tutorial-store";
 
 /** How long the finished ring is held before the card goes. */
 const FAREWELL_MS = 1900;
+
+/** The flight from /join, and the beat it is allowed to land in. */
+const FLIGHT_MS = 640;
+/**
+ * Long enough to see it arrive before the tutorial dims the screen around it.
+ *
+ * The whole point of the card travelling is that somebody watches it travel.
+ * Starting the tutorial on the same frame it lands puts a spotlight over the
+ * thing they were meant to be looking at.
+ */
+const LANDED_PAUSE_MS = 600;
 
 export interface GettingStartedCardProps {
   /**
@@ -68,29 +84,65 @@ export function GettingStartedCard({ surface = "today" }: GettingStartedCardProp
 
   useEffect(() => {
     if (surface !== "today" || typeof window === "undefined") return;
-    const from = takeHandoff();
+
+    // Read, never taken. This effect is set up and torn down again immediately
+    // after the card mounts - the page hydrates and the tree is regenerated -
+    // and a handoff consumed on the first read left the second run with
+    // nothing, the queued frame cancelled, and the card frozen at the position
+    // it was meant to be flying from. Both are claimed at the moment they are
+    // acted on instead, so a torn-down attempt simply replays.
+    const from = pendingHandoff();
     const el = cardRef.current;
-    if (!from || !el) return;
+    const wantsStart = startPending();
 
-    const to = el.getBoundingClientRect();
-    const scale = to.width > 0 ? from.width / to.width : 1;
-    setOffset(
-      `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${scale.toFixed(4)})`,
-    );
-
-    // Two frames: one for the offset to paint, one to turn the transition on
-    // before removing it. One frame and the browser coalesces both into no
-    // animation at all.
+    let timer = 0;
+    let first = 0;
     let second = 0;
-    const first = requestAnimationFrame(() => {
-      second = requestAnimationFrame(() => {
-        setFlying(true);
-        setOffset(undefined);
+
+    const flying = Boolean(from && el);
+
+    if (from && el) {
+      const to = el.getBoundingClientRect();
+      const scale = to.width > 0 ? from.width / to.width : 1;
+      setOffset(
+        `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${scale.toFixed(4)})`,
+      );
+
+      // Two frames: one for the offset to paint, one to turn the transition on
+      // before removing it. One frame and the browser coalesces both into no
+      // animation at all.
+      first = requestAnimationFrame(() => {
+        second = requestAnimationFrame(() => {
+          clearHandoff();
+          setFlying(true);
+          setOffset(undefined);
+        });
       });
-    });
+    }
+
+    if (wantsStart) {
+      // A timer rather than transitionend: a transition that is interrupted -
+      // by a rerender, by the card being scrolled out of view - never fires it,
+      // and the tutorial would never start. Two runs may both schedule one;
+      // only the first to fire claims the start.
+      timer = window.setTimeout(
+        () => {
+          if (!consumeTutorialStart()) return;
+          // Read at fire time, not closed over: `useInstallMode` reports
+          // "unavailable" on its first render and corrects itself a tick later.
+          const kind = installMode().kind;
+          useTutorialStore.getState().start({
+            canInstall: kind === "prompt" || kind === "manual-ios",
+          });
+        },
+        flying ? FLIGHT_MS + LANDED_PAUSE_MS : LANDED_PAUSE_MS,
+      );
+    }
+
     return () => {
       cancelAnimationFrame(first);
       cancelAnimationFrame(second);
+      window.clearTimeout(timer);
     };
   }, [surface]);
 
@@ -263,7 +315,8 @@ function transitionFor({
   // Placing the card back where it came from must not animate; releasing it
   // must.
   if (offset) return "none";
-  if (flying) return "transform 560ms cubic-bezier(0.2,0,0.2,1), opacity 560ms ease";
+  if (flying)
+    return `transform ${FLIGHT_MS}ms cubic-bezier(0.2,0,0.2,1), opacity ${FLIGHT_MS}ms ease`;
   const delay = exiting ? `${FAREWELL_MS - 420}ms` : "0ms";
   return `opacity 420ms ease ${delay}, transform 420ms ease ${delay}`;
 }
