@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format, isValid } from "date-fns";
 import { AppShell } from "../components/AppShell";
 import { DayActions } from "../components/DayActions";
+import { DaySessionList } from "../components/DaySessionList";
 import { DayStatsCard } from "../components/DayStatsCard";
 import { WeekStrip } from "../components/WeekStrip";
 import { CoachPlanCard } from "../components/CoachPlanPrompt";
@@ -116,6 +117,11 @@ function Home() {
             numbers under a date; a caption saying they are numbers was the
             screen narrating itself. */}
         <DayStatsCard date={selected} editable />
+        {/* What actually happened today, between the numbers and the way to add
+            to them - the same rows the Calendar shows for the day it is on. */}
+        <div className="pt-3">
+          <DaySessionList date={selected} />
+        </div>
         <DayActions date={selected} />
       </section>
 
