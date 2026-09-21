@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   advanceSplit,
   closeOpenPhases,
+  convertSplit,
   firstDayCard,
   isNutritionPhase,
   isPlannedDay,
@@ -313,5 +314,60 @@ describe("advanceSplit: edges", () => {
       { id: "a", rotationOrder: 0 },
     ];
     expect(advanceSplit(cards, "a")?.id).toBe("b");
+  });
+});
+
+describe("convertSplit", () => {
+  /** The user's own split: Upper, Lower, Repeat, Rest, Repeat. */
+  const cycle = [
+    { id: "upper", rotationOrder: 0 },
+    { id: "lower", rotationOrder: 1 },
+    { id: "rep1", rotationOrder: 2, kind: "repeat" as const },
+    { id: "rest", rotationOrder: 3, kind: "rest" as const },
+    { id: "rep2", rotationOrder: 4, kind: "repeat" as const },
+  ];
+
+  it("lays the day cards out from Monday and leaves the repeats off the week", () => {
+    const week = convertSplit(cycle, "week");
+
+    expect(week.find((c) => c.id === "upper")?.weekday).toBe(1);
+    expect(week.find((c) => c.id === "lower")?.weekday).toBe(2);
+    expect(week.find((c) => c.id === "rest")?.weekday).toBe(3);
+    expect(week.find((c) => c.id === "rep1")?.weekday).toBeUndefined();
+  });
+
+  it("carries the repeats through rather than deleting them", () => {
+    const week = convertSplit(cycle, "week");
+    expect(week.filter((c) => c.kind === "repeat")).toHaveLength(2);
+  });
+
+  it("returns every repeat to the card it followed, however the week moved them", () => {
+    // Rest to Monday, Upper to Wednesday: the two ends of the cycle swap.
+    const week = convertSplit(cycle, "week").map((c) =>
+      c.id === "rest" ? { ...c, weekday: 1 } : c.id === "upper" ? { ...c, weekday: 3 } : c,
+    );
+
+    const back = convertSplit(week, "rotation");
+
+    // Rest leads now, and rep2 - which sat behind Rest - leads with it.
+    expect(back.map((c) => c.id)).toEqual(["rest", "rep2", "lower", "rep1", "upper"]);
+    expect(back.every((c) => c.weekday === undefined)).toBe(true);
+    expect(back.map((c) => c.rotationOrder)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it("reads a week back from Monday, not from Sunday", () => {
+    // Sunday is 0 in JavaScript, so a naive sort puts it in front of Monday -
+    // and the planner that wrote this week starts on Monday.
+    const week = [
+      { id: "sun", rotationOrder: 0, weekday: 0 },
+      { id: "mon", rotationOrder: 1, weekday: 1 },
+    ];
+
+    expect(convertSplit(week, "rotation").map((c) => c.id)).toEqual(["mon", "sun"]);
+  });
+
+  it("survives a round trip with nothing rearranged", () => {
+    const back = convertSplit(convertSplit(cycle, "week"), "rotation");
+    expect(back.map((c) => c.id)).toEqual(["upper", "lower", "rep1", "rest", "rep2"]);
   });
 });
