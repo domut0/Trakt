@@ -95,6 +95,7 @@ export function SyncSettings() {
       <>
         <button
           type="button"
+          data-tutorial="connect-sheet"
           disabled={connecting || !googleAvailable()}
           onClick={() => {
             setConnecting(true);

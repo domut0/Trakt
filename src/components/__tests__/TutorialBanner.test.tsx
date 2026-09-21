@@ -75,7 +75,10 @@ describe("TutorialBanner standalone", () => {
     expect(banner).not.toBeNull();
     expect(banner.className).toContain("relative");
     expect(banner.className).not.toContain("fixed");
-    expect(banner.className).toContain("z-40");
+    // Above the spotlight's dim (z-54), so the way out of the mode is never
+    // one of the things the mode gates.
+    expect(banner.className).toContain("z-[57]");
+    expect(banner).toHaveAttribute("data-tutorial-banner");
     expect(banner.className).toContain("min-h-[44px]");
     // The safe-area inset is deliberately NOT asserted here. jsdom drops CSS
     // values it cannot parse, and `env()` is one of them, so it is absent from

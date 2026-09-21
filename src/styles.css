@@ -97,6 +97,9 @@
      that a legacy `text-success` reads as an ordinary figure rather than as an
      invisible one. The marks live in the `mark-*` utilities below. */
   --color-success: var(--ink);
+  /* The onboarding ring's one moment. See `--complete` for why this is the
+     only hue in the system besides the signal. */
+  --color-complete: var(--complete);
   --color-warning: var(--signal);
 
   /* Metric identity used to be seven hues. On paper it is hatch: angle plus
@@ -172,6 +175,20 @@
      MARK rather than by hue - an overrun figure takes a struck rule, an error
      takes a filled flag. That difference is what survives being colourblind. */
   --signal: #ff453a;
+
+  /* The second exception, and the narrower one.
+
+     Spent on exactly one thing: the onboarding ring, at the moment its last
+     task is ticked, just before the card removes itself. That is a state that
+     occurs ONCE in the life of an install and then never again, which is the
+     only kind of thing worth a hue of its own in a system built on two inks.
+
+     It is never hue alone. The ring fills AND draws a tick, so the completion
+     reads identically with no colour perception at all - the same rule the
+     struck rule and the filled flag follow. iOS systemGreen (dark), so it sits
+     beside the platform's own confirmations. Do not reach for this anywhere
+     else; `--color-success` still resolves to ink, deliberately. */
+  --complete: #30d158;
 }
 
 @layer base {

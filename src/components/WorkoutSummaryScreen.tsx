@@ -182,10 +182,17 @@ function SummaryScreen({ data, onDone }: { data: WorkoutSummaryData; onDone: () 
           many records a long session produced. */}
       <div
         className="px-4 pt-7"
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}
+        style={{
+          // The tutorial's rail is pinned to the bottom of the screen at a
+          // higher layer than this. Without the reservation it sat on top of
+          // the only way off this screen, which is what "after finishing the
+          // tutorial workout you can't exit" was.
+          paddingBottom: "calc(max(env(safe-area-inset-bottom), 24px) + var(--rail-h, 0px))",
+        }}
       >
         <button
           onClick={onDone}
+          data-tutorial="summary-done"
           className="min-h-[44px] w-full bg-ink py-3 t-body font-semibold text-paper rounded-md"
         >
           Done

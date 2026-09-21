@@ -7,7 +7,7 @@ import { DayStatsCard } from "../components/DayStatsCard";
 import { WeekStrip } from "../components/WeekStrip";
 import { CoachPlanCard } from "../components/CoachPlanPrompt";
 import { GettingStartedCard } from "../components/GettingStartedCard";
-import { TutorialClosingCard } from "../components/TutorialClosingCard";
+import { TutorialInstallCard } from "../components/TutorialInstallCard";
 import { dayKey, parseDayKey } from "../lib/daily-log";
 
 /**
@@ -91,8 +91,10 @@ function Home() {
           unless a coach plan is waiting. */}
       <CoachPlanCard />
 
+      {/* The one chapter of the tutorial that needs a control of its own, for
+          exactly as long as that chapter runs. */}
+      <TutorialInstallCard />
       <GettingStartedCard />
-      <TutorialClosingCard />
 
       <div className="px-4">
         <WeekStrip selectedDate={selected} onSelectDate={selectDate} />

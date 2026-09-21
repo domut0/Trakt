@@ -14,6 +14,13 @@ import { useTutorialStore } from "../lib/tutorial-store";
  * bar pinned to top-0 sits beneath the clock and its button cannot be
  * tapped. In flow it also needs no reserved gap in <main> to match.
  *
+ * ## The spotlight never dims it
+ *
+ * Marked `data-tutorial-banner`, which `TutorialSpotlight` reads so that its
+ * dimming starts underneath this bar. Everything else on screen is gated to one
+ * control at a time; the way OUT of the mode is not something to be gated, and
+ * a tutorial you cannot leave is the worst version of this feature.
+ *
  * ## Skip does not confirm
  *
  * The workout is fake, so skipping loses nothing, and a confirmation on a
@@ -38,8 +45,9 @@ export function TutorialBanner() {
 
   return (
     <div
+      data-tutorial-banner
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
-      className="relative z-40 flex min-h-[44px] w-full shrink-0 items-center justify-between gap-3 bg-accent px-4 py-2.5 text-accent-foreground"
+      className="relative z-[57] flex min-h-[44px] w-full shrink-0 items-center justify-between gap-3 bg-accent px-4 py-2.5 text-accent-foreground"
     >
       <span className="t-label font-medium">Tutorial mode</span>
       <button

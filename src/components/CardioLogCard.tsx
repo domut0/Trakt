@@ -117,11 +117,15 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
           aria-label="Search or add a cardio activity"
           className="mt-3 min-h-[44px] w-full bg-transparent t-heading outline-none placeholder:text-ink-2"
         />
-        <div className="mt-3 max-h-72 overflow-y-auto group-list">
+        <div
+          data-tutorial-region="cardio-picker"
+          className="mt-3 max-h-72 overflow-y-auto group-list"
+        >
           {filteredRows.map((r, idx) =>
             r.kind === "existing" ? (
               <button
                 key={r.exercise.id}
+                data-tutorial={r.exercise.name === "Treadmill" ? "cardio-treadmill" : undefined}
                 onClick={() => selectExercise(r.exercise.id)}
                 className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""}`}
               >
@@ -130,6 +134,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
             ) : (
               <button
                 key={r.name}
+                data-tutorial={r.name === "Treadmill" ? "cardio-treadmill" : undefined}
                 onClick={() => addCustom(r.name)}
                 className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""}`}
               >
@@ -205,7 +210,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
           />
         </div>
 
-        <div className="group-row group-row-sep">
+        <div data-tutorial="cardio-duration" className="group-row group-row-sep">
           <label htmlFor="cardio-duration" className="shrink-0 t-body text-ink-2">
             Duration
           </label>
@@ -258,6 +263,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
         </button>
         <button
           onClick={doSave}
+          data-tutorial="cardio-save"
           className="flex min-h-[44px] flex-[2] items-center justify-center bg-ink py-3 t-body font-semibold text-paper rounded-md"
         >
           Save

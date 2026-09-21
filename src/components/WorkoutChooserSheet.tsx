@@ -109,6 +109,7 @@ export function WorkoutChooserSheet({
               </button>
               <button
                 type="button"
+                data-tutorial="chooser-cardio"
                 onClick={() => setMode("cardio")}
                 aria-label="Log cardio workout"
                 className="flex flex-col items-center gap-2"

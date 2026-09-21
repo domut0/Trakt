@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactElement } from "rea
 import { createPortal } from "react-dom";
 
 /**
- * The demo cursor: a translucent dot that animates to the target control.
+ * The demo cursor: a translucent dot that travels to the target control.
  *
  * ## Live screen, no recordings
  *
@@ -16,28 +16,36 @@ import { createPortal } from "react-dom";
  * 3. It works across full-screen modals and portalled screens.
  * 4. It survives the soft keyboard pushing elements up the viewport.
  *
+ * ## It is drawn in the opposite of whatever it lands on
+ *
+ * The dot used to be ink-coloured always, which made it invisible on the two
+ * places it points at most: the inked "current lift" row and the dark Save
+ * button. It now reads the effective background colour under the target -
+ * walking up the tree until it finds something that is not transparent -
+ * and draws itself black on light and white on dark.
+ *
  * ## Shape: a translucent circle, not an arrow
  *
- * The app is mobile-first, designed for touch interaction. A translucent circle
- * mimics a finger tap and matches the convention used in iOS and Android screen
- * recordings. Arrow icons feel desktop-oriented and pointer-like; a circle is
- * unambiguous on a touch interface.
+ * The app is mobile-first, designed for touch. A translucent circle mimics a
+ * finger tap and matches the convention used in iOS and Android screen
+ * recordings. Arrow icons feel desktop-oriented and pointer-like.
  *
  * ## Reduced motion
  *
  * In `src/styles.css`, all CSS animations are clamped to 0.001ms under
  * `prefers-reduced-motion: reduce`. A moving CSS dot would teleport jarringly.
- * Under reduced motion, the dot and travel are disabled entirely. Instead, a
- * static, non-moving ring is drawn directly around the target element.
+ * Under reduced motion the dot and travel are disabled entirely, and a static
+ * ring is drawn around the target instead.
  *
  * ## When it plays
  *
- * - On demand: whenever "Show me" is tapped on the tutorial rail.
- * - Automatically: after 8 seconds stuck on the same step without progressing.
- * - Never while typing: if any input or textarea currently holds focus, the
- *   animation is suppressed so the app never talks over the user.
- * - Taps pass through: pointer-events are disabled so mid-animation taps land
- *   directly on the underlying controls.
+ * - Once, on its own, when a step first puts it on a target. Waiting eight
+ *   seconds for the first sign of life meant most people never saw it at all.
+ * - Again whenever "Show me" is tapped.
+ * - Never while typing: if an input holds focus the animation is suppressed,
+ *   so the app never talks over somebody mid-number.
+ * - Taps pass through: pointer-events are off, so a tap during the animation
+ *   lands on the control underneath it.
  */
 
 interface Point {
@@ -67,6 +75,49 @@ function checkReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+/** The first ancestor colour that is actually painted, including the element itself. */
+function backgroundUnder(el: Element): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  let node: Element | null = el;
+  while (node) {
+    const color = window.getComputedStyle(node).backgroundColor;
+    if (color && !isTransparent(color)) return color;
+    node = node.parentElement;
+  }
+  return undefined;
+}
+
+/**
+ * Only a colour with a zero alpha, and only a four-component one.
+ *
+ * The previous pattern allowed `rgba?` with any number of components and read
+ * whatever sat before the closing bracket as the alpha - so `rgb(0, 0, 0)` was
+ * "transparent" on the strength of its BLUE channel. Pure black is the ground
+ * this whole app is painted on, so the walk never stopped anywhere, every
+ * target came back as undefined, and the dot was drawn dark on dark every time.
+ */
+function isTransparent(color: string): boolean {
+  const value = color.trim();
+  if (value === "" || value === "transparent") return true;
+  const rgba = /^rgba\(\s*[\d.]+[,\s]+[\d.]+[,\s]+[\d.]+\s*[,/]\s*([\d.]+)\s*\)$/i.exec(value);
+  return rgba !== null && Number(rgba[1]) === 0;
+}
+
+/**
+ * Whether a colour is light enough that black reads better on it than white.
+ *
+ * Relative luminance with the sRGB coefficients, against the 0.5 midpoint. Not
+ * a contrast ratio: there are only two candidate inks and the question is which
+ * of them wins, which the midpoint answers exactly.
+ */
+export function isLightBackground(color: string | undefined): boolean {
+  if (!color) return true;
+  const parts = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(color);
+  if (!parts) return true;
+  const [r, g, b] = [1, 2, 3].map((i) => Number(parts[i]) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5;
+}
+
 export function TutorialCursor({
   target,
   trigger,
@@ -78,9 +129,9 @@ export function TutorialCursor({
 }): ReactElement | null {
   const [mounted, setMounted] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [onLight, setOnLight] = useState(true);
   const prevPosRef = useRef<Point | null>(null);
 
   useEffect(() => {
@@ -88,31 +139,17 @@ export function TutorialCursor({
     setReducedMotion(checkReducedMotion());
   }, []);
 
-  // Memoised, along with startAnimation below, because four effects call them.
-  // Redefined every render they are a new dependency every render, which is
-  // why the exhaustive-deps rule had four complaints here - and the honest fix
-  // is to make them stable rather than to silence it.
-  const measureTarget = useCallback((): Element | null => {
+  const findTarget = useCallback((): Element | null => {
     if (typeof document === "undefined") return null;
-    const el = document.querySelector(`[data-tutorial="${target}"]`);
-    if (!el) {
-      setTargetRect(null);
-      return null;
-    }
-    const r = el.getBoundingClientRect();
-    setTargetRect({
-      top: r.top,
-      left: r.left,
-      width: r.width,
-      height: r.height,
-    });
-    return el;
+    return document.querySelector(`[data-tutorial="${target}"]`);
   }, [target]);
 
   const startAnimation = useCallback(() => {
     if (isInputFocused()) return;
-    const el = measureTarget();
+    const el = findTarget();
     if (!el) return;
+
+    setOnLight(isLightBackground(backgroundUnder(el)));
 
     if (checkReducedMotion()) {
       setReducedMotion(true);
@@ -120,12 +157,10 @@ export function TutorialCursor({
     }
 
     const r = el.getBoundingClientRect();
-    const dest: Point = {
-      x: r.left + r.width / 2,
-      y: r.top + r.height / 2,
-    };
+    const dest: Point = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 
-    // Animate from wherever it previously was, or default to an offset down and to the right
+    // Travel from wherever it last landed, or from down and to the right, which
+    // is roughly where a thumb comes from.
     const from: Point = prevPosRef.current ?? {
       x: Math.min(window.innerWidth - 30, dest.x + 50),
       y: Math.min(window.innerHeight - 30, dest.y + 60),
@@ -134,83 +169,97 @@ export function TutorialCursor({
     prevPosRef.current = dest;
     setStartPoint(from);
     setPlaying(true);
-  }, [measureTarget]);
+  }, [findTarget]);
 
-  // Auto-play after 8 seconds stuck on the same step
+  /**
+   * Play once when the step arrives, retrying until the target exists.
+   *
+   * A step's target is often inside something that has not mounted yet - a
+   * sheet mid-animation, a screen being pushed - and measuring it then gives a
+   * zero-sized rect at the top left of the screen, which is where the dot used
+   * to fly to.
+   */
   useEffect(() => {
     if (!target) return;
-    measureTarget();
+    let cancelled = false;
+    let tries = 0;
 
-    const timer = setTimeout(() => {
-      startAnimation();
-    }, 8000);
+    const attempt = () => {
+      if (cancelled) return;
+      const el = findTarget();
+      const r = el?.getBoundingClientRect();
+      if (r && r.width > 0 && r.height > 0) {
+        startAnimation();
+        return;
+      }
+      tries += 1;
+      if (tries < 20) window.setTimeout(attempt, 120);
+    };
 
-    return () => clearTimeout(timer);
-  }, [target, measureTarget, startAnimation]);
+    // One beat, so a step that arrives with its screen mid-transition measures
+    // the destination rather than the doorway.
+    const timer = window.setTimeout(attempt, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [target, findTarget, startAnimation]);
 
-  // Trigger on demand from prop changes or "tutorial-show-me" window events
   useEffect(() => {
-    if (trigger !== undefined && trigger > 0) {
-      startAnimation();
-    }
+    if (trigger !== undefined && trigger > 0) startAnimation();
   }, [trigger, startAnimation]);
 
   useEffect(() => {
-    if (playImmediately) {
-      startAnimation();
-    }
+    if (playImmediately) startAnimation();
   }, [playImmediately, target, startAnimation]);
 
   useEffect(() => {
-    const handleShowMe = () => {
-      startAnimation();
-    };
+    const handleShowMe = () => startAnimation();
     window.addEventListener("tutorial-show-me", handleShowMe);
     return () => window.removeEventListener("tutorial-show-me", handleShowMe);
-  }, [target, startAnimation]);
+  }, [startAnimation]);
 
-  // Loop is ~1.5s, plays twice (3s total), then stops
+  // Loop is ~1.5s, plays twice, then stops.
   useEffect(() => {
     if (!playing) return;
-    const timer = setTimeout(() => {
-      setPlaying(false);
-    }, 3000);
+    const timer = setTimeout(() => setPlaying(false), 3000);
     return () => clearTimeout(timer);
   }, [playing]);
 
   if (!mounted || typeof document === "undefined") return null;
 
-  // Always check current DOM state for target
-  const el = document.querySelector(`[data-tutorial="${target}"]`);
+  const el = findTarget();
   if (!el) return null;
 
-  const currentRect = el.getBoundingClientRect();
+  const currentRect: TargetRect = el.getBoundingClientRect();
 
-  // Reduced motion: static ring around the target element, no dot, no travel
+  // Reduced motion: a static ring around the target, no dot and no travel.
   if (reducedMotion) {
     return createPortal(
       <div
         data-tutorial-cursor="ring"
         aria-hidden="true"
-        className="fixed z-[56] pointer-events-none rounded-md ring-2 ring-ink/40 ring-offset-2 ring-offset-paper"
+        className="fixed z-[56] pointer-events-none rounded-md"
         style={{
           top: `${Math.round(currentRect.top - 2)}px`,
           left: `${Math.round(currentRect.left - 2)}px`,
           width: `${Math.round(currentRect.width + 4)}px`,
           height: `${Math.round(currentRect.height + 4)}px`,
+          boxShadow: `0 0 0 2px ${onLight ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.75)"}`,
         }}
       />,
       document.body,
     );
   }
 
-  // If not currently playing and not reduced motion, render nothing
   if (!playing || !startPoint) return null;
 
   const destX = Math.round(currentRect.left + currentRect.width / 2);
   const destY = Math.round(currentRect.top + currentRect.height / 2);
   const fromX = Math.round(startPoint.x);
   const fromY = Math.round(startPoint.y);
+
+  const ink = onLight ? "0, 0, 0" : "255, 255, 255";
 
   return createPortal(
     <div className="pointer-events-none" aria-hidden="true">
@@ -220,56 +269,40 @@ export function TutorialCursor({
             transform: translate(calc(var(--from-x) - var(--to-x)), calc(var(--from-y) - var(--to-y))) scale(0.9);
             opacity: 0;
           }
-          20% {
-            opacity: 0.85;
-          }
-          60% {
-            transform: translate(0, 0) scale(1);
-            opacity: 0.95;
-          }
-          85% {
-            transform: translate(0, 0) scale(1);
-            opacity: 0.95;
-          }
-          100% {
-            transform: translate(0, 0) scale(1);
-            opacity: 0;
-          }
+          20% { opacity: 0.85; }
+          60% { transform: translate(0, 0) scale(1); opacity: 0.95; }
+          85% { transform: translate(0, 0) scale(1); opacity: 0.95; }
+          100% { transform: translate(0, 0) scale(1); opacity: 0; }
         }
         @keyframes tutorial-ripple-ping {
-          0%, 55% {
-            transform: translate(-50%, -50%) scale(0.5);
-            opacity: 0;
-          }
-          60% {
-            transform: translate(-50%, -50%) scale(1);
-            opacity: 0.7;
-          }
-          100% {
-            transform: translate(-50%, -50%) scale(2.3);
-            opacity: 0;
-          }
+          0%, 55% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+          60% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+          100% { transform: translate(-50%, -50%) scale(2.3); opacity: 0; }
         }
       `}</style>
       {/* Ripple ring on arrival */}
       <div
         data-tutorial-cursor="ripple"
-        className="fixed z-[56] pointer-events-none h-7 w-7 rounded-full ring-2 ring-ink/40"
+        className="fixed z-[56] pointer-events-none h-7 w-7 rounded-full"
         style={{
           top: `${destY}px`,
           left: `${destX}px`,
+          boxShadow: `0 0 0 2px rgba(${ink}, 0.5)`,
           animation: "tutorial-ripple-ping 1.5s cubic-bezier(0.2, 0, 0.2, 1) 2 forwards",
         }}
       />
-      {/* Translucent circle dot */}
+      {/* The dot itself */}
       <div
         data-tutorial-cursor="dot"
-        className="fixed z-[56] pointer-events-none h-7 w-7 rounded-full bg-ink/35 ring-4 ring-ink/20 shadow-sm"
+        data-on-light={onLight ? "true" : "false"}
+        className="fixed z-[56] pointer-events-none h-7 w-7 rounded-full shadow-sm"
         style={{
           top: `${destY}px`,
           left: `${destX}px`,
           marginTop: "-14px",
           marginLeft: "-14px",
+          backgroundColor: `rgba(${ink}, 0.4)`,
+          boxShadow: `0 0 0 4px rgba(${ink}, 0.22)`,
           ["--from-x" as string]: `${fromX}px`,
           ["--from-y" as string]: `${fromY}px`,
           ["--to-x" as string]: `${destX}px`,
