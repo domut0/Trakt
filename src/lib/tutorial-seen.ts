@@ -18,6 +18,7 @@ export function readSeen({
   sessions,
   dailyLogs,
   sheetConnected,
+  sheetPossible,
   installedNow,
   storeChooserOpen,
   storeStartSheetOpen,
@@ -28,6 +29,7 @@ export function readSeen({
   sessions: ReturnType<typeof useStore.getState>["sessions"];
   dailyLogs: ReturnType<typeof useStore.getState>["dailyLogs"];
   sheetConnected: boolean;
+  sheetPossible: boolean;
   installedNow: boolean;
   storeChooserOpen: boolean;
   storeStartSheetOpen: boolean;
@@ -62,6 +64,7 @@ export function readSeen({
       installedNow ||
       Boolean(tutorialState?.installedSeen) ||
       Boolean(tutorialState?.installOffered),
+    sheetPossible,
     sheetConnected,
     sharedWithCoach: coach?.sharedAt !== undefined,
     bodyweightLogged: dailyLogs.some((l) => l.date === today && l.bodyweight !== undefined),

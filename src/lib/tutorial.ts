@@ -79,6 +79,8 @@ export function isSandboxed(chapter: TutorialChapterId): boolean {
 export interface TutorialSeen {
   /** Running from the home screen, or the walkthrough has been read. */
   installHandled: boolean;
+  /** Whether this build can sign in to Google at all. */
+  sheetPossible: boolean;
   sheetConnected: boolean;
   sharedWithCoach: boolean;
   bodyweightLogged: boolean;
@@ -114,6 +116,16 @@ export interface TutorialStep {
   route?: "/" | "/settings";
   /** Whether the rail offers a way past. See "Nothing is a dead end" above. */
   skippable?: boolean;
+  /**
+   * When this step cannot happen at all, so the rail passes it without a word.
+   *
+   * Sharing a sheet that was never made is the case this exists for: the
+   * control is not merely disabled, it is not rendered, so the rail would have
+   * sat there saying "give Marcus access to it" with nothing on screen to give
+   * them access with. That is the exact failure the spotlight was built to
+   * stop, and a step can cause it to itself.
+   */
+  unreachable?: (seen: TutorialSeen) => boolean;
   done: (seen: TutorialSeen) => boolean;
 }
 
@@ -142,6 +154,10 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
     target: "connect-sheet",
     route: "/settings",
     skippable: true,
+    // A build with no OAuth client id renders the button disabled. Spotlighting
+    // a control that cannot be pressed and saying "make it" is the tutorial
+    // describing a screen that is not there.
+    unreachable: (seen) => !seen.sheetPossible,
     done: (seen) => seen.sheetConnected,
   },
   {
@@ -151,6 +167,8 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
     target: "share-coach",
     route: "/settings",
     skippable: true,
+    // Settings renders no share control until there is a sheet to share.
+    unreachable: (seen) => !seen.sheetConnected,
     done: (seen) => seen.sharedWithCoach,
   },
   {
@@ -198,10 +216,20 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
     done: (seen) => seen.sets.length >= 1,
   },
   {
+    id: "tap-set-2",
+    chapter: "workout",
+    say: "Set 2 copied what you just did. Tap it.",
+    target: "set-row-2",
+    done: (seen) => seen.editingRow === 2,
+  },
+  {
+    // Its own step, because the spotlight only lets through what the step
+    // names: while "log set 2" pointed at the ROW, tapping the row opened an
+    // editor whose Save button was outside the hole and inert.
     id: "save-set-2",
     chapter: "workout",
-    say: "Set 2 copied what you just did. Log it too.",
-    target: "set-row-2",
+    say: "Same numbers, already filled in. Save it.",
+    target: "set-save",
     done: (seen) => seen.sets.length >= 2,
   },
   {

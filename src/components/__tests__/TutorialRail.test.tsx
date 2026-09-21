@@ -38,7 +38,20 @@ function runTo(stepId: string) {
   throw new Error(`never reached ${stepId}`);
 }
 
+/** A build that can sign in, and a sheet that exists to be shared. */
+const CONNECTED = {
+  key: "syncConfig" as const,
+  kind: "google" as const,
+  spreadsheetId: "sheet_1",
+  url: "",
+  secret: "",
+};
+
 beforeEach(() => {
+  // Without a client id the sheet step is unreachable and the rail passes
+  // straight over it, which is exactly what it should do - and not what these
+  // tests are about.
+  vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "test-client-id.apps.googleusercontent.com");
   navigate.mockClear();
   pathname = "/";
   localStorage.clear();
@@ -63,6 +76,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   useTutorialStore.getState().skip();
 });
 
@@ -75,6 +89,7 @@ describe("TutorialRail", () => {
 
   it("says the current step's line, with the coach named", () => {
     savePendingCoach({ name: "Marcus", email: "m@example.com" });
+    useSyncStore.setState({ config: CONNECTED });
     act(() => {
       useTutorialStore.getState().start({ canInstall: false });
       runTo("share-sheet");
@@ -86,6 +101,7 @@ describe("TutorialRail", () => {
   });
 
   it("falls back to 'your coach' when nobody invited them", () => {
+    useSyncStore.setState({ config: CONNECTED });
     act(() => {
       useTutorialStore.getState().start({ canInstall: false });
       runTo("share-sheet");
@@ -111,14 +127,17 @@ describe("TutorialRail", () => {
     expect(screen.queryByRole("button", { name: "Skip" })).not.toBeInTheDocument();
   });
 
-  it("moves past a skippable step when Skip is tapped", () => {
+  it("moves past a skipped step, and past the one that step made impossible", () => {
+    // Skipping the sheet means there is no sheet to share, and Settings
+    // renders no share control without one. Stopping there to say "give Marcus
+    // access to it" would be the rail describing a screen that is not there.
     act(() => useTutorialStore.getState().start({ canInstall: false }));
     render(<TutorialRail />);
 
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
 
     expect(useTutorialStore.getState().steps[useTutorialStore.getState().step].id).toBe(
-      "share-sheet",
+      "log-bodyweight",
     );
   });
 

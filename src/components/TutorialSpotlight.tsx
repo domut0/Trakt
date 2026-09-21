@@ -30,6 +30,15 @@ import { createPortal } from "react-dom";
  * app is in and carries the way out of it, and gating that would make a
  * tutorial somebody could not leave.
  *
+ * ## It stands down for a screen the tutorial itself opened
+ *
+ * `[data-tutorial-modal]` on screen and the spotlight renders nothing at all.
+ * The iOS install walkthrough is the case: the step's target is the row that
+ * opens it, so the hole stayed over that row and the four frames of
+ * instructions that had just appeared could not be touched. Anything the
+ * tutorial puts in front of somebody is, by definition, the thing it wants
+ * them looking at.
+ *
  * ## Scrolling is locked to the target
  *
  * The panels swallow touch, wheel and keyboard scrolling, so the screen cannot
@@ -195,6 +204,8 @@ export function TutorialSpotlight({
   // Nothing to cut a hole for means nothing is dimmed. A tutorial that blacks
   // out the screen because its target has not mounted is a locked app.
   if (!rect) return null;
+  // See "It stands down" above.
+  if (document.querySelector("[data-tutorial-modal]")) return null;
 
   // The dim begins under the mode bar, never over it.
   const ceiling = Math.max(0, bannerBottom);

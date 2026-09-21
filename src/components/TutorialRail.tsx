@@ -65,6 +65,7 @@ export function TutorialRail(): ReactElement | null {
   const sessions = useStore((s) => s.sessions);
   const dailyLogs = useStore((s) => s.dailyLogs);
   const syncConfig = useSyncStore((s) => s.config);
+  const googleAvailable = useSyncStore((s) => s.googleAvailable);
 
   const install = useInstallMode();
   const router = useRouter();
@@ -141,6 +142,7 @@ export function TutorialRail(): ReactElement | null {
     sessions,
     dailyLogs,
     sheetConnected: syncConfig?.kind === "google" && Boolean(syncConfig.spreadsheetId),
+    sheetPossible: googleAvailable(),
     installedNow: install.kind === "installed",
     storeChooserOpen,
     storeStartSheetOpen,
@@ -149,7 +151,10 @@ export function TutorialRail(): ReactElement | null {
   // Drive the progression.
   useEffect(() => {
     if (!active || !currentStep) return;
-    if (currentStep.done(seen)) advance();
+    // A step with nothing on screen to point at is passed in silence. Saying
+    // "give Marcus access to it" over a Settings screen with no share control
+    // on it is the failure the spotlight exists to prevent.
+    if (currentStep.unreachable?.(seen) || currentStep.done(seen)) advance();
   }, [active, currentStep, seen, advance]);
 
   if (!active || !currentStep || typeof document === "undefined") return null;
@@ -170,6 +175,12 @@ export function TutorialRail(): ReactElement | null {
         ref={railRef}
         role="region"
         aria-label="Tutorial instructions"
+        // Which step this is, on the element that says it. The rail is the one
+        // place the current step is unambiguous, and an end-to-end driver that
+        // has to infer it from the copy is a driver that breaks when the copy
+        // is edited.
+        data-tutorial-step={currentStep.id}
+        data-tutorial-target={currentStep.target}
         style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 16px)" }}
         className="fixed inset-x-0 bottom-0 z-[55] border-t border-rule bg-surface px-4 pt-2.5 shadow-md"
       >

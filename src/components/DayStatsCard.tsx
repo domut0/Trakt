@@ -176,7 +176,17 @@ function MetricRow({
     >
       <div className="flex min-w-0 items-center gap-2.5">
         <MetricKey hatch={hatch} />
-        <span className="t-body text-ink">{label}</span>
+        {/* A real label, so tapping the word focuses the number beside it.
+            Six rows of a card that look tappable and are not is a card that
+            reads as broken, and on the tutorial's bodyweight step the row IS
+            the only thing on screen to tap. */}
+        {field ? (
+          <label htmlFor={field.id} className="t-body text-ink">
+            {label}
+          </label>
+        ) : (
+          <span className="t-body text-ink">{label}</span>
+        )}
       </div>
       <div className="flex shrink-0 items-baseline">
         {figure}

@@ -237,12 +237,10 @@ export function GettingStartedCard({ surface = "today" }: GettingStartedCardProp
         transformOrigin: "top left",
         transform: offset ?? (exiting ? "scale(0.98)" : "none"),
         opacity: exiting ? 0 : 1,
-        transition: offset
-          ? "none"
-          : flying
-            ? "transform 560ms cubic-bezier(0.2,0,0.2,1), opacity 560ms ease"
-            : "opacity 420ms ease, transform 420ms ease",
-        transitionDelay: exiting ? `${FAREWELL_MS - 420}ms` : "0ms",
+        // One shorthand, delay included. Setting `transition` and
+        // `transitionDelay` together makes React warn on every rerender that
+        // the two are fighting over the same property, and it is right.
+        transition: transitionFor({ offset: offset !== undefined, flying, exiting }),
       }}
       onTransitionEnd={() => setFlying(false)}
     >
@@ -250,6 +248,24 @@ export function GettingStartedCard({ surface = "today" }: GettingStartedCardProp
       {checklist}
     </div>
   );
+}
+
+/** One transition shorthand for the card's three states. */
+function transitionFor({
+  offset,
+  flying,
+  exiting,
+}: {
+  offset: boolean;
+  flying: boolean;
+  exiting: boolean;
+}): string {
+  // Placing the card back where it came from must not animate; releasing it
+  // must.
+  if (offset) return "none";
+  if (flying) return "transform 560ms cubic-bezier(0.2,0,0.2,1), opacity 560ms ease";
+  const delay = exiting ? `${FAREWELL_MS - 420}ms` : "0ms";
+  return `opacity 420ms ease ${delay}, transform 420ms ease ${delay}`;
 }
 
 /**

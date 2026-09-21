@@ -64,7 +64,7 @@ describe("TutorialBanner standalone", () => {
     render(<TutorialBanner />);
 
     expect(screen.getByText("Tutorial mode")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Skip/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "End tutorial" })).toBeInTheDocument();
   });
 
   it("is in flow, never fixed, to avoid sitting beneath translucent status bars", () => {
@@ -94,7 +94,7 @@ describe("TutorialBanner standalone", () => {
     useTutorialStore.setState({ active: true });
 
     render(<TutorialBanner />);
-    const skipButton = screen.getByRole("button", { name: /Skip/ });
+    const skipButton = screen.getByRole("button", { name: "End tutorial" });
     fireEvent.click(skipButton);
 
     // No confirmation prompt: skip does not argue with the user

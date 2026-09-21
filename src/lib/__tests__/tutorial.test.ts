@@ -11,6 +11,7 @@ import {
 /** Nothing has happened yet. Every predicate should be false against this. */
 const NOTHING: TutorialSeen = {
   installHandled: false,
+  sheetPossible: true,
   sheetConnected: false,
   sharedWithCoach: false,
   bodyweightLogged: false,
@@ -67,6 +68,18 @@ describe("the steps", () => {
     }
   });
 
+  it("passes a step in silence when there is nothing on screen to point at", () => {
+    const share = TUTORIAL_STEPS.find((s) => s.id === "share-sheet")!;
+    const connect = TUTORIAL_STEPS.find((s) => s.id === "connect-sheet")!;
+
+    // Settings renders no share control until there is a sheet to share, and
+    // a build with no client id renders Connect disabled.
+    expect(share.unreachable?.({ ...NOTHING, sheetConnected: false })).toBe(true);
+    expect(share.unreachable?.({ ...NOTHING, sheetConnected: true })).toBe(false);
+    expect(connect.unreachable?.({ ...NOTHING, sheetPossible: false })).toBe(true);
+    expect(connect.unreachable?.({ ...NOTHING, sheetPossible: true })).toBe(false);
+  });
+
   it("offers a way past exactly the steps that depend on Google", () => {
     const skippable = TUTORIAL_STEPS.filter((s) => s.skippable).map((s) => s.id);
     expect(skippable).toEqual(["install", "connect-sheet", "share-sheet"]);
@@ -115,6 +128,15 @@ describe("what each step waits for", () => {
     expect(stepById("save-set-1").done({ ...NOTHING, sets: [set("1")] })).toBe(true);
     expect(stepById("save-set-2").done({ ...NOTHING, sets: [set("1")] })).toBe(false);
     expect(stepById("save-set-2").done({ ...NOTHING, sets: [set("1"), set("2")] })).toBe(true);
+  });
+
+  it("opens each set row and saves it as two steps, pointing at two controls", () => {
+    // The spotlight lets through what the current step NAMES. One step
+    // pointing at the row would leave the editor's Save button outside the
+    // hole and inert, which is where set 2 used to strand people.
+    expect(stepById("tap-set-2").target).toBe("set-row-2");
+    expect(stepById("tap-set-2").done({ ...NOTHING, editingRow: 2 })).toBe(true);
+    expect(stepById("save-set-2").target).toBe("set-save");
   });
 
   it("Back is complete when the app has moved on to another lift", () => {

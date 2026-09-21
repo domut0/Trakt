@@ -21,11 +21,15 @@ import { useTutorialStore } from "../lib/tutorial-store";
  * control at a time; the way OUT of the mode is not something to be gated, and
  * a tutorial you cannot leave is the worst version of this feature.
  *
- * ## Skip does not confirm
+ * ## "End tutorial", not "Skip"
  *
- * The workout is fake, so skipping loses nothing, and a confirmation on a
- * Skip button is the app arguing with somebody who has already decided.
- * Skip calls skip() and navigates to /.
+ * The rail carries a Skip of its own, for the individual steps the app cannot
+ * finish on somebody's behalf. Two controls reading "Skip" on one screen, one
+ * of which passes a step and the other of which ends the whole run, is a
+ * choice nobody should have to make by guessing.
+ *
+ * It does not confirm. The workout is fake, so ending loses nothing, and a
+ * confirmation here is the app arguing with somebody who has already decided.
  */
 export function TutorialBanner() {
   const active = useTutorialStore((s) => s.active);
@@ -57,7 +61,7 @@ export function TutorialBanner() {
         // button fills it, so the tap target is the bar's full height.
         className="shrink-0 t-label font-medium opacity-90"
       >
-        Skip &rarr;
+        End tutorial
       </button>
     </div>
   );
