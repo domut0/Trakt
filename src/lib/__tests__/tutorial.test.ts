@@ -11,6 +11,7 @@ import {
 /** Nothing has happened yet. Every predicate should be false against this. */
 const NOTHING: TutorialSeen = {
   installHandled: false,
+  atSettings: false,
   sheetPossible: true,
   sheetConnected: false,
   sharedWithCoach: false,
@@ -82,7 +83,7 @@ describe("the steps", () => {
 
   it("offers a way past exactly the steps that depend on Google", () => {
     const skippable = TUTORIAL_STEPS.filter((s) => s.skippable).map((s) => s.id);
-    expect(skippable).toEqual(["install", "connect-sheet", "share-sheet"]);
+    expect(skippable).toEqual(["install", "open-settings", "connect-sheet", "share-sheet"]);
   });
 
   it("sandboxes the workout and the cardio, and nothing before them", () => {
@@ -99,6 +100,14 @@ describe("the steps", () => {
 describe("what each step waits for", () => {
   it("the sheet step waits for a connected sheet", () => {
     expect(stepById("connect-sheet").done({ ...NOTHING, sheetConnected: true })).toBe(true);
+  });
+
+  it("the Settings step waits for Settings, so the gear is tapped rather than bypassed", () => {
+    // Somebody moved to a screen by the app cannot find their way back to it.
+    const step = stepById("open-settings");
+    expect(step.route).toBeUndefined();
+    expect(step.done({ ...NOTHING, atSettings: false })).toBe(false);
+    expect(step.done({ ...NOTHING, atSettings: true })).toBe(true);
   });
 
   it("the bodyweight step waits for today's number, not for any number", () => {

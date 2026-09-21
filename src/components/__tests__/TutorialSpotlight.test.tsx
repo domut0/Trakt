@@ -4,8 +4,29 @@ import { TutorialSpotlight } from "../TutorialSpotlight";
 
 const planted: HTMLElement[] = [];
 
+/**
+ * A scroller around the target, so the spotlight has something to scroll.
+ *
+ * The app shell scrolls its own <main> and never the document, which is why
+ * window.scrollBy is the wrong instrument in the one place this matters.
+ */
+function plantScroller() {
+  const scroller = document.createElement("div");
+  scroller.style.overflowY = "auto";
+  Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 2000 });
+  Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 600 });
+  scroller.scrollBy = vi.fn();
+  document.body.appendChild(scroller);
+  planted.push(scroller);
+  return scroller;
+}
+
 /** A real element with a real-looking rect, which jsdom will not give us. */
-function plantTarget(marker: string, rect = { top: 200, left: 40, width: 300, height: 48 }) {
+function plantTarget(
+  marker: string,
+  rect = { top: 200, left: 40, width: 300, height: 48 },
+  parent?: HTMLElement,
+) {
   const el = document.createElement("button");
   el.setAttribute("data-tutorial", marker);
   el.textContent = "Add activity";
@@ -22,7 +43,7 @@ function plantTarget(marker: string, rect = { top: 200, left: 40, width: 300, he
       toJSON: () => ({}),
     }) as DOMRect;
   el.scrollIntoView = vi.fn();
-  document.body.appendChild(el);
+  (parent ?? document.body).appendChild(el);
   planted.push(el);
   return el;
 }
@@ -59,12 +80,48 @@ describe("TutorialSpotlight", () => {
     expect(bottom.style.top).toBe("256px");
   });
 
-  it("brings the target on screen, which is what the demo playing below the fold was", async () => {
-    const el = plantTarget("add-activity");
+  it("scrolls a target below the fold into view, because nothing else can", async () => {
+    // Scrolling is locked while the spotlight is up, so a control under the
+    // fold is a step nobody can finish. This is what "Start Tutorial day" was.
+    const scroller = plantScroller();
+    plantTarget("start-planned", { top: 1400, left: 40, width: 300, height: 48 }, scroller);
+
+    render(<TutorialSpotlight target="start-planned" zoomKey={0} />);
+
+    await waitFor(() => {
+      expect(scroller.scrollBy).toHaveBeenCalled();
+    });
+    const [{ top }] = (scroller.scrollBy as unknown as { mock: { calls: [{ top: number }][] } })
+      .mock.calls[0];
+    // Downward, and by roughly the distance that centres it.
+    expect(top).toBeGreaterThan(500);
+  });
+
+  it("leaves a target that is already in view alone", async () => {
+    const scroller = plantScroller();
+    plantTarget("add-activity", { top: 300, left: 40, width: 300, height: 48 }, scroller);
+
     render(<TutorialSpotlight target="add-activity" zoomKey={0} />);
 
     await waitFor(() => {
-      expect(el.scrollIntoView).toHaveBeenCalled();
+      expect(document.querySelectorAll("[data-tutorial-dim]")).toHaveLength(4);
+    });
+    expect(scroller.scrollBy).not.toHaveBeenCalled();
+  });
+
+  it("keeps asking until it arrives, for a target that mounts late", async () => {
+    // The sandbox is still swapping in when its step begins, so a single
+    // scroll on arrival is aimed at nothing.
+    const scroller = plantScroller();
+    render(<TutorialSpotlight target="late-target" zoomKey={0} />);
+
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(scroller.scrollBy).not.toHaveBeenCalled();
+
+    plantTarget("late-target", { top: 1400, left: 40, width: 300, height: 48 }, scroller);
+
+    await waitFor(() => {
+      expect(scroller.scrollBy).toHaveBeenCalled();
     });
   });
 

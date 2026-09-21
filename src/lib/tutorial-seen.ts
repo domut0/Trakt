@@ -17,6 +17,7 @@ export function readSeen({
   sets,
   sessions,
   dailyLogs,
+  atSettings,
   sheetConnected,
   sheetPossible,
   installedNow,
@@ -28,6 +29,7 @@ export function readSeen({
   sets: ReturnType<typeof useStore.getState>["sets"];
   sessions: ReturnType<typeof useStore.getState>["sessions"];
   dailyLogs: ReturnType<typeof useStore.getState>["dailyLogs"];
+  atSettings: boolean;
   sheetConnected: boolean;
   sheetPossible: boolean;
   installedNow: boolean;
@@ -64,6 +66,7 @@ export function readSeen({
       installedNow ||
       Boolean(tutorialState?.installedSeen) ||
       Boolean(tutorialState?.installOffered),
+    atSettings,
     sheetPossible,
     sheetConnected,
     sharedWithCoach: coach?.sharedAt !== undefined,

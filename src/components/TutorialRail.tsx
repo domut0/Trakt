@@ -141,6 +141,7 @@ export function TutorialRail(): ReactElement | null {
     sets,
     sessions,
     dailyLogs,
+    atSettings: location.pathname === "/settings",
     sheetConnected: syncConfig?.kind === "google" && Boolean(syncConfig.spreadsheetId),
     sheetPossible: googleAvailable(),
     installedNow: install.kind === "installed",

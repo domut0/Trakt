@@ -78,9 +78,9 @@ describe("starting", () => {
   it("opens on the first step and records that a run is under way", () => {
     expect(useTutorialStore.getState().start({ canInstall: false })).toBe(true);
     const { steps, step } = useTutorialStore.getState();
-    expect(steps[step].id).toBe("connect-sheet");
+    expect(steps[step].id).toBe("open-settings");
     expect(loadTutorialState()?.startedAt).toBeTypeOf("number");
-    expect(loadTutorialState()?.stepId).toBe("connect-sheet");
+    expect(loadTutorialState()?.stepId).toBe("open-settings");
   });
 
   it("includes the install chapter only where it can succeed", () => {
@@ -93,7 +93,7 @@ describe("the sandbox, and the line it starts at", () => {
   it("leaves the real store alone through the sheet, share and bodyweight chapters", () => {
     useTutorialStore.getState().start({ canInstall: false });
 
-    for (const stepId of ["connect-sheet", "share-sheet", "log-bodyweight"]) {
+    for (const stepId of ["open-settings", "connect-sheet", "share-sheet", "log-bodyweight"]) {
       runTo(stepId);
       expect(dbReadOnlyReason(), stepId).toBeUndefined();
       expect(useTutorialStore.getState().sandboxed, stepId).toBe(false);
@@ -179,7 +179,7 @@ describe("skipping a step the app cannot finish", () => {
     useTutorialStore.getState().start({ canInstall: false });
     useTutorialStore.getState().skipStep();
     expect(useTutorialStore.getState().steps[useTutorialStore.getState().step].id).toBe(
-      "share-sheet",
+      "connect-sheet",
     );
   });
 

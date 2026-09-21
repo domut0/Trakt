@@ -45,6 +45,8 @@ const CONNECTED = {
   spreadsheetId: "sheet_1",
   url: "",
   secret: "",
+  deviceId: "device_1",
+  enabled: true,
 };
 
 beforeEach(() => {
@@ -97,7 +99,7 @@ describe("TutorialRail", () => {
 
     render(<TutorialRail />);
 
-    expect(screen.getByText(/give Marcus access to it/)).toBeInTheDocument();
+    expect(screen.getByText("Share it with Marcus.")).toBeInTheDocument();
   });
 
   it("falls back to 'your coach' when nobody invited them", () => {
@@ -108,7 +110,7 @@ describe("TutorialRail", () => {
     });
 
     render(<TutorialRail />);
-    expect(screen.getByText(/give your coach access to it/)).toBeInTheDocument();
+    expect(screen.getByText("Share it with your coach.")).toBeInTheDocument();
   });
 
   it("carries an outlined Show me, and offers Skip only where a step allows it", () => {
@@ -129,9 +131,13 @@ describe("TutorialRail", () => {
 
   it("moves past a skipped step, and past the one that step made impossible", () => {
     // Skipping the sheet means there is no sheet to share, and Settings
-    // renders no share control without one. Stopping there to say "give Marcus
-    // access to it" would be the rail describing a screen that is not there.
-    act(() => useTutorialStore.getState().start({ canInstall: false }));
+    // renders no share control without one. Stopping there to say "share it
+    // with Marcus" would be the rail describing a screen that is not there.
+    act(() => {
+      useTutorialStore.getState().start({ canInstall: false });
+      // Past "open Settings", which is where a run starts.
+      useTutorialStore.getState().skipStep();
+    });
     render(<TutorialRail />);
 
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
@@ -139,6 +145,16 @@ describe("TutorialRail", () => {
     expect(useTutorialStore.getState().steps[useTutorialStore.getState().step].id).toBe(
       "log-bodyweight",
     );
+  });
+
+  it("leaves the trip to Settings to the user, because a gear tapped once is found again", () => {
+    act(() => useTutorialStore.getState().start({ canInstall: false }));
+    render(<TutorialRail />);
+
+    expect(
+      screen.getByText("Your numbers go to a Google Sheet. Open Settings."),
+    ).toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it("asks for the demo again when Show me is tapped", () => {
@@ -154,7 +170,11 @@ describe("TutorialRail", () => {
   });
 
   it("takes the user to the screen the step happens on", () => {
-    act(() => useTutorialStore.getState().start({ canInstall: false }));
+    act(() => {
+      useTutorialStore.getState().start({ canInstall: false });
+      // On the Connect step, which belongs on Settings, from Today.
+      useTutorialStore.getState().skipStep();
+    });
     render(<TutorialRail />);
 
     expect(navigate).toHaveBeenCalledWith({ to: "/settings" });

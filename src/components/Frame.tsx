@@ -7,10 +7,13 @@ import type { ReactNode } from "react";
  * no nav, no tabs, one thing to do.
  */
 
-export function Frame({ title, children }: { title: string; children: ReactNode }) {
+export function Frame({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <div className="mx-auto flex h-[100dvh] max-w-md flex-col justify-center gap-4 bg-background px-6">
-      <h1 className="t-title text-ink">{title}</h1>
+      {/* Optional, because not every screen this wraps has something to say
+          above its contents. A checklist under a ring reading "0/3 tasks
+          complete" does not need a sentence introducing it. */}
+      {title && <h1 className="t-title text-ink">{title}</h1>}
       {children}
     </div>
   );

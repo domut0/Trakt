@@ -20,8 +20,8 @@ export const Route = createFileRoute("/join")({
   component: JoinPage,
 });
 
-/** How long the finished checklist is shown here before it moves to Today. */
-const HANDOFF_MS = 1100;
+/** How long the checklist is shown here before it moves to Today. */
+const HANDOFF_MS = 1900;
 
 /**
  * The invite a coach sends, and the way in.
@@ -40,7 +40,9 @@ const HANDOFF_MS = 1100;
  *
  * The field is prefilled from the invite and still shown: what the coach calls
  * somebody in their own notes is not necessarily what that person would call
- * themselves.
+ * themselves. What the name is FOR is deliberately not explained under it -
+ * nobody asked what the sheet would be called, and the answer was a line of
+ * copy on the first screen of the app justifying its own question.
  *
  * ## Then the checklist appears here, and then it leaves
  *
@@ -112,8 +114,11 @@ function JoinPage() {
   }
 
   if (phase === "checklist") {
+    // No heading. The ring says "0/3 tasks complete" directly above three
+    // named tasks, and a sentence introducing that is a sentence about a
+    // sentence.
     return (
-      <Frame title={`Three things, ${name.trim()}`}>
+      <Frame>
         <GettingStartedCard surface="join" />
       </Frame>
     );
@@ -141,13 +146,6 @@ function JoinPage() {
           className="min-h-[44px] w-full rounded-md border border-rule bg-transparent px-3 t-heading text-ink"
         />
       </label>
-
-      {/* The one thing the name is FOR, said where it is asked. A sheet called
-          after somebody is the difference between a coach with six clients
-          reading six names and reading six dates. */}
-      <p className="t-label text-ink-2">
-        Your sheet will be called {trimmed.length > 0 ? `Trakt — ${trimmed}` : "Trakt — …"}
-      </p>
 
       <Primary
         disabled={trimmed.length === 0 || !hydrated}
