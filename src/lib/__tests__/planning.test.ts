@@ -11,6 +11,7 @@ import {
   pinnedSlotIdFor,
   sortPhases,
   type NutritionPhase,
+  type SplitCardLike,
 } from "../planning";
 
 /** The user's own stated case: maintenance for a week, then a cut that is still
@@ -318,13 +319,15 @@ describe("advanceSplit: edges", () => {
 });
 
 describe("convertSplit", () => {
+  type Card = SplitCardLike & { weekday?: number };
+
   /** The user's own split: Upper, Lower, Repeat, Rest, Repeat. */
-  const cycle = [
+  const cycle: Card[] = [
     { id: "upper", rotationOrder: 0 },
     { id: "lower", rotationOrder: 1 },
-    { id: "rep1", rotationOrder: 2, kind: "repeat" as const },
-    { id: "rest", rotationOrder: 3, kind: "rest" as const },
-    { id: "rep2", rotationOrder: 4, kind: "repeat" as const },
+    { id: "rep1", rotationOrder: 2, kind: "repeat" },
+    { id: "rest", rotationOrder: 3, kind: "rest" },
+    { id: "rep2", rotationOrder: 4, kind: "repeat" },
   ];
 
   it("lays the day cards out from Monday and leaves the repeats off the week", () => {
@@ -358,7 +361,7 @@ describe("convertSplit", () => {
   it("reads a week back from Monday, not from Sunday", () => {
     // Sunday is 0 in JavaScript, so a naive sort puts it in front of Monday -
     // and the planner that wrote this week starts on Monday.
-    const week = [
+    const week: Card[] = [
       { id: "sun", rotationOrder: 0, weekday: 0 },
       { id: "mon", rotationOrder: 1, weekday: 1 },
     ];

@@ -61,7 +61,10 @@ export function WeekPlanner({ onEdit }: { onEdit: (slot: SplitSlot) => void }) {
             <div key={index} className={`group-row ${i === 0 ? "" : "group-row-sep"}`}>
               <button
                 type="button"
-                disabled={locked}
+                // A locked day with a card on it is still tappable: `onEdit`
+                // opens it to be read rather than changed. A locked day with
+                // nothing on it has nothing to open.
+                disabled={locked && !card}
                 onClick={() => (card ? onEdit(card) : setAssigning(index))}
                 className="flex min-w-0 flex-1 items-center gap-3 text-left"
               >
@@ -114,7 +117,6 @@ export function WeekPlanner({ onEdit }: { onEdit: (slot: SplitSlot) => void }) {
               <button
                 key={slot.id}
                 type="button"
-                disabled={locked}
                 onClick={() => onEdit(slot)}
                 className={`group-row w-full text-left ${i === 0 ? "" : "group-row-sep"}`}
               >
