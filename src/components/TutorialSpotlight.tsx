@@ -39,12 +39,21 @@ import { createPortal } from "react-dom";
  * tutorial puts in front of somebody is, by definition, the thing it wants
  * them looking at.
  *
- * ## Scrolling is locked to the target
+ * ## Scrolling is locked to the target, so the target is brought to you
  *
  * The panels swallow touch, wheel and keyboard scrolling, so the screen cannot
- * drift away from the thing being pointed at. The target itself is scrolled
- * into view when a step arrives - which is what "the circle is below the
- * screen" was: the demo was playing perfectly, forty pixels under the fold.
+ * drift away from the thing being pointed at. That makes bringing it on screen
+ * the spotlight's job and nobody else's: a step whose control is below the fold
+ * with scrolling locked is a step nobody can complete, which is exactly what
+ * "Start Tutorial day" was.
+ *
+ * It is not a one-shot scroll on arrival. That was tried and it is not enough:
+ * the target frequently does not exist yet when its step begins - the sandbox
+ * is still swapping in, a sheet is still animating - and a scroll aimed at a
+ * thing that is not there does nothing. The frame loop below keeps the target
+ * inside a band between the mode bar and the rail for as long as the step
+ * lasts, so it does not matter when it appears, how tall it is, or what moved
+ * underneath it.
  */
 
 interface Rect {
@@ -70,6 +79,77 @@ function rectsEqual(a: Rect | null, b: Rect | null): boolean {
   );
 }
 
+/** How long to leave a scroll alone before asking for another. */
+const SCROLL_COOLDOWN_MS = 500;
+/** Smooth scrolling gets two attempts; after that it snaps, and it arrives. */
+const SMOOTH_ATTEMPTS = 2;
+
+/**
+ * The element that actually scrolls this one.
+ *
+ * The shell scrolls its own `<main>` and never the document, and the exercise
+ * screen scrolls a list inside a portal, so `window.scrollBy` is wrong in both
+ * of the places this matters most.
+ */
+function scrollerFor(el: Element): Element | null {
+  let node = el.parentElement;
+  while (node) {
+    const overflow = window.getComputedStyle(node).overflowY;
+    const scrolls = overflow === "auto" || overflow === "scroll" || overflow === "overlay";
+    if (scrolls && node.scrollHeight > node.clientHeight + 1) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+/**
+ * Keep `rect` inside the band between the mode bar and the rail.
+ *
+ * Called every frame, and does nothing on nearly all of them: a scroll is only
+ * asked for when the target is actually outside the band, and then not again
+ * for half a second, so this never fights a smooth scroll it started itself.
+ */
+function keepInView(
+  el: Element,
+  rect: Rect,
+  bannerBottom: number,
+  scrolledAt: { current: number },
+  tries: { current: number },
+): void {
+  const now = Date.now();
+  if (now - scrolledAt.current < SCROLL_COOLDOWN_MS) return;
+
+  const railHeight =
+    Number.parseFloat(
+      window.getComputedStyle(document.documentElement).getPropertyValue("--rail-h"),
+    ) || 0;
+
+  const top = bannerBottom + PAD * 2;
+  const bottom = window.innerHeight - railHeight - PAD * 2;
+  if (bottom <= top) return;
+
+  const above = rect.top - top;
+  const below = rect.top + rect.height - bottom;
+  if (above >= 0 && below <= 0) {
+    // In view. Reset, so a target that goes off screen later gets the gentle
+    // treatment again rather than inheriting a snap.
+    tries.current = 0;
+    return;
+  }
+
+  // Centre it in the band, which reads better than nudging it just inside.
+  const delta = rect.top + rect.height / 2 - (top + bottom) / 2;
+  const behavior: ScrollBehavior =
+    prefersReducedMotion() || tries.current >= SMOOTH_ATTEMPTS ? "auto" : "smooth";
+
+  scrolledAt.current = now;
+  tries.current += 1;
+
+  const scroller = scrollerFor(el);
+  if (scroller) scroller.scrollBy({ top: delta, behavior });
+  else window.scrollBy({ top: delta, behavior });
+}
+
 function prefersReducedMotion(): boolean {
   if (typeof window === "undefined" || !window.matchMedia) return false;
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -88,6 +168,9 @@ export function TutorialSpotlight({
   const [pad, setPad] = useState(PAD);
   const rectRef = useRef<Rect | null>(null);
   const bannerRef = useRef(0);
+  /** When the last scroll was asked for, and how many have been asked for. */
+  const scrolledAt = useRef(0);
+  const scrollTries = useRef(0);
 
   /**
    * Measured every frame while the tutorial is up.
@@ -126,45 +209,13 @@ export function TutorialSpotlight({
         bannerRef.current = bottom;
         setBannerBottom(bottom);
       }
+
+      if (el && next) keepInView(el, next, bottom, scrolledAt, scrollTries);
       raf = requestAnimationFrame(tick);
     };
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [target]);
-
-  /**
-   * Bring the target on screen when a step arrives.
-   *
-   * Retried, because the element is often inside something still mounting. The
-   * first "Show me" on Today pointed at the Add activity button, which on a
-   * short phone sits below the fold: the demo played, off screen, and the rail
-   * read as a lie.
-   */
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    let cancelled = false;
-    let tries = 0;
-
-    const attempt = () => {
-      if (cancelled) return;
-      const el = document.querySelector(`[data-tutorial="${target}"]`);
-      if (el) {
-        el.scrollIntoView({
-          block: "center",
-          inline: "nearest",
-          behavior: prefersReducedMotion() ? "auto" : "smooth",
-        });
-        return;
-      }
-      tries += 1;
-      if (tries < 25) window.setTimeout(attempt, 120);
-    };
-
-    attempt();
-    return () => {
-      cancelled = true;
-    };
   }, [target]);
 
   /** "Show me" pulls the hole in from wide open, which reads as a zoom. */
@@ -177,6 +228,8 @@ export function TutorialSpotlight({
 
   useEffect(() => {
     setPad(PAD);
+    scrollTries.current = 0;
+    scrolledAt.current = 0;
   }, [target]);
 
   /**

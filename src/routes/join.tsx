@@ -4,10 +4,8 @@ import { decodeInvite, type JoinPayload } from "../lib/invite";
 import { loadPendingCoach, savePendingCoach } from "../lib/pending-coach";
 import { Frame, Primary } from "../components/Frame";
 import { GettingStartedCard } from "../components/GettingStartedCard";
-import { stageHandoff } from "../lib/onboarding-handoff";
-import { useInstallMode } from "../lib/install-prompt";
-import { loadDisplayName, saveDisplayName } from "../lib/tutorial-state";
-import { useTutorialStore } from "../lib/tutorial-store";
+import { stageHandoff, stageTutorialStart } from "../lib/onboarding-handoff";
+import { loadDisplayName, saveDisplayName, updateTutorialState } from "../lib/tutorial-state";
 import { useStore } from "../lib/store";
 
 export const Route = createFileRoute("/join")({
@@ -20,8 +18,8 @@ export const Route = createFileRoute("/join")({
   component: JoinPage,
 });
 
-/** How long the finished checklist is shown here before it moves to Today. */
-const HANDOFF_MS = 1100;
+/** How long the checklist is shown here before it moves to Today. */
+const HANDOFF_MS = 1500;
 
 /**
  * The invite a coach sends, and the way in.
@@ -40,7 +38,9 @@ const HANDOFF_MS = 1100;
  *
  * The field is prefilled from the invite and still shown: what the coach calls
  * somebody in their own notes is not necessarily what that person would call
- * themselves.
+ * themselves. What the name is FOR is deliberately not explained under it -
+ * nobody asked what the sheet would be called, and the answer was a line of
+ * copy on the first screen of the app justifying its own question.
  *
  * ## Then the checklist appears here, and then it leaves
  *
@@ -50,7 +50,6 @@ const HANDOFF_MS = 1100;
  */
 function JoinPage() {
   const router = useRouter();
-  const install = useInstallMode();
   const hydrated = useStore((s) => s.hydrated);
 
   const [payload, setPayload] = useState<JoinPayload | undefined>();
@@ -80,24 +79,29 @@ function JoinPage() {
   }, []);
 
   /**
-   * Show the checklist here, then move it and start the tutorial.
+   * Show the checklist here, then send it to Today and let it start the
+   * tutorial once it has landed.
    *
-   * The tutorial is started BEFORE the navigation so that Today paints once,
-   * already in tutorial mode, rather than painting bare and then having a rail
-   * and a dimmed overlay arrive on top of it.
+   * The tutorial used to be started here, before the navigation, so Today
+   * painted already in tutorial mode: the spotlight's dim went up over the
+   * card while it was still in the air and its auto-scroll moved the page out
+   * from under it. The journey this whole animation exists to show happened
+   * behind a black sheet, which read as the app skipping straight to Settings.
    */
   useEffect(() => {
     if (phase !== "checklist") return;
     const timer = window.setTimeout(() => {
       const card = document.querySelector("[data-onboarding-card]");
       if (card) stageHandoff(card.getBoundingClientRect());
-      useTutorialStore.getState().start({
-        canInstall: install.kind === "prompt" || install.kind === "manual-ios",
-      });
+      // Somebody who dismissed the card on a previous run and then opened a
+      // fresh invite has to see it again: it is the thing that is about to
+      // travel, and it is what the tutorial hands back to.
+      updateTutorialState({ cardDismissedAt: undefined });
+      stageTutorialStart();
       void router.navigate({ to: "/" });
     }, HANDOFF_MS);
     return () => window.clearTimeout(timer);
-  }, [phase, install.kind, router]);
+  }, [phase, router]);
 
   if (!ready) return null;
 
@@ -112,8 +116,11 @@ function JoinPage() {
   }
 
   if (phase === "checklist") {
+    // No heading. The ring says "0/3 tasks complete" directly above three
+    // named tasks, and a sentence introducing that is a sentence about a
+    // sentence.
     return (
-      <Frame title={`Three things, ${name.trim()}`}>
+      <Frame>
         <GettingStartedCard surface="join" />
       </Frame>
     );
@@ -141,13 +148,6 @@ function JoinPage() {
           className="min-h-[44px] w-full rounded-md border border-rule bg-transparent px-3 t-heading text-ink"
         />
       </label>
-
-      {/* The one thing the name is FOR, said where it is asked. A sheet called
-          after somebody is the difference between a coach with six clients
-          reading six names and reading six dates. */}
-      <p className="t-label text-ink-2">
-        Your sheet will be called {trimmed.length > 0 ? `Trakt — ${trimmed}` : "Trakt — …"}
-      </p>
 
       <Primary
         disabled={trimmed.length === 0 || !hydrated}

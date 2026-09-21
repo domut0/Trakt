@@ -79,6 +79,8 @@ export function isSandboxed(chapter: TutorialChapterId): boolean {
 export interface TutorialSeen {
   /** Running from the home screen, or the walkthrough has been read. */
   installHandled: boolean;
+  /** Whether Settings is the screen currently on. */
+  atSettings: boolean;
   /** Whether this build can sign in to Google at all. */
   sheetPossible: boolean;
   sheetConnected: boolean;
@@ -141,16 +143,28 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     id: "install",
     chapter: "install",
-    say: "Keep Trakt on your home screen. Tap here and follow the steps.",
+    say: "Add Trakt to your home screen.",
     target: "install-row",
     route: "/",
     skippable: true,
     done: (seen) => seen.installHandled,
   },
   {
+    // Tapping the gear, rather than being moved there. Settings is where the
+    // two things a coach needs live, and somebody who was teleported to it
+    // cannot get back to it on their own afterwards.
+    id: "open-settings",
+    chapter: "sheet",
+    say: "Your numbers go to a Google Sheet. Open Settings.",
+    target: "settings-gear",
+    skippable: true,
+    unreachable: (seen) => !seen.sheetPossible,
+    done: (seen) => seen.atSettings,
+  },
+  {
     id: "connect-sheet",
     chapter: "sheet",
-    say: "Your numbers mirror to a Google Sheet in your own Drive. Make it.",
+    say: "Connect a Google Sheet.",
     target: "connect-sheet",
     route: "/settings",
     skippable: true,
@@ -163,7 +177,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     id: "share-sheet",
     chapter: "share",
-    say: "Now give {coach} access to it. This is the only thing they can see.",
+    say: "Share it with {coach}.",
     target: "share-coach",
     route: "/settings",
     skippable: true,
@@ -204,7 +218,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     id: "tap-set-1",
     chapter: "workout",
-    say: "Set 1 is already filled in, from the plan. Tap it.",
+    say: "Set 1 is already filled in. Tap it.",
     target: "set-row-1",
     done: (seen) => seen.editingRow === 1,
   },
@@ -235,7 +249,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     id: "back",
     chapter: "finish",
-    say: "That is Bench Press done. Tap Back, and the next lift comes up.",
+    say: "Bench Press done. Tap Back and the next lift comes up.",
     target: "exercise-back",
     done: (seen) => seen.currentExerciseId !== undefined && seen.currentExerciseId !== "tut_bench",
   },
@@ -249,14 +263,14 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     id: "summary-done",
     chapter: "finish",
-    say: "That is what every workout ends with. Tap Done.",
+    say: "Tap Done.",
     target: "summary-done",
     done: (seen) => !seen.summaryShown,
   },
   {
     id: "open-chooser",
     chapter: "cardio",
-    say: "{coach} asked for conditioning too. Tap Add activity.",
+    say: "{coach} asked for cardio too. Tap Add activity.",
     target: "add-activity",
     route: "/",
     done: (seen) => seen.chooserOpen,
@@ -285,7 +299,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     id: "cardio-save",
     chapter: "cardio",
-    say: "Tap Save. That is the whole of logging cardio.",
+    say: "Tap Save.",
     target: "cardio-save",
     done: (seen) => seen.cardioLogged,
   },

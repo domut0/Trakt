@@ -5,6 +5,12 @@ import { useStore } from "../../lib/store";
 import { useCoachStore } from "../../lib/coach-store";
 import { useTutorialStore } from "../../lib/tutorial-store";
 import { loadTutorialState, saveTutorialState } from "../../lib/tutorial-state";
+import {
+  clearHandoff,
+  consumeTutorialStart,
+  stageHandoff,
+  stageTutorialStart,
+} from "../../lib/onboarding-handoff";
 import { dayKey } from "../../lib/daily-log";
 
 const navigate = vi.fn();
@@ -25,6 +31,9 @@ vi.mock("../../lib/install-prompt", async () => {
 const today = dayKey(new Date());
 
 beforeEach(() => {
+  // Module state, so one test's staged flight would otherwise play in the next.
+  clearHandoff();
+  consumeTutorialStart();
   navigate.mockClear();
   localStorage.clear();
   useCoachStore.setState({ viewing: undefined });
@@ -193,5 +202,53 @@ describe("the join surface", () => {
       expect(screen.getByText("Log a day's steps")).toBeInTheDocument();
     });
     expect(loadTutorialState()?.cardDismissedAt).toBeUndefined();
+  });
+});
+
+describe("arriving from /join", () => {
+  it("waits for the card to land before the tutorial starts", async () => {
+    // The tutorial used to be started on /join, before the navigation, so
+    // Today painted already dimmed: the card flew behind the spotlight and the
+    // journey the animation exists to show was invisible.
+    vi.useFakeTimers();
+    stageHandoff({ top: 400, left: 24, width: 320 });
+    stageTutorialStart();
+
+    render(<GettingStartedCard />);
+
+    expect(useTutorialStore.getState().active).toBe(false);
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(useTutorialStore.getState().active).toBe(true);
+  });
+
+  it("still starts when there is no flight to play", async () => {
+    // A staged start left unconsumed is an onboarding that silently never
+    // happens, so the absence of a measured card is not a reason to stop.
+    vi.useFakeTimers();
+    stageTutorialStart();
+
+    render(<GettingStartedCard />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(useTutorialStore.getState().active).toBe(true);
+  });
+
+  it("starts nothing on an ordinary visit to Today", async () => {
+    vi.useFakeTimers();
+
+    render(<GettingStartedCard />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(useTutorialStore.getState().active).toBe(false);
   });
 });
