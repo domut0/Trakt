@@ -70,6 +70,8 @@ function StatusMark({ status }: { status: TargetStatus }) {
 type NumKey = "calories" | "protein" | "carbs" | "fat" | "steps" | "bodyweight";
 
 interface EditableField {
+  /** `stat-calories` and friends, so a checklist row can send you to the field. */
+  id: string;
   /** Raw text to display, which is the stored number unless this field is the
    *  one being typed into. */
   raw: string;
@@ -95,6 +97,7 @@ interface EditableField {
  * number went out to the store and came back.
  */
 function FigureField({
+  id,
   raw,
   placeholder,
   decimal,
@@ -105,6 +108,7 @@ function FigureField({
 }: EditableField & { exceeded: boolean; label: string }) {
   return (
     <input
+      id={id}
       type="number"
       inputMode={decimal ? "decimal" : "numeric"}
       aria-label={label}
@@ -130,7 +134,10 @@ function MetricRow({
   sep,
   strongSep,
   field,
+  tutorial,
 }: {
+  /** data-tutorial marker, so the tutorial can point at one row of six. */
+  tutorial?: string;
   /** When given, the figure is an input writing straight to the day's log
    *  instead of a printed number. */
   field?: EditableField;
@@ -163,10 +170,23 @@ function MetricRow({
   }
 
   return (
-    <div className={`group-row ${strongSep ? "rule-t" : sep ? "group-row-sep" : ""}`}>
+    <div
+      data-tutorial={tutorial}
+      className={`group-row ${strongSep ? "rule-t" : sep ? "group-row-sep" : ""}`}
+    >
       <div className="flex min-w-0 items-center gap-2.5">
         <MetricKey hatch={hatch} />
-        <span className="t-body text-ink">{label}</span>
+        {/* A real label, so tapping the word focuses the number beside it.
+            Six rows of a card that look tappable and are not is a card that
+            reads as broken, and on the tutorial's bodyweight step the row IS
+            the only thing on screen to tap. */}
+        {field ? (
+          <label htmlFor={field.id} className="t-body text-ink">
+            {label}
+          </label>
+        ) : (
+          <span className="t-body text-ink">{label}</span>
+        )}
       </div>
       <div className="flex shrink-0 items-baseline">
         {figure}
@@ -228,6 +248,7 @@ export function DayStatsCard({
     if (!editable) return undefined;
     const stored = dayLog?.[key];
     return {
+      id: `stat-${key}`,
       raw: editing?.field === key ? editing.raw : stored === undefined ? "" : String(stored),
       // On a day that has not happened yet the target IS the hint, so the plan
       // is what an empty row shows.
@@ -309,6 +330,7 @@ export function DayStatsCard({
           single obvious target. */}
       <MetricRow
         sep={false}
+        tutorial="stat-bodyweight"
         label="Bodyweight"
         field={fieldFor("bodyweight", undefined, true)}
         hatch="open"

@@ -324,16 +324,23 @@ describe("week mode", () => {
 
     useStore.getState().setPlanningMode("week");
     const week = useStore.getState().slots;
-    // Repeats are dropped: "start again" is what a week already means.
+    // Repeats survive the trip. Nothing renders one in week mode - "start
+    // again" is what a week already means - but dropping them would mean
+    // rebuilding the cycle by hand after a look at the other screen.
     expect(week.map((s) => s.id)).toContain(upper.id);
     expect(week.find((s) => s.id === upper.id)?.weekday).toBe(MON);
-    expect(week.some((s) => kindOf(s) === "repeat")).toBe(false);
+    expect(week.filter((s) => kindOf(s) === "repeat")).toHaveLength(2);
+    expect(week.filter((s) => kindOf(s) === "repeat").every((s) => s.weekday === undefined)).toBe(
+      true,
+    );
     expect(useStore.getState().sessions[0].splitSlotId).toBe(upper.id);
 
     useStore.getState().setCardWeekday(lower.id, WED);
     useStore.getState().setPlanningMode("rotation");
     const back = useStore.getState().slots;
-    expect(back.map((s) => s.name)).toEqual(["Upper", "Lower", "Rest"]);
+    // Each repeat comes back behind the card it was behind, not at the index it
+    // happened to hold: the week was free to reorder those cards underneath it.
+    expect(back.map((s) => s.name)).toEqual(["Upper", "Lower", "Repeat", "Rest", "Repeat"]);
     expect(back.every((s) => s.weekday === undefined)).toBe(true);
     expect(useStore.getState().nextCard()?.id).toBe(upper.id);
 

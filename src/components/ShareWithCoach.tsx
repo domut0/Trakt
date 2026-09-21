@@ -59,6 +59,7 @@ export function ShareWithCoach({ spreadsheetId }: { spreadsheetId: string }) {
       <>
         <button
           type="button"
+          data-tutorial="share-coach"
           disabled={sharing}
           onClick={() => void share(coach.email!)}
           className="group-row group-row-sep w-full text-left"
@@ -80,6 +81,7 @@ export function ShareWithCoach({ spreadsheetId }: { spreadsheetId: string }) {
     return (
       <button
         type="button"
+        data-tutorial="share-coach"
         onClick={() => setOpen(true)}
         className="group-row group-row-sep w-full text-left"
       >
@@ -92,7 +94,7 @@ export function ShareWithCoach({ spreadsheetId }: { spreadsheetId: string }) {
   }
 
   return (
-    <div className="group-row-sep space-y-3 px-4 py-4">
+    <div data-tutorial="share-coach" className="group-row-sep space-y-3 px-4 py-4">
       <label className="block">
         <span className="block pb-1 t-label text-ink-2">Your coach&rsquo;s Google email</span>
         <input

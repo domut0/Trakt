@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   addMonths,
@@ -11,8 +10,9 @@ import {
 } from "date-fns";
 import { dayKey } from "../lib/daily-log";
 import { DayActions } from "./DayActions";
+import { DaySessionList } from "./DaySessionList";
 import { DayStatsCard } from "./DayStatsCard";
-import { isCardioSession, sessionSlotName, useStore, type WorkoutSession } from "../lib/store";
+import { isCardioSession, useStore, type WorkoutSession } from "../lib/store";
 
 /**
  * Monday-start, matching `weekStartKey` in daily-log.ts and therefore the
@@ -22,25 +22,6 @@ import { isCardioSession, sessionSlotName, useStore, type WorkoutSession } from 
  */
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
-function fmtTime(ts: number) {
-  return new Date(ts).toLocaleTimeString(undefined, { hour: "numeric" });
-}
-
-function fmtCardioDetails(
-  durationMinutes?: number,
-  distance?: number,
-  unit: "lbs" | "kg" = "lbs",
-): string {
-  const parts: string[] = [];
-  if (durationMinutes != null) {
-    parts.push(`${durationMinutes} min`);
-  }
-  if (distance != null) {
-    parts.push(`${distance} ${unit === "lbs" ? "mi" : "km"}`);
-  }
-  return parts.join(" · ");
-}
-
 /**
  * The History tab's Calendar view: month stepper, weekday header, day-cell
  * grid with workout dots, and the selected day's session list. Moved here
@@ -48,11 +29,7 @@ function fmtCardioDetails(
  */
 export function CalendarView() {
   const sessions = useStore((s) => s.sessions);
-  const slots = useStore((s) => s.slots);
-  const exercises = useStore((s) => s.exercises);
-  const sets = useStore((s) => s.sets);
   const dailyLogs = useStore((s) => s.dailyLogs);
-  const unit = useStore((s) => s.unit);
 
   const [viewedMonth, setViewedMonth] = useState(() => startOfMonth(new Date()));
   // null until the user taps a day, which lets the default track newly-hydrated
@@ -87,7 +64,6 @@ export function CalendarView() {
     const [y, m, d] = selectedKey.split("-").map(Number);
     return new Date(y, m - 1, d);
   }, [selectedKey]);
-  const selectedSessions = byDay.get(selectedKey) ?? [];
   const todayKey = dayKey(new Date());
   const selectedIsToday = selectedKey === todayKey;
   const selectedIsFuture = selectedKey > todayKey;
@@ -259,50 +235,7 @@ export function CalendarView() {
         <div className="mx-4 space-y-3">
           <DayStatsCard date={selectedKey} editable />
 
-          {selectedSessions.length > 0 && (
-            <div className="group-list">
-              {selectedSessions.map((session, i) => {
-                const isCardio = isCardioSession(session);
-                const slotName = !isCardio ? sessionSlotName(session, slots) : undefined;
-                const cardioEx = isCardio
-                  ? exercises.find((e) => e.id === session.cardioExerciseId)
-                  : undefined;
-                const title = isCardio ? (cardioEx?.name ?? "Cardio") : (slotName ?? "Untitled");
-                const cardioDetails = isCardio
-                  ? fmtCardioDetails(session.durationMinutes, session.distance, unit)
-                  : null;
-                const subtitle = isCardio
-                  ? cardioDetails
-                    ? `· ${cardioDetails}`
-                    : undefined
-                  : `· ${sets.filter((x) => x.sessionId === session.id).length} sets`;
-
-                return (
-                  <Link
-                    key={session.id}
-                    to="/session/$id"
-                    params={{ id: session.id }}
-                    className="group-row group-row-sep w-full items-center justify-between py-4"
-                    style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
-                  >
-                    <div className="min-w-0 flex-1 pr-3">
-                      <div className="flex min-w-0 items-baseline gap-2">
-                        <span className="truncate t-body font-semibold tracking-tight text-ink">
-                          {title}
-                        </span>
-                        {subtitle && (
-                          <span className="t-label shrink-0 text-ink-2">{subtitle}</span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="t-label shrink-0 text-ink-2">
-                      {fmtTime(session.startedAt)}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
+          <DaySessionList date={selectedKey} />
 
           {/* The same actions Today carries, on the same card, because this
               screen and that one are now one screen with two date pickers.

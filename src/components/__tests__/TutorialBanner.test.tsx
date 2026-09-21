@@ -64,7 +64,7 @@ describe("TutorialBanner standalone", () => {
     render(<TutorialBanner />);
 
     expect(screen.getByText("Tutorial mode")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Skip/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "End tutorial" })).toBeInTheDocument();
   });
 
   it("is in flow, never fixed, to avoid sitting beneath translucent status bars", () => {
@@ -75,7 +75,10 @@ describe("TutorialBanner standalone", () => {
     expect(banner).not.toBeNull();
     expect(banner.className).toContain("relative");
     expect(banner.className).not.toContain("fixed");
-    expect(banner.className).toContain("z-40");
+    // Above the spotlight's dim (z-54), so the way out of the mode is never
+    // one of the things the mode gates.
+    expect(banner.className).toContain("z-[57]");
+    expect(banner).toHaveAttribute("data-tutorial-banner");
     expect(banner.className).toContain("min-h-[44px]");
     // The safe-area inset is deliberately NOT asserted here. jsdom drops CSS
     // values it cannot parse, and `env()` is one of them, so it is absent from
@@ -91,7 +94,7 @@ describe("TutorialBanner standalone", () => {
     useTutorialStore.setState({ active: true });
 
     render(<TutorialBanner />);
-    const skipButton = screen.getByRole("button", { name: /Skip/ });
+    const skipButton = screen.getByRole("button", { name: "End tutorial" });
     fireEvent.click(skipButton);
 
     // No confirmation prompt: skip does not argue with the user

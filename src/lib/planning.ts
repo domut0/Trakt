@@ -295,6 +295,17 @@ export function cardForWeekday<T extends SplitCardLike & { weekday?: number }>(
 }
 
 /**
+ * Monday first, and cards on no day at all last.
+ *
+ * JavaScript numbers Sunday 0, which puts it in front of Monday in a naive
+ * sort - so a week read back into a cycle used to start on Sunday, while the
+ * planner that wrote it starts on Monday. Same week, two different orders.
+ */
+function mondayFirst(weekday: number | undefined): number {
+  return weekday === undefined ? 7 : (weekday + 6) % 7;
+}
+
+/**
  * The same cards, rearranged for the other planning mode.
  *
  * Nothing is created or deleted: switching mode changes how the split is
@@ -303,29 +314,72 @@ export function cardForWeekday<T extends SplitCardLike & { weekday?: number }>(
  *
  * To `week`: day cards land on consecutive days from Monday, because a week has
  * to start somewhere and Monday is where a programme is usually written from.
- * Repeats are dropped, since "start again" is what a week already means.
  * To `rotation`: cards take cycle order from the days they were on, and the
  * weekday is cleared.
+ *
+ * ## Repeats are kept, not dropped
+ *
+ * A week repeats by definition, so a repeat card has nothing to say while a
+ * week is on screen and nothing renders it there. It is still carried through
+ * the conversion, because dropping it means someone who looks at the other mode
+ * once comes back to a cycle they have to rebuild by hand - and `Upper, Lower,
+ * Repeat, Rest, Repeat` is five cards of which two would be gone.
+ *
+ * Coming back, each repeat returns to the day card it followed rather than to
+ * an index: the week is free to have reordered those cards, and a repeat's
+ * whole meaning is which card it sits behind.
  */
 export function convertSplit<T extends SplitCardLike & { weekday?: number }>(
   cards: readonly T[],
   to: "week" | "rotation",
 ): T[] {
+  const inOrder = orderedSplit(cards);
+
   if (to === "rotation") {
-    const ordered = [...cards]
-      .filter((c) => kindOf(c) !== "repeat")
-      .sort((a, b) => (a.weekday ?? 7) - (b.weekday ?? 7) || a.rotationOrder - b.rotationOrder);
-    return ordered.map((card, i) => ({ ...card, rotationOrder: i, weekday: undefined }));
+    // Which day card each repeat followed. A repeat at the very top of the
+    // cycle followed nothing, and stays at the top.
+    const head: T[] = [];
+    const following = new Map<string, T[]>();
+    let previousDay: string | undefined;
+    for (const card of inOrder) {
+      if (isDayCard(card)) {
+        previousDay = card.id;
+        continue;
+      }
+      if (previousDay === undefined) {
+        head.push(card);
+        continue;
+      }
+      const trailing = following.get(previousDay);
+      if (trailing) trailing.push(card);
+      else following.set(previousDay, [card]);
+    }
+
+    const days = inOrder
+      .filter(isDayCard)
+      .sort(
+        (a, b) =>
+          mondayFirst(a.weekday) - mondayFirst(b.weekday) || a.rotationOrder - b.rotationOrder,
+      );
+
+    const out: T[] = [...head];
+    for (const day of days) {
+      out.push(day);
+      const trailing = following.get(day.id);
+      if (trailing) out.push(...trailing);
+    }
+    return out.map((card, i) => ({ ...card, rotationOrder: i, weekday: undefined }));
   }
 
   // Monday first, wrapping to Sunday: 1..6 then 0.
   const week = [1, 2, 3, 4, 5, 6, 0];
-  const days = orderedSplit(cards).filter((c) => kindOf(c) !== "repeat");
-  return days.map((card, i) => ({
-    ...card,
-    rotationOrder: i,
-    weekday: i < week.length ? week[i] : undefined,
-  }));
+  let dayIndex = 0;
+  return inOrder.map((card, i) => {
+    if (!isDayCard(card)) return { ...card, rotationOrder: i, weekday: undefined };
+    const weekday = dayIndex < week.length ? week[dayIndex] : undefined;
+    dayIndex += 1;
+    return { ...card, rotationOrder: i, weekday };
+  });
 }
 
 /** The first day card, for a split with no cursor yet. */

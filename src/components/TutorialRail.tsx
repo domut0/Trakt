@@ -1,75 +1,107 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
-import { TUTORIAL_STEPS, type TutorialSeen } from "../lib/tutorial";
+import { useLocation, useRouter } from "@tanstack/react-router";
 import { useTutorialStore } from "../lib/tutorial-store";
+import { tutorialInterrupted } from "../lib/tutorial-state";
+import { readSeen } from "../lib/tutorial-seen";
+import { loadPendingCoach } from "../lib/pending-coach";
+import { useInstallMode } from "../lib/install-prompt";
 import { useStore } from "../lib/store";
+import { useSyncStore } from "../lib/sync-store";
 import { TutorialCursor } from "./TutorialCursor";
+import { TutorialSpotlight } from "./TutorialSpotlight";
 
 /**
  * The tutorial rail: one line of instruction pinned to the bottom.
  *
  * ## How it works
  *
- * Portalled directly to `document.body` at `z-[55]`, above full-screen overlays
- * like `ExerciseScreen` (`z-50`) but below `Toast` (`z-[60]`). It renders
- * whatever line the current step prescribes, along with a "Show me" action
- * that triggers the live dot cursor.
+ * Portalled directly to `document.body` at `z-[55]`, above the spotlight
+ * (`z-[54]`) and full-screen overlays like `ExerciseScreen` (`z-50`), below
+ * `Toast` (`z-[60]`). It renders the current step's line, a "Show me" that
+ * replays the demo, and - on the steps that depend on Google - a way past.
  *
- * ## Not a sheet
+ * ## It drives the app, not just the commentary
  *
- * It does not use `useSheetDismiss`. Escape must continue to dismiss modal
- * screens (like the exercise screen) rather than closing the teacher.
+ * A step names the screen it happens on, and the rail navigates there. The
+ * tutorial used to start on Today and hope; the first thing a new client
+ * actually has to do is in Settings, two taps away, and "go to Settings" as an
+ * instruction is where most of them stopped.
+ *
+ * ## Why the snapshot is read every tick and not memoised
+ *
+ * Half of what a step waits for is in the DOM: whether a sheet is up, which set
+ * row is open, whether the summary has mounted. Those were once read inside a
+ * `useMemo` keyed on store values only, so opening Bench Press - which changes
+ * no store value, because it is already the current lift - left the snapshot
+ * stale and the step never completed. That one bug was four separate reports:
+ * the instruction that would not go away, the rail stuck over the summary's
+ * Done button, and both ends of the cardio flow.
+ *
+ * So the snapshot is assembled fresh on every render, and a timer re-renders
+ * while the tutorial is up. Two hundred milliseconds of polling for the length
+ * of an onboarding is not a cost worth a correctness argument.
  *
  * ## Height reservation
  *
- * The rail reserves its own height by measuring its rendered DOM element and
- * writing `--rail-h` onto `document.documentElement` (`0px` when inactive or
- * unmounted). Both `workout.tsx` and `ExerciseScreen.tsx` add `var(--rail-h, 0px)`
- * to their bottom padding so that the pinned rail never covers "+ Add set" or
- * the bottom action row.
- *
- * ## Reactive step advancement
- *
- * The rail listens to store updates and observes DOM mutations while active,
- * assembling a `TutorialSeen` snapshot per tick. When a step predicate reports
- * `done(seen) === true`, the rail advances to the next step. When step 9
- * finishes, it calls `finish()`.
+ * The rail measures itself and writes `--rail-h` onto `document.documentElement`
+ * (`0px` when inactive). `workout.tsx`, `ExerciseScreen.tsx` and the workout
+ * summary add `var(--rail-h, 0px)` to their bottom padding, so the rail never
+ * covers the control it is talking about.
  */
 export function TutorialRail(): ReactElement | null {
   const active = useTutorialStore((s) => s.active);
-  const step = useTutorialStore((s) => s.step);
+  const steps = useTutorialStore((s) => s.steps);
+  const stepIndex = useTutorialStore((s) => s.step);
   const advance = useTutorialStore((s) => s.advance);
-  const finish = useTutorialStore((s) => s.finish);
+  const skipStep = useTutorialStore((s) => s.skipStep);
   const storeChooserOpen = useTutorialStore((s) => s.chooserOpen);
   const storeStartSheetOpen = useTutorialStore((s) => s.startSheetOpen);
 
+  const hydrated = useStore((s) => s.hydrated);
   const activeSessionId = useStore((s) => s.activeSessionId);
   const currentExerciseId = useStore((s) => s.currentExerciseId);
   const sets = useStore((s) => s.sets);
+  const sessions = useStore((s) => s.sessions);
+  const dailyLogs = useStore((s) => s.dailyLogs);
+  const syncConfig = useSyncStore((s) => s.config);
+  const googleAvailable = useSyncStore((s) => s.googleAvailable);
+
+  const install = useInstallMode();
+  const router = useRouter();
+  const location = useLocation();
 
   const railRef = useRef<HTMLDivElement>(null);
   const [showMeTrigger, setShowMeTrigger] = useState(0);
-  const [, setDomTick] = useState(0);
+  const [, setTick] = useState(0);
 
-  // Watch for DOM changes (dialog portals mounting/unmounting, input focus, row expansion)
+  const currentStep = active ? steps[stepIndex] : undefined;
+
+  /**
+   * Pick up an interrupted run.
+   *
+   * The whole of setting this app up happens across an OAuth popup, a trip to
+   * the home screen and back, and whatever else the day does. A tutorial that
+   * only ever started from the beginning would be one most people never
+   * finished.
+   */
   useEffect(() => {
-    if (!active || typeof document === "undefined") return;
-
-    const observer = new MutationObserver(() => {
-      setDomTick((t) => t + 1);
+    if (active || !hydrated) return;
+    if (!tutorialInterrupted()) return;
+    useTutorialStore.getState().start({
+      canInstall: install.kind === "prompt" || install.kind === "manual-ios",
+      resume: true,
     });
+  }, [active, hydrated, install.kind]);
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["data-tutorial", "aria-expanded"],
-    });
-
-    return () => observer.disconnect();
+  // Re-read the world. See "Why the snapshot is read every tick" above.
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setInterval(() => setTick((t) => t + 1), 200);
+    return () => window.clearInterval(timer);
   }, [active]);
 
-  // Measure height and set --rail-h on document.documentElement
+  // Measure and publish the rail's height.
   useEffect(() => {
     if (typeof document === "undefined") return;
 
@@ -80,114 +112,106 @@ export function TutorialRail(): ReactElement | null {
 
     const measure = () => {
       if (railRef.current) {
-        const h = railRef.current.offsetHeight;
-        document.documentElement.style.setProperty("--rail-h", `${h}px`);
+        document.documentElement.style.setProperty("--rail-h", `${railRef.current.offsetHeight}px`);
       }
     };
 
     measure();
     window.addEventListener("resize", measure);
-
     return () => {
       window.removeEventListener("resize", measure);
       document.documentElement.style.setProperty("--rail-h", "0px");
     };
-  }, [active, step]);
+  }, [active, stepIndex]);
 
-  const currentStep = TUTORIAL_STEPS[step];
-
-  // Assemble current TutorialSeen snapshot
-  const seen: TutorialSeen = useMemo(() => {
-    const sessionSets = activeSessionId
-      ? sets.filter((s) => s.sessionId === activeSessionId).sort((a, b) => a.loggedAt - b.loggedAt)
-      : [];
-
-    let editingRow: number | undefined;
-    if (typeof document !== "undefined") {
-      if (document.getElementById("set-1-weight")) editingRow = 1;
-      else if (document.getElementById("set-2-weight")) editingRow = 2;
-      else if (document.getElementById("set-3-weight")) editingRow = 3;
+  // Take the user to the screen this step happens on.
+  useEffect(() => {
+    if (!active || !currentStep?.route) return;
+    if (location.pathname === currentStep.route) return;
+    try {
+      void router.navigate({ to: currentStep.route });
+    } catch {
+      // Outside a live router (tests), the rail still narrates.
     }
+  }, [active, currentStep?.route, location.pathname, router]);
 
-    const exerciseScreenOpen =
-      typeof document !== "undefined" &&
-      document.querySelector('[data-tutorial="exercise-back"]') !== null;
+  const seen = readSeen({
+    activeSessionId,
+    currentExerciseId,
+    sets,
+    sessions,
+    dailyLogs,
+    sheetConnected: syncConfig?.kind === "google" && Boolean(syncConfig.spreadsheetId),
+    sheetPossible: googleAvailable(),
+    installedNow: install.kind === "installed",
+    storeChooserOpen,
+    storeStartSheetOpen,
+  });
 
-    const chooserOpen =
-      storeChooserOpen ||
-      (typeof document !== "undefined" &&
-        document.querySelector('[data-tutorial="chooser-strength"]') !== null);
-
-    const startSheetOpen =
-      storeStartSheetOpen ||
-      (typeof document !== "undefined" &&
-        document.querySelector('[data-tutorial="start-confirm"]') !== null);
-
-    // The summary screen says so itself. This used to fall back to "we are on
-    // /workout, there is no active session, and the End button is gone", which
-    // is also true of the moment before the summary mounts and of a /workout
-    // visited with nothing running - so the last step could complete without
-    // the user having seen anything.
-    const summaryShown =
-      typeof document !== "undefined" && document.querySelector("[data-summary-screen]") !== null;
-
-    return {
-      chooserOpen,
-      startSheetOpen,
-      activeSessionId,
-      exerciseScreenOpen,
-      currentExerciseId,
-      sets: sessionSets,
-      editingRow,
-      summaryShown,
-    };
-  }, [activeSessionId, currentExerciseId, sets, storeChooserOpen, storeStartSheetOpen]);
-
-  // Drive step progression
+  // Drive the progression.
   useEffect(() => {
     if (!active || !currentStep) return;
+    // A step with nothing on screen to point at is passed in silence. Saying
+    // "give Marcus access to it" over a Settings screen with no share control
+    // on it is the failure the spotlight exists to prevent.
+    if (currentStep.unreachable?.(seen) || currentStep.done(seen)) advance();
+  }, [active, currentStep, seen, advance]);
 
-    if (currentStep.done(seen)) {
-      if (step >= TUTORIAL_STEPS.length - 1) {
-        finish();
-      } else {
-        advance();
-      }
-    }
-  }, [active, step, currentStep, seen, advance, finish]);
-
-  if (!active || !currentStep || typeof document === "undefined") {
-    return null;
-  }
+  if (!active || !currentStep || typeof document === "undefined") return null;
 
   const handleShowMe = () => {
     setShowMeTrigger((t) => t + 1);
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("tutorial-show-me"));
-    }
+    window.dispatchEvent(new CustomEvent("tutorial-show-me"));
   };
+
+  const coachName = loadPendingCoach()?.name ?? "your coach";
+  const say = currentStep.say.replace("{coach}", coachName);
 
   return createPortal(
     <>
+      <TutorialSpotlight target={currentStep.target} zoomKey={showMeTrigger} />
       <TutorialCursor target={currentStep.target} trigger={showMeTrigger} />
       <div
         ref={railRef}
         role="region"
         aria-label="Tutorial instructions"
-        style={{
-          paddingBottom: "max(env(safe-area-inset-bottom, 0px), 16px)",
-        }}
-        className="fixed inset-x-0 bottom-0 z-[55] bg-surface border-t border-rule px-4 pt-2.5 shadow-md"
+        // Which step this is, on the element that says it. The rail is the one
+        // place the current step is unambiguous, and an end-to-end driver that
+        // has to infer it from the copy is a driver that breaks when the copy
+        // is edited.
+        data-tutorial-step={currentStep.id}
+        data-tutorial-target={currentStep.target}
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 16px)" }}
+        className="fixed inset-x-0 bottom-0 z-[55] border-t border-rule bg-surface px-4 pt-2.5 shadow-md"
       >
         <div className="mx-auto flex max-w-md items-center justify-between gap-3">
-          <p className="min-w-0 flex-1 t-body font-medium text-ink">{currentStep.say}</p>
-          <button
-            type="button"
-            onClick={handleShowMe}
-            className="shrink-0 flex min-h-[44px] items-center t-action t-body font-semibold text-ink"
-          >
-            Show me
-          </button>
+          <p aria-live="polite" className="min-w-0 flex-1 t-body font-medium text-ink">
+            {say}
+          </p>
+          <div className="flex shrink-0 items-center gap-2">
+            {/* Only where the app cannot finish the job on its own: a declined
+                consent screen, no Google account, a build with no client id.
+                See "Nothing is a dead end" in tutorial.ts. */}
+            {currentStep.skippable && (
+              <button
+                type="button"
+                onClick={skipStep}
+                className="flex min-h-[44px] items-center px-1 t-label text-ink-2"
+              >
+                Skip
+              </button>
+            )}
+            {/* Outlined. It used to be bare text beside a sentence, in the same
+                weight as the sentence, so the one control on the rail read as
+                the last two words of the instruction. */}
+            <button
+              type="button"
+              onClick={handleShowMe}
+              className="flex min-h-[44px] items-center rounded-md border border-ink/35 px-3 t-body font-semibold text-ink"
+            >
+              Show me
+            </button>
+          </div>
         </div>
       </div>
     </>,

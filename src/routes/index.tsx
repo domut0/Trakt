@@ -2,11 +2,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format, isValid } from "date-fns";
 import { AppShell } from "../components/AppShell";
 import { DayActions } from "../components/DayActions";
+import { DaySessionList } from "../components/DaySessionList";
 import { DayStatsCard } from "../components/DayStatsCard";
 import { WeekStrip } from "../components/WeekStrip";
 import { CoachPlanCard } from "../components/CoachPlanPrompt";
 import { GettingStartedCard } from "../components/GettingStartedCard";
-import { TutorialClosingCard } from "../components/TutorialClosingCard";
+import { TutorialInstallCard } from "../components/TutorialInstallCard";
 import { dayKey, parseDayKey } from "../lib/daily-log";
 
 /**
@@ -90,8 +91,10 @@ function Home() {
           unless a coach plan is waiting. */}
       <CoachPlanCard />
 
+      {/* The one chapter of the tutorial that needs a control of its own, for
+          exactly as long as that chapter runs. */}
+      <TutorialInstallCard />
       <GettingStartedCard />
-      <TutorialClosingCard />
 
       <div className="px-4">
         <WeekStrip selectedDate={selected} onSelectDate={selectDate} />
@@ -116,6 +119,11 @@ function Home() {
             numbers under a date; a caption saying they are numbers was the
             screen narrating itself. */}
         <DayStatsCard date={selected} editable />
+        {/* What actually happened today, between the numbers and the way to add
+            to them - the same rows the Calendar shows for the day it is on. */}
+        <div className="pt-3">
+          <DaySessionList date={selected} />
+        </div>
         <DayActions date={selected} />
       </section>
 

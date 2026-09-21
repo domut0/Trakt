@@ -33,7 +33,7 @@ export type SyncOk = {
  * token, so a lapsed grant needs a tap.
  */
 export type SyncErrorCode =
-  "bad-secret" | "busy" | "network" | "needs-consent" | "timeout" | "unreadable";
+  "bad-secret" | "busy" | "network" | "needs-consent" | "popup-blocked" | "timeout" | "unreadable";
 
 export type SyncFail = {
   ok: false;

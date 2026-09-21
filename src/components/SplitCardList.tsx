@@ -1,5 +1,6 @@
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { kindOf } from "../lib/planning";
+import { usePlanLocked } from "../lib/plan-lock";
 import { useStore, type SplitSlot } from "../lib/store";
 import { ArrowDown, ArrowUp, Repeat } from "./icons";
 
@@ -30,6 +31,9 @@ type Gesture = "undecided" | "swipe" | "scroll";
  */
 export function SplitCardList({ onEdit }: { onEdit: (slot: SplitSlot) => void }) {
   const slots = useStore((s) => s.slots);
+  // A coach-managed plan has no actions on it, so a tap goes straight to
+  // `onEdit` and the caller opens it to be read. Reading is not a write.
+  const locked = usePlanLocked();
   const exercises = useStore((s) => s.exercises);
   const deleteSplitCard = useStore((s) => s.deleteSplitCard);
   const moveSplitCard = useStore((s) => s.moveSplitCard);
@@ -71,10 +75,20 @@ export function SplitCardList({ onEdit }: { onEdit: (slot: SplitSlot) => void })
     if (gesture.current === "scroll") return;
 
     if (gesture.current === "swipe") {
+      // Nothing to reveal on a card that cannot be deleted.
+      if (locked) return;
       // Right only. Pulling right reveals a delete button on the LEFT, so the
       // control appears from the side the thumb came from.
       const dx = e.clientX - s.x;
       setSwipedId(dx > SWIPE_OPEN ? s.id : null);
+      return;
+    }
+
+    // A tap on a locked card opens the card itself. There are no actions to
+    // toggle, and the thing the tap is reaching for is what is on it.
+    if (locked) {
+      const tapped = slots.find((sl) => sl.id === s.id);
+      if (tapped) onEdit(tapped);
       return;
     }
 
@@ -94,7 +108,7 @@ export function SplitCardList({ onEdit }: { onEdit: (slot: SplitSlot) => void })
         const kind = kindOf(slot);
         const isNext = nextCard?.id === slot.id;
         const isSwiped = swipedId === slot.id;
-        const showActions = actionsId === slot.id;
+        const showActions = actionsId === slot.id && !locked;
         const lifts = (slot.plannedLifts ?? [])
           .map((lift) => exercises.find((e) => e.id === lift.exerciseId)?.name)
           .filter((n): n is string => n !== undefined);
@@ -185,12 +199,14 @@ export function SplitCardList({ onEdit }: { onEdit: (slot: SplitSlot) => void })
                   </span>
                 )}
 
-                <Reorder
-                  label={slot.name}
-                  index={i}
-                  count={ordered.length}
-                  onMove={(to) => moveSplitCard(slot.id, to)}
-                />
+                {!locked && (
+                  <Reorder
+                    label={slot.name}
+                    index={i}
+                    count={ordered.length}
+                    onMove={(to) => moveSplitCard(slot.id, to)}
+                  />
+                )}
               </div>
             </div>
 

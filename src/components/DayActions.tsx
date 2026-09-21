@@ -122,6 +122,7 @@ export function DayActions({ date }: { date: string }) {
         // an answer for is asking a question it knows the answer to.
         <button
           type="button"
+          data-tutorial="start-planned"
           onClick={() => (plannedIsCardio ? setCardioOpen(true) : setStartOpen(true))}
           className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-md bg-ink t-body font-semibold text-paper"
         >

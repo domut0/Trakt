@@ -1,93 +1,121 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  loadDisplayName,
   loadTutorialState,
+  markInstallOffered,
   markInstalledSeen,
   markTutorialDone,
+  saveDisplayName,
   saveTutorialState,
+  tutorialInterrupted,
+  updateTutorialState,
 } from "../tutorial-state";
 
+const KEY = "trakt.tutorial";
+
+beforeEach(() => {
+  // Unstub FIRST: one test replaces localStorage with a throwing stub, and
+  // clearing before restoring it clears the stub instead.
+  vi.unstubAllGlobals();
+  localStorage.clear();
+});
+
 describe("tutorial state", () => {
-  beforeEach(() => {
-    localStorage.clear();
+  it("is absent before anything happens", () => {
+    expect(loadTutorialState()).toBeUndefined();
+    expect(loadDisplayName()).toBeUndefined();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("round-trips full tutorial progress", () => {
-    const state = {
-      joinedAt: 1000,
-      doneAt: 2000,
-      cardDismissedAt: 3000,
-      closingCardDismissedAt: 4000,
+  it("round-trips everything it stores", () => {
+    saveTutorialState({
+      joinedAt: 1,
+      name: "Bob",
+      startedAt: 2,
+      stepId: "log-bodyweight",
+      doneAt: 3,
+      cardDismissedAt: 4,
       installedSeen: true,
-    };
-    saveTutorialState(state);
-    expect(loadTutorialState()).toEqual(state);
-  });
-
-  it("round-trips minimal tutorial progress with only joinedAt", () => {
-    saveTutorialState({ joinedAt: 1234 });
-    expect(loadTutorialState()).toEqual({ joinedAt: 1234 });
-  });
-
-  it("returns undefined when nothing is stored", () => {
-    expect(loadTutorialState()).toBeUndefined();
-  });
-
-  it("tolerates corrupt or non-JSON data in localStorage", () => {
-    localStorage.setItem("trakt.tutorial", "{corrupted json");
-    expect(loadTutorialState()).toBeUndefined();
-
-    localStorage.setItem("trakt.tutorial", JSON.stringify({ wrongField: "test" }));
-    expect(loadTutorialState()).toBeUndefined();
-
-    localStorage.setItem("trakt.tutorial", JSON.stringify(42));
-    expect(loadTutorialState()).toBeUndefined();
-  });
-
-  it("tolerates storage access throwing, as private browsing modes do", () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new Error("QuotaExceededError / access denied");
-    });
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("QuotaExceededError / access denied");
+      installOffered: true,
     });
 
+    expect(loadTutorialState()).toEqual({
+      joinedAt: 1,
+      name: "Bob",
+      startedAt: 2,
+      stepId: "log-bodyweight",
+      doneAt: 3,
+      cardDismissedAt: 4,
+      installedSeen: true,
+      installOffered: true,
+    });
+  });
+
+  it("refuses a record with no join date, and anything unparseable", () => {
+    localStorage.setItem(KEY, JSON.stringify({ doneAt: 1 }));
     expect(loadTutorialState()).toBeUndefined();
-    expect(() => saveTutorialState({ joinedAt: 100 })).not.toThrow();
+
+    localStorage.setItem(KEY, "{not json");
+    expect(loadTutorialState()).toBeUndefined();
+  });
+
+  it("drops a field of the wrong type rather than the whole record", () => {
+    localStorage.setItem(KEY, JSON.stringify({ joinedAt: 1, doneAt: "yesterday", name: 7 }));
+    expect(loadTutorialState()).toEqual({ joinedAt: 1 });
+  });
+
+  it("survives storage that throws, which is private browsing", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => {
+        throw new Error("denied");
+      },
+      setItem: () => {
+        throw new Error("denied");
+      },
+    });
+
+    expect(loadTutorialState()).toBeUndefined();
     expect(() => markTutorialDone()).not.toThrow();
-    expect(() => markInstalledSeen()).not.toThrow();
   });
 
-  it("marks tutorial done idempotently without altering an existing completion timestamp", () => {
+  it("stamps the finish once, and clears the resume pointer with it", () => {
+    // A finished tutorial has nowhere to resume to; leaving a pointer behind
+    // would make the next run start half way through.
+    updateTutorialState({ startedAt: 10, stepId: "save-set-2" });
     markTutorialDone();
     const first = loadTutorialState();
     expect(first?.doneAt).toBeTypeOf("number");
-    expect(first?.joinedAt).toBeTypeOf("number");
+    expect(first?.stepId).toBeUndefined();
 
-    const originalDoneAt = first!.doneAt;
-
-    // Advance clock or second invocation
     markTutorialDone();
-    const second = loadTutorialState();
-    expect(second?.doneAt).toBe(originalDoneAt);
+    expect(loadTutorialState()?.doneAt).toBe(first?.doneAt);
   });
 
-  it("marks installed seen idempotently", () => {
-    saveTutorialState({ joinedAt: 500, doneAt: 600 });
-    markInstalledSeen();
+  it("knows an interrupted run from a finished one and from no run at all", () => {
+    expect(tutorialInterrupted()).toBe(false);
 
-    const first = loadTutorialState();
-    expect(first?.installedSeen).toBe(true);
-    expect(first?.doneAt).toBe(600);
-    expect(first?.joinedAt).toBe(500);
+    updateTutorialState({ startedAt: 1, stepId: "connect-sheet" });
+    expect(tutorialInterrupted()).toBe(true);
 
-    // Call again to verify idempotency
-    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+    markTutorialDone();
+    expect(tutorialInterrupted()).toBe(false);
+  });
+
+  it("trims the name, and treats a blank one as no name", () => {
+    saveDisplayName("  Bob  ");
+    expect(loadDisplayName()).toBe("Bob");
+
+    saveDisplayName("   ");
+    expect(loadDisplayName()).toBeUndefined();
+  });
+
+  it("records the install being seen and being offered separately", () => {
+    // On iOS the app cannot tick "installed" until the next launch from the
+    // home screen, so the tutorial completes its step on the offer.
+    markInstallOffered();
+    expect(loadTutorialState()?.installOffered).toBe(true);
+    expect(loadTutorialState()?.installedSeen).toBeUndefined();
+
     markInstalledSeen();
-    expect(setItemSpy).not.toHaveBeenCalled();
     expect(loadTutorialState()?.installedSeen).toBe(true);
   });
 });

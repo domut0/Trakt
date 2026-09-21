@@ -90,6 +90,10 @@ export function InstallWalkthrough({ onClose }: InstallWalkthroughProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Add to Home Screen"
+      // The tutorial's spotlight stands down while this is up. It is opened BY
+      // a tutorial step, so the hole would otherwise stay over the row that
+      // opened it and none of these frames could be touched.
+      data-tutorial-modal
       className="fixed inset-0 z-50 flex items-center justify-center bg-paper/85 px-4 py-6 backdrop-blur-sm"
     >
       {/* Backdrop tap dismiss target */}
