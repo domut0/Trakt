@@ -71,3 +71,48 @@ describe("the coach profile", () => {
     expect(screen.getByText("That email does not look right")).toBeInTheDocument();
   });
 });
+
+describe("adding a client via picker", () => {
+  it("renders specific error and diagnostic line when Google rejects the API key", async () => {
+    const googlePicker = await import("../../lib/google-picker");
+    vi.spyOn(googlePicker, "pickSharedSpreadsheet").mockRejectedValue(new Error("bad-api-key"));
+    vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "123456789-test.apps.googleusercontent.com");
+    vi.stubEnv("VITE_GOOGLE_API_KEY", "test-api-key");
+
+    renderSettings();
+    fireEvent.click(screen.getByRole("button", { name: /Add a client/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Choose their sheet/ }));
+
+    await vi.waitFor(() => {
+      expect(
+        screen.getByText(
+          "Google rejected this build's API key. Check the Picker API is on and the key allows this site",
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText("Client id present, API key present, app id 123456789"),
+    ).toBeInTheDocument();
+  });
+
+  // The diagnostic is not tied to the key error. The failure it exists for --
+  // the Picker rejecting the key behind its own iframe -- reaches us as an
+  // ordinary cancel, so every failure has to carry the configuration with it.
+  it("renders the diagnostic line on any picker failure, not just a key error", async () => {
+    const googlePicker = await import("../../lib/google-picker");
+    vi.spyOn(googlePicker, "pickSharedSpreadsheet").mockRejectedValue(new Error("needs-consent"));
+    vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "987654321-test.apps.googleusercontent.com");
+    vi.stubEnv("VITE_GOOGLE_API_KEY", "test-api-key");
+
+    renderSettings();
+    fireEvent.click(screen.getByRole("button", { name: /Add a client/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Choose their sheet/ }));
+
+    await vi.waitFor(() => {
+      expect(screen.getByText("Google sign-in was closed before it finished")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText("Client id present, API key present, app id 987654321"),
+    ).toBeInTheDocument();
+  });
+});

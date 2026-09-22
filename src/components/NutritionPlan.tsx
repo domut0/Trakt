@@ -453,7 +453,7 @@ function PhaseEditor({
           value={phase.note ?? ""}
           onChange={(e) => onPatch({ note: e.target.value.trim() ? e.target.value : undefined })}
           placeholder="What these weeks are for"
-          className="mt-1.5 w-full resize-none rounded-md bg-wash px-3 py-2 t-body text-ink outline-none placeholder:text-ink-3"
+          className="mt-1.5 w-full resize-none rounded-md bg-field px-3 py-2 t-body text-ink outline-none placeholder:text-ink-3"
         />
       </div>
 

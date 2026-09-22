@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus } from "./icons";
+import { Primary } from "./Frame";
 import { TutorialBanner } from "./TutorialBanner";
 import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { lastSessionFor } from "../lib/exercise-history";
@@ -59,6 +60,8 @@ export function ExerciseScreen({
   /** Whether the setup note at the top is open for editing, and its draft. */
   const [editingNote, setEditingNote] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
+  /** Whether the setup note was edited during this visit to the exercise screen. */
+  const [noteEditedThisVisit, setNoteEditedThisVisit] = useState(false);
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
   const [rpe, setRpe] = useState("");
@@ -90,6 +93,7 @@ export function ExerciseScreen({
     [lift, logged, lastSets, minRows],
   );
   const complete = rows.every((row) => row.set !== undefined);
+  const hasDoneSomething = logged.length > 0 || noteEditedThisVisit;
 
   useSheetDismiss(true, () => onDone(complete));
 
@@ -147,6 +151,7 @@ export function ExerciseScreen({
     setEditingNote(false);
     if (noteDraft.trim() === (setupNote ?? "").trim()) return;
     setSetupNote(exerciseId, noteDraft);
+    setNoteEditedThisVisit(true);
   };
 
   const parsedWeight = parseFloat(weight);
@@ -188,12 +193,14 @@ export function ExerciseScreen({
     <div className="fixed inset-x-0 top-0 z-50 h-[100dvh] bg-paper anim-backdrop">
       <div className="mx-auto flex h-full max-w-md flex-col">
         <TutorialBanner />
-        {/* The way out, in the corner every other screen in this app keeps it.
-            There used to be a full-width Done pinned to the bottom instead,
-            which promised a transaction that does not exist: a set is saved the
-            moment you save it, and nothing on this screen is waiting to be
-            committed. Naming the exit after a commit made leaving mid-exercise
-            feel like abandoning something. */}
+        {/* The way out in the corner stays as the exit when nothing has been
+            done. An unconditional full-width Done pinned to the bottom was
+            deliberately removed, because it promised a transaction that does
+            not exist: a set is saved the moment you save it, and naming the
+            exit after a commit made leaving mid-exercise feel like abandoning
+            something. A conditional Done that appears only once you have logged
+            a set or edited the setup note is different: it marks work you did
+            rather than a commit you owe. */}
         <div className="flex items-center justify-between px-4 pt-14 pb-2">
           <button
             onClick={() => onDone(complete)}
@@ -242,7 +249,7 @@ export function ExerciseScreen({
               autoCapitalize="off"
               autoCorrect="off"
               spellCheck={false}
-              className="mt-2 min-h-[44px] w-full rounded-md bg-wash px-3 t-label text-ink outline-none placeholder:text-ink-3"
+              className="mt-2 min-h-[44px] w-full rounded-md bg-field px-3 t-label text-ink outline-none placeholder:text-ink-3"
             />
           ) : (
             <button
@@ -255,7 +262,7 @@ export function ExerciseScreen({
               // itself, which reads as a statement rather than a control, and
               // when there is no note yet that text is only a placeholder.
               aria-label="Edit setup note"
-              className="mt-2 flex min-h-[44px] w-full items-center rounded-md bg-wash px-3 text-left t-label text-ink-2"
+              className="mt-2 flex min-h-[44px] w-full items-center rounded-md bg-field px-3 text-left t-label text-ink-2"
             >
               {setupNote ?? <span className="text-ink-3">Seat, pins, grip</span>}
             </button>
@@ -269,12 +276,16 @@ export function ExerciseScreen({
 
         <div
           className="min-h-0 flex-1 overflow-y-auto px-4"
-          // The scroller reaches the bottom of the screen now that no bar is
-          // parked there, so "Add set" is the last thing on it and needs the
-          // inset itself.
+          // Who owns the bottom inset depends on whether the Done bar is
+          // there. With no bar, the scroller runs to the bottom of the screen
+          // and "Add set" is the last thing on it, so the scroller carries the
+          // inset itself. With the bar, the bar is the last thing on screen
+          // and carries it instead -- both would double it.
           style={{
             marginBottom: keyboardOffset,
-            paddingBottom: "calc(max(env(safe-area-inset-bottom), 24px) + var(--rail-h, 0px))",
+            paddingBottom: hasDoneSomething
+              ? "16px"
+              : "calc(max(env(safe-area-inset-bottom), 24px) + var(--rail-h, 0px))",
           }}
         >
           <ul className="group-list">
@@ -377,7 +388,7 @@ export function ExerciseScreen({
                         autoCapitalize="off"
                         autoCorrect="off"
                         spellCheck={false}
-                        className="min-h-[44px] w-full rounded-md bg-wash px-3 t-label text-ink outline-none placeholder:text-ink-3"
+                        className="min-h-[44px] w-full rounded-md bg-field px-3 t-label text-ink outline-none placeholder:text-ink-3"
                       />
                     </div>
                   )}
@@ -394,6 +405,19 @@ export function ExerciseScreen({
             Add set
           </button>
         </div>
+
+        {hasDoneSomething && (
+          <div
+            className="shrink-0 bg-paper px-4 pt-2"
+            style={{
+              paddingBottom: "calc(max(env(safe-area-inset-bottom), 16px) + var(--rail-h, 0px))",
+            }}
+          >
+            <Primary onClick={() => onDone(complete)} dataTutorial="exercise-done">
+              Done
+            </Primary>
+          </div>
+        )}
       </div>
     </div>,
     document.body,

@@ -115,7 +115,7 @@ export function StartWorkoutSheet({
             max={today}
             onChange={(e) => setOn(e.target.value || today)}
             aria-label="Workout date"
-            className="min-h-[44px] rounded-md bg-wash px-2 t-label text-ink-2 outline-none"
+            className="min-h-[44px] rounded-md bg-field px-2 t-label text-ink-2 outline-none"
           />
         </div>
 
@@ -151,7 +151,7 @@ export function StartWorkoutSheet({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={shown.length > 0 ? "or something new" : "Upper, Lower, Arms…"}
-          className="mt-4 min-h-[44px] w-full rounded-md bg-wash px-3 t-body text-ink outline-none placeholder:text-ink-3"
+          className="mt-4 min-h-[44px] w-full rounded-md bg-field px-3 t-body text-ink outline-none placeholder:text-ink-3"
           onKeyDown={(e) => {
             if (e.key === "Enter") handleStart();
           }}

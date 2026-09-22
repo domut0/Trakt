@@ -176,7 +176,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
           max={today}
           onChange={(e) => setOn(e.target.value || today)}
           aria-label="Cardio date"
-          className="min-h-[44px] rounded-md bg-wash px-2 t-label text-ink-2 outline-none"
+          className="min-h-[44px] rounded-md bg-field px-2 t-label text-ink-2 outline-none"
         />
       </div>
       <div className="mt-3 group-list">

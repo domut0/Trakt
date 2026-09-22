@@ -26,7 +26,16 @@ const GAPI_SRC = "https://apis.google.com/js/api.js";
 /** Same budget as the GIS script: long enough for a slow network, short enough to fail visibly. */
 const LOAD_TIMEOUT_MS = 15_000;
 
-export type PickFailure = "no-api-key" | "no-client-id" | "needs-consent" | "script-blocked";
+export type PickFailure =
+  "no-api-key" | "no-client-id" | "needs-consent" | "script-blocked" | "bad-api-key";
+
+type PickerFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+let pickerFetchImpl: PickerFetch | undefined;
+
+/** A seam, matching `setGoogleTokenSource`. Tests install a fake rather than a global stub. */
+export function setPickerFetch(fn: PickerFetch | undefined): void {
+  pickerFetchImpl = fn;
+}
 
 export interface PickedSheet {
   id: string;
@@ -132,6 +141,56 @@ async function loadPicker(): Promise<PickerApi> {
   return api;
 }
 
+const PREFLIGHT_TIMEOUT_MS = 5_000;
+
+/**
+ * Asks Google whether it will accept this build's API key, before the Picker
+ * gets a chance to fail behind glass.
+ *
+ * ## Why this exists
+ *
+ * When the key is wrong the Picker reports "API developer key invalid" INSIDE
+ * its own iframe. That never reaches our callback, so the coach sees a dead
+ * sheet chooser and the app says nothing. The person who has to fix it is
+ * holding a phone with no Cloud Console open, which is why the message has to
+ * name the fix rather than the symptom.
+ *
+ * ## Why only one status blocks
+ *
+ * This probes the DRIVE api, because the Picker has no endpoint worth probing.
+ * That means it can prove the key is rejected and it CANNOT prove anything
+ * about whether the Picker API itself is enabled -- Drive answers happily
+ * while the Picker is switched off. So a 400 naming the key is the one
+ * unambiguous answer, and it is the only one allowed to stop the flow.
+ *
+ * Everything else -- 403, 5xx, a dropped connection, a timeout -- falls
+ * through and opens the Picker exactly as before. `drive.file` is a narrow
+ * scope and a 403 here is at least as likely to mean "this token may not call
+ * about.get" as it is to mean a real misconfiguration. Blocking on it would
+ * turn a working coach into a blocked one, which is a worse failure than the
+ * one this function exists to explain.
+ */
+export async function preflightPicker(apiKey: string, token: string): Promise<void> {
+  const fetchFn = pickerFetchImpl ?? fetch;
+  const url = `https://www.googleapis.com/drive/v3/about?fields=kind&key=${encodeURIComponent(apiKey)}`;
+  try {
+    const res = await withTimeout(
+      fetchFn(url, { headers: { Authorization: `Bearer ${token}` } }),
+      PREFLIGHT_TIMEOUT_MS,
+      "timeout",
+    );
+    if (res.status !== 400) return;
+    const text = await res.text().catch(() => "");
+    const lower = text.toLowerCase();
+    if ((lower.includes("invalid") && lower.includes("key")) || lower.includes("api key")) {
+      throw new Error("bad-api-key" satisfies PickFailure);
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message === "bad-api-key") throw err;
+    // Anything else is not evidence. Fall through and let the Picker try.
+  }
+}
+
 /**
  * Opens the Picker on spreadsheets other people own, resolving with the one the
  * coach picks, or undefined if they close it.
@@ -156,6 +215,8 @@ export async function pickSharedSpreadsheet(): Promise<PickedSheet | undefined> 
     const message = err instanceof Error ? err.message : "";
     throw new Error(message === "script-blocked" ? "script-blocked" : "needs-consent");
   }
+
+  await preflightPicker(apiKey, token);
 
   const api = await loadPicker();
   return new Promise<PickedSheet | undefined>((resolve) => {

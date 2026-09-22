@@ -64,7 +64,7 @@ describe("TUTORIAL_STEPS structure and IDs", () => {
       "set-row-1",
       "set-save",
       "set-row-2",
-      "exercise-back",
+      "exercise-done",
       "workout-end",
     ];
 
@@ -81,7 +81,7 @@ describe("TUTORIAL_STEPS structure and IDs", () => {
       "Set 1 is already filled in. Tap it.",
       "Save takes those numbers as they are. Change one first if you lifted something else.",
       "Set 2 copied what you just did. Log it too.",
-      "Tap Back. Finishing a lift moves you on to the next one.",
+      "Tap Done. Finishing a lift moves you on to the next one.",
       "Tap End, top right.",
     ];
 

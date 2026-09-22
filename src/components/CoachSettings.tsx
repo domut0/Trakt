@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCoachStore } from "../lib/coach-store";
 import {
+  googleApiKey,
   pickerAvailable,
   pickSharedSpreadsheet,
   type PickedSheet,
   type PickFailure,
 } from "../lib/google-picker";
+import { googleClientId } from "../lib/google-auth";
 import { Chevron } from "./icons";
 import { Toggle } from "./Toggle";
 import { freshness } from "./ClientBanner";
@@ -203,7 +205,20 @@ const PICK_ERRORS: Record<PickFailure, string> = {
   "script-blocked": "Couldn't load Google. Check your connection or content blocker",
   "no-api-key": "This build has no Google API key",
   "no-client-id": "This build has no Google client id",
+  // Two different Cloud Console mistakes produce one indistinguishable
+  // rejection, so the message names both rather than guessing at one.
+  "bad-api-key":
+    "Google rejected this build's API key. Check the Picker API is on and the key allows this site",
 };
+
+/** Present/absent plus the derived app id. Never the secrets themselves. */
+function buildDiagnostics(): string {
+  const clientId = googleClientId();
+  const appId = clientId ? clientId.split("-")[0] : "absent";
+  return `Client id ${clientId ? "present" : "absent"}, API key ${
+    googleApiKey() ? "present" : "absent"
+  }, app id ${appId}`;
+}
 
 function AddByPickerForm({ onDone }: { onDone: () => void }) {
   const addClient = useCoachStore((s) => s.addClient);
@@ -211,10 +226,12 @@ function AddByPickerForm({ onDone }: { onDone: () => void }) {
   const [sheet, setSheet] = useState<PickedSheet | undefined>();
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const [errorCode, setErrorCode] = useState<PickFailure | undefined>();
 
   const pick = async () => {
     setPicking(true);
     setError(undefined);
+    setErrorCode(undefined);
     try {
       const picked = await pickSharedSpreadsheet();
       if (picked) {
@@ -225,6 +242,7 @@ function AddByPickerForm({ onDone }: { onDone: () => void }) {
       }
     } catch (err) {
       const code = (err instanceof Error ? err.message : "") as PickFailure;
+      setErrorCode(code);
       setError(PICK_ERRORS[code] ?? PICK_ERRORS["script-blocked"]);
     } finally {
       setPicking(false);
@@ -262,6 +280,13 @@ function AddByPickerForm({ onDone }: { onDone: () => void }) {
       </button>
       <Field label="Name" value={name} onChange={setName} placeholder="Bob" />
       {error && <p className="t-label text-signal">{error}</p>}
+      {/* What this build is actually configured with, readable off a phone in
+          a gym car park. It shows on ANY failure, because the codes that reach
+          us do not cover the case this exists for: the Picker rejecting the
+          key behind its own iframe, which surfaces here as a cancel. Never the
+          key or the client id themselves -- present/absent and the app id,
+          which is the one value that has to match the Cloud project. */}
+      {errorCode !== undefined && <p className="t-caption text-ink-2">{buildDiagnostics()}</p>}
       <div className="flex gap-2">
         <button
           type="button"

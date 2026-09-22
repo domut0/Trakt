@@ -75,6 +75,7 @@
   --color-rule: var(--rule);
   --color-rule-strong: var(--rule-strong);
   --color-wash: var(--wash);
+  --color-field: var(--field);
   --color-signal: var(--signal);
 
   /* Legacy role names, remapped onto the paper world so that no screen renders
@@ -144,6 +145,10 @@
      field. Inherits the name `wash` from the build before this one, where it
      was "the one filled tone", which is still exactly its job. */
   --wash: #2c2c2e;
+
+  /* A field inset against a card. Needs to read as an inset against --surface,
+     and --wash cannot do that job because it is also the rule colour. */
+  --field: #48484a;
 
   /* Three text tones, named as three real colours rather than one colour at
      three opacities. Opacity variants are what let secondary text drift below

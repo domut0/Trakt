@@ -536,4 +536,80 @@ describe("store: the grey note hint and the prefilled numbers stay in step", () 
     });
     expect(useStore.getState().lastSetupNoteFor("bench")).toBe("seat 4, pins 12");
   });
+
+  it("note edited with no set logged this session survives a re-read", () => {
+    const pastSession = done("past", "fb1", 2);
+    useStore.setState({
+      exercises: [{ id: "bench", name: "Bench", type: "main" }],
+      sessions: [pastSession, open("today", "fb1", 0)],
+      sets: [set("past", "bench", 185, 5, { setupNote: "old pin 4", loggedAt: 1000 })],
+      activeSessionId: "today",
+    });
+    // Editing note stamps Date.now()
+    useStore.getState().setSetupNote("bench", "new pin 6");
+    expect(useStore.getState().lastSetupNoteFor("bench")).toBe("new pin 6");
+  });
+
+  it("note edited then an older set still present does not win", () => {
+    const pastSession = done("past", "fb1", 2);
+    useStore.setState({
+      exercises: [
+        {
+          id: "bench",
+          name: "Bench",
+          type: "main",
+          setupNote: "hand correction",
+          setupNoteAt: 2000,
+        },
+      ],
+      sessions: [pastSession, open("today", "fb1", 0)],
+      sets: [set("past", "bench", 185, 5, { setupNote: "historical pin 3", loggedAt: 1000 })],
+      activeSessionId: "today",
+    });
+    // Hand correction at 2000 outranks history at 1000
+    expect(useStore.getState().lastSetupNoteFor("bench")).toBe("hand correction");
+
+    // But a newer set at 3000 outranks the correction
+    useStore.setState({
+      sets: [set("past", "bench", 185, 5, { setupNote: "newer set note", loggedAt: 3000 })],
+    });
+    expect(useStore.getState().lastSetupNoteFor("bench")).toBe("newer set note");
+  });
+
+  it("an exercise with a legacy note and no timestamp is unchanged", () => {
+    const pastSession = done("past", "fb1", 2);
+    useStore.setState({
+      exercises: [
+        {
+          id: "bench",
+          name: "Bench",
+          type: "main",
+          setupNote: "legacy note",
+          // No setupNoteAt (legacy row)
+        },
+      ],
+      sessions: [pastSession, open("today", "fb1", 0)],
+      sets: [set("past", "bench", 185, 5, { setupNote: "history note", loggedAt: 1000 })],
+      activeSessionId: "today",
+    });
+    // In legacy mode, history wins over the exercise's note
+    expect(useStore.getState().lastSetupNoteFor("bench")).toBe("history note");
+  });
+
+  // Deleting a note is an edit too. Without a stamp on the clear, the note
+  // logged weeks ago simply comes back and the deletion looks like it failed.
+  it("a note cleared by hand stays cleared and does not resurrect an old one", () => {
+    const pastSession = done("past", "fb1", 2);
+    useStore.setState({
+      exercises: [{ id: "bench", name: "Bench", type: "main" }],
+      sessions: [pastSession, open("today", "fb1", 0)],
+      sets: [set("past", "bench", 185, 5, { setupNote: "old pin 4", loggedAt: 1000 })],
+      activeSessionId: "today",
+    });
+    useStore.getState().setSetupNote("bench", "new pin 6");
+    expect(useStore.getState().lastSetupNoteFor("bench")).toBe("new pin 6");
+
+    useStore.getState().setSetupNote("bench", "");
+    expect(useStore.getState().lastSetupNoteFor("bench")).toBeUndefined();
+  });
 });

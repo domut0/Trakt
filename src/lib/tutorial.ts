@@ -25,7 +25,7 @@
  *   set 1 into set 2 is its single biggest advantage over a notes app, but it
  *   is invisible until it happens. Without noticing it, someone will retype
  *   every number forever.
- * - Step 8 ("Tap Back. Finishing a lift moves you on to the next one."): The
+ * - Step 8 ("Tap Done. Finishing a lift moves you on to the next one."): The
  *   app advancing to the next lift on its own is its core model of a session.
  *   Someone who misses this will think the highlight moved randomly.
  */
@@ -108,8 +108,8 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   },
   {
     id: "back",
-    say: "Tap Back. Finishing a lift moves you on to the next one.",
-    target: "exercise-back",
+    say: "Tap Done. Finishing a lift moves you on to the next one.",
+    target: "exercise-done",
     done: (seen) => seen.currentExerciseId !== undefined && seen.currentExerciseId !== "tut_bench",
   },
   {

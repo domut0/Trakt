@@ -43,6 +43,11 @@ export interface Exercise {
   name: string;
   type: ExerciseType;
   setupNote?: string;
+  /**
+   * The instant the note was last set by hand. The note on the exercise is a
+   * correction, and a correction outranks history.
+   */
+  setupNoteAt?: number;
 }
 
 /**
@@ -735,6 +740,8 @@ export interface PrefillSource {
   setupNote?: string;
   /** The bucket the source was matched on (see `setupNoteKey`). */
   noteKey: string;
+  /** The specific set the setup note was drawn from, if any. */
+  sourceSet?: WorkoutSet;
 }
 
 /**
@@ -824,9 +831,40 @@ export function findPrefillSource(
     // Every set here shares one key, so the freshest spelling of it is as good
     // as any and better than a stale one.
     const noted = [...matching].reverse().find((s) => setupNoteKey(s.setupNote) !== "");
-    return { session: candidate, sets: matching, setupNote: noted?.setupNote, noteKey };
+    return {
+      session: candidate,
+      sets: matching,
+      setupNote: noted?.setupNote,
+      noteKey,
+      sourceSet: noted,
+    };
   }
   return undefined;
+}
+
+export interface SetupNoteSource {
+  note?: string;
+  set?: WorkoutSet;
+}
+
+/**
+ * Returns which set the setup note was drawn from alongside the note itself,
+ * allowing callers to compare note timestamps against the exercise's setupNoteAt.
+ */
+export function suggestSetupNoteSource(
+  sessions: WorkoutSession[],
+  sets: WorkoutSet[],
+  sessionId: string | undefined,
+  exerciseId: string,
+): SetupNoteSource {
+  if (sessionId !== undefined) {
+    const source = findPrefillSource(sessions, sets, sessionId, exerciseId);
+    if (source) return { note: source.setupNote, set: source.sourceSet };
+  }
+  const matchedSet = sets
+    .filter((s) => s.exerciseId === exerciseId && setupNoteKey(s.setupNote) !== "")
+    .sort((a, b) => b.loggedAt - a.loggedAt)[0];
+  return { note: matchedSet?.setupNote, set: matchedSet };
 }
 
 /**
@@ -848,13 +886,7 @@ export function suggestSetupNote(
   sessionId: string | undefined,
   exerciseId: string,
 ): string | undefined {
-  if (sessionId !== undefined) {
-    const source = findPrefillSource(sessions, sets, sessionId, exerciseId);
-    if (source) return source.setupNote;
-  }
-  return sets
-    .filter((s) => s.exerciseId === exerciseId && setupNoteKey(s.setupNote) !== "")
-    .sort((a, b) => b.loggedAt - a.loggedAt)[0]?.setupNote;
+  return suggestSetupNoteSource(sessions, sets, sessionId, exerciseId).note;
 }
 
 /**
@@ -960,6 +992,7 @@ function isExercise(v: unknown): v is Exercise {
   if (typeof v.name !== "string") return false;
   if (v.type !== "main" && v.type !== "accessory" && v.type !== "cardio") return false;
   if (v.setupNote !== undefined && typeof v.setupNote !== "string") return false;
+  if (v.setupNoteAt !== undefined && !isFiniteNumber(v.setupNoteAt)) return false;
   return true;
 }
 
@@ -1511,9 +1544,14 @@ export const useStore = create<State>((set, get) => ({
   setSetupNote: (exerciseId, note) => {
     const trimmed = note.trim();
     const value = trimmed || undefined;
+    // Stamped even when the note is being CLEARED. Deleting a note is an edit
+    // like any other, and without a stamp on it the old note logged weeks ago
+    // simply reappears -- which is the bug this timestamp exists to kill,
+    // wearing a different hat.
+    const setupNoteAt = Date.now();
 
     const exercises = get().exercises.map((e) =>
-      e.id === exerciseId ? { ...e, setupNote: value } : e,
+      e.id === exerciseId ? { ...e, setupNote: value, setupNoteAt } : e,
     );
     const updatedExercise = exercises.find((e) => e.id === exerciseId);
     if (!updatedExercise) return;
@@ -2291,15 +2329,31 @@ export const useStore = create<State>((set, get) => ({
     // Scoped to the open workout so the hint and the prefilled numbers come off
     // one session. With no workout open there is no source to agree with, and
     // suggestSetupNote falls back to the most recent note logged anywhere.
-    const suggested = suggestSetupNote(
+    const exercise = get().exercises.find((e) => e.id === exerciseId);
+    const { note: suggested, set: sourceSet } = suggestSetupNoteSource(
       get().sessions,
       get().sets,
       get().activeSessionId,
       exerciseId,
     );
+
+    // A note edited by hand is newer information than any historical set, and
+    // must win. The test is on the STAMP, not on the note: an exercise whose
+    // note was deliberately cleared has a stamp and no note, and must come
+    // back empty rather than resurrecting what was logged last month.
+    //
+    // An exercise with no stamp at all is every row already in everyone's
+    // database, and history wins for it exactly as it did before.
+    if (
+      exercise?.setupNoteAt !== undefined &&
+      (sourceSet === undefined || exercise.setupNoteAt > sourceSet.loggedAt)
+    ) {
+      return exercise.setupNote;
+    }
+
     // The exercise's own note is a property of the exercise rather than of any
     // session, so it stays the last resort for a lift never logged with a note.
-    return suggested ?? get().exercises.find((e) => e.id === exerciseId)?.setupNote;
+    return suggested ?? exercise?.setupNote;
   },
 
   dismissWriteError: () => set({ writeFailed: false }),

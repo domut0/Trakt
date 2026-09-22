@@ -5,6 +5,7 @@ colors:
   paper: "#000000"
   surface: "#1C1C1E"
   wash: "#2C2C2E"
+  field: "#48484A"
   ink: "#FFFFFF"
   ink-2: "#AEAEB2"
   ink-3: "#8E8E93"
@@ -67,13 +68,14 @@ None of this is about paint, and all of it carries forward unchanged:
 
 ## Colors
 
-Nine values, and only one of them is a hue.
+Ten values, and only one of them is a hue.
 
 | Token         | Value     | What it is                                    |
 | ------------- | --------- | --------------------------------------------- |
 | `paper`       | `#000000` | The ground.                                   |
 | `surface`     | `#1C1C1E` | A card. The one elevation step.               |
 | `wash`        | `#2C2C2E` | A control sitting on a card.                  |
+| `field`       | `#48484A` | A field inset against a card; wash is the rule colour and cannot do that job. |
 | `ink`         | `#FFFFFF` | Primary text and figures. 21:1 / 18.4:1       |
 | `ink-2`       | `#AEAEB2` | Secondary text, annotations. 10.6:1 / 9.3:1   |
 | `ink-3`       | `#8E8E93` | Tertiary. 6.9:1 / 6.0:1 — AA on both grounds. |

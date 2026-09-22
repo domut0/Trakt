@@ -446,7 +446,7 @@ export function SlotPlanSheet({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search exercises"
               aria-label="Search exercises"
-              className="mt-4 block min-h-[44px] w-full rounded-md bg-wash px-3 t-body text-ink outline-none placeholder:text-ink-3"
+              className="mt-4 block min-h-[44px] w-full rounded-md bg-field px-3 t-body text-ink outline-none placeholder:text-ink-3"
             />
 
             <div className="mt-3 group-list bg-wash">
@@ -605,7 +605,7 @@ function Prescribe({
       autoCapitalize="off"
       autoCorrect="off"
       spellCheck={false}
-      className={`min-h-[38px] rounded-md bg-wash px-2 t-label text-ink outline-none placeholder:text-ink-3 ${
+      className={`min-h-[38px] rounded-md bg-field px-2 t-label text-ink outline-none placeholder:text-ink-3 ${
         wide ? "flex-[2]" : "flex-1"
       }`}
     />
