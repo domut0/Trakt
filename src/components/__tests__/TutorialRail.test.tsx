@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TutorialRail } from "../TutorialRail";
 import { useTutorialStore } from "../../lib/tutorial-store";
@@ -81,5 +81,31 @@ describe("TutorialRail", () => {
     // Step should advance to 1 ("Pick Strength.")
     expect(useTutorialStore.getState().step).toBe(1);
     expect(screen.getByText("Pick Strength.")).toBeInTheDocument();
+  });
+
+  /**
+   * The regression this guards is the one that made the whole tutorial
+   * useless. Half the steps wait on something no store knows about -- a screen
+   * being open, a row being expanded, the summary having mounted -- and the
+   * rail reads the DOM for those. The `seen` memo listed only store values, so
+   * the MutationObserver re-rendered the rail and the memo handed back its
+   * cached answer: every DOM-only step was missed, the rail sat on step 3
+   * while the user logged sets, and it lurched forward several steps at once
+   * whenever some unrelated store write finally invalidated it.
+   */
+  it("advances on a condition only the DOM can report", async () => {
+    // Step 3 is "open Bench Press", and the only evidence it happened is the
+    // exercise screen's back control existing.
+    useTutorialStore.setState({ active: true, step: 3 });
+    render(<TutorialRail />);
+    expect(
+      screen.getByText("These are your lifts, in order. Open Bench Press."),
+    ).toBeInTheDocument();
+
+    const back = document.createElement("button");
+    back.setAttribute("data-tutorial", "exercise-back");
+    document.body.appendChild(back);
+
+    await waitFor(() => expect(useTutorialStore.getState().step).toBe(4));
   });
 });

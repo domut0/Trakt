@@ -49,14 +49,44 @@ export function TutorialRail(): ReactElement | null {
 
   const railRef = useRef<HTMLDivElement>(null);
   const [showMeTrigger, setShowMeTrigger] = useState(0);
-  const [, setDomTick] = useState(0);
+  /**
+   * Bumped whenever the DOM changes, and READ by the `seen` memo below.
+   *
+   * The read is the whole point and it used to be missing. Half of what a step
+   * waits for is not in any store -- an exercise screen being open, a set row
+   * being expanded, the summary having mounted -- so `seen` queries the DOM
+   * for it. A memo cannot depend on the DOM, so without this counter in its
+   * dependency list the observer re-rendered the rail and the memo handed back
+   * its cached answer, unchanged, forever.
+   *
+   * What that looked like: open a lift, tap a set row, log it, and the rail
+   * still says "Open Bench Press", because every step whose condition is
+   * DOM-only had already come true and been missed. It then jumped several
+   * steps at once the moment some unrelated store write finally invalidated
+   * the memo -- and a rail that changes height under a focused field is how a
+   * half-typed number ends up saved as its first digit.
+   */
+  const [domTick, setDomTick] = useState(0);
 
   // Watch for DOM changes (dialog portals mounting/unmounting, input focus, row expansion)
   useEffect(() => {
     if (!active || typeof document === "undefined") return;
 
+    // Coalesced, because this observer sees every node added anywhere in the
+    // document -- a keystroke that grows a label is enough -- and recomputing
+    // per mutation put that work in the middle of typing.
+    //
+    // A timer and NOT requestAnimationFrame: rAF does not run while the page
+    // is not painting, so a step completed in a backgrounded tab would sit
+    // unnoticed until something brought the page back. Progression must not
+    // depend on the compositor.
+    let queued: ReturnType<typeof setTimeout> | undefined;
     const observer = new MutationObserver(() => {
-      setDomTick((t) => t + 1);
+      if (queued !== undefined) return;
+      queued = setTimeout(() => {
+        queued = undefined;
+        setDomTick((t) => t + 1);
+      }, 0);
     });
 
     observer.observe(document.body, {
@@ -66,7 +96,10 @@ export function TutorialRail(): ReactElement | null {
       attributeFilter: ["data-tutorial", "aria-expanded"],
     });
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (queued !== undefined) clearTimeout(queued);
+    };
   }, [active]);
 
   // Measure height and set --rail-h on document.documentElement
@@ -141,7 +174,10 @@ export function TutorialRail(): ReactElement | null {
       editingRow,
       summaryShown,
     };
-  }, [activeSessionId, currentExerciseId, sets, storeChooserOpen, storeStartSheetOpen]);
+    // `domTick` is not read in the body and must stay in this list anyway: it
+    // is what stands in for the DOM reads above, which nothing else can see.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId, currentExerciseId, sets, storeChooserOpen, storeStartSheetOpen, domTick]);
 
   // Drive step progression
   useEffect(() => {

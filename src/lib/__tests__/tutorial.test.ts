@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TUTORIAL_STEPS, type TutorialSeen, type WorkoutSet } from "../tutorial";
 import { useTutorialStore } from "../tutorial-store";
 import { useStore } from "../store";
+import { tutorialFixture } from "../tutorial-fixture";
 
 const mockSet1: WorkoutSet = {
   id: "set_1",
@@ -253,5 +254,26 @@ describe("advancing past step 9 calls finish", () => {
     // Active should be false, step reset to 0
     expect(useTutorialStore.getState().active).toBe(false);
     expect(useTutorialStore.getState().step).toBe(0);
+  });
+});
+
+/**
+ * The script and the fixture are one contract, and nothing else checks it.
+ *
+ * The script logs two sets on Bench Press and then says "Finishing a lift
+ * moves you on to the next one", waiting for the workout to move off
+ * `tut_bench`. But `WorkoutLog.done` only moves on from a lift whose
+ * prescribed sets are ALL logged. Prescribe three and the app is right to
+ * stay put, the step's condition never comes true, and the tutorial cannot be
+ * finished -- which is exactly what shipped.
+ */
+describe("the fixture prescribes what the script actually logs", () => {
+  it("prescribes Bench Press for as many sets as the script saves", () => {
+    const savesSets = TUTORIAL_STEPS.filter((s) => s.id.startsWith("save-set")).length;
+    const bench = tutorialFixture("lbs").slots[0].plannedLifts?.find(
+      (l) => l.exerciseId === "tut_bench",
+    );
+    expect(savesSets).toBe(2);
+    expect(bench?.sets).toBe(savesSets);
   });
 });

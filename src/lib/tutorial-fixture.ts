@@ -37,8 +37,14 @@ export function tutorialFixture(unit: "lbs" | "kg"): {
 
   const plannedLifts: PlannedLift[] = [
     {
+      // TWO, and it has to be two: the script logs set 1, logs set 2, then
+      // says "Finishing a lift moves you on to the next one" and waits for
+      // that to happen. `WorkoutLog`'s `done` only moves on from a lift whose
+      // prescribed sets are all logged, so a third set here means the lift is
+      // NOT finished, the app correctly stays put, the step's condition never
+      // comes true, and the tutorial cannot be completed at all.
       exerciseId: "tut_bench",
-      sets: 3,
+      sets: 2,
       reps: "8",
       load: unit === "kg" ? "60 kg" : "135 lbs",
     },
