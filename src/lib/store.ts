@@ -626,6 +626,14 @@ interface State {
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+/**
+ * True while `hydrate` is running. Module scope rather than store state: it is
+ * a latch for one async function, not something any component renders, and
+ * putting it in the store would publish a re-render to every subscriber twice
+ * per launch. See the note in `hydrate`.
+ */
+let hydrateInFlight = false;
+
 /** Whether an instant falls on today, by the app's own day boundary. */
 function isToday(at: number): boolean {
   return dayKey(new Date(at)) === dayKey(new Date());
@@ -1337,95 +1345,115 @@ export const useStore = create<State>((set, get) => ({
   writeFailed: false,
 
   hydrate: async () => {
-    if (get().hydrated) return; // idempotent — never double-seed/duplicate on repeat calls
-    if (!isIndexedDbAvailable()) {
-      // Should never happen (hydrate is only ever invoked from a client-side
-      // effect), but never leave the app stuck un-hydrated.
-      set({ hydrated: true });
-      return;
-    }
+    // `hydrated` alone is not a guard. It is read BEFORE the awaits below, so
+    // two calls that overlap both pass it, both run, and both write the whole
+    // store at the end. The second write lands on top of anything that
+    // replaced the store in between.
+    //
+    // What that would cost: the tutorial swaps fixture data in and latches the
+    // database read-only. A hydrate still in flight when it starts would
+    // overwrite the fixture a moment later, leaving the sandbox "active" with
+    // no fixture, no rail, and -- the latch still being on -- an app that
+    // silently saves nothing.
+    //
+    // This is a hole read out of the code, not a bug anyone has reported: the
+    // window is small and `hydrate` is called from one effect. The guard is
+    // here because the cost of losing that race is silent and total, not
+    // because the race has been seen.
+    if (get().hydrated || hydrateInFlight) return;
+    hydrateInFlight = true;
     try {
-      const empty = await isDbEmpty();
-      if (empty) {
-        const settings: SettingsMeta = { key: "settings", unit: "lbs" };
-        // A first run seeds the exercise NAME library and nothing else. The
-        // library is reference data the picker needs to be usable on day one;
-        // slots, sessions and sets are the user's own record of what they did,
-        // and inventing any of those would show someone a training history they
-        // never had. An empty log is the honest state of a new install.
-        await seedDb({
-          exercises: seedExercises,
-          slots: [],
-          sessions: [],
-          sets: [],
-          settings,
-        });
-        set({
-          exercises: seedExercises,
-          slots: [],
-          sessions: [],
-          sets: [],
-          dailyLogs: [],
-          unit: settings.unit,
-          nutritionPhases: [],
-          plannedDays: [],
-          nextSlotId: undefined,
-          restSince: undefined,
-          lastAcceptedPlanAt: undefined,
-          coachManaged: false,
-          planningMode: "week",
-          activeSessionId: undefined,
-          currentExerciseId: undefined,
-          hydrated: true,
-        });
+      if (!isIndexedDbAvailable()) {
+        // Should never happen (hydrate is only ever invoked from a client-side
+        // effect), but never leave the app stuck un-hydrated.
+        set({ hydrated: true });
         return;
       }
-      const data = await loadAll();
-      // See the note on `nutritionPhases` below. Derived once here so the same
-      // array is both put into state and written back, rather than computed
-      // twice and trusted to agree.
-      const phases = closeOpenPhases(data.nutritionPhases);
-      const migratedPhases = phases.filter((p, i) => p !== data.nutritionPhases[i]);
-      // loadAll already backfills targetProfiles/weekdayTargets for records
-      // written before targets existed, so these two are safe to trust here.
-      set({
-        exercises: data.exercises,
-        slots: data.slots,
-        sessions: data.sessions,
-        sets: data.sets,
-        dailyLogs: data.dailyLogs,
-        unit: data.settings.unit,
-        // MIGRATED HERE rather than in a Dexie upgrade, because it is a
-        // reinterpretation of rows that are already valid rather than a schema
-        // change: before end dates, a phase ran until the next one started, so
-        // the end each row implies is derivable and no data is being recovered.
-        // Idempotent, so running it on every hydration costs a pass over a
-        // handful of rows and removes a whole class of "was the upgrade
-        // applied" question. The write-back below is what makes it stick.
-        nutritionPhases: phases,
-        plannedDays: data.plannedDays,
-        nextSlotId: data.settings.nextSlotId,
-        restSince: data.settings.restSince,
-        lastAcceptedPlanAt: data.settings.lastAcceptedPlanAt,
-        coachManaged: data.settings.coachManaged ?? false,
-        // Absent means a plan written before week mode existed, which is a
-        // rotation by construction: cards in a cycle, with no weekdays.
-        planningMode: data.settings.planningMode ?? "rotation",
-        templates: data.templates,
-        // Both default on READ. A settings record written before planning
-        // existed has neither key, and no migration is needed to make it mean
-        // "no plan" (see the note on `plannedWeek` in db.ts).
-        activeSessionId: data.activeSession.activeSessionId,
-        currentExerciseId: data.activeSession.currentExerciseId,
-        hydrated: true,
-      });
-      // Persisted so the derivation happens once rather than on every launch
-      // forever, and so an export taken after this point carries real end
-      // dates rather than leaning on the reader to infer them again.
-      if (migratedPhases.length > 0) safeWrite(() => db.nutritionPhases.bulkPut(migratedPhases));
-    } catch (err) {
-      console.error("[store] hydrate failed", err);
-      set({ hydrated: true }); // don't leave the UI stuck; falls back to empty in-memory state
+      try {
+        const empty = await isDbEmpty();
+        if (empty) {
+          const settings: SettingsMeta = { key: "settings", unit: "lbs" };
+          // A first run seeds the exercise NAME library and nothing else. The
+          // library is reference data the picker needs to be usable on day one;
+          // slots, sessions and sets are the user's own record of what they did,
+          // and inventing any of those would show someone a training history they
+          // never had. An empty log is the honest state of a new install.
+          await seedDb({
+            exercises: seedExercises,
+            slots: [],
+            sessions: [],
+            sets: [],
+            settings,
+          });
+          set({
+            exercises: seedExercises,
+            slots: [],
+            sessions: [],
+            sets: [],
+            dailyLogs: [],
+            unit: settings.unit,
+            nutritionPhases: [],
+            plannedDays: [],
+            nextSlotId: undefined,
+            restSince: undefined,
+            lastAcceptedPlanAt: undefined,
+            coachManaged: false,
+            planningMode: "week",
+            activeSessionId: undefined,
+            currentExerciseId: undefined,
+            hydrated: true,
+          });
+          return;
+        }
+        const data = await loadAll();
+        // See the note on `nutritionPhases` below. Derived once here so the same
+        // array is both put into state and written back, rather than computed
+        // twice and trusted to agree.
+        const phases = closeOpenPhases(data.nutritionPhases);
+        const migratedPhases = phases.filter((p, i) => p !== data.nutritionPhases[i]);
+        // loadAll already backfills targetProfiles/weekdayTargets for records
+        // written before targets existed, so these two are safe to trust here.
+        set({
+          exercises: data.exercises,
+          slots: data.slots,
+          sessions: data.sessions,
+          sets: data.sets,
+          dailyLogs: data.dailyLogs,
+          unit: data.settings.unit,
+          // MIGRATED HERE rather than in a Dexie upgrade, because it is a
+          // reinterpretation of rows that are already valid rather than a schema
+          // change: before end dates, a phase ran until the next one started, so
+          // the end each row implies is derivable and no data is being recovered.
+          // Idempotent, so running it on every hydration costs a pass over a
+          // handful of rows and removes a whole class of "was the upgrade
+          // applied" question. The write-back below is what makes it stick.
+          nutritionPhases: phases,
+          plannedDays: data.plannedDays,
+          nextSlotId: data.settings.nextSlotId,
+          restSince: data.settings.restSince,
+          lastAcceptedPlanAt: data.settings.lastAcceptedPlanAt,
+          coachManaged: data.settings.coachManaged ?? false,
+          // Absent means a plan written before week mode existed, which is a
+          // rotation by construction: cards in a cycle, with no weekdays.
+          planningMode: data.settings.planningMode ?? "rotation",
+          templates: data.templates,
+          // Both default on READ. A settings record written before planning
+          // existed has neither key, and no migration is needed to make it mean
+          // "no plan" (see the note on `plannedWeek` in db.ts).
+          activeSessionId: data.activeSession.activeSessionId,
+          currentExerciseId: data.activeSession.currentExerciseId,
+          hydrated: true,
+        });
+        // Persisted so the derivation happens once rather than on every launch
+        // forever, and so an export taken after this point carries real end
+        // dates rather than leaning on the reader to infer them again.
+        if (migratedPhases.length > 0) safeWrite(() => db.nutritionPhases.bulkPut(migratedPhases));
+      } catch (err) {
+        console.error("[store] hydrate failed", err);
+        set({ hydrated: true }); // don't leave the UI stuck; falls back to empty in-memory state
+      }
+    } finally {
+      hydrateInFlight = false;
     }
   },
 
