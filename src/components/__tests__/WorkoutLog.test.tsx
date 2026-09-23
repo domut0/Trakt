@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkoutLog } from "../WorkoutLog";
 import {
   useStore,
@@ -20,6 +20,7 @@ import {
 
 const BENCH: Exercise = { id: "e_bench", name: "Bench Press", type: "main" };
 const ROW: Exercise = { id: "e_row", name: "Barbell Row", type: "main" };
+const SQUAT: Exercise = { id: "e_squat", name: "Back Squat", type: "main" };
 
 const SESSION: WorkoutSession = { id: "sess_today", splitSlotId: "s_upper", startedAt: 1_000 };
 
@@ -456,5 +457,240 @@ describe("what the review added", () => {
 
     expect(screen.queryByRole("button", { name: /^Bench Press/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Dumbbell Bench Press/ })).toBeInTheDocument();
+  });
+});
+
+describe("reordering exercises", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useStore.setState({ sets: [], sessions: [], exercises: [BENCH, ROW, SQUAT], slots: [] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("opens the exercise screen on a short press", () => {
+    setup([{ exerciseId: BENCH.id, sets: 3, reps: "8" }]);
+    const bench = screen.getByRole("button", { name: /^Bench Press/ });
+
+    fireEvent.pointerDown(bench, { clientX: 50, clientY: 20, pointerId: 1 });
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    fireEvent.pointerUp(bench, { clientX: 50, clientY: 20, pointerId: 1 });
+    fireEvent.click(bench);
+
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+  });
+
+  it("starts a drag and does not open the screen when held past the threshold", () => {
+    setup([{ exerciseId: BENCH.id, sets: 3, reps: "8" }]);
+    const bench = screen.getByRole("button", { name: /^Bench Press/ });
+
+    fireEvent.pointerDown(bench, { clientX: 50, clientY: 20, pointerId: 1 });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.pointerUp(bench, { clientX: 50, clientY: 20, pointerId: 1 });
+    fireEvent.click(bench);
+
+    expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Bench Press/ })).toBeInTheDocument();
+  });
+
+  it("cancels into a scroll when moving beyond the slop distance before the threshold", () => {
+    setup([{ exerciseId: BENCH.id, sets: 3, reps: "8" }]);
+    const bench = screen.getByRole("button", { name: /^Bench Press/ });
+
+    fireEvent.pointerDown(bench, { clientX: 50, clientY: 20, pointerId: 1 });
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    // Move 15px vertically (>8px slop distance)
+    fireEvent.pointerMove(bench, { clientX: 50, clientY: 35, pointerId: 1 });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.pointerUp(bench, { clientX: 50, clientY: 35, pointerId: 1 });
+    fireEvent.click(bench);
+
+    // Cancelled drag does not suppress tap/click
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+  });
+
+  it("reorders the list when dropping a row into a new slot", () => {
+    setup([
+      { exerciseId: BENCH.id, sets: 3, reps: "8" },
+      { exerciseId: ROW.id, sets: 3, reps: "8" },
+    ]);
+
+    const initialRows = screen.getAllByRole("button", { name: /sets$/ });
+    expect(initialRows[0]).toHaveTextContent("Bench Press");
+    expect(initialRows[1]).toHaveTextContent("Barbell Row");
+
+    // Drag Bench Press (index 0) down past Barbell Row's midpoint
+    fireEvent.pointerDown(initialRows[0], { clientX: 50, clientY: 20, pointerId: 1 });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.pointerMove(initialRows[0], { clientX: 50, clientY: 80, pointerId: 1 });
+    act(() => {
+      fireEvent.pointerUp(initialRows[0], { clientX: 50, clientY: 80, pointerId: 1 });
+    });
+
+    const updatedRows = screen.getAllByRole("button", { name: /sets$/ });
+    expect(updatedRows[0]).toHaveTextContent("Barbell Row");
+    expect(updatedRows[1]).toHaveTextContent("Bench Press");
+  });
+
+  it("restores the previous order when cancelled via Escape or releasing outside", () => {
+    setup([
+      { exerciseId: BENCH.id, sets: 3, reps: "8" },
+      { exerciseId: ROW.id, sets: 3, reps: "8" },
+    ]);
+
+    const rows = screen.getAllByRole("button", { name: /sets$/ });
+
+    // 1. Cancel via Escape
+    fireEvent.pointerDown(rows[0], { clientX: 50, clientY: 20, pointerId: 1 });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.pointerMove(rows[0], { clientX: 50, clientY: 80, pointerId: 1 });
+    act(() => {
+      fireEvent.keyDown(window, { key: "Escape" });
+    });
+
+    let currentRows = screen.getAllByRole("button", { name: /sets$/ });
+    expect(currentRows[0]).toHaveTextContent("Bench Press");
+    expect(currentRows[1]).toHaveTextContent("Barbell Row");
+
+    // 2. Cancel via releasing outside the list
+    fireEvent.pointerDown(currentRows[0], { clientX: 50, clientY: 20, pointerId: 1 });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.pointerMove(currentRows[0], { clientX: 50, clientY: 80, pointerId: 1 });
+    act(() => {
+      fireEvent.pointerUp(currentRows[0], { clientX: 50, clientY: 500, pointerId: 1 });
+    });
+
+    currentRows = screen.getAllByRole("button", { name: /sets$/ });
+    expect(currentRows[0]).toHaveTextContent("Bench Press");
+    expect(currentRows[1]).toHaveTextContent("Barbell Row");
+  });
+
+  it("ensures a lift added after a reorder appears exactly once", () => {
+    setup([
+      { exerciseId: BENCH.id, sets: 3, reps: "8" },
+      { exerciseId: ROW.id, sets: 3, reps: "8" },
+    ]);
+    useStore.setState({ exercises: [BENCH, ROW, SQUAT] });
+
+    // Drag Bench (0) below Row (1) -> [Row, Bench]
+    const initialRows = screen.getAllByRole("button", { name: /sets$/ });
+    fireEvent.pointerDown(initialRows[0], { clientX: 50, clientY: 20, pointerId: 1 });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.pointerMove(initialRows[0], { clientX: 50, clientY: 80, pointerId: 1 });
+    act(() => {
+      fireEvent.pointerUp(initialRows[0], { clientX: 50, clientY: 80, pointerId: 1 });
+    });
+
+    // Add Back Squat manually
+    fireEvent.click(screen.getByRole("button", { name: /Add exercise/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Back Squat/ }));
+    done();
+
+    const finalRows = screen.getAllByRole("button", { name: /sets$/ });
+    expect(finalRows).toHaveLength(3);
+    expect(finalRows[0]).toHaveTextContent("Barbell Row");
+    expect(finalRows[1]).toHaveTextContent("Bench Press");
+    expect(finalRows[2]).toHaveTextContent("Back Squat");
+  });
+
+  it("advances done(complete) to the next unlogged lift in the reordered order", () => {
+    setup([
+      { exerciseId: BENCH.id, sets: 1, reps: "5" },
+      { exerciseId: ROW.id, sets: 1, reps: "5" },
+      { exerciseId: SQUAT.id, sets: 1, reps: "5" },
+    ]);
+    // Wrapped, because `setup` renders with only BENCH and ROW and a lift
+    // whose exercise is missing is dropped from the list. Outside act() the
+    // re-render that brings Back Squat back has not flushed by the time the
+    // rows are read, and the drag below fires at an undefined element.
+    act(() => {
+      useStore.setState({ exercises: [BENCH, ROW, SQUAT] });
+    });
+
+    // Initial plan order: Bench (0), Row (1), Squat (2)
+    // Drag Squat (2) to slot 0:
+    const rows = screen.getAllByRole("button", { name: /sets$/ });
+    fireEvent.pointerDown(rows[2], { clientX: 50, clientY: 120, pointerId: 1 });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.pointerMove(rows[2], { clientX: 50, clientY: 10, pointerId: 1 });
+    act(() => {
+      fireEvent.pointerUp(rows[2], { clientX: 50, clientY: 10, pointerId: 1 });
+    });
+    // A drag arms a one-shot guard that eats the synthetic click a real
+    // browser fires after pointerup. fireEvent does not produce that click, so
+    // without letting the guard's timer expire the guard is still armed and
+    // swallows the deliberate tap below instead.
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+
+    // Reordered order is now: Squat, Bench, Row
+    const reorderedRows = screen.getAllByRole("button", { name: /sets$/ });
+    expect(reorderedRows[0]).toHaveTextContent("Back Squat");
+    expect(reorderedRows[1]).toHaveTextContent("Bench Press");
+    expect(reorderedRows[2]).toHaveTextContent("Barbell Row");
+
+    // Open Back Squat and log its 1 prescribed set
+    openExercise("Back Squat");
+    tapRow(1);
+    type("Weight", "225");
+    type("Reps", "5");
+    save();
+
+    // Leaving Back Squat should advance to Bench Press (next in reordered sequence)
+    done();
+    expect(useStore.getState().currentExerciseId).toBe(BENCH.id);
+
+    // Now complete Bench Press
+    openExercise("Bench Press");
+    tapRow(1);
+    type("Weight", "185");
+    type("Reps", "5");
+    save();
+
+    // Leaving Bench Press advances to Barbell Row (next in reordered sequence)
+    done();
+    expect(useStore.getState().currentExerciseId).toBe(ROW.id);
+  });
+
+  it("does not write to plannedLifts or any store slot during reordering", () => {
+    const originalPlan: PlannedLift[] = [
+      { exerciseId: BENCH.id, sets: 3, reps: "8" },
+      { exerciseId: ROW.id, sets: 4, reps: "10" },
+    ];
+    setup(originalPlan);
+
+    const initialRows = screen.getAllByRole("button", { name: /sets$/ });
+    fireEvent.pointerDown(initialRows[0], { clientX: 50, clientY: 20, pointerId: 1 });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.pointerMove(initialRows[0], { clientX: 50, clientY: 80, pointerId: 1 });
+    act(() => {
+      fireEvent.pointerUp(initialRows[0], { clientX: 50, clientY: 80, pointerId: 1 });
+    });
+
+    const slot = useStore.getState().slots.find((s) => s.id === "s_upper");
+    expect(slot?.plannedLifts).toEqual(originalPlan);
   });
 });
