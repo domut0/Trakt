@@ -77,9 +77,11 @@ function save() {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
 }
 
-/** Leaving the exercise screen. The control says Back rather than Done: the
- *  screen commits nothing on the way out, so it is an exit, not a transaction.
- *  The auto-advance it triggers is unchanged, which is what these tests check. */
+/** Leaving the exercise screen by the corner control, which is the only way
+ *  out until something has been done on the screen. Both it and the Done
+ *  button that appears later call the same handler: neither commits anything,
+ *  because a set is saved the moment it is saved. The auto-advance it triggers
+ *  is unchanged, which is what these tests check. */
 function done() {
   fireEvent.click(screen.getByRole("button", { name: "Back" }));
 }
@@ -456,5 +458,70 @@ describe("what the review added", () => {
 
     expect(screen.queryByRole("button", { name: /^Bench Press/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Dumbbell Bench Press/ })).toBeInTheDocument();
+  });
+
+  /**
+   * "Replace everywhere" rewrites the lift the CARD prescribes, which after a
+   * substitution is not the exercise on screen. Substitute A for B, then
+   * replace everywhere with C: the plan entry to rewrite is still A. An
+   * earlier version also rewrote B, which would have edited every other card
+   * that happened to prescribe B -- days this substitution was never about.
+   */
+  it("replaces the lift the plan prescribes, not the one currently on screen", () => {
+    const DB_BENCH: Exercise = {
+      id: "e_db_bench",
+      name: "Dumbbell Bench Press",
+      type: "accessory",
+    };
+    const MACHINE: Exercise = {
+      id: "e_machine_chest_press",
+      name: "Machine Chest Press",
+      type: "accessory",
+    };
+
+    setup([{ exerciseId: BENCH.id, sets: 3, reps: "8" }]);
+    useStore.setState({
+      exercises: [BENCH, ROW, DB_BENCH, MACHINE],
+      // A second card prescribing the lift we are about to substitute IN.
+      // Nothing may touch it.
+      slots: [
+        {
+          id: "s_upper",
+          name: "Upper",
+          rotationOrder: 0,
+          plannedLifts: [{ exerciseId: BENCH.id, sets: 3, reps: "8" }],
+        },
+        {
+          id: "s_other",
+          name: "Other",
+          rotationOrder: 1,
+          plannedLifts: [{ exerciseId: DB_BENCH.id, sets: 4 }],
+        },
+      ],
+    });
+
+    // Session-only substitution first: the screen is now showing DB_BENCH
+    // while the plan still says BENCH.
+    openExercise("Bench Press");
+    fireEvent.click(screen.getByRole("button", { name: "Substitute" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Dumbbell Bench Press/ }));
+    let subButtons = screen.getAllByRole("button", { name: "Substitute" });
+    fireEvent.click(subButtons[subButtons.length - 1]);
+
+    // Now replace everywhere with a third lift.
+    openExercise("Dumbbell Bench Press");
+    fireEvent.click(screen.getByRole("button", { name: "Substitute" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Machine Chest Press/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Replace everywhere" }));
+
+    const slots = useStore.getState().slots;
+    // The plan's own entry was rewritten, keeping its prescription.
+    expect(slots.find((s) => s.id === "s_upper")?.plannedLifts).toEqual([
+      { exerciseId: MACHINE.id, sets: 3, reps: "8" },
+    ]);
+    // The other card, which prescribed the substituted-IN lift, is untouched.
+    expect(slots.find((s) => s.id === "s_other")?.plannedLifts).toEqual([
+      { exerciseId: DB_BENCH.id, sets: 4 },
+    ]);
   });
 });
