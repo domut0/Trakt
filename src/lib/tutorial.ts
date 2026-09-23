@@ -77,6 +77,18 @@ export function isSandboxed(chapter: TutorialChapterId): boolean {
 
 /** What a step can see. Assembled per render from the store and the DOM. */
 export interface TutorialSeen {
+  /**
+   * Whether this browser has a way to install at all: Android holding a
+   * deferred prompt, or iOS Safari, where it is done by hand.
+   *
+   * Read every tick with everything else, and deliberately NOT decided once
+   * when the run starts. Chrome only fires `beforeinstallprompt` after its own
+   * engagement heuristics are satisfied, which can be seconds after load or
+   * never, so a run that sampled this at start could drop the home-screen
+   * chapter on a phone that was perfectly capable of installing a moment
+   * later.
+   */
+  canInstall: boolean;
   /** Running from the home screen, or the walkthrough has been read. */
   installHandled: boolean;
   /** Whether Settings is the screen currently on. */
@@ -147,7 +159,35 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
     target: "install-row",
     route: "/",
     skippable: true,
+    // Nothing to install with, so nothing to say here. The step below is what
+    // that case gets instead.
+    unreachable: (seen) => !seen.canInstall,
     done: (seen) => seen.installHandled,
+  },
+  {
+    /**
+     * The same chapter, for a browser that cannot install.
+     *
+     * This used to be silence: the whole chapter was filtered out when the
+     * browser reported no install path, on the reasoning that "add to home
+     * screen" means nothing on a desktop. But Trakt is a phone app, and a
+     * client who opens their coach's invite on a laptop is the one person who
+     * most needs telling so. They were the only ones told nothing.
+     *
+     * It cannot detect its own completion -- there is no event for "went and
+     * got their phone" -- so it is skippable, and Skip is the way past. The
+     * target does not exist on this screen, which is deliberate and safe: the
+     * spotlight cuts no hole and dims nothing when it cannot find one, so the
+     * app stays usable while the line is up.
+     */
+    id: "install-elsewhere",
+    chapter: "install",
+    say: "Trakt is made for your phone. Open this link there.",
+    target: "install-row",
+    route: "/",
+    skippable: true,
+    unreachable: (seen) => seen.canInstall || seen.installHandled,
+    done: () => false,
   },
   {
     // Tapping the gear, rather than being moved there. Settings is where the
@@ -312,14 +352,22 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 ] as const;
 
 /**
- * The steps this device runs.
+ * The steps this device runs, which is all of them.
  *
- * The install chapter is left out where it cannot succeed - a desktop browser,
- * or an app already launched from the home screen - rather than shown and
- * excused. A step nobody can complete is not a step.
+ * This used to drop the install chapter when the device could not install,
+ * decided once from a flag passed in at start. Two things were wrong with
+ * that. A caller could simply forget the flag -- one did, so the tutorial
+ * opened from Settings lost the chapter on every device, iPhones included --
+ * and the answer was fixed at start, while Chrome decides whether an install
+ * is possible on its own schedule and often after the run has begun.
+ *
+ * So no step is removed. Each one says for itself, every tick, whether there
+ * is anything for it to do, and `unreachable` passes it in silence when there
+ * is not. That is the same mechanism the sheet chapter already uses for a
+ * build with no Google client id.
  */
-export function stepsFor({ canInstall }: { canInstall: boolean }): readonly TutorialStep[] {
-  return canInstall ? TUTORIAL_STEPS : TUTORIAL_STEPS.filter((s) => s.chapter !== "install");
+export function stepsFor(): readonly TutorialStep[] {
+  return TUTORIAL_STEPS;
 }
 
 /** The first step of the chapter `stepId` belongs to, which is where a resume lands. */

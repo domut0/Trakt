@@ -76,7 +76,7 @@ export interface TutorialStoreState {
   setStartSheetOpen: (open: boolean) => void;
 
   /** Begins, or picks up where an interrupted run left off. False if refused. */
-  start: (options?: { canInstall?: boolean; resume?: boolean }) => boolean;
+  start: (options?: { resume?: boolean }) => boolean;
   skip: () => void;
   finish: () => void;
   advance: () => void;
@@ -146,7 +146,7 @@ export const useTutorialStore = create<TutorialStoreState>((set, get) => ({
   setChooserOpen: (chooserOpen) => set({ chooserOpen }),
   setStartSheetOpen: (startSheetOpen) => set({ startSheetOpen }),
 
-  start: ({ canInstall = false, resume = false } = {}) => {
+  start: ({ resume = false } = {}) => {
     // Refuse, before touching anything.
     const main = useStore.getState();
     if (!main.hydrated) return false;
@@ -154,7 +154,7 @@ export const useTutorialStore = create<TutorialStoreState>((set, get) => ({
     if (useCoachStore.getState().viewing !== undefined) return false;
     if (get().active) return false;
 
-    const steps = stepsFor({ canInstall });
+    const steps = stepsFor();
     if (steps.length === 0) return false;
 
     // A resume lands at the start of the chapter it left, never mid-chapter:

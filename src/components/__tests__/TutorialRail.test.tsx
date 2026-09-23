@@ -26,7 +26,12 @@ vi.mock("../../lib/install-prompt", async () => {
   const actual = await vi.importActual<typeof import("../../lib/install-prompt")>(
     "../../lib/install-prompt",
   );
-  return { ...actual, useInstallMode: () => ({ kind: "unavailable" }) };
+  // "installed", so the home-screen chapter rules itself out in silence and
+  // these tests start where they are actually about. Reporting "unavailable"
+  // instead would open every one of them on "open this link on your phone",
+  // which is a real step now rather than a chapter that got filtered away, and
+  // it is covered on its own in tutorial.test.ts.
+  return { ...actual, useInstallMode: () => ({ kind: "installed" }) };
 });
 
 function runTo(stepId: string) {
@@ -93,7 +98,7 @@ describe("TutorialRail", () => {
     savePendingCoach({ name: "Marcus", email: "m@example.com" });
     useSyncStore.setState({ config: CONNECTED });
     act(() => {
-      useTutorialStore.getState().start({ canInstall: false });
+      useTutorialStore.getState().start();
       runTo("share-sheet");
     });
 
@@ -105,7 +110,7 @@ describe("TutorialRail", () => {
   it("falls back to 'your coach' when nobody invited them", () => {
     useSyncStore.setState({ config: CONNECTED });
     act(() => {
-      useTutorialStore.getState().start({ canInstall: false });
+      useTutorialStore.getState().start();
       runTo("share-sheet");
     });
 
@@ -114,7 +119,7 @@ describe("TutorialRail", () => {
   });
 
   it("carries an outlined Show me, and offers Skip only where a step allows it", () => {
-    act(() => useTutorialStore.getState().start({ canInstall: false }));
+    act(() => useTutorialStore.getState().start());
     const { rerender } = render(<TutorialRail />);
 
     // The sheet step depends on Google, so there is a way past it.
@@ -134,9 +139,10 @@ describe("TutorialRail", () => {
     // renders no share control without one. Stopping there to say "share it
     // with Marcus" would be the rail describing a screen that is not there.
     act(() => {
-      useTutorialStore.getState().start({ canInstall: false });
-      // Past "open Settings", which is where a run starts.
-      useTutorialStore.getState().skipStep();
+      useTutorialStore.getState().start();
+      // Onto the Connect step. A run opens in the home-screen chapter now, so
+      // this is two steps rather than the one it used to be.
+      runTo("connect-sheet");
     });
     render(<TutorialRail />);
 
@@ -148,7 +154,7 @@ describe("TutorialRail", () => {
   });
 
   it("leaves the trip to Settings to the user, because a gear tapped once is found again", () => {
-    act(() => useTutorialStore.getState().start({ canInstall: false }));
+    act(() => useTutorialStore.getState().start());
     render(<TutorialRail />);
 
     expect(
@@ -160,7 +166,7 @@ describe("TutorialRail", () => {
   it("asks for the demo again when Show me is tapped", () => {
     const heard = vi.fn();
     window.addEventListener("tutorial-show-me", heard);
-    act(() => useTutorialStore.getState().start({ canInstall: false }));
+    act(() => useTutorialStore.getState().start());
     render(<TutorialRail />);
 
     fireEvent.click(screen.getByRole("button", { name: "Show me" }));
@@ -171,9 +177,9 @@ describe("TutorialRail", () => {
 
   it("takes the user to the screen the step happens on", () => {
     act(() => {
-      useTutorialStore.getState().start({ canInstall: false });
+      useTutorialStore.getState().start();
       // On the Connect step, which belongs on Settings, from Today.
-      useTutorialStore.getState().skipStep();
+      runTo("connect-sheet");
     });
     render(<TutorialRail />);
 
@@ -182,7 +188,7 @@ describe("TutorialRail", () => {
 
   it("advances as soon as the thing it asked for has happened", async () => {
     act(() => {
-      useTutorialStore.getState().start({ canInstall: false });
+      useTutorialStore.getState().start();
       runTo("log-bodyweight");
     });
     render(<TutorialRail />);
@@ -207,7 +213,7 @@ describe("TutorialRail", () => {
       value: 64,
     });
 
-    act(() => useTutorialStore.getState().start({ canInstall: false }));
+    act(() => useTutorialStore.getState().start());
     const { unmount } = render(<TutorialRail />);
 
     await waitFor(() => {

@@ -88,11 +88,8 @@ export function TutorialRail(): ReactElement | null {
   useEffect(() => {
     if (active || !hydrated) return;
     if (!tutorialInterrupted()) return;
-    useTutorialStore.getState().start({
-      canInstall: install.kind === "prompt" || install.kind === "manual-ios",
-      resume: true,
-    });
-  }, [active, hydrated, install.kind]);
+    useTutorialStore.getState().start({ resume: true });
+  }, [active, hydrated]);
 
   // Re-read the world. See "Why the snapshot is read every tick" above.
   useEffect(() => {
@@ -145,6 +142,10 @@ export function TutorialRail(): ReactElement | null {
     sheetConnected: syncConfig?.kind === "google" && Boolean(syncConfig.spreadsheetId),
     sheetPossible: googleAvailable(),
     installedNow: install.kind === "installed",
+    // Re-read on every tick with the rest of the snapshot, so a
+    // `beforeinstallprompt` that Chrome fires late still reaches the step that
+    // depends on it.
+    canInstall: install.kind === "prompt" || install.kind === "manual-ios",
     storeChooserOpen,
     storeStartSheetOpen,
   });

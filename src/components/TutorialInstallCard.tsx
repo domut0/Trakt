@@ -31,7 +31,14 @@ export function TutorialInstallCard() {
   const install = useInstallMode();
   const [showWalkthrough, setShowWalkthrough] = useState(false);
 
-  if (!active || steps[step]?.chapter !== "install") return null;
+  // That ONE step, not the chapter. The chapter also holds the step for a
+  // browser with no install path at all, and this card is the wrong answer
+  // there twice over: its second line would read "Share, then Add to Home
+  // Screen" to somebody on a laptop, and tapping it would open the iOS
+  // walkthrough on a machine that has no share sheet. That step has nothing to
+  // point at on purpose -- the spotlight cuts no hole when it finds no target,
+  // so the line and its Skip stand alone.
+  if (!active || steps[step]?.id !== "install") return null;
 
   const handle = () => {
     if (install.kind === "prompt") {

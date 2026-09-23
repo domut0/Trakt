@@ -128,12 +128,7 @@ export function GettingStartedCard({ surface = "today" }: GettingStartedCardProp
       timer = window.setTimeout(
         () => {
           if (!consumeTutorialStart()) return;
-          // Read at fire time, not closed over: `useInstallMode` reports
-          // "unavailable" on its first render and corrects itself a tick later.
-          const kind = installMode().kind;
-          useTutorialStore.getState().start({
-            canInstall: kind === "prompt" || kind === "manual-ios",
-          });
+          useTutorialStore.getState().start();
         },
         flying ? FLIGHT_MS + LANDED_PAUSE_MS : LANDED_PAUSE_MS,
       );
@@ -165,10 +160,7 @@ export function GettingStartedCard({ surface = "today" }: GettingStartedCardProp
       done: tutorialDone,
       onClick: () => {
         if (tutorialDone || tutorialActive) return;
-        const started = useTutorialStore.getState().start({
-          canInstall: install.kind === "prompt" || install.kind === "manual-ios",
-          resume: true,
-        });
+        const started = useTutorialStore.getState().start({ resume: true });
         if (started) void router.navigate({ to: "/" });
       },
     },

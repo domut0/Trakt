@@ -10,6 +10,7 @@ import {
 
 /** Nothing has happened yet. Every predicate should be false against this. */
 const NOTHING: TutorialSeen = {
+  canInstall: false,
   installHandled: false,
   atSettings: false,
   sheetPossible: true,
@@ -83,7 +84,15 @@ describe("the steps", () => {
 
   it("offers a way past exactly the steps that depend on Google", () => {
     const skippable = TUTORIAL_STEPS.filter((s) => s.skippable).map((s) => s.id);
-    expect(skippable).toEqual(["install", "open-settings", "connect-sheet", "share-sheet"]);
+    expect(skippable).toEqual([
+      "install",
+      // Not Google, but the same reason: nothing here can be detected, so the
+      // only way past is offered rather than waited for.
+      "install-elsewhere",
+      "open-settings",
+      "connect-sheet",
+      "share-sheet",
+    ]);
   });
 
   it("sandboxes the workout and the cardio, and nothing before them", () => {
@@ -171,20 +180,51 @@ describe("what each step waits for", () => {
 });
 
 describe("stepsFor", () => {
-  it("leaves the install chapter out where it cannot succeed", () => {
-    const desktop = stepsFor({ canInstall: false });
-    expect(desktop.some((s) => s.chapter === "install")).toBe(false);
-    expect(desktop.length).toBe(TUTORIAL_STEPS.length - 1);
+  /**
+   * Every step, always. The install chapter used to be filtered out here from
+   * a flag decided once when the run began, which went wrong twice over: a
+   * caller could omit the flag (one did, and the tutorial opened from Settings
+   * lost the chapter on every device), and Chrome decides whether an install
+   * is possible on its own schedule, often after the run has started.
+   */
+  it("removes nothing, so no caller can drop a chapter by forgetting", () => {
+    expect(stepsFor().map((s) => s.id)).toEqual(TUTORIAL_STEPS.map((s) => s.id));
+  });
+});
+
+describe("the home-screen chapter, whatever the browser can do", () => {
+  const installStep = stepById("install");
+  const elsewhere = stepById("install-elsewhere");
+
+  it("asks a phone to install, and says nothing else to it", () => {
+    const phone = { ...NOTHING, canInstall: true };
+    expect(installStep.unreachable?.(phone)).toBe(false);
+    expect(elsewhere.unreachable?.(phone)).toBe(true);
   });
 
-  it("keeps every other step in the same order either way", () => {
-    const phone = stepsFor({ canInstall: true }).filter((s) => s.chapter !== "install");
-    expect(phone.map((s) => s.id)).toEqual(stepsFor({ canInstall: false }).map((s) => s.id));
+  it("tells a browser that cannot install to go to a phone", () => {
+    // The case that was silent: a client opening their coach's invite on a
+    // laptop was the only one told nothing at all.
+    const desktop = { ...NOTHING, canInstall: false };
+    expect(installStep.unreachable?.(desktop)).toBe(true);
+    expect(elsewhere.unreachable?.(desktop)).toBe(false);
+  });
+
+  it("says neither thing to an app already on the home screen", () => {
+    const installed = { ...NOTHING, canInstall: false, installHandled: true };
+    expect(installStep.done(installed)).toBe(true);
+    expect(elsewhere.unreachable?.(installed)).toBe(true);
+  });
+
+  it("offers a way past the one step it cannot detect for itself", () => {
+    // There is no event for "went and got their phone".
+    expect(elsewhere.skippable).toBe(true);
+    expect(elsewhere.done(NOTHING)).toBe(false);
   });
 });
 
 describe("resumePoint", () => {
-  const steps = stepsFor({ canInstall: false });
+  const steps = stepsFor();
 
   it("starts at the beginning when there is nothing to resume", () => {
     expect(resumePoint(steps, undefined)).toBe(0);

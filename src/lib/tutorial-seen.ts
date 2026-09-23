@@ -21,6 +21,7 @@ export function readSeen({
   sheetConnected,
   sheetPossible,
   installedNow,
+  canInstall,
   storeChooserOpen,
   storeStartSheetOpen,
 }: {
@@ -33,6 +34,7 @@ export function readSeen({
   sheetConnected: boolean;
   sheetPossible: boolean;
   installedNow: boolean;
+  canInstall: boolean;
   storeChooserOpen: boolean;
   storeStartSheetOpen: boolean;
 }): TutorialSeen {
@@ -62,6 +64,7 @@ export function readSeen({
   const today = dayKey(new Date());
 
   return {
+    canInstall,
     installHandled:
       installedNow ||
       Boolean(tutorialState?.installedSeen) ||

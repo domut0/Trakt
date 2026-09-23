@@ -76,22 +76,30 @@ describe("starting", () => {
   });
 
   it("opens on the first step and records that a run is under way", () => {
-    expect(useTutorialStore.getState().start({ canInstall: false })).toBe(true);
+    expect(useTutorialStore.getState().start()).toBe(true);
     const { steps, step } = useTutorialStore.getState();
-    expect(steps[step].id).toBe("open-settings");
+    expect(steps[step].id).toBe("install");
     expect(loadTutorialState()?.startedAt).toBeTypeOf("number");
-    expect(loadTutorialState()?.stepId).toBe("open-settings");
+    expect(loadTutorialState()?.stepId).toBe("install");
   });
 
-  it("includes the install chapter only where it can succeed", () => {
-    useTutorialStore.getState().start({ canInstall: true });
-    expect(useTutorialStore.getState().steps[0].id).toBe("install");
+  /**
+   * The store no longer decides this. It carries every step and the two
+   * install steps rule themselves out per tick, so that a browser which only
+   * admits it can install AFTER the run has begun still gets the chapter --
+   * which is ordinary on Chrome, where `beforeinstallprompt` waits on its own
+   * engagement heuristics.
+   */
+  it("always carries the install chapter, and leaves the choosing to the steps", () => {
+    useTutorialStore.getState().start();
+    const ids = useTutorialStore.getState().steps.map((s) => s.id);
+    expect(ids.slice(0, 2)).toEqual(["install", "install-elsewhere"]);
   });
 });
 
 describe("the sandbox, and the line it starts at", () => {
   it("leaves the real store alone through the sheet, share and bodyweight chapters", () => {
-    useTutorialStore.getState().start({ canInstall: false });
+    useTutorialStore.getState().start();
 
     for (const stepId of ["open-settings", "connect-sheet", "share-sheet", "log-bodyweight"]) {
       runTo(stepId);
@@ -103,7 +111,7 @@ describe("the sandbox, and the line it starts at", () => {
   });
 
   it("latches the database read-only BEFORE the fixture is swapped in", () => {
-    useTutorialStore.getState().start({ canInstall: false });
+    useTutorialStore.getState().start();
 
     let latchedWhenSwapped: string | undefined = "not observed";
     const unsubscribe = useStore.subscribe((state) => {
@@ -121,14 +129,14 @@ describe("the sandbox, and the line it starts at", () => {
   });
 
   it("puts the fixture card on today, so the day offers it by name", () => {
-    useTutorialStore.getState().start({ canInstall: false });
+    useTutorialStore.getState().start();
     runTo("start-day");
 
     expect(useStore.getState().plannedCardFor(dayKey(new Date()))?.id).toBe(TUTORIAL_SLOT_ID);
   });
 
   it("prescribes two sets of Bench Press, so Back moves on after the second", () => {
-    useTutorialStore.getState().start({ canInstall: false });
+    useTutorialStore.getState().start();
     runTo("start-day");
 
     const card = useStore.getState().slots.find((s) => s.id === TUTORIAL_SLOT_ID);
@@ -136,7 +144,7 @@ describe("the sandbox, and the line it starts at", () => {
   });
 
   it("gives the user their own world back, and takes the latch off, on finish", () => {
-    useTutorialStore.getState().start({ canInstall: false });
+    useTutorialStore.getState().start();
     runTo("cardio-save");
     expect(dbReadOnlyReason()).toBe("tutorial");
 
@@ -151,7 +159,7 @@ describe("the sandbox, and the line it starts at", () => {
   });
 
   it("does the same on skip, from inside the sandbox", () => {
-    useTutorialStore.getState().start({ canInstall: false });
+    useTutorialStore.getState().start();
     runTo("save-set-2");
     expect(dbReadOnlyReason()).toBe("tutorial");
 
@@ -163,7 +171,7 @@ describe("the sandbox, and the line it starts at", () => {
 
   it("keeps the bodyweight, because it was never in the sandbox", () => {
     const today = dayKey(new Date());
-    useTutorialStore.getState().start({ canInstall: false });
+    useTutorialStore.getState().start();
     runTo("log-bodyweight");
 
     useStore.getState().upsertDailyLog(today, { bodyweight: 179.2 });
@@ -176,7 +184,10 @@ describe("the sandbox, and the line it starts at", () => {
 
 describe("skipping a step the app cannot finish", () => {
   it("moves past a step that offers it", () => {
-    useTutorialStore.getState().start({ canInstall: false });
+    useTutorialStore.getState().start();
+    // A run now opens in the install chapter, so get to the step this is
+    // actually about before skipping it.
+    runTo("open-settings");
     useTutorialStore.getState().skipStep();
     expect(useTutorialStore.getState().steps[useTutorialStore.getState().step].id).toBe(
       "connect-sheet",
@@ -184,7 +195,7 @@ describe("skipping a step the app cannot finish", () => {
   });
 
   it("does nothing on a step that does not", () => {
-    useTutorialStore.getState().start({ canInstall: false });
+    useTutorialStore.getState().start();
     runTo("log-bodyweight");
     useTutorialStore.getState().skipStep();
     expect(useTutorialStore.getState().steps[useTutorialStore.getState().step].id).toBe(
@@ -197,7 +208,7 @@ describe("resuming", () => {
   it("picks up at the start of the chapter it left", () => {
     saveTutorialState({ joinedAt: 1, startedAt: 2, stepId: "save-set-2" });
 
-    useTutorialStore.getState().start({ canInstall: false, resume: true });
+    useTutorialStore.getState().start({ resume: true });
 
     const { steps, step } = useTutorialStore.getState();
     expect(steps[step].id).toBe("start-day");
@@ -206,12 +217,12 @@ describe("resuming", () => {
   });
 
   it("starts from the beginning when asked to resume with nothing stored", () => {
-    useTutorialStore.getState().start({ canInstall: false, resume: true });
+    useTutorialStore.getState().start({ resume: true });
     expect(useTutorialStore.getState().step).toBe(0);
   });
 
   it("records the step as it goes, so an interruption has something to return to", () => {
-    useTutorialStore.getState().start({ canInstall: false });
+    useTutorialStore.getState().start();
     runTo("log-bodyweight");
     expect(loadTutorialState()?.stepId).toBe("log-bodyweight");
   });
@@ -219,8 +230,8 @@ describe("resuming", () => {
 
 describe("the step list", () => {
   it("ends by finishing rather than by running off the end", () => {
-    const steps = stepsFor({ canInstall: false });
-    useTutorialStore.getState().start({ canInstall: false });
+    const steps = stepsFor();
+    useTutorialStore.getState().start();
     runTo(steps[steps.length - 1].id);
 
     useTutorialStore.getState().advance();
