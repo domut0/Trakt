@@ -349,6 +349,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link
               to="/settings"
               aria-label="Settings"
+              data-tutorial="settings-gear"
               className="flex h-11 w-11 items-center justify-center text-ink-3"
             >
               <Gear size={22} />

@@ -64,6 +64,10 @@ async function call(
     token = await getAccessToken({ interactive: init.interactive ?? false });
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
+    // A window the browser refused to open is its own failure with its own
+    // cure. Folding it into "needs-consent" told the user their sign-in had
+    // expired when nothing had; folding it into "network" blamed the network.
+    if (message === "popup-blocked") return { ok: false, error: "popup-blocked" };
     return { ok: false, error: message === "needs-consent" ? "needs-consent" : "network" };
   }
 

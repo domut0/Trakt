@@ -6,6 +6,7 @@ import { NutritionPlan } from "../components/NutritionPlan";
 import { TargetStrip } from "../components/TargetStrip";
 import { SlotPlanSheet } from "../components/SlotPlanSheet";
 import { SplitCardList } from "../components/SplitCardList";
+import { PlannedCardSheet } from "../components/PlannedCardSheet";
 import { WeekPlanner } from "../components/WeekPlanner";
 import { SaveChangesBar } from "../components/SaveChangesBar";
 import { CoachPlanCard } from "../components/CoachPlanPrompt";
@@ -60,6 +61,25 @@ function PlanPage() {
 
   const [editingSlot, setEditingSlot] = useState<SplitSlot | undefined>();
   const [cardOpen, setCardOpen] = useState(false);
+  /** The card being READ, which is what a tap does while a coach owns the plan. */
+  const [viewingSlot, setViewingSlot] = useState<SplitSlot | undefined>();
+
+  /**
+   * What a tap on a card does, which depends on whose plan it is.
+   *
+   * The whole section used to be `inert` while a coach managed it, which
+   * answers "can I change this" correctly and "what is it" not at all: the one
+   * person the programme was written for could read that Wednesday says Upper
+   * and could not find out what Upper contains without starting it.
+   */
+  const openCard = (slot: SplitSlot) => {
+    if (locked) {
+      setViewingSlot(slot);
+      return;
+    }
+    setEditingSlot(slot);
+    setCardOpen(true);
+  };
 
   const rotation = useMemo(
     () => [...slots].sort((a, b) => a.rotationOrder - b.rotationOrder),
@@ -94,18 +114,19 @@ function PlanPage() {
 
       {/* Inert while a coach manages the plan: readable, not editable. The
           store refuses these edits anyway; this is so nothing looks tappable. */}
+      {/* Inert while a coach manages the plan: readable, not editable. The
+          store refuses these edits anyway; this is so nothing looks tappable.
+          The split below is deliberately NOT in here - its cards open to be
+          read, and a tap that opens a card changes nothing. */}
       <div inert={locked}>
         <NutritionPlan />
         <TargetStrip />
+      </div>
 
+      <div>
         {/* ---- The workout split ----------------------------------------- */}
         {planningMode === "week" ? (
-          <WeekPlanner
-            onEdit={(slot) => {
-              setEditingSlot(slot);
-              setCardOpen(true);
-            }}
-          />
+          <WeekPlanner onEdit={openCard} />
         ) : (
           <section className="px-4 section-gap">
             <div className="group-header">
@@ -134,12 +155,7 @@ function PlanPage() {
                 <p className="t-body text-ink-2">No cards yet</p>
               </div>
             ) : (
-              <SplitCardList
-                onEdit={(slot) => {
-                  setEditingSlot(slot);
-                  setCardOpen(true);
-                }}
-              />
+              <SplitCardList onEdit={openCard} />
             )}
           </section>
         )}
@@ -148,7 +164,7 @@ function PlanPage() {
             screen this is. A rotation advances when you train; a week repeats.
             Switching rearranges the cards and creates or deletes nothing, so
             every session logged against a card stays attached to it. */}
-        <div className="px-4 pt-2">
+        <div className="px-4 pt-2" inert={locked}>
           <div className="flex gap-1 rounded-md bg-wash p-1">
             {(["week", "rotation"] as const).map((mode) => (
               <button
@@ -168,7 +184,7 @@ function PlanPage() {
 
         {/* ---- Pinned ---- */}
         {futurePins.length > 0 && (
-          <section className="px-4 section-gap">
+          <section className="px-4 section-gap" inert={locked}>
             <div className="group-header">
               <h2 className="t-caption">Pinned</h2>
             </div>
@@ -206,6 +222,12 @@ function PlanPage() {
           setCardOpen(false);
           setEditingSlot(undefined);
         }}
+      />
+
+      <PlannedCardSheet
+        slot={viewingSlot}
+        open={viewingSlot !== undefined}
+        onClose={() => setViewingSlot(undefined)}
       />
     </AppShell>
   );

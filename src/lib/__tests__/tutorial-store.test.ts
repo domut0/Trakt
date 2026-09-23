@@ -1,425 +1,229 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { db, dbReadOnlyReason, safeWrite, setDbReadOnly } from "../db";
+import { beforeEach, describe, expect, it } from "vitest";
+import { dbReadOnlyReason } from "../db";
 import { useStore } from "../store";
 import { useCoachStore } from "../coach-store";
-import { useTutorialStore, isTutorialActive } from "../tutorial-store";
-import { TUTORIAL_SLOT_ID, tutorialFixture, tutorialStoreState } from "../tutorial-fixture";
-import { SWAPPED_KEYS, captureOwnState, type Swapped } from "../store-swap";
-import { loadTutorialState } from "../tutorial-state";
+import { useTutorialStore } from "../tutorial-store";
+import { TUTORIAL_SLOT_ID } from "../tutorial-fixture";
+import { loadTutorialState, saveTutorialState } from "../tutorial-state";
+import { dayKey } from "../daily-log";
+import { stepsFor } from "../tutorial";
 
-/**
- * Tutorial sandbox store tests.
- *
- * Verifies the single most important invariant:
- * The latch goes on BEFORE the swap, and comes off AFTER the restore.
- * If the latch were ever left on with the user's real data back in the store,
- * the app would silently stop saving anything for the rest of the session.
- */
-
-const REAL_USER_STATE: Swapped = {
-  unit: "lbs",
-  exercises: [
-    { id: "e_squat", name: "Barbell Squat", type: "main" },
-    { id: "e_bench", name: "Barbell Bench Press", type: "main" },
-  ],
-  slots: [
-    {
-      id: "slot_a",
-      name: "Leg Day",
-      rotationOrder: 0,
-      plannedLifts: [{ exerciseId: "e_squat", sets: 3, reps: "5", load: "225 lbs" }],
-    },
-  ],
-  sessions: [
-    {
-      id: "sess_real_1",
-      splitSlotId: "slot_a",
-      startedAt: 1700000000000,
-      endedAt: 1700003600000,
-    },
-  ],
-  sets: [
-    {
-      id: "set_real_1",
-      sessionId: "sess_real_1",
-      exerciseId: "e_squat",
-      weight: 225,
-      reps: 5,
-      loggedAt: 1700001000000,
-    },
-  ],
-  dailyLogs: [{ date: "2026-09-20", calories: 2400, bodyweight: 185 }],
-  nutritionPhases: [
-    {
-      id: "np_real",
-      name: "Maintenance",
-      calories: 2400,
-      protein: 180,
-      carbs: 250,
-      fat: 75,
-      startsOn: "2026-09-01",
-    },
-  ],
-  plannedDays: [{ date: "2026-09-20", splitSlotId: "slot_a" }],
-  activeSessionId: undefined,
-  currentExerciseId: undefined,
-  nextSlotId: "slot_a",
-  restSince: undefined,
-  lastAcceptedPlanAt: "2026-09-14T10:04:00.000Z",
-  coachManaged: false,
-};
-
-async function clearDb() {
-  await Promise.all([
-    db.exercises.clear(),
-    db.slots.clear(),
-    db.sessions.clear(),
-    db.sets.clear(),
-    db.dailyLogs.clear(),
-    db.nutritionPhases.clear(),
-    db.plannedDays.clear(),
-  ]);
+/** The user's own world, which must come back exactly as it went in. */
+function realState() {
+  return {
+    hydrated: true,
+    unit: "lbs" as const,
+    exercises: [{ id: "real_squat", name: "Squat", type: "main" as const }],
+    slots: [{ id: "real_slot", name: "Lower", rotationOrder: 0 }],
+    sessions: [{ id: "real_sess", splitSlotId: "real_slot", startedAt: 1, endedAt: 2 }],
+    sets: [
+      {
+        id: "real_set",
+        sessionId: "real_sess",
+        exerciseId: "real_squat",
+        weight: 225,
+        reps: 5,
+        loggedAt: 1,
+      },
+    ],
+    dailyLogs: [{ date: dayKey(new Date()), bodyweight: 181.4 }],
+    nutritionPhases: [],
+    plannedDays: [],
+    activeSessionId: undefined,
+    currentExerciseId: undefined,
+    nextSlotId: undefined,
+    restSince: undefined,
+    lastAcceptedPlanAt: undefined,
+    coachManaged: false,
+  };
 }
 
-beforeEach(async () => {
-  localStorage.clear();
-  setDbReadOnly(undefined);
-  useTutorialStore.setState({ active: false, step: 0 });
-  useCoachStore.setState({ viewing: undefined });
-  useStore.setState({
-    ...REAL_USER_STATE,
-    hydrated: true,
-  });
-  await clearDb();
-});
-
-afterEach(async () => {
-  // Ensure teardown even if a test failed mid-run
-  if (useTutorialStore.getState().active) {
-    useTutorialStore.getState().finish();
+/** Walk the run until the given step id is current. */
+function runTo(stepId: string) {
+  const store = useTutorialStore.getState();
+  for (let i = 0; i < 40; i++) {
+    const { steps, step } = useTutorialStore.getState();
+    if (steps[step]?.id === stepId) return;
+    store.advance();
   }
-  setDbReadOnly(undefined);
-  vi.restoreAllMocks();
-  await clearDb();
+  throw new Error(`never reached ${stepId}`);
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  useCoachStore.setState({ viewing: undefined });
+  useTutorialStore.getState().skip();
+  useStore.setState(realState());
+  localStorage.clear();
 });
 
-describe("tutorial fixture", () => {
-  it("returns EVERY key in SWAPPED_KEYS", () => {
-    const lbsState = tutorialStoreState("lbs");
-    const kgState = tutorialStoreState("kg");
-
-    for (const key of SWAPPED_KEYS) {
-      expect(key in lbsState).toBe(true);
-      expect(key in kgState).toBe(true);
-    }
-  });
-
-  it("differs in kg and lbs load strings, and leaves curl unweighted", () => {
-    const lbsFixture = tutorialFixture("lbs");
-    const kgFixture = tutorialFixture("kg");
-
-    const lbsBench = lbsFixture.slots[0].plannedLifts?.find((l) => l.exerciseId === "tut_bench");
-    const kgBench = kgFixture.slots[0].plannedLifts?.find((l) => l.exerciseId === "tut_bench");
-    expect(lbsBench?.load).toBe("135 lbs");
-    expect(kgBench?.load).toBe("60 kg");
-
-    const lbsPulldown = lbsFixture.slots[0].plannedLifts?.find(
-      (l) => l.exerciseId === "tut_pulldown",
-    );
-    const kgPulldown = kgFixture.slots[0].plannedLifts?.find(
-      (l) => l.exerciseId === "tut_pulldown",
-    );
-    expect(lbsPulldown?.load).toBe("100 lbs");
-    expect(kgPulldown?.load).toBe("45 kg");
-
-    // The third lift has no load on purpose
-    const lbsCurl = lbsFixture.slots[0].plannedLifts?.find((l) => l.exerciseId === "tut_curl");
-    const kgCurl = kgFixture.slots[0].plannedLifts?.find((l) => l.exerciseId === "tut_curl");
-    expect(lbsCurl?.load).toBeUndefined();
-    expect(kgCurl?.load).toBeUndefined();
-  });
-
-  it("has stable IDs and no kind, plannedCardio, or weekday on slot", () => {
-    const { exercises, slots } = tutorialFixture("lbs");
-    expect(slots[0].id).toBe(TUTORIAL_SLOT_ID);
-    expect(slots[0].id).toBe("tut_slot");
-    expect(slots[0].name).toBe("Tutorial");
-    expect(slots[0].kind).toBeUndefined();
-    expect((slots[0] as { plannedCardio?: unknown }).plannedCardio).toBeUndefined();
-    expect(slots[0].weekday).toBeUndefined();
-
-    const exIds = exercises.map((e) => e.id);
-    expect(exIds).toEqual(["tut_bench", "tut_pulldown", "tut_curl"]);
-  });
-});
-
-describe("start() refusal cases", () => {
-  it("refuses when store is not hydrated", () => {
+describe("starting", () => {
+  it("refuses before the store has hydrated", () => {
     useStore.setState({ hydrated: false });
-    const started = useTutorialStore.getState().start();
-
-    expect(started).toBe(false);
-    expect(useTutorialStore.getState().active).toBe(false);
-    expect(dbReadOnlyReason()).toBeUndefined();
-    expect(useStore.getState().exercises[0].id).toBe("e_squat");
+    expect(useTutorialStore.getState().start()).toBe(false);
   });
 
-  it("refuses when a real workout is active", () => {
-    useStore.setState({ hydrated: true, activeSessionId: "real_active_sess" });
-    const started = useTutorialStore.getState().start();
-
-    expect(started).toBe(false);
-    expect(useTutorialStore.getState().active).toBe(false);
-    expect(dbReadOnlyReason()).toBeUndefined();
-    expect(useStore.getState().activeSessionId).toBe("real_active_sess");
+  it("refuses while a real workout is running", () => {
+    useStore.setState({ activeSessionId: "real_sess" });
+    expect(useTutorialStore.getState().start()).toBe(false);
   });
 
-  it("refuses while a coach is viewing a client", () => {
+  it("refuses inside a client's view, where the data is not the user's", () => {
     useCoachStore.setState({
-      viewing: {
-        client: { id: "c_ann", name: "Ann", kind: "appsScript" },
-        pulledAt: Date.now(),
-      },
-    });
-    const started = useTutorialStore.getState().start();
-
-    expect(started).toBe(false);
-    expect(useTutorialStore.getState().active).toBe(false);
-    expect(dbReadOnlyReason()).toBeUndefined();
+      viewing: { client: { id: "c", name: "Bob" }, pulledAt: Date.now() },
+    } as never);
+    expect(useTutorialStore.getState().start()).toBe(false);
   });
 
-  it("refuses when the tutorial is already active", () => {
-    useTutorialStore.setState({ active: true });
-    const started = useTutorialStore.getState().start();
+  it("opens on the first step and records that a run is under way", () => {
+    expect(useTutorialStore.getState().start({ canInstall: false })).toBe(true);
+    const { steps, step } = useTutorialStore.getState();
+    expect(steps[step].id).toBe("open-settings");
+    expect(loadTutorialState()?.startedAt).toBeTypeOf("number");
+    expect(loadTutorialState()?.stepId).toBe("open-settings");
+  });
 
-    expect(started).toBe(false);
-    expect(dbReadOnlyReason()).toBeUndefined();
+  it("includes the install chapter only where it can succeed", () => {
+    useTutorialStore.getState().start({ canInstall: true });
+    expect(useTutorialStore.getState().steps[0].id).toBe("install");
   });
 });
 
-describe("the single most important invariant: latch order and lifecycle", () => {
-  it("sets the latch BEFORE the store is swapped", () => {
-    let latchWhenSwapped: string | undefined;
+describe("the sandbox, and the line it starts at", () => {
+  it("leaves the real store alone through the sheet, share and bodyweight chapters", () => {
+    useTutorialStore.getState().start({ canInstall: false });
 
-    const origSetState = useStore.setState;
-    vi.spyOn(useStore, "setState").mockImplementation((arg: unknown) => {
-      // Check latch status right when useStore.setState is called during swap
-      if (typeof arg === "object" && arg !== null && "exercises" in arg) {
-        latchWhenSwapped = dbReadOnlyReason();
-      }
-      return origSetState(arg as Parameters<typeof origSetState>[0]);
-    });
-
-    const started = useTutorialStore.getState().start();
-    expect(started).toBe(true);
-    expect(latchWhenSwapped).toBe("tutorial");
-  });
-
-  it("is ON during tutorial and OFF after finish() and after skip()", () => {
-    // 1. Enter tutorial
-    const started = useTutorialStore.getState().start();
-    expect(started).toBe(true);
-    expect(useTutorialStore.getState().active).toBe(true);
-    expect(isTutorialActive()).toBe(true);
-    expect(dbReadOnlyReason()).toBe("tutorial");
-
-    // 2. Exit via finish()
-    useTutorialStore.getState().finish();
-    expect(useTutorialStore.getState().active).toBe(false);
-    expect(isTutorialActive()).toBe(false);
-    expect(dbReadOnlyReason()).toBeUndefined();
-
-    // 3. Enter again and exit via skip()
-    const startedAgain = useTutorialStore.getState().start();
-    expect(startedAgain).toBe(true);
-    expect(dbReadOnlyReason()).toBe("tutorial");
-
-    useTutorialStore.getState().skip();
-    expect(useTutorialStore.getState().active).toBe(false);
-    expect(dbReadOnlyReason()).toBeUndefined();
-  });
-
-  it("releases the latch even when the restore throws (the unrecoverable bug)", () => {
-    const started = useTutorialStore.getState().start();
-    expect(started).toBe(true);
-    expect(dbReadOnlyReason()).toBe("tutorial");
-
-    // Simulate an unexpected error while restoring state
-    const origSetState = useStore.setState;
-    vi.spyOn(useStore, "setState").mockImplementation(() => {
-      throw new Error("simulated catastrophic store restore failure");
-    });
-
-    try {
-      expect(() => useTutorialStore.getState().finish()).toThrow(
-        "simulated catastrophic store restore failure",
-      );
-    } finally {
-      vi.spyOn(useStore, "setState").mockImplementation(origSetState);
+    for (const stepId of ["open-settings", "connect-sheet", "share-sheet", "log-bodyweight"]) {
+      runTo(stepId);
+      expect(dbReadOnlyReason(), stepId).toBeUndefined();
+      expect(useTutorialStore.getState().sandboxed, stepId).toBe(false);
+      // The user's own data is on screen, so a bodyweight typed here is real.
+      expect(useStore.getState().exercises[0].id, stepId).toBe("real_squat");
     }
-
-    // THE LATCH MUST BE RELEASED!
-    expect(dbReadOnlyReason()).toBeUndefined();
-    expect(useTutorialStore.getState().active).toBe(false);
   });
 
-  it("releases the latch if an error occurs during start() swap", () => {
-    const origSetState = useStore.setState;
-    let callCount = 0;
-    vi.spyOn(useStore, "setState").mockImplementation((arg: unknown) => {
-      callCount++;
-      // Throw on the swap call
-      if (callCount === 1) {
-        throw new Error("simulated failure during start swap");
+  it("latches the database read-only BEFORE the fixture is swapped in", () => {
+    useTutorialStore.getState().start({ canInstall: false });
+
+    let latchedWhenSwapped: string | undefined = "not observed";
+    const unsubscribe = useStore.subscribe((state) => {
+      if (state.slots.some((s) => s.id === TUTORIAL_SLOT_ID)) {
+        latchedWhenSwapped = dbReadOnlyReason();
       }
-      return origSetState(arg as Parameters<typeof origSetState>[0]);
     });
 
-    const started = useTutorialStore.getState().start();
-    expect(started).toBe(false);
-    expect(dbReadOnlyReason()).toBeUndefined();
-    expect(useTutorialStore.getState().active).toBe(false);
-  });
-});
+    runTo("start-day");
+    unsubscribe();
 
-describe("state restoration byte-identical check", () => {
-  it("restores user state byte-identical after finish()", () => {
-    const originalState = captureOwnState();
-
-    const started = useTutorialStore.getState().start();
-    expect(started).toBe(true);
-
-    // Verify tutorial state is active
-    expect(useStore.getState().exercises[0].id).toBe("tut_bench");
-
-    // Mutate state during tutorial workout (simulate logging sets and starting session)
-    useStore.setState({
-      activeSessionId: "tut_session_1",
-      currentExerciseId: "tut_bench",
-      sets: [
-        {
-          id: "tut_set_1",
-          sessionId: "tut_session_1",
-          exerciseId: "tut_bench",
-          weight: 135,
-          reps: 8,
-          loggedAt: Date.now(),
-        },
-      ],
-    });
-
-    useTutorialStore.getState().finish();
-
-    const restoredState = captureOwnState();
-    expect(restoredState).toStrictEqual(originalState);
-    expect(JSON.stringify(restoredState)).toBe(JSON.stringify(originalState));
+    // If this is ever undefined, fixture data is in a store whose writes reach
+    // the user's real IndexedDB.
+    expect(latchedWhenSwapped).toBe("tutorial");
   });
 
-  it("restores user state byte-identical after skip()", () => {
-    const originalState = captureOwnState();
+  it("puts the fixture card on today, so the day offers it by name", () => {
+    useTutorialStore.getState().start({ canInstall: false });
+    runTo("start-day");
 
-    const started = useTutorialStore.getState().start();
-    expect(started).toBe(true);
-
-    // Mutate state
-    useStore.setState({
-      activeSessionId: "tut_session_2",
-      nextSlotId: undefined,
-    });
-
-    useTutorialStore.getState().skip();
-
-    const restoredState = captureOwnState();
-    expect(restoredState).toStrictEqual(originalState);
-    expect(JSON.stringify(restoredState)).toBe(JSON.stringify(originalState));
+    expect(useStore.getState().plannedCardFor(dayKey(new Date()))?.id).toBe(TUTORIAL_SLOT_ID);
   });
-});
 
-describe("database protection and step advancement", () => {
-  it("prevents safeWrite from executing while tutorial is active", () => {
-    useTutorialStore.getState().start();
+  it("prescribes two sets of Bench Press, so Back moves on after the second", () => {
+    useTutorialStore.getState().start({ canInstall: false });
+    runTo("start-day");
+
+    const card = useStore.getState().slots.find((s) => s.id === TUTORIAL_SLOT_ID);
+    expect(card?.plannedLifts?.[0]).toMatchObject({ exerciseId: "tut_bench", sets: 2 });
+  });
+
+  it("gives the user their own world back, and takes the latch off, on finish", () => {
+    useTutorialStore.getState().start({ canInstall: false });
+    runTo("cardio-save");
     expect(dbReadOnlyReason()).toBe("tutorial");
 
-    const writeOp = vi.fn().mockResolvedValue(undefined);
-    safeWrite(writeOp);
-    expect(writeOp).not.toHaveBeenCalled();
+    useTutorialStore.getState().advance();
 
-    useTutorialStore.getState().finish();
     expect(dbReadOnlyReason()).toBeUndefined();
-
-    safeWrite(writeOp);
-    expect(writeOp).toHaveBeenCalledTimes(1);
-  });
-
-  it("writes nothing to Dexie during the entire tutorial", async () => {
-    useTutorialStore.getState().start();
-
-    // Log two sets and start workout directly
-    useStore.getState().startWorkout(TUTORIAL_SLOT_ID);
-    const activeSessionId = useStore.getState().activeSessionId;
-    expect(activeSessionId).toBeDefined();
-
-    useStore.getState().logSet({
-      exerciseId: "tut_bench",
-      weight: 135,
-      reps: 8,
-    });
-
-    useStore.getState().logSet({
-      exerciseId: "tut_bench",
-      weight: 135,
-      reps: 8,
-    });
-
-    // Wait a tick for any fire-and-forget writes
-    await new Promise((resolve) => setTimeout(resolve, 30));
-
-    // Finish tutorial
-    useTutorialStore.getState().finish();
-
-    // Verify Dexie tables have ZERO tutorial records
-    const [sessions, sets, slots] = await Promise.all([
-      db.sessions.toArray(),
-      db.sets.toArray(),
-      db.slots.toArray(),
-    ]);
-
-    expect(sessions.find((s) => s.id === activeSessionId)).toBeUndefined();
-    expect(sets.filter((s) => s.exerciseId === "tut_bench")).toHaveLength(0);
-    expect(slots.find((s) => s.id === TUTORIAL_SLOT_ID)).toBeUndefined();
-  });
-
-  it("advances steps when active and resets on exit", () => {
-    useTutorialStore.getState().start();
-    expect(useTutorialStore.getState().step).toBe(0);
-
-    useTutorialStore.getState().advance();
-    expect(useTutorialStore.getState().step).toBe(1);
-
-    useTutorialStore.getState().advance();
-    expect(useTutorialStore.getState().step).toBe(2);
-
-    useTutorialStore.getState().finish();
-    expect(useTutorialStore.getState().step).toBe(0);
-  });
-
-  it("does not advance when tutorial is not active", () => {
+    expect(useStore.getState().exercises).toEqual(realState().exercises);
+    expect(useStore.getState().sets).toEqual(realState().sets);
+    expect(useStore.getState().slots).toEqual(realState().slots);
     expect(useTutorialStore.getState().active).toBe(false);
+    expect(loadTutorialState()?.doneAt).toBeTypeOf("number");
+  });
+
+  it("does the same on skip, from inside the sandbox", () => {
+    useTutorialStore.getState().start({ canInstall: false });
+    runTo("save-set-2");
+    expect(dbReadOnlyReason()).toBe("tutorial");
+
+    useTutorialStore.getState().skip();
+
+    expect(dbReadOnlyReason()).toBeUndefined();
+    expect(useStore.getState().exercises).toEqual(realState().exercises);
+  });
+
+  it("keeps the bodyweight, because it was never in the sandbox", () => {
+    const today = dayKey(new Date());
+    useTutorialStore.getState().start({ canInstall: false });
+    runTo("log-bodyweight");
+
+    useStore.getState().upsertDailyLog(today, { bodyweight: 179.2 });
+    runTo("cardio-save");
     useTutorialStore.getState().advance();
+
+    expect(useStore.getState().dailyLogs.find((l) => l.date === today)?.bodyweight).toBe(179.2);
+  });
+});
+
+describe("skipping a step the app cannot finish", () => {
+  it("moves past a step that offers it", () => {
+    useTutorialStore.getState().start({ canInstall: false });
+    useTutorialStore.getState().skipStep();
+    expect(useTutorialStore.getState().steps[useTutorialStore.getState().step].id).toBe(
+      "connect-sheet",
+    );
+  });
+
+  it("does nothing on a step that does not", () => {
+    useTutorialStore.getState().start({ canInstall: false });
+    runTo("log-bodyweight");
+    useTutorialStore.getState().skipStep();
+    expect(useTutorialStore.getState().steps[useTutorialStore.getState().step].id).toBe(
+      "log-bodyweight",
+    );
+  });
+});
+
+describe("resuming", () => {
+  it("picks up at the start of the chapter it left", () => {
+    saveTutorialState({ joinedAt: 1, startedAt: 2, stepId: "save-set-2" });
+
+    useTutorialStore.getState().start({ canInstall: false, resume: true });
+
+    const { steps, step } = useTutorialStore.getState();
+    expect(steps[step].id).toBe("start-day");
+    // Landing inside a sandboxed chapter brings the sandbox with it.
+    expect(dbReadOnlyReason()).toBe("tutorial");
+  });
+
+  it("starts from the beginning when asked to resume with nothing stored", () => {
+    useTutorialStore.getState().start({ canInstall: false, resume: true });
     expect(useTutorialStore.getState().step).toBe(0);
   });
 
-  it("marks tutorial done in localStorage on finish and on skip", () => {
-    expect(loadTutorialState()?.doneAt).toBeUndefined();
+  it("records the step as it goes, so an interruption has something to return to", () => {
+    useTutorialStore.getState().start({ canInstall: false });
+    runTo("log-bodyweight");
+    expect(loadTutorialState()?.stepId).toBe("log-bodyweight");
+  });
+});
 
-    useTutorialStore.getState().start();
-    useTutorialStore.getState().finish();
-    expect(loadTutorialState()?.doneAt).toBeTypeOf("number");
+describe("the step list", () => {
+  it("ends by finishing rather than by running off the end", () => {
+    const steps = stepsFor({ canInstall: false });
+    useTutorialStore.getState().start({ canInstall: false });
+    runTo(steps[steps.length - 1].id);
 
-    // Reset and test skip
-    localStorage.clear();
-    useTutorialStore.getState().start();
-    useTutorialStore.getState().skip();
-    expect(loadTutorialState()?.doneAt).toBeTypeOf("number");
+    useTutorialStore.getState().advance();
+    expect(useTutorialStore.getState().active).toBe(false);
   });
 });

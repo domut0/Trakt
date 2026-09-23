@@ -1,105 +1,212 @@
 import { useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Chevron } from "./icons";
-import { Primary } from "./Frame";
-import { InstallWalkthrough } from "./InstallWalkthrough";
-import { useInstallMode, promptInstall } from "../lib/install-prompt";
-import { loadPendingCoach } from "../lib/pending-coach";
-import { useSyncStore } from "../lib/sync-store";
-import { loadTutorialState, saveTutorialState } from "../lib/tutorial-state";
+import { TutorialRing } from "./TutorialRing";
+import {
+  clearHandoff,
+  consumeTutorialStart,
+  pendingHandoff,
+  startPending,
+} from "../lib/onboarding-handoff";
+import { installMode, useInstallMode } from "../lib/install-prompt";
+import { useStore } from "../lib/store";
+import { loadTutorialState, saveTutorialState, updateTutorialState } from "../lib/tutorial-state";
 import { useTutorialStore } from "../lib/tutorial-store";
 
-export { TutorialClosingCard } from "./TutorialClosingCard";
+/**
+ * The three things a new client has to do, and how far through them they are.
+ *
+ * ## Three tasks, not four rows of setup
+ *
+ * It used to list the home screen, the sheet, the share and the tutorial - four
+ * rows, two of which were locked behind the other two, and all four of which
+ * the tutorial now walks somebody through itself. What is left is what the card
+ * is for: the three habits the app exists to collect.
+ *
+ *   1. Complete tutorial - the whole guided run, sheet and share included.
+ *   2. Log nutrition - one day's calories or macros, ever.
+ *   3. Log steps - the same, for steps.
+ *
+ * ## It ends by leaving
+ *
+ * At three of three the ring fills, draws a tick, and the card takes itself off
+ * the screen for good. The thing it replaced was a permanent block of prose
+ * about what to do every morning and every night, sitting at the top of the one
+ * screen this app is opened on.
+ */
+
+/** How long the finished ring is held before the card goes. */
+const FAREWELL_MS = 1900;
+
+/** The flight from /join, and the beat it is allowed to land in. */
+const FLIGHT_MS = 640;
+/**
+ * Long enough to see it arrive before the tutorial dims the screen around it.
+ *
+ * The whole point of the card travelling is that somebody watches it travel.
+ * Starting the tutorial on the same frame it lands puts a spotlight over the
+ * thing they were meant to be looking at.
+ */
+const LANDED_PAUSE_MS = 600;
 
 export interface GettingStartedCardProps {
   /**
-   * "today" renders the dismissable card with its "Getting started" heading.
-   * "join" renders inside Frame on /join with the "Continue" action button.
+   * "today" is the dismissable card. "join" is the same checklist on the invite
+   * screen, where it is born, before it flies here.
    */
   surface?: "today" | "join";
 }
 
-/**
- * The four-row onboarding checklist.
- *
- * Rendered in two places:
- * 1. Inside `Frame` on `/join` when a new client accepts their invite link.
- * 2. As a dismissable card on Today until completed or dismissed.
- *
- * ## The four rows and their completion sources
- *
- * - Row 1 (Home screen): `installMode().kind === "installed"` or `installedSeen`.
- *   Hidden entirely when installMode is "unavailable" (desktop, or unsupported browsers).
- * - Row 2 (Sheet): `useSyncStore(s => s.config)` has kind "google" and a valid spreadsheetId.
- * - Row 3 (Share): `loadPendingCoach()?.sharedAt !== undefined`.
- * - Row 4 (Tutorial): `loadTutorialState()?.doneAt !== undefined`.
- *
- * ## Locking rule
- *
- * Row 4 is locked until rows 2 and 3 are both done. A locked row is not merely
- * styled differently: tapping it is completely inert.
- *
- * ## The iOS row ticks late, not never
- *
- * On iOS Safari, `navigator.standalone` is false in the browser tab where the
- * instruction is read. Next time the user launches the app from the home screen,
- * it is true, and the row ticks. This is expected behavior.
- */
 export function GettingStartedCard({ surface = "today" }: GettingStartedCardProps) {
   const router = useRouter();
   const install = useInstallMode();
-  const syncConfig = useSyncStore((s) => s.config);
-  const [showWalkthrough, setShowWalkthrough] = useState(false);
+  const dailyLogs = useStore((s) => s.dailyLogs);
+  const tutorialActive = useTutorialStore((s) => s.active);
 
   const [dismissed, setDismissed] = useState(() => {
     if (typeof window === "undefined") return false;
     return loadTutorialState()?.cardDismissedAt !== undefined;
   });
+  const [leaving, setLeaving] = useState(false);
+  const [gone, setGone] = useState(false);
 
-  const tutorialState = typeof window !== "undefined" ? loadTutorialState() : undefined;
-  const pendingCoach = typeof window !== "undefined" ? loadPendingCoach() : undefined;
+  /**
+   * The flight from /join.
+   *
+   * A real FLIP rather than a clone: the card mounts where it belongs, is
+   * offset back to where it stood on the invite screen without a transition,
+   * and then released. Nothing is duplicated, so nothing can arrive and find
+   * the real one already sitting there.
+   */
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [offset, setOffset] = useState<string | undefined>();
+  const [flying, setFlying] = useState(false);
 
-  // Row 1: Add Trakt to your home screen
-  const row1Done = install.kind === "installed" || Boolean(tutorialState?.installedSeen);
-  const showRow1 = install.kind !== "unavailable";
+  useEffect(() => {
+    if (surface !== "today" || typeof window === "undefined") return;
 
-  // Row 2: Connect a Google Sheet
-  const row2Done = syncConfig?.kind === "google" && Boolean(syncConfig.spreadsheetId);
+    // Read, never taken. This effect is set up and torn down again immediately
+    // after the card mounts - the page hydrates and the tree is regenerated -
+    // and a handoff consumed on the first read left the second run with
+    // nothing, the queued frame cancelled, and the card frozen at the position
+    // it was meant to be flying from. Both are claimed at the moment they are
+    // acted on instead, so a torn-down attempt simply replays.
+    const from = pendingHandoff();
+    const el = cardRef.current;
+    const wantsStart = startPending();
 
-  // Row 3: Share it with {coach}
-  const coachName = pendingCoach?.name ?? "your coach";
-  const row3Done = pendingCoach?.sharedAt !== undefined;
+    let timer = 0;
+    let first = 0;
+    let second = 0;
 
-  // Row 4: Try a tutorial workout
-  const row4Done = tutorialState?.doneAt !== undefined;
-  const row4Locked = !row2Done || !row3Done;
+    const flying = Boolean(from && el);
 
-  const allDone = (!showRow1 || row1Done) && row2Done && row3Done && row4Done;
+    if (from && el) {
+      const to = el.getBoundingClientRect();
+      const scale = to.width > 0 ? from.width / to.width : 1;
+      setOffset(
+        `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${scale.toFixed(4)})`,
+      );
 
-  // On Today, the card is hidden once dismissed, or once all rows are done,
-  // or once the tutorial itself has completed (at which point the closing card appears).
-  if (surface === "today") {
-    if (dismissed || allDone || row4Done) {
-      return null;
+      // Two frames: one for the offset to paint, one to turn the transition on
+      // before removing it. One frame and the browser coalesces both into no
+      // animation at all.
+      first = requestAnimationFrame(() => {
+        second = requestAnimationFrame(() => {
+          clearHandoff();
+          setFlying(true);
+          setOffset(undefined);
+        });
+      });
     }
-  }
 
-  const handleRow1Click = async () => {
-    if (row1Done) return;
-    if (install.kind === "prompt") {
-      await promptInstall();
-    } else if (install.kind === "manual-ios") {
-      setShowWalkthrough(true);
+    if (wantsStart) {
+      // A timer rather than transitionend: a transition that is interrupted -
+      // by a rerender, by the card being scrolled out of view - never fires it,
+      // and the tutorial would never start. Two runs may both schedule one;
+      // only the first to fire claims the start.
+      timer = window.setTimeout(
+        () => {
+          if (!consumeTutorialStart()) return;
+          // Read at fire time, not closed over: `useInstallMode` reports
+          // "unavailable" on its first render and corrects itself a tick later.
+          const kind = installMode().kind;
+          useTutorialStore.getState().start({
+            canInstall: kind === "prompt" || kind === "manual-ios",
+          });
+        },
+        flying ? FLIGHT_MS + LANDED_PAUSE_MS : LANDED_PAUSE_MS,
+      );
     }
-  };
 
-  const handleRow4Click = () => {
-    if (row4Locked) return;
-    const started = useTutorialStore.getState().start();
-    if (started) {
-      router.navigate({ to: "/" });
-    }
-  };
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+      window.clearTimeout(timer);
+    };
+  }, [surface]);
+
+  const tutorialState = typeof window === "undefined" ? undefined : loadTutorialState();
+
+  const tutorialDone = tutorialState?.doneAt !== undefined;
+  const nutritionDone = dailyLogs.some(
+    (l) =>
+      l.calories !== undefined ||
+      l.protein !== undefined ||
+      l.carbs !== undefined ||
+      l.fat !== undefined,
+  );
+  const stepsDone = dailyLogs.some((l) => l.steps !== undefined);
+
+  const rows = [
+    {
+      id: "tutorial",
+      title: tutorialDone ? "Tutorial done" : "Complete the tutorial",
+      done: tutorialDone,
+      onClick: () => {
+        if (tutorialDone || tutorialActive) return;
+        const started = useTutorialStore.getState().start({
+          canInstall: install.kind === "prompt" || install.kind === "manual-ios",
+          resume: true,
+        });
+        if (started) void router.navigate({ to: "/" });
+      },
+    },
+    {
+      id: "nutrition",
+      title: "Log a day's nutrition",
+      done: nutritionDone,
+      onClick: () => focusOnToday(router, "stat-calories"),
+    },
+    {
+      id: "steps",
+      title: "Log a day's steps",
+      done: stepsDone,
+      onClick: () => focusOnToday(router, "stat-steps"),
+    },
+  ];
+
+  const doneCount = rows.filter((r) => r.done).length;
+  const allDone = doneCount === rows.length;
+
+  /**
+   * The exit. Only on Today, and only once: the card is not a thing that comes
+   * back to congratulate you again on your next visit.
+   */
+  useEffect(() => {
+    if (surface !== "today" || !allDone) return;
+    // `leaving` is deliberately NOT a dependency. It was, and setting it
+    // re-ran this effect, whose cleanup cancelled the timer it had just set -
+    // so the card played its farewell and then stayed forever.
+    setLeaving(true);
+    const timer = window.setTimeout(() => {
+      updateTutorialState({ cardDismissedAt: Date.now() });
+      setGone(true);
+    }, FAREWELL_MS);
+    return () => window.clearTimeout(timer);
+  }, [surface, allDone]);
+
+  if (surface === "today" && (dismissed || gone)) return null;
 
   const handleDismiss = () => {
     const current = loadTutorialState() ?? { joinedAt: Date.now() };
@@ -107,147 +214,126 @@ export function GettingStartedCard({ surface = "today" }: GettingStartedCardProp
     setDismissed(true);
   };
 
-  /**
-   * "Continue on /join goes to the first row that is not done, rather than always to Settings."
-   */
-  const handleContinue = async () => {
-    if (showRow1 && !row1Done) {
-      if (install.kind === "prompt") {
-        await promptInstall();
-      } else if (install.kind === "manual-ios") {
-        setShowWalkthrough(true);
-      }
-      return;
-    }
-    if (!row2Done) {
-      router.navigate({ to: "/settings" });
-      return;
-    }
-    if (!row3Done) {
-      router.navigate({ to: "/settings" });
-      return;
-    }
-    if (!row4Done) {
-      const started = useTutorialStore.getState().start();
-      if (started) {
-        router.navigate({ to: "/" });
-      }
-      return;
-    }
-    router.navigate({ to: "/" });
-  };
-
-  interface ChecklistRowItem {
-    id: number;
-    title: string;
-    done: boolean;
-    locked: boolean;
-    onClick: () => void;
-  }
-
-  const visibleRows: ChecklistRowItem[] = [];
-
-  if (showRow1) {
-    visibleRows.push({
-      id: 1,
-      title: "Add Trakt to your home screen",
-      done: row1Done,
-      locked: false,
-      onClick: () => void handleRow1Click(),
-    });
-  }
-
-  visibleRows.push({
-    id: 2,
-    title: "Connect a Google Sheet",
-    done: row2Done,
-    locked: false,
-    onClick: () => router.navigate({ to: "/settings" }),
-  });
-
-  visibleRows.push({
-    id: 3,
-    title: `Share it with ${coachName}`,
-    done: row3Done,
-    locked: false,
-    onClick: () => router.navigate({ to: "/settings" }),
-  });
-
-  visibleRows.push({
-    id: 4,
-    title: "Try a tutorial workout",
-    done: row4Done,
-    locked: row4Locked,
-    onClick: handleRow4Click,
-  });
-
-  const checklistContent = (
+  const checklist = (
     <div className="group-list">
-      {visibleRows.map((row, idx) => {
-        const isFirst = idx === 0;
-        return (
-          <button
-            key={row.id}
-            type="button"
-            disabled={row.locked}
-            aria-disabled={row.locked}
-            data-done={row.done ? "true" : "false"}
-            data-locked={row.locked ? "true" : "false"}
-            onClick={row.onClick}
-            className={
-              "group-row w-full text-left transition-opacity " +
-              (!isFirst ? "group-row-sep " : "") +
-              (row.locked ? "opacity-40 cursor-not-allowed" : "cursor-pointer")
-            }
-          >
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <span className="w-4 shrink-0 text-ink-2 t-label tabular-nums">{idx + 1}</span>
-              <span className="truncate t-body text-ink">{row.title}</span>
-            </div>
+      {rows.map((row, idx) => (
+        <button
+          key={row.id}
+          type="button"
+          data-done={row.done ? "true" : "false"}
+          onClick={row.onClick}
+          className={
+            "group-row w-full text-left " + (idx === 0 ? "" : "group-row-sep ") + "cursor-pointer"
+          }
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <span className="w-4 shrink-0 tabular-nums t-label text-ink-2">{idx + 1}</span>
+            <span className={"truncate t-body " + (row.done ? "text-ink-2" : "text-ink")}>
+              {row.title}
+            </span>
+          </div>
 
-            {row.done ? (
+          {row.done ? (
+            <>
               <span
                 aria-hidden="true"
                 data-testid="status-met"
-                className="h-2.5 w-2.5 bg-ink rounded-sm shrink-0"
+                className="h-2.5 w-2.5 shrink-0 rounded-sm bg-ink"
               />
-            ) : row.locked ? null : (
-              <Chevron className="shrink-0 text-ink-2" size={16} />
-            )}
-            {row.done && <span className="sr-only">Done</span>}
-          </button>
-        );
-      })}
+              <span className="sr-only">Done</span>
+            </>
+          ) : (
+            <Chevron className="shrink-0 text-ink-2" size={16} />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+
+  const header = (
+    <div className="flex items-center gap-3 px-4 pb-2 pt-1">
+      <TutorialRing done={doneCount} total={rows.length} complete={allDone} />
+      <span className="min-w-0 flex-1 t-label text-ink-2">
+        {allDone ? "All set" : "tasks complete"}
+      </span>
+      {surface === "today" && !allDone && (
+        <button
+          type="button"
+          onClick={handleDismiss}
+          aria-label="Dismiss"
+          className="-mr-2 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center text-ink-2"
+        >
+          <span className="t-label">Dismiss</span>
+        </button>
+      )}
     </div>
   );
 
   if (surface === "join") {
     return (
-      <div className="space-y-4 py-2">
-        {checklistContent}
-        <Primary onClick={() => void handleContinue()}>Continue</Primary>
-        {showWalkthrough && <InstallWalkthrough onClose={() => setShowWalkthrough(false)} />}
+      <div data-onboarding-card className="space-y-1 py-2">
+        {header}
+        {checklist}
       </div>
     );
   }
 
+  const exiting = leaving && allDone;
+
   return (
-    <div className="mx-4 mb-4">
-      <div className="group-header">
-        <span className="t-caption">Getting started</span>
-        <button
-          type="button"
-          onClick={handleDismiss}
-          aria-label="Dismiss"
-          className="-mr-2 flex min-h-[44px] min-w-[44px] items-center justify-center text-ink-2 hover:text-ink"
-        >
-          <span className="t-label">Dismiss</span>
-        </button>
-      </div>
-
-      {checklistContent}
-
-      {showWalkthrough && <InstallWalkthrough onClose={() => setShowWalkthrough(false)} />}
+    <div
+      ref={cardRef}
+      data-onboarding-card
+      className="mx-4 mb-4"
+      style={{
+        transformOrigin: "top left",
+        transform: offset ?? (exiting ? "scale(0.98)" : "none"),
+        opacity: exiting ? 0 : 1,
+        // One shorthand, delay included. Setting `transition` and
+        // `transitionDelay` together makes React warn on every rerender that
+        // the two are fighting over the same property, and it is right.
+        transition: transitionFor({ offset: offset !== undefined, flying, exiting }),
+      }}
+      onTransitionEnd={() => setFlying(false)}
+    >
+      {header}
+      {checklist}
     </div>
   );
+}
+
+/** One transition shorthand for the card's three states. */
+function transitionFor({
+  offset,
+  flying,
+  exiting,
+}: {
+  offset: boolean;
+  flying: boolean;
+  exiting: boolean;
+}): string {
+  // Placing the card back where it came from must not animate; releasing it
+  // must.
+  if (offset) return "none";
+  if (flying)
+    return `transform ${FLIGHT_MS}ms cubic-bezier(0.2,0,0.2,1), opacity ${FLIGHT_MS}ms ease`;
+  const delay = exiting ? `${FAREWELL_MS - 420}ms` : "0ms";
+  return `opacity 420ms ease ${delay}, transform 420ms ease ${delay}`;
+}
+
+/**
+ * Take the user to the field the row is about.
+ *
+ * A checklist row that only says a thing is undone, without offering to go and
+ * do it, is a to-do list the app wrote for somebody else.
+ */
+function focusOnToday(router: ReturnType<typeof useRouter>, fieldId: string) {
+  void router.navigate({ to: "/" });
+  window.setTimeout(() => {
+    const field = document.getElementById(fieldId);
+    if (field instanceof HTMLInputElement) {
+      field.scrollIntoView({ block: "center", behavior: "smooth" });
+      field.focus();
+    }
+  }, 120);
 }

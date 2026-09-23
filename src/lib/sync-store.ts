@@ -28,6 +28,7 @@ import {
   shouldPublishOwnPlan,
   type PlanPayload,
 } from "./plan-tab";
+import { loadDisplayName } from "./tutorial-state";
 import { loadPendingCoach } from "./pending-coach";
 import type { SyncErrorCode, SyncResponse } from "./sync-protocol";
 import { createSpreadsheet, pullTabs, pushTabs } from "./sync-client-google";
@@ -230,6 +231,14 @@ function describeFailure(error: string): { status: SyncStatus; message: string }
         status: "blocked",
         message: "Google sign-in has expired. Reconnect to keep syncing.",
       };
+    case "popup-blocked":
+      // Not an expired grant and not the network. The browser declined to open
+      // the sign-in window, which the user clears by allowing popups or simply
+      // by tapping again now that nothing has to be fetched first.
+      return {
+        status: "blocked",
+        message: "Your browser blocked the Google sign-in window. Allow popups, then try again.",
+      };
     case "empty-plan":
       return { status: "error", message: "There was no plan to send." };
     case "unreadable":
@@ -290,12 +299,13 @@ export const useSyncStore = create<SyncState>((set, get) => ({
       return { ok: false, error: "This build has no Google client id configured." };
     }
 
-    // Named after the person whose sheet it is, when their coach's invite said
-    // so: every client's sheet is otherwise called the same thing, and the
-    // coach picks between them by date in the Picker.
-    const invitedName = loadPendingCoach()?.clientName?.trim();
-    const title = invitedName
-      ? `Trakt — ${invitedName}`
+    // Named after the person whose sheet it is. Onboarding asks them directly
+    // now, so the date fallback is reached only by someone who connected a
+    // sheet without ever going through /join - every client's sheet used to be
+    // called the same thing, and a coach with six of them picked by date.
+    const chosenName = loadDisplayName() ?? loadPendingCoach()?.clientName?.trim();
+    const title = chosenName
+      ? `Trakt — ${chosenName}`
       : `Trakt — ${new Date().toISOString().slice(0, 10)}`;
     const created = await createSpreadsheet(title);
     if (!created.ok) {

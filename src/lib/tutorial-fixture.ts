@@ -1,3 +1,4 @@
+import { dayKey } from "./daily-log";
 import type { Exercise, PlannedLift, SplitSlot } from "./store";
 import { SWAPPED_KEYS, type Swapped } from "./store-swap";
 
@@ -18,6 +19,23 @@ import { SWAPPED_KEYS, type Swapped } from "./store-swap";
  *    This teaches the user what an unprompted lift looks like and lets them type
  *    their own numbers.
  *
+ * ## Bench Press prescribes two sets, and the number is load-bearing
+ *
+ * The tutorial says "tap Back, and the next lift comes up" after the second
+ * set. Back only moves on once the lift is FINISHED, so a card asking for three
+ * sets left the app on Bench Press with the rail insisting otherwise: the
+ * instruction was right about the app and wrong about the screen, and the only
+ * way out was to log a set nobody had asked for. Two sets makes the sentence
+ * true.
+ *
+ * ## The card is pinned to today
+ *
+ * So that Today offers "Start Tutorial day" rather than only "Add activity".
+ * The first thing the tutorial teaches about training is that a prescribed day
+ * is already waiting, which is how this app is meant to be used and what the
+ * client's coach will have set up for them. Cardio, later in the run, is what
+ * teaches "Add activity".
+ *
  * All IDs are literal, stable strings so step predicates and tests can
  * reliably name them.
  */
@@ -37,13 +55,8 @@ export function tutorialFixture(unit: "lbs" | "kg"): {
 
   const plannedLifts: PlannedLift[] = [
     {
-      // TWO, and it has to be two: the script logs set 1, logs set 2, then
-      // says "Finishing a lift moves you on to the next one" and waits for
-      // that to happen. `WorkoutLog`'s `done` only moves on from a lift whose
-      // prescribed sets are all logged, so a third set here means the lift is
-      // NOT finished, the app correctly stays put, the step's condition never
-      // comes true, and the tutorial cannot be completed at all.
       exerciseId: "tut_bench",
+      // Two, deliberately. See the note above.
       sets: 2,
       reps: "8",
       load: unit === "kg" ? "60 kg" : "135 lbs",
@@ -95,7 +108,10 @@ export function tutorialStoreState(unit: "lbs" | "kg"): Swapped {
     // Empty nutrition phases is a deliberate choice and a legal state: phases
     // have real dates, and the practice day showing no targets is honest.
     nutritionPhases: [],
-    plannedDays: [],
+    // Pinned to today, so the day offers the card by name. A pin beats both
+    // planning modes in `plannedCardFor`, so this works whichever one the
+    // user's own plan is in.
+    plannedDays: [{ date: dayKey(new Date()), splitSlotId: TUTORIAL_SLOT_ID }],
     unit,
     activeSessionId: undefined,
     currentExerciseId: undefined,

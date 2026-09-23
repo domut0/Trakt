@@ -14,11 +14,22 @@ import { useTutorialStore } from "../lib/tutorial-store";
  * bar pinned to top-0 sits beneath the clock and its button cannot be
  * tapped. In flow it also needs no reserved gap in <main> to match.
  *
- * ## Skip does not confirm
+ * ## The spotlight never dims it
  *
- * The workout is fake, so skipping loses nothing, and a confirmation on a
- * Skip button is the app arguing with somebody who has already decided.
- * Skip calls skip() and navigates to /.
+ * Marked `data-tutorial-banner`, which `TutorialSpotlight` reads so that its
+ * dimming starts underneath this bar. Everything else on screen is gated to one
+ * control at a time; the way OUT of the mode is not something to be gated, and
+ * a tutorial you cannot leave is the worst version of this feature.
+ *
+ * ## "End tutorial", not "Skip"
+ *
+ * The rail carries a Skip of its own, for the individual steps the app cannot
+ * finish on somebody's behalf. Two controls reading "Skip" on one screen, one
+ * of which passes a step and the other of which ends the whole run, is a
+ * choice nobody should have to make by guessing.
+ *
+ * It does not confirm. The workout is fake, so ending loses nothing, and a
+ * confirmation here is the app arguing with somebody who has already decided.
  */
 export function TutorialBanner() {
   const active = useTutorialStore((s) => s.active);
@@ -38,8 +49,9 @@ export function TutorialBanner() {
 
   return (
     <div
+      data-tutorial-banner
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
-      className="relative z-40 flex min-h-[44px] w-full shrink-0 items-center justify-between gap-3 bg-accent px-4 py-2.5 text-accent-foreground"
+      className="relative z-[57] flex min-h-[44px] w-full shrink-0 items-center justify-between gap-3 bg-accent px-4 py-2.5 text-accent-foreground"
     >
       <span className="t-label font-medium">Tutorial mode</span>
       <button
@@ -49,7 +61,7 @@ export function TutorialBanner() {
         // button fills it, so the tap target is the bar's full height.
         className="shrink-0 t-label font-medium opacity-90"
       >
-        Skip &rarr;
+        End tutorial
       </button>
     </div>
   );

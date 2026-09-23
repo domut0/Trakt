@@ -1,29 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TUTORIAL_STEPS, type TutorialSeen, type WorkoutSet } from "../tutorial";
-import { useTutorialStore } from "../tutorial-store";
-import { useStore } from "../store";
-import { tutorialFixture } from "../tutorial-fixture";
+import { describe, expect, it } from "vitest";
+import {
+  TUTORIAL_STEPS,
+  chaptersOf,
+  isSandboxed,
+  resumePoint,
+  stepsFor,
+  type TutorialSeen,
+} from "../tutorial";
 
-const mockSet1: WorkoutSet = {
-  id: "set_1",
-  sessionId: "sess_tut",
-  exerciseId: "tut_bench",
-  weight: 135,
-  reps: 8,
-  loggedAt: 1000,
-};
-
-const mockSet2: WorkoutSet = {
-  id: "set_2",
-  sessionId: "sess_tut",
-  exerciseId: "tut_bench",
-  weight: 135,
-  reps: 8,
-  loggedAt: 2000,
-};
-
-const emptySeen: TutorialSeen = {
-  chooserOpen: false,
+/** Nothing has happened yet. Every predicate should be false against this. */
+const NOTHING: TutorialSeen = {
+  installHandled: false,
+  atSettings: false,
+  sheetPossible: true,
+  sheetConnected: false,
+  sharedWithCoach: false,
+  bodyweightLogged: false,
   startSheetOpen: false,
   activeSessionId: undefined,
   exerciseScreenOpen: false,
@@ -31,249 +23,183 @@ const emptySeen: TutorialSeen = {
   sets: [],
   editingRow: undefined,
   summaryShown: false,
+  chooserOpen: false,
+  cardioPickerOpen: false,
+  cardioFormOpen: false,
+  cardioDurationTyped: false,
+  cardioLogged: false,
 };
 
-describe("TUTORIAL_STEPS structure and IDs", () => {
-  it("has exactly 9 steps in the prescribed order with unique IDs", () => {
-    expect(TUTORIAL_STEPS).toHaveLength(9);
+const set = (id: string) => ({
+  id,
+  sessionId: "tut",
+  exerciseId: "tut_bench",
+  weight: 135,
+  reps: 8,
+  loggedAt: Number(id),
+});
 
-    const expectedIds = [
-      "open-chooser",
-      "pick-strength",
-      "start",
-      "open-lift",
-      "tap-set-1",
-      "save-set-1",
-      "save-set-2",
-      "back",
-      "end",
-    ];
+const stepById = (id: string) => {
+  const step = TUTORIAL_STEPS.find((s) => s.id === id);
+  if (!step) throw new Error(`no step ${id}`);
+  return step;
+};
 
-    const actualIds = TUTORIAL_STEPS.map((s) => s.id);
-    expect(actualIds).toEqual(expectedIds);
-
-    const uniqueIds = new Set(actualIds);
-    expect(uniqueIds.size).toBe(9);
+describe("the steps", () => {
+  it("has a unique id for every step", () => {
+    const ids = TUTORIAL_STEPS.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("has the exact target markers in order", () => {
-    const expectedTargets = [
-      "add-activity",
-      "chooser-strength",
-      "start-confirm",
-      "lift-row-first",
-      "set-row-1",
-      "set-save",
-      "set-row-2",
-      "exercise-done",
-      "workout-end",
-    ];
-
-    const actualTargets = TUTORIAL_STEPS.map((s) => s.target);
-    expect(actualTargets).toEqual(expectedTargets);
+  it("runs its chapters in one order and never returns to one", () => {
+    const order = TUTORIAL_STEPS.map((s) => s.chapter);
+    const firstSeen = chaptersOf(TUTORIAL_STEPS);
+    // A chapter appearing again after another has begun would make "resume at
+    // the chapter you left" ambiguous.
+    expect(order).toEqual(firstSeen.flatMap((c) => order.filter((o) => o === c)));
   });
 
-  it("has verbatim UI copy in sentence case with no em dashes", () => {
-    const expectedCopy = [
-      "Tap Add activity.",
-      "Pick Strength.",
-      "Start Tutorial.",
-      "These are your lifts, in order. Open Bench Press.",
-      "Set 1 is already filled in. Tap it.",
-      "Save takes those numbers as they are. Change one first if you lifted something else.",
-      "Set 2 copied what you just did. Log it too.",
-      "Tap Done. Finishing a lift moves you on to the next one.",
-      "Tap End, top right.",
-    ];
-
-    for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
-      expect(TUTORIAL_STEPS[i].say).toBe(expectedCopy[i]);
-      // Brand commitment: no em dashes in UI copy
-      expect(TUTORIAL_STEPS[i].say).not.toContain("—");
-      expect(TUTORIAL_STEPS[i].say).not.toContain("–");
-    }
-  });
-
-  it("evaluates to false for every single predicate on an empty Seen snapshot", () => {
+  it("is complete only after the last thing it asks for", () => {
+    // The guard on the whole design: nothing may be satisfied by an empty app.
     for (const step of TUTORIAL_STEPS) {
-      expect(step.done(emptySeen)).toBe(false);
+      // "Tap Done" on the summary is the one step whose done-state is an
+      // ABSENCE, and it is only ever evaluated while the summary is up.
+      if (step.id === "summary-done") continue;
+      expect(step.done(NOTHING), step.id).toBe(false);
     }
+  });
+
+  it("passes a step in silence when there is nothing on screen to point at", () => {
+    const share = TUTORIAL_STEPS.find((s) => s.id === "share-sheet")!;
+    const connect = TUTORIAL_STEPS.find((s) => s.id === "connect-sheet")!;
+
+    // Settings renders no share control until there is a sheet to share, and
+    // a build with no client id renders Connect disabled.
+    expect(share.unreachable?.({ ...NOTHING, sheetConnected: false })).toBe(true);
+    expect(share.unreachable?.({ ...NOTHING, sheetConnected: true })).toBe(false);
+    expect(connect.unreachable?.({ ...NOTHING, sheetPossible: false })).toBe(true);
+    expect(connect.unreachable?.({ ...NOTHING, sheetPossible: true })).toBe(false);
+  });
+
+  it("offers a way past exactly the steps that depend on Google", () => {
+    const skippable = TUTORIAL_STEPS.filter((s) => s.skippable).map((s) => s.id);
+    expect(skippable).toEqual(["install", "open-settings", "connect-sheet", "share-sheet"]);
+  });
+
+  it("sandboxes the workout and the cardio, and nothing before them", () => {
+    expect(isSandboxed("sheet")).toBe(false);
+    expect(isSandboxed("share")).toBe(false);
+    // The bodyweight they type is a real bodyweight.
+    expect(isSandboxed("weight")).toBe(false);
+    expect(isSandboxed("workout")).toBe(true);
+    expect(isSandboxed("finish")).toBe(true);
+    expect(isSandboxed("cardio")).toBe(true);
   });
 });
 
-describe("Tutorial step predicates and near-misses", () => {
-  it("step 1 (open-chooser): fires only when chooserOpen is true", () => {
-    const step = TUTORIAL_STEPS[0];
-    expect(step.done({ ...emptySeen, chooserOpen: false })).toBe(false);
-    expect(step.done({ ...emptySeen, chooserOpen: true })).toBe(true);
-
-    // Near-miss: start sheet is open instead
-    expect(step.done({ ...emptySeen, chooserOpen: false, startSheetOpen: true })).toBe(false);
+describe("what each step waits for", () => {
+  it("the sheet step waits for a connected sheet", () => {
+    expect(stepById("connect-sheet").done({ ...NOTHING, sheetConnected: true })).toBe(true);
   });
 
-  it("step 2 (pick-strength): fires only when startSheetOpen is true", () => {
-    const step = TUTORIAL_STEPS[1];
-    expect(step.done({ ...emptySeen, startSheetOpen: false })).toBe(false);
-    expect(step.done({ ...emptySeen, startSheetOpen: true })).toBe(true);
-
-    // Near-miss: chooser is open instead
-    expect(step.done({ ...emptySeen, startSheetOpen: false, chooserOpen: true })).toBe(false);
+  it("the Settings step waits for Settings, so the gear is tapped rather than bypassed", () => {
+    // Somebody moved to a screen by the app cannot find their way back to it.
+    const step = stepById("open-settings");
+    expect(step.route).toBeUndefined();
+    expect(step.done({ ...NOTHING, atSettings: false })).toBe(false);
+    expect(step.done({ ...NOTHING, atSettings: true })).toBe(true);
   });
 
-  it("step 3 (start): fires only when activeSessionId is defined", () => {
-    const step = TUTORIAL_STEPS[2];
-    expect(step.done({ ...emptySeen, activeSessionId: undefined })).toBe(false);
-    expect(step.done({ ...emptySeen, activeSessionId: "tut_session_1" })).toBe(true);
+  it("the bodyweight step waits for today's number, not for any number", () => {
+    expect(stepById("log-bodyweight").done({ ...NOTHING, bodyweightLogged: true })).toBe(true);
+  });
 
-    // Near-miss: startSheetOpen is true but session not yet created
+  it("the prescribed-day step is satisfied by the sheet OR by a session already running", () => {
+    // Tapping fast enough to skip the confirm sheet is not a reason to stall.
+    expect(stepById("start-day").done({ ...NOTHING, startSheetOpen: true })).toBe(true);
+    expect(stepById("start-day").done({ ...NOTHING, activeSessionId: "s1" })).toBe(true);
+  });
+
+  it("opening a lift completes on the screen, not on the store", () => {
+    // Bench Press is ALREADY the current lift, so opening it changes no store
+    // value. Waiting on one is the bug that stranded people on this step.
     expect(
-      step.done({
-        ...emptySeen,
-        startSheetOpen: true,
-        activeSessionId: undefined,
-      }),
-    ).toBe(false);
-  });
-
-  it("step 4 (open-lift): fires only when exerciseScreenOpen is true", () => {
-    const step = TUTORIAL_STEPS[3];
-    expect(step.done({ ...emptySeen, exerciseScreenOpen: false })).toBe(false);
-    expect(step.done({ ...emptySeen, exerciseScreenOpen: true })).toBe(true);
-
-    // Near-miss: session is active and bench is current, but exercise screen is not open
-    expect(
-      step.done({
-        ...emptySeen,
-        activeSessionId: "tut_session_1",
+      stepById("open-lift").done({
+        ...NOTHING,
+        activeSessionId: "s1",
         currentExerciseId: "tut_bench",
-        exerciseScreenOpen: false,
+        exerciseScreenOpen: true,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("step 5 (tap-set-1): fires on editingRow 1, does NOT fire on editingRow 2 or undefined", () => {
-    const step = TUTORIAL_STEPS[4];
-    expect(step.done({ ...emptySeen, editingRow: undefined })).toBe(false);
-    expect(step.done({ ...emptySeen, editingRow: 1 })).toBe(true);
-
-    // Near-miss: user tapped row 2 instead of row 1
-    expect(step.done({ ...emptySeen, editingRow: 2 })).toBe(false);
-    expect(step.done({ ...emptySeen, editingRow: 3 })).toBe(false);
+  it("set 1 and set 2 wait for the count, so a correction cannot skip one", () => {
+    expect(stepById("save-set-1").done({ ...NOTHING, sets: [set("1")] })).toBe(true);
+    expect(stepById("save-set-2").done({ ...NOTHING, sets: [set("1")] })).toBe(false);
+    expect(stepById("save-set-2").done({ ...NOTHING, sets: [set("1"), set("2")] })).toBe(true);
   });
 
-  it("step 6 (save-set-1): fires when at least 1 set is logged", () => {
-    const step = TUTORIAL_STEPS[5];
-    expect(step.done({ ...emptySeen, sets: [] })).toBe(false);
-    expect(step.done({ ...emptySeen, sets: [mockSet1] })).toBe(true);
-    expect(step.done({ ...emptySeen, sets: [mockSet1, mockSet2] })).toBe(true);
-
-    // Near-miss: row 1 was editing but Save was not pressed (no sets logged)
-    expect(step.done({ ...emptySeen, editingRow: 1, sets: [] })).toBe(false);
+  it("opens each set row and saves it as two steps, pointing at two controls", () => {
+    // The spotlight lets through what the current step NAMES. One step
+    // pointing at the row would leave the editor's Save button outside the
+    // hole and inert, which is where set 2 used to strand people.
+    expect(stepById("tap-set-2").target).toBe("set-row-2");
+    expect(stepById("tap-set-2").done({ ...NOTHING, editingRow: 2 })).toBe(true);
+    expect(stepById("save-set-2").target).toBe("set-save");
   });
 
-  it("step 7 (save-set-2): fires when at least 2 sets are logged, does NOT fire on 1 set", () => {
-    const step = TUTORIAL_STEPS[6];
-    expect(step.done({ ...emptySeen, sets: [] })).toBe(false);
-    // Near-miss: only set 1 logged
-    expect(step.done({ ...emptySeen, sets: [mockSet1] })).toBe(false);
-
-    expect(step.done({ ...emptySeen, sets: [mockSet1, mockSet2] })).toBe(true);
+  it("Back is complete when the app has moved on to another lift", () => {
+    const back = stepById("back");
+    expect(back.done({ ...NOTHING, currentExerciseId: "tut_bench" })).toBe(false);
+    expect(back.done({ ...NOTHING, currentExerciseId: "tut_pulldown" })).toBe(true);
   });
 
-  it("step 8 (back): fires when finished lift moves user to next lift", () => {
-    const step = TUTORIAL_STEPS[7];
-    // Empty seen: undefined currentExerciseId -> false
-    expect(step.done({ ...emptySeen, currentExerciseId: undefined })).toBe(false);
-
-    // Near-miss: still on tut_bench
-    expect(step.done({ ...emptySeen, currentExerciseId: "tut_bench" })).toBe(false);
-
-    // Advanced to next lift (tut_pulldown)
-    expect(step.done({ ...emptySeen, currentExerciseId: "tut_pulldown" })).toBe(true);
-    expect(step.done({ ...emptySeen, currentExerciseId: "tut_curl" })).toBe(true);
+  it("the summary's Done is complete when the summary goes", () => {
+    expect(stepById("summary-done").done({ ...NOTHING, summaryShown: true })).toBe(false);
+    expect(stepById("summary-done").done({ ...NOTHING, summaryShown: false })).toBe(true);
   });
 
-  it("step 9 (end): fires only when summaryShown is true", () => {
-    const step = TUTORIAL_STEPS[8];
-    expect(step.done({ ...emptySeen, summaryShown: false })).toBe(false);
-    expect(step.done({ ...emptySeen, summaryShown: true })).toBe(true);
+  it("picking cardio accepts the picker or the form, so a fast tap cannot strand it", () => {
+    const pick = stepById("pick-cardio");
+    expect(pick.done({ ...NOTHING, cardioPickerOpen: true })).toBe(true);
+    expect(pick.done({ ...NOTHING, cardioFormOpen: true })).toBe(true);
+  });
 
-    // Near-miss: 2 sets logged and on pulldown, but summary not yet shown
-    expect(
-      step.done({
-        ...emptySeen,
-        sets: [mockSet1, mockSet2],
-        currentExerciseId: "tut_pulldown",
-        summaryShown: false,
-      }),
-    ).toBe(false);
+  it("the cardio chapter ends on a logged session", () => {
+    expect(stepById("cardio-save").done({ ...NOTHING, cardioLogged: true })).toBe(true);
   });
 });
 
-describe("advancing past step 9 calls finish", () => {
-  beforeEach(() => {
-    useStore.setState({
-      hydrated: true,
-      unit: "lbs",
-      exercises: [],
-      slots: [],
-      sessions: [],
-      sets: [],
-      dailyLogs: [],
-      nutritionPhases: [],
-      plannedDays: [],
-      activeSessionId: undefined,
-      currentExerciseId: undefined,
-    });
-    useTutorialStore.setState({ active: false, step: 0 });
+describe("stepsFor", () => {
+  it("leaves the install chapter out where it cannot succeed", () => {
+    const desktop = stepsFor({ canInstall: false });
+    expect(desktop.some((s) => s.chapter === "install")).toBe(false);
+    expect(desktop.length).toBe(TUTORIAL_STEPS.length - 1);
   });
 
-  afterEach(() => {
-    useTutorialStore.getState().skip();
-  });
-
-  it("advances through steps 0 to 8, and advancing past step 8 (step 9) calls finish", () => {
-    const started = useTutorialStore.getState().start();
-    expect(started).toBe(true);
-    expect(useTutorialStore.getState().active).toBe(true);
-    expect(useTutorialStore.getState().step).toBe(0);
-
-    // Advance 8 times to reach step index 8 (the 9th step, "end")
-    for (let i = 1; i <= 8; i++) {
-      useTutorialStore.getState().advance();
-      expect(useTutorialStore.getState().step).toBe(i);
-      expect(useTutorialStore.getState().active).toBe(true);
-    }
-
-    // Now on step index 8 (step 9: "end").
-    expect(useTutorialStore.getState().step).toBe(8);
-
-    // Advancing past step 9 must call finish (teardown) rather than running off the end
-    useTutorialStore.getState().advance();
-
-    // Active should be false, step reset to 0
-    expect(useTutorialStore.getState().active).toBe(false);
-    expect(useTutorialStore.getState().step).toBe(0);
+  it("keeps every other step in the same order either way", () => {
+    const phone = stepsFor({ canInstall: true }).filter((s) => s.chapter !== "install");
+    expect(phone.map((s) => s.id)).toEqual(stepsFor({ canInstall: false }).map((s) => s.id));
   });
 });
 
-/**
- * The script and the fixture are one contract, and nothing else checks it.
- *
- * The script logs two sets on Bench Press and then says "Finishing a lift
- * moves you on to the next one", waiting for the workout to move off
- * `tut_bench`. But `WorkoutLog.done` only moves on from a lift whose
- * prescribed sets are ALL logged. Prescribe three and the app is right to
- * stay put, the step's condition never comes true, and the tutorial cannot be
- * finished -- which is exactly what shipped.
- */
-describe("the fixture prescribes what the script actually logs", () => {
-  it("prescribes Bench Press for as many sets as the script saves", () => {
-    const savesSets = TUTORIAL_STEPS.filter((s) => s.id.startsWith("save-set")).length;
-    const bench = tutorialFixture("lbs").slots[0].plannedLifts?.find(
-      (l) => l.exerciseId === "tut_bench",
-    );
-    expect(savesSets).toBe(2);
-    expect(bench?.sets).toBe(savesSets);
+describe("resumePoint", () => {
+  const steps = stepsFor({ canInstall: false });
+
+  it("starts at the beginning when there is nothing to resume", () => {
+    expect(resumePoint(steps, undefined)).toBe(0);
+    expect(resumePoint(steps, "a-step-that-was-renamed")).toBe(0);
+  });
+
+  it("lands at the start of the chapter, never mid-chapter", () => {
+    // The practice workout lives in memory only. Half of one is not something
+    // to come back to.
+    const index = resumePoint(steps, "save-set-2");
+    expect(steps[index].id).toBe("start-day");
+  });
+
+  it("is exact for a chapter that is one step long", () => {
+    const index = resumePoint(steps, "log-bodyweight");
+    expect(steps[index].id).toBe("log-bodyweight");
   });
 });

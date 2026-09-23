@@ -141,8 +141,16 @@ async function resetAll() {
 }
 
 beforeEach(async () => {
+  // Every path through connectGoogle refuses before it starts when the build
+  // carries no OAuth client id, which is exactly what a test run is. Without
+  // this the three tests that connect a sheet assert against an early return.
+  vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "test-client-id.apps.googleusercontent.com");
   await resetAll();
   useStore.setState({ hydrated: false, sets: [], sessions: [], dailyLogs: [] });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe("syncNow: refusing to run", () => {
