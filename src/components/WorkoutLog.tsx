@@ -41,6 +41,15 @@ export function WorkoutLog({
    * list stops mattering.
    */
   const [added, setAdded] = useState<string[]>([]);
+  /**
+   * Planned exercises substituted for this session only, mapping the original
+   * planned exercise id to the replacement exercise id.
+   *
+   * Like `added`, this state is session-local and is lost if the component
+   * unmounts. That is the existing, accepted trade-off in this file: once a set
+   * is logged against the replacement the row is derived from the set anyway.
+   */
+  const [substitutions, setSubstitutions] = useState<Record<string, string>>({});
   const [openExerciseId, setOpenExerciseId] = useState<string | undefined>(undefined);
   const [picking, setPicking] = useState(false);
 
@@ -61,8 +70,13 @@ export function WorkoutLog({
     const out: { exercise: Exercise; lift?: PlannedLift }[] = [];
     const seen = new Set<string>();
     for (const lift of lifts) {
-      const exercise = byId.get(lift.exerciseId);
-      if (!exercise || seen.has(exercise.id)) continue;
+      const effectiveId = substitutions[lift.exerciseId] ?? lift.exerciseId;
+      const exercise = byId.get(effectiveId);
+      if (!exercise || seen.has(exercise.id)) {
+        seen.add(lift.exerciseId);
+        continue;
+      }
+      seen.add(lift.exerciseId);
       seen.add(exercise.id);
       out.push({ exercise, lift });
     }
@@ -74,7 +88,7 @@ export function WorkoutLog({
       out.push({ exercise });
     }
     return out;
-  }, [exercises, lifts, sessSets, added]);
+  }, [exercises, lifts, sessSets, added, substitutions]);
 
   const loggedCountOf = (exerciseId: string) =>
     sessSets.filter((s) => s.exerciseId === exerciseId).length;
@@ -173,6 +187,23 @@ export function WorkoutLog({
           lift={openRow?.lift}
           stopwatch={stopwatch}
           onDone={done}
+          onSubstitute={(replacementId) => {
+            setSubstitutions((prev) => {
+              const originalKey =
+                Object.keys(prev).find((k) => prev[k] === openExerciseId) ?? openExerciseId;
+              return { ...prev, [originalKey]: replacementId };
+            });
+            setAdded((prev) =>
+              prev.includes(openExerciseId)
+                ? Array.from(
+                    new Set(prev.map((id) => (id === openExerciseId ? replacementId : id))),
+                  )
+                : prev,
+            );
+            setCurrentExercise(replacementId);
+            setOpenExerciseId(undefined);
+          }}
+          sessionExerciseIds={rows.map((r) => r.exercise.id)}
         />
       )}
     </>

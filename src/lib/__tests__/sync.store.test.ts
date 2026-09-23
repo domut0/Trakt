@@ -517,6 +517,9 @@ describe("syncNow: pulling sheet edits back", () => {
 
 describe("device id", () => {
   beforeEach(() => {
+    // `connectGoogle` refuses without one, and these tests connect. See the
+    // note in "connecting a Google sheet" below.
+    vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "test-client-id");
     useStore.setState({
       hydrated: true,
       unit: "lbs",
@@ -527,6 +530,8 @@ describe("device id", () => {
       dailyLogs: [],
     });
   });
+
+  afterEach(() => vi.unstubAllEnvs());
 
   it("survives a disconnect and reconnect, because it is this browser's", async () => {
     fakeSheets();
@@ -553,6 +558,13 @@ describe("device id", () => {
 
 describe("connecting a Google sheet", () => {
   beforeEach(() => {
+    // Stubbed for the same reason google-transport.test.ts stubs it: without a
+    // client id `connectGoogle` refuses before it ever names a sheet, so these
+    // assertions were passing only on a machine that happens to have an
+    // untracked .env.local, and failing anywhere else -- a worktree, a fresh
+    // clone, CI. Whether the file exists is a property of the machine, not of
+    // the behaviour under test.
+    vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "test-client-id");
     useStore.setState({
       hydrated: true,
       unit: "lbs",
@@ -564,6 +576,8 @@ describe("connecting a Google sheet", () => {
     });
     localStorage.clear();
   });
+
+  afterEach(() => vi.unstubAllEnvs());
 
   it("names the sheet after the person, when their coach's invite said who they are", async () => {
     // Every client's sheet is otherwise called the same thing, and the coach

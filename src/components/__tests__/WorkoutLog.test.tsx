@@ -400,4 +400,61 @@ describe("what the review added", () => {
 
     expect(useStore.getState().exercises.find((e) => e.id === BENCH.id)?.setupNote).toBeUndefined();
   });
+
+  it("substituting swaps the row in place and keeps the prescription's set count", () => {
+    const DB_BENCH: Exercise = {
+      id: "e_db_bench",
+      name: "Dumbbell Bench Press",
+      type: "accessory",
+    };
+    setup([
+      { exerciseId: BENCH.id, sets: 3, reps: "8" },
+      { exerciseId: ROW.id, sets: 4, reps: "10" },
+    ]);
+    useStore.setState({ exercises: [BENCH, ROW, DB_BENCH] });
+
+    expect(screen.getByRole("button", { name: /^Bench Press/ })).toHaveTextContent("0/3 sets");
+    expect(screen.getByRole("button", { name: /^Barbell Row/ })).toHaveTextContent("0/4 sets");
+
+    openExercise("Bench Press");
+    fireEvent.click(screen.getByRole("button", { name: "Substitute" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Dumbbell Bench Press/ }));
+    const subButtons = screen.getAllByRole("button", { name: "Substitute" });
+    fireEvent.click(subButtons[subButtons.length - 1]);
+
+    // Screen closes back to list
+    expect(screen.queryByRole("button", { name: /^Bench Press/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Dumbbell Bench Press/ })).toHaveTextContent(
+      "0/3 sets",
+    );
+    expect(screen.getByRole("button", { name: /^Barbell Row/ })).toHaveTextContent("0/4 sets");
+
+    const rows = screen.getAllByRole("button", { name: /sets$/ });
+    expect(rows[0]).toHaveTextContent("Dumbbell Bench Press");
+    expect(rows[1]).toHaveTextContent("Barbell Row");
+  });
+
+  it("does not list the substituted-out lift twice even if logged", () => {
+    const DB_BENCH: Exercise = {
+      id: "e_db_bench",
+      name: "Dumbbell Bench Press",
+      type: "accessory",
+    };
+    setup([{ exerciseId: BENCH.id, sets: 3, reps: "8" }]);
+    useStore.setState({ exercises: [BENCH, ROW, DB_BENCH] });
+
+    openExercise("Bench Press");
+    tapRow(1);
+    type("Weight", "225");
+    type("Reps", "5");
+    save();
+
+    fireEvent.click(screen.getByRole("button", { name: "Substitute" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Dumbbell Bench Press/ }));
+    const subButtons = screen.getAllByRole("button", { name: "Substitute" });
+    fireEvent.click(subButtons[subButtons.length - 1]);
+
+    expect(screen.queryByRole("button", { name: /^Bench Press/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Dumbbell Bench Press/ })).toBeInTheDocument();
+  });
 });

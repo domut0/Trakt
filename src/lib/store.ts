@@ -540,6 +540,9 @@ interface State {
   /** The lifts a slot is for. Preloaded at Start Workout, never a constraint. */
   /** Replaces a card's prescribed lifts, in the order the workout opens them. */
   setSlotLifts: (slotId: string, lifts: PlannedLift[]) => void;
+  /** Replaces an exercise across every slot that prescribes it, collapsing duplicates
+   *  if a slot already prescribed the replacement. Refused while a coach owns the plan. */
+  replacePlannedExercise: (fromExerciseId: string, toExerciseId: string) => void;
   /** What this card prescribes on the bike or the treadmill. `undefined`
    *  removes it. Refused, like every plan edit, while a coach owns the plan. */
   setSlotCardio: (slotId: string, cardio: PlannedCardio | undefined) => void;
@@ -2009,6 +2012,43 @@ export const useStore = create<State>((set, get) => ({
     set({ slots: next });
     const updated = next.find((sl) => sl.id === slotId);
     if (updated) safeWrite(() => db.slots.put(updated));
+  },
+
+  replacePlannedExercise: (fromExerciseId, toExerciseId) => {
+    if (get().coachManaged) return;
+    if (fromExerciseId === toExerciseId) return;
+
+    // Walks every slot's plan and replaces the lift. Logged history (sessions
+    // and sets) is intentionally untouched: it is a record of what happened.
+    const changedSlots: SplitSlot[] = [];
+    const next = get().slots.map((sl) => {
+      if (!sl.plannedLifts || sl.plannedLifts.length === 0) return sl;
+      const hasFrom = sl.plannedLifts.some((l) => l.exerciseId === fromExerciseId);
+      if (!hasFrom) return sl;
+
+      const alreadyHasReplacement = sl.plannedLifts.some((l) => l.exerciseId === toExerciseId);
+      let rewritten: PlannedLift[];
+      if (alreadyHasReplacement) {
+        // If the slot already prescribed the replacement, collapse to that original entry,
+        // keeping its original position and sets/reps/load rather than duplicating the lift.
+        rewritten = sl.plannedLifts.filter((l) => l.exerciseId !== fromExerciseId);
+      } else {
+        rewritten = sl.plannedLifts.map((l) =>
+          l.exerciseId === fromExerciseId ? { ...l, exerciseId: toExerciseId } : l,
+        );
+      }
+
+      const updated: SplitSlot = { ...sl, plannedLifts: rewritten };
+      changedSlots.push(updated);
+      return updated;
+    });
+
+    if (changedSlots.length === 0) return;
+
+    set({ slots: next });
+    for (const slot of changedSlots) {
+      safeWrite(() => db.slots.put(slot));
+    }
   },
 
   setSlotCardio: (slotId, cardio) => {
