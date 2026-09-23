@@ -75,14 +75,24 @@ export function SubstituteSheet({
     [filteredSuggestions],
   );
 
+  /**
+   * Everything else, minus what today already contains.
+   *
+   * The session exclusion is not tidiness, it is a data loss guard. The
+   * workout log shows one row per exercise, so substituting a lift for one
+   * that is ALREADY in the session merges the two rows -- observed in the
+   * browser: a three-lift day silently became a two-lift day, and the
+   * prescription on the row that vanished went with it. Offering the choice at
+   * all was the bug.
+   */
   const filteredEverythingElse = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = strengthExercises.filter(
-      (e) => e.id !== exercise.id && !visibleSuggestionIds.has(e.id),
+      (e) => e.id !== exercise.id && !sessionSet.has(e.id) && !visibleSuggestionIds.has(e.id),
     );
     const matched = q ? list.filter((e) => e.name.toLowerCase().includes(q)) : list;
     return matched.slice(0, 20);
-  }, [strengthExercises, exercise.id, visibleSuggestionIds, query]);
+  }, [strengthExercises, exercise.id, sessionSet, visibleSuggestionIds, query]);
 
   if (!open || typeof document === "undefined") return null;
 

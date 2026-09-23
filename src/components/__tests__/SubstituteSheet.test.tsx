@@ -126,4 +126,25 @@ describe("SubstituteSheet", () => {
 
     expect(onReplaceEverywhere).toHaveBeenCalledWith("e_incline_bench");
   });
+
+  /**
+   * Found by driving the app, not by reading it: a three-lift day became a
+   * two-lift day. The workout log keeps one row per exercise, so choosing a
+   * lift the session already contains merges the rows and takes the
+   * disappearing row's prescription with it. The fix is to not offer it --
+   * in EITHER list, not just the suggestions.
+   */
+  it("never offers a lift the session already contains", () => {
+    render(
+      <SubstituteSheet
+        open
+        onClose={() => {}}
+        exercise={BENCH}
+        sessionExerciseIds={[BENCH.id, "e_incline_bench"]}
+        onSubstitute={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /^Incline Bench Press/ })).not.toBeInTheDocument();
+  });
 });
