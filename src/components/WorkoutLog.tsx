@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Plus } from "./icons";
 import { ExercisePickerSheet } from "./ExercisePickerSheet";
 import { ExerciseScreen } from "./ExerciseScreen";
+import { applyOrder, useReorderList } from "../hooks/useReorderList";
 import { hasUnloggedSets } from "../lib/set-rows";
 import { useStore, type Exercise, type PlannedLift } from "../lib/store";
 
@@ -50,6 +51,14 @@ export function WorkoutLog({
    * is logged against the replacement the row is derived from the set anyway.
    */
   const [substitutions, setSubstitutions] = useState<Record<string, string>>({});
+  /**
+   * Session-local reorder of exercises chosen by dragging rows.
+   *
+   * Held here rather than in the store because reordering is transient to this
+   * session and never mutates planned lifts or template slots. Lifts added or
+   * logged later appear in their natural relative positions.
+   */
+  const [order, setOrder] = useState<string[]>([]);
   const [openExerciseId, setOpenExerciseId] = useState<string | undefined>(undefined);
   const [picking, setPicking] = useState(false);
 
@@ -65,7 +74,7 @@ export function WorkoutLog({
    * A lift whose exercise has since been deleted is dropped here rather than
    * stored pruned, so deleting an exercise never has to walk every slot.
    */
-  const rows = useMemo(() => {
+  const baseRows = useMemo(() => {
     const byId = new Map(exercises.map((e) => [e.id, e]));
     const out: { exercise: Exercise; lift?: PlannedLift }[] = [];
     const seen = new Set<string>();
@@ -89,6 +98,14 @@ export function WorkoutLog({
     }
     return out;
   }, [exercises, lifts, sessSets, added, substitutions]);
+
+  const rows = useMemo(() => applyOrder(baseRows, order), [baseRows, order]);
+
+  const reorder = useReorderList({
+    items: rows,
+    getItemId: (r) => r.exercise.id,
+    onReorder: (_newItems, newIds) => setOrder(newIds),
+  });
 
   const loggedCountOf = (exerciseId: string) =>
     sessSets.filter((s) => s.exerciseId === exerciseId).length;
@@ -125,23 +142,61 @@ export function WorkoutLog({
     <>
       <section className="section-gap min-h-0 flex-1 overflow-y-auto px-4">
         {rows.length > 0 && (
-          <ul className="group-list">
+          <ul ref={reorder.listRef} className="group-list relative">
             {rows.map(({ exercise, lift }, idx) => {
               const logged = loggedCountOf(exercise.id);
               const isCurrent = exercise.id === currentExerciseId;
+              const isDraggingThis = reorder.dragIndex === idx;
+
+              let shiftY = 0;
+              if (reorder.dragIndex !== null && reorder.overIndex !== null && !isDraggingThis) {
+                if (reorder.dragIndex < reorder.overIndex) {
+                  if (idx > reorder.dragIndex && idx <= reorder.overIndex) {
+                    shiftY = -reorder.rowHeight;
+                  }
+                } else if (reorder.dragIndex > reorder.overIndex) {
+                  if (idx >= reorder.overIndex && idx < reorder.dragIndex) {
+                    shiftY = reorder.rowHeight;
+                  }
+                }
+              }
+
               return (
-                <li key={exercise.id}>
+                <li
+                  key={exercise.id}
+                  className={isDraggingThis ? "relative z-10" : "relative"}
+                  style={{
+                    transform: isDraggingThis
+                      ? `translateY(${reorder.dragOffsetY}px) scale(1.02)`
+                      : shiftY !== 0
+                        ? `translateY(${shiftY}px)`
+                        : undefined,
+                    transition: isDraggingThis ? "none" : "transform 150ms ease",
+                  }}
+                >
                   <button
-                    onClick={() => open(exercise.id)}
+                    {...reorder.getItemProps(idx)}
+                    onClick={() => {
+                      if (reorder.isClickSuppressed()) return;
+                      open(exercise.id);
+                    }}
                     aria-pressed={isCurrent}
                     data-tutorial={idx === 0 ? "lift-row-first" : undefined}
+                    style={{
+                      touchAction: isDraggingThis ? "none" : undefined,
+                    }}
                     /*
                       The lift you are on is an INKED ROW, which is the same mark
                       the week strip uses for the day you are on. One vocabulary
-                      for "you are here" across the app.
+                      for "you are here" across the app. A dragged row declares its
+                      own opaque background explicitly (DESIGN.md background rule).
                     */
-                    className={`group-row w-full text-left ${idx > 0 ? "group-row-sep" : ""} ${
-                      isCurrent ? "bg-ink text-paper rounded-md" : "text-ink"
+                    className={`group-row w-full text-left ${idx > 0 && !isDraggingThis ? "group-row-sep" : ""} ${
+                      isCurrent
+                        ? "bg-ink text-paper rounded-md"
+                        : isDraggingThis
+                          ? "bg-surface text-ink rounded-md shadow-md"
+                          : "text-ink"
                     }`}
                   >
                     {/* The space between the two spans is load-bearing: flex
@@ -193,6 +248,7 @@ export function WorkoutLog({
                 Object.keys(prev).find((k) => prev[k] === openExerciseId) ?? openExerciseId;
               return { ...prev, [originalKey]: replacementId };
             });
+            setOrder((prev) => prev.map((id) => (id === openExerciseId ? replacementId : id)));
             setAdded((prev) =>
               prev.includes(openExerciseId)
                 ? Array.from(
