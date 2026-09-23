@@ -506,7 +506,7 @@ describe("what the review added", () => {
     openExercise("Bench Press");
     fireEvent.click(screen.getByRole("button", { name: "Substitute" }));
     fireEvent.click(screen.getByRole("button", { name: /^Dumbbell Bench Press/ }));
-    let subButtons = screen.getAllByRole("button", { name: "Substitute" });
+    const subButtons = screen.getAllByRole("button", { name: "Substitute" });
     fireEvent.click(subButtons[subButtons.length - 1]);
 
     // Now replace everywhere with a third lift.
