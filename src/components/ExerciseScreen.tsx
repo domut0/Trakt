@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus } from "./icons";
 import { Primary } from "./Frame";
+import { SubstituteSheet } from "./SubstituteSheet";
 import { TutorialBanner } from "./TutorialBanner";
 import { useSheetDismiss } from "../hooks/useSheetDismiss";
 import { lastSessionFor } from "../lib/exercise-history";
@@ -33,6 +34,8 @@ export function ExerciseScreen({
   lift,
   stopwatch,
   onDone,
+  onSubstitute,
+  sessionExerciseIds,
 }: {
   exerciseId: string;
   /** What the card prescribed, when this exercise came off a plan. */
@@ -42,6 +45,10 @@ export function ExerciseScreen({
   stopwatch: string;
   /** `complete` is true when every row on this screen has been logged. */
   onDone: (complete: boolean) => void;
+  /** Swaps the exercise mid-workout and returns to the workout log. */
+  onSubstitute?: (replacementId: string) => void;
+  /** Exercises already in the workout session, excluded from suggestions. */
+  sessionExerciseIds?: readonly string[];
 }) {
   const activeSessionId = useStore((s) => s.activeSessionId);
   const exercises = useStore((s) => s.exercises);
@@ -52,7 +59,9 @@ export function ExerciseScreen({
   const updateSet = useStore((s) => s.updateSet);
   const lastSetupNoteFor = useStore((s) => s.lastSetupNoteFor);
   const setSetupNote = useStore((s) => s.setSetupNote);
+  const replacePlannedExercise = useStore((s) => s.replacePlannedExercise);
 
+  const [substituting, setSubstituting] = useState(false);
   /** How far "+ Add set" has pushed the row count past what is prescribed. */
   const [minRows, setMinRows] = useState(0);
   /** The row whose editor is open, by its 1-based index, or null for none. */
@@ -209,6 +218,18 @@ export function ExerciseScreen({
           >
             Back
           </button>
+          {/* Only when somebody is listening. The screen cannot swap a lift on
+              its own -- the row belongs to the workout log -- so without a
+              handler this would open a sheet whose answer goes nowhere. */}
+          {onSubstitute && (
+            <button
+              type="button"
+              onClick={() => setSubstituting(true)}
+              className="-my-[11px] flex min-h-[44px] items-center t-body font-medium t-action"
+            >
+              Substitute
+            </button>
+          )}
         </div>
 
         <div className="px-4 pb-2">
@@ -417,6 +438,30 @@ export function ExerciseScreen({
               Done
             </Primary>
           </div>
+        )}
+
+        {substituting && exercise && (
+          <SubstituteSheet
+            open={substituting}
+            onClose={() => setSubstituting(false)}
+            exercise={exercise}
+            sessionExerciseIds={sessionExerciseIds}
+            onSubstitute={(replacementId) => {
+              setSubstituting(false);
+              onSubstitute?.(replacementId);
+            }}
+            onReplaceEverywhere={(replacementId) => {
+              setSubstituting(false);
+              // What the PLAN knows this row as, which is the prescribed lift
+              // and not whatever is on screen: substitute A for B and then
+              // replace everywhere with C, and the entry to rewrite is still
+              // A. Rewriting B as well would edit every other card that
+              // happens to prescribe B -- days this substitution was never
+              // about.
+              replacePlannedExercise(lift?.exerciseId ?? exerciseId, replacementId);
+              onSubstitute?.(replacementId);
+            }}
+          />
         )}
       </div>
     </div>,

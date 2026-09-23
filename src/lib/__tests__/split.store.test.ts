@@ -427,3 +427,94 @@ describe("logging a workout you forgot", () => {
     expect(minutes).toBeLessThan(5);
   });
 });
+
+describe("replacePlannedExercise", () => {
+  const bench = { id: "e_bench", name: "Bench Press", type: "main" as const };
+  const dbBench = { id: "e_db_bench", name: "DB Bench", type: "accessory" as const };
+  const row = { id: "e_row", name: "Row", type: "accessory" as const };
+
+  beforeEach(() => {
+    useStore.setState({
+      coachManaged: false,
+      exercises: [bench, dbBench, row],
+    });
+  });
+
+  it("rewrites every slot that prescribed the lift, keeping sets/reps/load", () => {
+    const s = useStore.getState();
+    const upper1 = s.addSplitCard({ name: "Upper 1" })!;
+    const upper2 = s.addSplitCard({ name: "Upper 2" })!;
+    s.setSlotLifts(upper1.id, [
+      { exerciseId: "e_bench", sets: 3, reps: "5", load: "225" },
+      { exerciseId: "e_row", sets: 4 },
+    ]);
+    s.setSlotLifts(upper2.id, [{ exerciseId: "e_bench", sets: 5, reps: "3" }]);
+
+    s.replacePlannedExercise("e_bench", "e_db_bench");
+
+    const slots = useStore.getState().slots;
+    const u1 = slots.find((sl) => sl.id === upper1.id)!;
+    const u2 = slots.find((sl) => sl.id === upper2.id)!;
+
+    expect(u1.plannedLifts).toEqual([
+      { exerciseId: "e_db_bench", sets: 3, reps: "5", load: "225" },
+      { exerciseId: "e_row", sets: 4 },
+    ]);
+    expect(u2.plannedLifts).toEqual([{ exerciseId: "e_db_bench", sets: 5, reps: "3" }]);
+  });
+
+  it("collapses duplicates keeping the original position and prescription", () => {
+    const s = useStore.getState();
+    const upper = s.addSplitCard({ name: "Upper" })!;
+    s.setSlotLifts(upper.id, [
+      { exerciseId: "e_bench", sets: 3, reps: "5" },
+      { exerciseId: "e_db_bench", sets: 4, reps: "10-12", load: "60" },
+    ]);
+
+    s.replacePlannedExercise("e_bench", "e_db_bench");
+
+    const slots = useStore.getState().slots;
+    const u = slots.find((sl) => sl.id === upper.id)!;
+    // Keeps the original entry prescribing the replacement:
+    expect(u.plannedLifts).toEqual([
+      { exerciseId: "e_db_bench", sets: 4, reps: "10-12", load: "60" },
+    ]);
+  });
+
+  it("is a no-op when coachManaged is true", () => {
+    const s = useStore.getState();
+    const upper = s.addSplitCard({ name: "Upper" })!;
+    s.setSlotLifts(upper.id, [{ exerciseId: "e_bench", sets: 3 }]);
+    useStore.setState({ coachManaged: true });
+
+    s.replacePlannedExercise("e_bench", "e_db_bench");
+
+    const slots = useStore.getState().slots;
+    const u = slots.find((sl) => sl.id === upper.id)!;
+    expect(u.plannedLifts).toEqual([{ exerciseId: "e_bench", sets: 3 }]);
+  });
+
+  it("leaves logged sets and sessions untouched", () => {
+    const s = useStore.getState();
+    const upper = s.addSplitCard({ name: "Upper" })!;
+    s.setSlotLifts(upper.id, [{ exerciseId: "e_bench", sets: 3 }]);
+    const pastSession = { id: "sess_past", splitSlotId: upper.id, startedAt: 1000 };
+    const pastWorkoutSet = {
+      id: "set_past",
+      sessionId: "sess_past",
+      exerciseId: "e_bench",
+      weight: 225,
+      reps: 5,
+      loggedAt: 1050,
+    };
+    useStore.setState({
+      sessions: [pastSession],
+      sets: [pastWorkoutSet],
+    });
+
+    s.replacePlannedExercise("e_bench", "e_db_bench");
+
+    expect(useStore.getState().sets).toEqual([pastWorkoutSet]);
+    expect(useStore.getState().sessions).toEqual([pastSession]);
+  });
+});

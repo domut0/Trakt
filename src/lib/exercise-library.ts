@@ -3,6 +3,167 @@
  * Extracted from store.ts to keep that module focused on state logic.
  */
 import type { Exercise } from "./store";
+export type MuscleGroup =
+  | "Chest"
+  | "Back"
+  | "Shoulders"
+  | "Quads"
+  | "Hamstrings / Glutes"
+  | "Biceps"
+  | "Triceps"
+  | "Calves"
+  | "Core"
+  | "Forearms / Traps";
+
+/**
+ * Static lookup from seeded exercise id to muscle group.
+ *
+ * Keyed by id rather than stored on the Exercise model because a user-created
+ * exercise has no muscle group, and inventing or guessing one would be the app
+ * presenting a guess as a fact. The library's seed exercises have known targets,
+ * while user-defined lifts simply have no entry here.
+ */
+export const EXERCISE_GROUPS: Record<string, MuscleGroup> = {
+  e_bench: "Chest",
+  e_squat: "Quads",
+  e_dead: "Back",
+  e_flap: "Back",
+  e_push: "Triceps",
+  e_curl: "Biceps",
+  e_row: "Back",
+
+  // Chest
+  e_incline_bench: "Chest",
+  e_decline_bench: "Chest",
+  e_close_grip_bench: "Chest",
+  e_paused_bench: "Chest",
+  e_db_bench: "Chest",
+  e_incline_db_press: "Chest",
+  e_decline_db_press: "Chest",
+  e_db_fly: "Chest",
+  e_incline_db_fly: "Chest",
+  e_cable_fly: "Chest",
+  e_low_high_cable_fly: "Chest",
+  e_pec_deck: "Chest",
+  e_machine_chest_press: "Chest",
+  e_pushup: "Chest",
+  e_chest_dip: "Chest",
+  e_landmine_press: "Chest",
+  e_smith_bench: "Chest",
+  e_db_pullover: "Chest",
+
+  // Back
+  e_rdl: "Back",
+  e_sumo_dead: "Back",
+  e_deficit_dead: "Back",
+  e_trap_bar_dead: "Back",
+  e_barbell_row: "Back",
+  e_pendlay_row: "Back",
+  e_tbar_row: "Back",
+  e_seated_cable_row: "Back",
+  e_lat_pulldown: "Back",
+  e_wide_lat_pulldown: "Back",
+  e_close_lat_pulldown: "Back",
+  e_single_db_row: "Back",
+  e_pullup: "Back",
+  e_chinup: "Back",
+  e_straight_arm_pulldown: "Back",
+  e_reverse_hyper: "Back",
+  e_back_extension: "Back",
+  e_barbell_shrug: "Back",
+  e_db_shrug: "Back",
+  e_smith_row: "Back",
+
+  // Shoulders
+  e_ohp: "Shoulders",
+  e_push_press: "Shoulders",
+  e_seated_db_press: "Shoulders",
+  e_arnold_press: "Shoulders",
+  e_db_lateral_raise: "Shoulders",
+  e_cable_lateral_raise: "Shoulders",
+  e_db_front_raise: "Shoulders",
+  e_db_rear_delt_fly: "Shoulders",
+  e_reverse_pec_deck: "Shoulders",
+  e_face_pull: "Shoulders",
+  e_machine_shoulder_press: "Shoulders",
+  e_upright_row: "Shoulders",
+
+  // Quads
+  e_front_squat: "Quads",
+  e_box_squat: "Quads",
+  e_leg_press: "Quads",
+  e_hack_squat: "Quads",
+  e_leg_extension: "Quads",
+  e_bulgarian_split_squat: "Quads",
+  e_walking_lunge: "Quads",
+  e_goblet_squat: "Quads",
+  e_step_up: "Quads",
+  e_safety_bar_squat: "Quads",
+  e_smith_squat: "Quads",
+
+  // Hamstrings / Glutes
+  e_stiff_leg_dead: "Hamstrings / Glutes",
+  e_lying_leg_curl: "Hamstrings / Glutes",
+  e_seated_leg_curl: "Hamstrings / Glutes",
+  e_glute_ham_raise: "Hamstrings / Glutes",
+  e_hip_thrust: "Hamstrings / Glutes",
+  e_cable_pull_through: "Hamstrings / Glutes",
+  e_good_morning: "Hamstrings / Glutes",
+  e_cable_glute_kickback: "Hamstrings / Glutes",
+  e_nordic_curl: "Hamstrings / Glutes",
+  e_hip_abduction_machine: "Hamstrings / Glutes",
+  e_hip_adduction_machine: "Hamstrings / Glutes",
+
+  // Biceps
+  e_barbell_curl: "Biceps",
+  e_ezbar_curl: "Biceps",
+  e_db_curl: "Biceps",
+  e_hammer_curl: "Biceps",
+  e_preacher_curl: "Biceps",
+  e_cable_curl: "Biceps",
+  e_concentration_curl: "Biceps",
+  e_spider_curl: "Biceps",
+  e_zottman_curl: "Biceps",
+
+  // Triceps
+  e_skull_crusher: "Triceps",
+  e_overhead_tricep_ext: "Triceps",
+  e_cable_overhead_tricep_ext: "Triceps",
+  e_tricep_dip: "Triceps",
+  e_tricep_kickback: "Triceps",
+  e_jm_press: "Triceps",
+  e_diamond_pushup: "Triceps",
+
+  // Calves
+  e_standing_calf_raise: "Calves",
+  e_seated_calf_raise: "Calves",
+  e_leg_press_calf_raise: "Calves",
+
+  // Core
+  e_plank: "Core",
+  e_side_plank: "Core",
+  e_hanging_leg_raise: "Core",
+  e_cable_crunch: "Core",
+  e_ab_wheel_rollout: "Core",
+  e_russian_twist: "Core",
+  e_weighted_situp: "Core",
+  e_machine_crunch: "Core",
+  e_cable_woodchopper: "Core",
+  e_bicycle_crunch: "Core",
+  e_v_up: "Core",
+  e_dead_bug: "Core",
+  e_pallof_press: "Core",
+
+  // Forearms / Traps
+  e_wrist_curl: "Forearms / Traps",
+  e_reverse_wrist_curl: "Forearms / Traps",
+  e_farmers_carry: "Forearms / Traps",
+  e_reverse_curl: "Forearms / Traps",
+
+  // Machine variety
+  e_assisted_pullup: "Back",
+  e_assisted_dip: "Triceps",
+};
 
 export const seedExercises: Exercise[] = [
   { id: "e_bench", name: "Bench Press", type: "main" },
