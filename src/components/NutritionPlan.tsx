@@ -312,7 +312,7 @@ function NumberField({
           onPatch({ [field]: t === "" || !Number.isFinite(n) ? undefined : n });
         }}
         placeholder={suggestion === undefined ? "—" : String(suggestion)}
-        className={`min-h-[44px] ${width} bg-transparent text-right t-body outline-none placeholder:text-ink-3 ${
+        className={`min-h-[44px] ${width} rounded-md bg-field px-2 text-right t-body outline-none placeholder:text-ink-3 ${
           wrong ? "text-signal" : "text-ink"
         }`}
       />
@@ -355,7 +355,7 @@ function PhaseEditor({
           value={phase.name}
           onChange={(e) => onPatch({ name: e.target.value })}
           placeholder="Cut"
-          className="min-h-[44px] min-w-0 flex-1 bg-transparent text-right t-body text-ink outline-none placeholder:text-ink-3"
+          className="min-h-[44px] min-w-0 flex-1 rounded-md bg-field px-3 text-right t-body text-ink outline-none placeholder:text-ink-3"
         />
       </div>
 
@@ -368,7 +368,7 @@ function PhaseEditor({
           type="date"
           value={phase.startsOn}
           onChange={(e) => e.target.value && onDates({ startsOn: e.target.value })}
-          className="min-h-[44px] bg-transparent text-right t-body text-ink outline-none"
+          className="min-h-[44px] rounded-md bg-field px-2 text-right t-body text-ink outline-none"
         />
       </div>
 
@@ -386,7 +386,7 @@ function PhaseEditor({
           value={phase.endsOn ?? ""}
           min={phase.startsOn}
           onChange={(e) => onDates({ endsOn: e.target.value || null })}
-          className="min-h-[44px] bg-transparent text-right t-body text-ink outline-none"
+          className="min-h-[44px] rounded-md bg-field px-2 text-right t-body text-ink outline-none"
         />
       </div>
 

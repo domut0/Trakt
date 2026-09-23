@@ -247,7 +247,7 @@ export function SlotPlanSheet({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={kind === "rest" ? "Rest" : "Upper"}
-                className="min-h-[44px] flex-1 bg-transparent text-right t-body text-ink outline-none placeholder:text-ink-3"
+                className="min-h-[44px] flex-1 rounded-md bg-field px-3 text-right t-body text-ink outline-none placeholder:text-ink-3"
               />
             </div>
           )}
@@ -294,7 +294,7 @@ export function SlotPlanSheet({
                   id="card-cardio"
                   value={cardioId ?? ""}
                   onChange={(e) => setCardioId(e.target.value || undefined)}
-                  className="min-h-[44px] bg-transparent text-right t-body text-ink outline-none"
+                  className="min-h-[44px] rounded-md bg-field px-2 text-right t-body text-ink outline-none"
                 >
                   {/* Blank is a real choice on a cardio card: "do some cardio"
                       without saying which is a legitimate thing to plan. */}
@@ -320,7 +320,7 @@ export function SlotPlanSheet({
                       value={minutes}
                       onChange={(e) => setMinutes(e.target.value)}
                       placeholder="—"
-                      className="min-h-[44px] w-24 bg-transparent text-right t-body text-ink outline-none placeholder:text-ink-3"
+                      className="min-h-[44px] w-24 rounded-md bg-field px-2 text-right t-body text-ink outline-none placeholder:text-ink-3"
                     />
                   </div>
                   <div className="group-row group-row-sep">
@@ -334,7 +334,7 @@ export function SlotPlanSheet({
                       value={distance}
                       onChange={(e) => setDistance(e.target.value)}
                       placeholder="—"
-                      className="min-h-[44px] w-24 bg-transparent text-right t-body text-ink outline-none placeholder:text-ink-3"
+                      className="min-h-[44px] w-24 rounded-md bg-field px-2 text-right t-body text-ink outline-none placeholder:text-ink-3"
                     />
                   </div>
                 </>

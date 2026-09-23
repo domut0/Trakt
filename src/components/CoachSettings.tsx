@@ -372,7 +372,7 @@ function InviteForm({ onDone }: { onDone: () => void }) {
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
-          className="min-h-[44px] w-full border border-rule bg-transparent px-3 t-body text-ink rounded-md"
+          className="min-h-[44px] w-full bg-field px-3 t-body text-ink rounded-md"
         />
       )}
       <div className="flex gap-2">
@@ -413,7 +413,7 @@ function Field({
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
-        className="min-h-[44px] w-full border border-rule bg-transparent px-3 t-body text-ink rounded-md"
+        className="min-h-[44px] w-full bg-field px-3 t-body text-ink rounded-md"
       />
     </label>
   );

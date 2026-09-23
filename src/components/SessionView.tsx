@@ -209,7 +209,7 @@ export function SessionView({
             placeholder="Felt flat, shoulder tweaked, good bar speed"
             // Placeholder at full text-ink-2, not /60: at 60% over the surface
             // it measures 3.7:1, under the 4.5:1 AA floor for text this size.
-            className="mt-1 w-full resize-none bg-transparent t-body text-ink outline-none placeholder:text-ink-2"
+            className="mt-1 w-full resize-none rounded-md bg-field px-3 py-2 t-body text-ink outline-none placeholder:text-ink-2"
           />
         </div>
       );
@@ -355,7 +355,7 @@ function EditSetSheet({
                   inputMode="decimal"
                   value={val}
                   onChange={(e) => setter(e.target.value)}
-                  className="mt-1 min-h-[44px] w-full min-w-0 bg-transparent t-stat outline-none"
+                  className="mt-1 min-h-[44px] w-full min-w-0 rounded-md bg-field px-3 t-stat outline-none"
                 />
               </div>
             );

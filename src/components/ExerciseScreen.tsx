@@ -478,7 +478,7 @@ function EditorField({
               onEnter();
             }
           }}
-          className="min-h-[44px] w-full min-w-0 bg-transparent tnum t-stat text-ink outline-none"
+          className="min-h-[44px] w-full min-w-0 rounded-md bg-field px-3 tnum t-stat text-ink outline-none"
         />
         {suffix && <span className="t-label text-ink-2">{suffix}</span>}
       </div>

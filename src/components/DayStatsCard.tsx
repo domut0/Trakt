@@ -112,10 +112,18 @@ function FigureField({
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
-      className={`w-[4.5ch] min-w-0 bg-transparent text-right t-stat text-ink outline-none placeholder:font-normal placeholder:text-ink-3 ${
+      /* Filled, not bare. These six are the app's most-used inputs and they
+         read as printed values until you happen to tap one, which is the
+         complaint that put the `field` token in the palette. The box hugs its
+         own content so a row of them still scans as figures rather than as a
+         form, and it keeps a floor so an unlogged day is a target you can hit
+         rather than a dash. */
+      className={`min-w-0 rounded-md bg-field px-2 py-0.5 text-right t-stat text-ink outline-none placeholder:font-normal placeholder:text-ink-3 ${
         exceeded ? "mark-over" : ""
       }`}
-      style={{ width: `${Math.max(raw.length, placeholder.length, 1) + 0.5}ch` }}
+      /* Content width plus the horizontal padding, because the box sizes
+         border-box and the padding would otherwise eat the digits. */
+      style={{ width: `calc(${Math.max(raw.length, placeholder.length, 4)}ch + 1rem)` }}
     />
   );
 }

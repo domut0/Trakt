@@ -115,7 +115,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
           onChange={(e) => setExerciseQuery(e.target.value)}
           placeholder="Search or add activity"
           aria-label="Search or add a cardio activity"
-          className="mt-3 min-h-[44px] w-full bg-transparent t-heading outline-none placeholder:text-ink-2"
+          className="mt-3 min-h-[44px] w-full rounded-md bg-field px-3 t-heading outline-none placeholder:text-ink-2"
         />
         <div className="mt-3 max-h-72 overflow-y-auto group-list">
           {filteredRows.map((r, idx) =>
@@ -201,7 +201,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
             value={setupNote}
             onChange={(e) => setSetupNote(e.target.value)}
             placeholder={suggestedNote ?? "Incline, resistance"}
-            className="min-h-[44px] w-full min-w-0 bg-transparent t-body outline-none placeholder:text-ink-2"
+            className="min-h-[44px] w-full min-w-0 rounded-md bg-field px-3 t-body outline-none placeholder:text-ink-2"
           />
         </div>
 
@@ -218,7 +218,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
               onChange={(e) => setDuration(e.target.value)}
               onFocus={(e) => e.currentTarget.select()}
               placeholder="0"
-              className="t-stat w-20 text-right bg-transparent outline-none placeholder:text-ink-2"
+              className="t-stat w-20 rounded-md bg-field px-2 py-0.5 text-right outline-none placeholder:text-ink-2"
             />
             <span className="t-label text-ink-2">min</span>
           </div>
@@ -242,7 +242,7 @@ export function CardioLogCard({ onBack, onDone }: { onBack: () => void; onDone: 
               onChange={(e) => setDistance(e.target.value)}
               onFocus={(e) => e.currentTarget.select()}
               placeholder="0"
-              className="t-stat w-20 text-right bg-transparent outline-none placeholder:text-ink-2"
+              className="t-stat w-20 rounded-md bg-field px-2 py-0.5 text-right outline-none placeholder:text-ink-2"
             />
             <span className="t-label text-ink-2">{unit === "lbs" ? "mi" : "km"}</span>
           </div>

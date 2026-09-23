@@ -81,7 +81,7 @@ export function ExercisePickerSheet({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search or add exercise"
-            className="w-full bg-transparent t-heading font-semibold tracking-tight outline-none placeholder:text-ink-2"
+            className="w-full rounded-md bg-field px-3 py-2 t-heading font-semibold tracking-tight outline-none placeholder:text-ink-2"
           />
           <div className="mt-3 max-h-72 overflow-y-auto group-list bg-wash">
             {filtered.map((e, idx) => (
