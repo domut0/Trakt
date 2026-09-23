@@ -34,31 +34,23 @@ export function WorkoutLog({
   const setCurrentExercise = useStore((s) => s.setCurrentExercise);
 
   /**
-   * Exercises added by hand that have no sets yet.
+   * How this session departs from the card: what was added off-plan, what was
+   * swapped, and the order the lifts are being done in.
    *
-   * Held here rather than in the store because an off-plan lift with nothing
-   * logged against it is not yet part of the record - it is a row somebody
-   * opened. Once a set exists the row is derived from the set instead, so this
-   * list stops mattering.
+   * All three live ON THE SESSION, not in this component. They used to be
+   * `useState` here, on the reasoning that a row nobody has logged against is
+   * not yet part of the record -- and that reasoning does not survive contact
+   * with a gym. Leaving this screen unmounts the component, so a reorder was
+   * gone the moment you looked at anything else, and a substitution lasted
+   * only until you left unless a set had already been logged against it. Both
+   * were reported. The session also survives the app being evicted while
+   * backgrounded, which this component cannot.
    */
-  const [added, setAdded] = useState<string[]>([]);
-  /**
-   * Planned exercises substituted for this session only, mapping the original
-   * planned exercise id to the replacement exercise id.
-   *
-   * Like `added`, this state is session-local and is lost if the component
-   * unmounts. That is the existing, accepted trade-off in this file: once a set
-   * is logged against the replacement the row is derived from the set anyway.
-   */
-  const [substitutions, setSubstitutions] = useState<Record<string, string>>({});
-  /**
-   * Session-local reorder of exercises chosen by dragging rows.
-   *
-   * Held here rather than in the store because reordering is transient to this
-   * session and never mutates planned lifts or template slots. Lifts added or
-   * logged later appear in their natural relative positions.
-   */
-  const [order, setOrder] = useState<string[]>([]);
+  const session = useStore((s) => s.sessions.find((x) => x.id === sessionId));
+  const updateSession = useStore((s) => s.updateSession);
+  const added = useMemo(() => session?.addedExerciseIds ?? [], [session?.addedExerciseIds]);
+  const substitutions = useMemo(() => session?.substitutions ?? {}, [session?.substitutions]);
+  const order = useMemo(() => session?.exerciseOrder ?? [], [session?.exerciseOrder]);
   const [openExerciseId, setOpenExerciseId] = useState<string | undefined>(undefined);
   const [picking, setPicking] = useState(false);
 
@@ -104,7 +96,7 @@ export function WorkoutLog({
   const reorder = useReorderList({
     items: rows,
     getItemId: (r) => r.exercise.id,
-    onReorder: (_newItems, newIds) => setOrder(newIds),
+    onReorder: (_newItems, newIds) => updateSession(sessionId, { exerciseOrder: newIds }),
   });
 
   const loggedCountOf = (exerciseId: string) =>
@@ -230,7 +222,9 @@ export function WorkoutLog({
         onClose={() => setPicking(false)}
         onPick={(exerciseId) => {
           setPicking(false);
-          setAdded((prev) => (prev.includes(exerciseId) ? prev : [...prev, exerciseId]));
+          if (!added.includes(exerciseId)) {
+            updateSession(sessionId, { addedExerciseIds: [...added, exerciseId] });
+          }
           open(exerciseId);
         }}
       />
@@ -243,19 +237,20 @@ export function WorkoutLog({
           stopwatch={stopwatch}
           onDone={done}
           onSubstitute={(replacementId) => {
-            setSubstitutions((prev) => {
-              const originalKey =
-                Object.keys(prev).find((k) => prev[k] === openExerciseId) ?? openExerciseId;
-              return { ...prev, [originalKey]: replacementId };
-            });
-            setOrder((prev) => prev.map((id) => (id === openExerciseId ? replacementId : id)));
-            setAdded((prev) =>
-              prev.includes(openExerciseId)
+            // Keyed by what the CARD prescribes, so substituting twice
+            // rewrites the one entry rather than chaining A->B->C.
+            const originalKey =
+              Object.keys(substitutions).find((k) => substitutions[k] === openExerciseId) ??
+              openExerciseId;
+            updateSession(sessionId, {
+              substitutions: { ...substitutions, [originalKey]: replacementId },
+              exerciseOrder: order.map((id) => (id === openExerciseId ? replacementId : id)),
+              addedExerciseIds: added.includes(openExerciseId)
                 ? Array.from(
-                    new Set(prev.map((id) => (id === openExerciseId ? replacementId : id))),
+                    new Set(added.map((id) => (id === openExerciseId ? replacementId : id))),
                   )
-                : prev,
-            );
+                : added,
+            });
             setCurrentExercise(replacementId);
             setOpenExerciseId(undefined);
           }}

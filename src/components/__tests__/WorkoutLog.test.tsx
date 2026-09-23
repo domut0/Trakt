@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkoutLog } from "../WorkoutLog";
 import {
@@ -759,5 +759,93 @@ describe("reordering exercises", () => {
 
     const slot = useStore.getState().slots.find((s) => s.id === "s_upper");
     expect(slot?.plannedLifts).toEqual(originalPlan);
+  });
+});
+
+/**
+ * Both of these were reported from the gym, and they were one bug: the order,
+ * the substitutions and the off-plan rows were component state, so leaving the
+ * workout screen threw them away. A substitution appeared to survive only once
+ * a set had been logged against it -- at which point the row is derived from
+ * that set and the state was never carrying it anyway.
+ *
+ * "Leaving" is an unmount and a fresh mount, which is what the route does.
+ */
+describe("what the session remembers after you leave the screen", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useStore.setState({ sets: [], sessions: [], exercises: [], slots: [] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Leave the workout screen and come back to it. */
+  function leaveAndReturn(lifts: PlannedLift[]) {
+    cleanup();
+    render(<WorkoutLog sessionId={SESSION.id} lifts={lifts} stopwatch="0:00" />);
+  }
+
+  it("keeps a reordered list", () => {
+    const lifts = [
+      { exerciseId: BENCH.id, sets: 1, reps: "5" },
+      { exerciseId: ROW.id, sets: 1, reps: "5" },
+    ];
+    setup(lifts);
+
+    const rows = screen.getAllByRole("button", { name: /sets$/ });
+    fireEvent.pointerDown(rows[1], { clientX: 50, clientY: 100, pointerId: 1 });
+    act(() => void vi.advanceTimersByTime(400));
+    fireEvent.pointerMove(rows[1], { clientX: 50, clientY: 5, pointerId: 1 });
+    act(() => {
+      fireEvent.pointerUp(rows[1], { clientX: 50, clientY: 5, pointerId: 1 });
+    });
+    expect(screen.getAllByRole("button", { name: /sets$/ })[0]).toHaveTextContent("Barbell Row");
+
+    leaveAndReturn(lifts);
+
+    expect(screen.getAllByRole("button", { name: /sets$/ })[0]).toHaveTextContent("Barbell Row");
+  });
+
+  it("keeps a substitution made before a single set was logged", () => {
+    const DB_BENCH: Exercise = {
+      id: "e_db_bench",
+      name: "Dumbbell Bench Press",
+      type: "accessory",
+    };
+    const lifts = [{ exerciseId: BENCH.id, sets: 3, reps: "8" }];
+    setup(lifts);
+    act(() => {
+      useStore.setState({ exercises: [BENCH, ROW, DB_BENCH] });
+    });
+
+    openExercise("Bench Press");
+    fireEvent.click(screen.getByRole("button", { name: "Substitute" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Dumbbell Bench Press/ }));
+    const subButtons = screen.getAllByRole("button", { name: "Substitute" });
+    fireEvent.click(subButtons[subButtons.length - 1]);
+
+    // Nothing logged against it. This is the case that used to be lost.
+    expect(useStore.getState().sets).toHaveLength(0);
+
+    leaveAndReturn(lifts);
+
+    expect(screen.getByRole("button", { name: /^Dumbbell Bench Press/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Bench Press/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps an off-plan lift opened but not yet logged", () => {
+    // Not reported, but the same state and the same loss.
+    const lifts = [{ exerciseId: BENCH.id, sets: 1, reps: "5" }];
+    setup(lifts);
+
+    fireEvent.click(screen.getByRole("button", { name: /Add exercise/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Barbell Row/ }));
+    done();
+
+    leaveAndReturn(lifts);
+
+    expect(screen.getByRole("button", { name: /^Barbell Row/ })).toBeInTheDocument();
   });
 });

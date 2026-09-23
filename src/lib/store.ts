@@ -183,6 +183,35 @@ export interface WorkoutSession {
    * Non-indexed, so no Dexie version bump.
    */
   slotName?: string;
+  /**
+   * How this session departs from the card it came off: the order the lifts
+   * are being done in, what was swapped for what, and anything opened that the
+   * card never prescribed.
+   *
+   * ## Why these are on the session and not component state
+   *
+   * They were held in `WorkoutLog`, on the reasoning that a row nobody has
+   * logged against is not yet part of the record. That was wrong in the gym.
+   * Leaving the workout screen unmounts the component, so a reorder was lost
+   * the moment you looked at anything else, and a substitution survived only
+   * once a set had been logged against it -- at which point the row is derived
+   * from the set and the state was never load-bearing anyway. Both were
+   * reported, and they are the same bug.
+   *
+   * The session is also the only place that survives the app being evicted
+   * while backgrounded, which a phone will do to a PWA in the middle of an
+   * hour-long workout.
+   *
+   * All three are non-indexed and optional, so no Dexie version bump and no
+   * backup format change: a session written before this simply has none of
+   * them, which reads as "did the card as written".
+   */
+  /** Exercise ids in the order they are being done, when that is not the card's. */
+  exerciseOrder?: string[];
+  /** Prescribed exercise id to the one being done instead, for today only. */
+  substitutions?: Record<string, string>;
+  /** Off-plan exercises opened but not yet logged against. */
+  addedExerciseIds?: string[];
 }
 
 /** What to call a strength session: its card, or the card it had when that was deleted. */
@@ -486,7 +515,18 @@ interface State {
   setUnit: (u: "lbs" | "kg") => void;
 
   /** Free-text note on a whole session. */
-  updateSession: (sessionId: string, patch: Pick<WorkoutSession, "note">) => void;
+  /**
+   * A patch onto an open or finished session.
+   *
+   * Deliberately narrow: this is for what the user says about a session and
+   * how they departed from the card, never for its identity, its timing or
+   * its slot. Widening it to those would make every caller a place a session
+   * can be silently re-dated.
+   */
+  updateSession: (
+    sessionId: string,
+    patch: Pick<WorkoutSession, "note" | "exerciseOrder" | "substitutions" | "addedExerciseIds">,
+  ) => void;
 
   // --- Nutrition phases ---------------------------------------------------
   /**
@@ -1031,7 +1071,18 @@ function isWorkoutSession(v: unknown): v is WorkoutSession {
   if (!isOptionalNumber(v.durationMinutes)) return false;
   if (!isOptionalNumber(v.distance)) return false;
   if (v.setupNote !== undefined && typeof v.setupNote !== "string") return false;
+  if (v.exerciseOrder !== undefined && !isStringArray(v.exerciseOrder)) return false;
+  if (v.addedExerciseIds !== undefined && !isStringArray(v.addedExerciseIds)) return false;
+  if (v.substitutions !== undefined && !isStringRecord(v.substitutions)) return false;
   return true;
+}
+
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every((x) => typeof x === "string");
+}
+
+function isStringRecord(v: unknown): v is Record<string, string> {
+  return isPlainObject(v) && Object.values(v).every((x) => typeof x === "string");
 }
 
 /**
