@@ -19,6 +19,26 @@ import { getAccessToken, googleClientId, withTimeout } from "./google-auth";
  * third value to configure. The spike failed check 4 without it.
  *
  * Like GIS, the script loads only when a coach taps, never at boot.
+ *
+ * ## The Picker does not run on the token alone
+ *
+ * Everything else here reaches Google with a Bearer header and nothing else.
+ * The Picker does not: it draws an iframe from `docs.google.com` that
+ * authenticates with the user's Google COOKIES. On WebKit -- so every browser
+ * on iOS, not just Safari -- those cookies are partitioned away from the frame
+ * unless the storage-access grant is live, and that grant lapses on the order
+ * of a day.
+ *
+ * When it has lapsed the Picker does not say so. It asks for cookie access,
+ * and then reports whatever it could not do as "The API developer key is
+ * invalid" -- from inside its own iframe, where no callback of ours can see
+ * it. That message has sent more than one person to the Cloud Console after a
+ * key that was never wrong.
+ *
+ * What puts the cookies back is an interactive sign-in: it opens
+ * accounts.google.com as a FIRST-PARTY window. So `pickSharedSpreadsheet`
+ * refuses to open the Picker on a cached credential old enough that the
+ * session behind it may already be gone -- see `freshSession` in google-auth.
  */
 
 const GAPI_SRC = "https://apis.google.com/js/api.js";
@@ -27,7 +47,13 @@ const GAPI_SRC = "https://apis.google.com/js/api.js";
 const LOAD_TIMEOUT_MS = 15_000;
 
 export type PickFailure =
-  "no-api-key" | "no-client-id" | "needs-consent" | "script-blocked" | "bad-api-key";
+  | "no-api-key"
+  | "no-client-id"
+  | "needs-consent"
+  | "script-blocked"
+  | "bad-api-key"
+  | "popup-blocked"
+  | "timeout";
 
 type PickerFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 let pickerFetchImpl: PickerFetch | undefined;
@@ -163,6 +189,22 @@ const PREFLIGHT_TIMEOUT_MS = 5_000;
  * while the Picker is switched off. So a 400 naming the key is the one
  * unambiguous answer, and it is the only one allowed to stop the flow.
  *
+ * ## What it can still catch that the Picker would hide
+ *
+ * A 401 means the token itself is dead -- revoked, or issued to an account the
+ * browser is no longer signed into. The Picker reports that as the same
+ * "developer key is invalid" it reports everything else as, so catching it
+ * here is the difference between "reconnect your Google account" and a coach
+ * reading Cloud Console docs on a phone.
+ *
+ * ## A caveat about the key probe, which is not the same thing
+ *
+ * `docs/google-setup.md` step 5 restricts the API key to the Google Picker API
+ * alone, and this probes DRIVE, so on a correctly-restricted production key
+ * Google answers 403 and the key check below never fires. It is kept for
+ * unrestricted and development keys, where it still earns its place. The 401
+ * check does not depend on any of that.
+ *
  * Everything else -- 403, 5xx, a dropped connection, a timeout -- falls
  * through and opens the Picker exactly as before. `drive.file` is a narrow
  * scope and a 403 here is at least as likely to mean "this token may not call
@@ -179,6 +221,8 @@ export async function preflightPicker(apiKey: string, token: string): Promise<vo
       PREFLIGHT_TIMEOUT_MS,
       "timeout",
     );
+    // The one status that is about the credential rather than the endpoint.
+    if (res.status === 401) throw new Error("needs-consent" satisfies PickFailure);
     if (res.status !== 400) return;
     const text = await res.text().catch(() => "");
     const lower = text.toLowerCase();
@@ -186,7 +230,8 @@ export async function preflightPicker(apiKey: string, token: string): Promise<vo
       throw new Error("bad-api-key" satisfies PickFailure);
     }
   } catch (err) {
-    if (err instanceof Error && err.message === "bad-api-key") throw err;
+    const message = err instanceof Error ? err.message : "";
+    if (message === "bad-api-key" || message === "needs-consent") throw err;
     // Anything else is not evidence. Fall through and let the Picker try.
   }
 }
@@ -210,10 +255,22 @@ export async function pickSharedSpreadsheet(): Promise<PickedSheet | undefined> 
 
   let token: string;
   try {
-    token = await getAccessToken({ interactive: true });
+    // `freshSession` is the fix for "adding a client stops working after a
+    // day". A cached token is enough for every OTHER call to Google, because
+    // they carry it in a header; the Picker needs the cookie session it was
+    // minted from to still be reachable from an iframe, and on WebKit that
+    // stops being true long before the token expires. Re-minting it re-opens
+    // accounts.google.com first-party, which is what restores them.
+    token = await getAccessToken({ interactive: true, freshSession: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
-    throw new Error(message === "script-blocked" ? "script-blocked" : "needs-consent");
+    // Each of these has a different cure, and flattening them all into
+    // "sign-in was closed" told coaches they had cancelled something they had
+    // never been shown. Only a message we do not recognise falls back.
+    const known: PickFailure[] = ["script-blocked", "popup-blocked", "timeout", "no-client-id"];
+    throw new Error(
+      (known as string[]).includes(message) ? message : ("needs-consent" satisfies PickFailure),
+    );
   }
 
   await preflightPicker(apiKey, token);

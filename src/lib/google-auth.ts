@@ -48,6 +48,24 @@ const GIS_LOAD_TIMEOUT_MS = 15_000;
 const SILENT_TOKEN_TIMEOUT_MS = 30_000;
 const INTERACTIVE_TOKEN_TIMEOUT_MS = 120_000;
 
+/**
+ * How recently a token must have been minted to count as "the Google session
+ * behind it is live".
+ *
+ * Only the Picker asks for this (`freshSession`), and only because it is the
+ * one flow that does not run on the token alone: it draws a `docs.google.com`
+ * iframe that authenticates with the user's Google COOKIES, not with anything
+ * we hand it. On WebKit those cookies are partitioned away from the iframe
+ * once the storage-access grant lapses -- about a day -- and the Picker then
+ * reports the loss as "The API developer key is invalid", which sends whoever
+ * reads it to the Cloud Console after a key that was never wrong.
+ *
+ * Minting a token interactively re-opens accounts.google.com as a first-party
+ * window, which is what puts those cookies back. So the Picker refuses to open
+ * on a credential old enough that the session behind it may already be gone.
+ */
+const FRESH_SESSION_MS = 5 * 60_000;
+
 /** Rejects with `reason` if `promise` has not settled in time. */
 export function withTimeout<T>(promise: Promise<T>, ms: number, reason: AuthFailure): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -103,43 +121,58 @@ declare global {
   }
 }
 
-let cached: { token: string; expiresAt: number } | undefined;
+let cached: { token: string; expiresAt: number; issuedAt: number } | undefined;
 let scriptPromise: Promise<void> | undefined;
 
 /**
- * The token client, built once and kept.
+ * One token client per kind of request, each with its own callbacks.
  *
- * THIS IS THE FIX FOR "IT TAKES THREE TAPS". `requestAccessToken` opens a
- * popup, and a browser only allows that while the page holds transient user
- * activation - roughly five seconds from the tap that caused it. Building the
- * client meant loading accounts.google.com/gsi/client first, and on a phone on
- * mobile data that load routinely outlives the activation, so the popup was
- * blocked before it ever appeared. GIS reports a blocked popup through the same
- * error callback as a closed one, so it read as "the user declined" and the
- * only cure on offer was tapping again - by which time the script was cached
- * and it worked.
+ * THE SHARED CLIENT WAS THE BUG BEHIND "ADD A CLIENT STOPS WORKING AFTER A DAY".
+ * `SyncEngine` starts a background sync on every `visibilitychange`, so
+ * foregrounding the app fires a SILENT renewal -- the one the module header
+ * warns is unreliable in an iOS PWA. A single client meant a single in-flight
+ * request, and the coach's tap seconds later was handed that silent promise
+ * instead of getting a window of its own. A silent request runs with
+ * `prompt: ""`, which cannot show consent and cannot open anything, so the tap
+ * inherited its `needs-consent` -- or its thirty-second hang, with the tap's
+ * user activation dead long before it settled.
  *
- * So the script and the client are built AHEAD of the tap, by `warmGoogleAuth`,
- * and the tap itself does nothing but call `requestAccessToken`.
+ * Splitting the clients makes the collision structurally impossible: a silent
+ * renewal and a deliberate tap never share a callback slot, so neither can
+ * answer the other. They are built lazily and kept for the page's life; GIS
+ * builds one with no network of its own, so the second costs nothing.
+ *
+ * `warmGoogleAuth` builds the INTERACTIVE one, because that is the one a tap
+ * needs to be ready before the tap happens.
  */
-let tokenClient: TokenClient | undefined;
+interface Slot {
+  /** Whether requests from this slot may open a window. */
+  interactive: boolean;
+  client?: TokenClient;
+  /** The request this slot's callbacks belong to, if any. */
+  pending?: Pending;
+  /** The request in flight, so two callers never race the one set of callbacks. */
+  inflight?: Promise<string>;
+}
 
-/** The request the shared client's callbacks belong to, if any. */
-let pending: Pending | undefined;
-
-/** The request in flight, so two callers never race the one set of callbacks. */
-let inflight: Promise<string> | undefined;
+const interactiveSlot: Slot = { interactive: true };
+const silentSlot: Slot = { interactive: false };
 
 /** A seam, matching `setSyncFetch`. Tests install a fake rather than a global stub. */
 type TokenSource = (interactive: boolean) => Promise<string>;
 let tokenSourceImpl: TokenSource | undefined;
 
+function resetSlot(slot: Slot): void {
+  slot.client = undefined;
+  slot.pending = undefined;
+  slot.inflight = undefined;
+}
+
 export function setGoogleTokenSource(fn: TokenSource | undefined): void {
   tokenSourceImpl = fn;
   cached = undefined;
-  tokenClient = undefined;
-  pending = undefined;
-  inflight = undefined;
+  resetSlot(interactiveSlot);
+  resetSlot(silentSlot);
 }
 
 export function clearGoogleToken(): void {
@@ -189,6 +222,16 @@ function loadGis(): Promise<void> {
   return scriptPromise;
 }
 
+export interface TokenRequest {
+  interactive: boolean;
+  /**
+   * Refuse a cached token old enough that the first-party Google session
+   * behind it may have lapsed, and mint a new one instead. See
+   * `FRESH_SESSION_MS`: only the Picker needs this.
+   */
+  freshSession?: boolean;
+}
+
 /**
  * An access token, from cache where possible.
  *
@@ -197,23 +240,26 @@ function loadGis(): Promise<void> {
  * throwing a Google popup at someone mid-workout. Only a Settings tap passes
  * true.
  */
-export async function getAccessToken({ interactive }: { interactive: boolean }): Promise<string> {
+export async function getAccessToken({ interactive, freshSession }: TokenRequest): Promise<string> {
   if (tokenSourceImpl) return tokenSourceImpl(interactive);
 
-  if (cached && cached.expiresAt - RENEW_MARGIN_MS > Date.now()) return cached.token;
+  if (cached && cached.expiresAt - RENEW_MARGIN_MS > Date.now()) {
+    if (!freshSession || cached.issuedAt + FRESH_SESSION_MS > Date.now()) return cached.token;
+    // Old enough that the cookies the Picker needs may already be gone. Drop it
+    // so the request below cannot be answered with the same stale credential.
+    cached = undefined;
+  }
 
   const clientId = googleClientId();
   if (!clientId) throw new Error("no-client-id" satisfies AuthFailure);
 
   await withTimeout(loadGis(), GIS_LOAD_TIMEOUT_MS, "script-blocked");
 
-  const client = ensureTokenClient(clientId);
-  if (!client) throw new Error("script-blocked" satisfies AuthFailure);
-
-  const timeout = interactive ? INTERACTIVE_TOKEN_TIMEOUT_MS : SILENT_TOKEN_TIMEOUT_MS;
+  const slot = slotFor(interactive);
+  if (!ensureTokenClient(clientId, slot)) throw new Error("script-blocked" satisfies AuthFailure);
 
   try {
-    return await withTimeout(requestToken(client, interactive), timeout, "timeout");
+    return await requestToken(slot);
   } catch (err) {
     // One retry, and only for the one failure a retry can actually fix. The
     // first attempt may have spent its user activation loading the script; by
@@ -221,17 +267,30 @@ export async function getAccessToken({ interactive }: { interactive: boolean }):
     // is not retried - asking twice is the app arguing with an answer.
     const blocked = err instanceof Error && err.message === "popup-blocked";
     if (!blocked || !interactive) throw err;
-    return withTimeout(requestToken(client, true), timeout, "timeout");
+    return requestToken(slot);
   }
+}
+
+/**
+ * The slot a request belongs to.
+ *
+ * A silent caller may JOIN an interactive request already in flight -- it is
+ * about to be handed a token either way, and the window is already open. The
+ * reverse is never allowed, which is the whole point of the split: see the
+ * `Slot` comment.
+ */
+function slotFor(interactive: boolean): Slot {
+  if (!interactive && interactiveSlot.inflight) return interactiveSlot;
+  return interactive ? interactiveSlot : silentSlot;
 }
 
 /**
  * Loads the script and builds the token client before anyone taps anything.
  *
  * Call it from wherever a sign-in is about to be offered -- the Settings screen,
- * the tutorial chapter that drives someone there -- not at boot: this app is
- * offline-first and nothing on the path to logging a set may wait on a
- * third-party script.
+ * coach mode's client list, the tutorial chapter that drives someone there --
+ * not at boot: this app is offline-first and nothing on the path to logging a
+ * set may wait on a third-party script.
  *
  * Deliberately returns nothing and throws nothing. A failure here costs the
  * warm start and no more; the real attempt reports for itself.
@@ -240,10 +299,10 @@ export function warmGoogleAuth(): void {
   if (tokenSourceImpl) return;
   const clientId = googleClientId();
   if (!clientId) return;
-  if (tokenClient) return;
+  if (interactiveSlot.client) return;
   void loadGis()
     .then(() => {
-      ensureTokenClient(clientId);
+      ensureTokenClient(clientId, interactiveSlot);
     })
     .catch(() => {
       // See above: warming is best-effort by design.
@@ -251,36 +310,38 @@ export function warmGoogleAuth(): void {
 }
 
 /**
- * The one token client, built on first use and kept for the page's life.
+ * A slot's token client, built on first use and kept for the page's life.
  *
  * Its two callbacks are fixed at construction, so they answer whichever request
- * is in flight rather than closing over one -- which is what `pending` is.
+ * the slot has in flight rather than closing over one -- which is what
+ * `slot.pending` is.
  */
-function ensureTokenClient(clientId: string): TokenClient | undefined {
-  if (tokenClient) return tokenClient;
+function ensureTokenClient(clientId: string, slot: Slot): TokenClient | undefined {
+  if (slot.client) return slot.client;
   const oauth2 = window.google?.accounts?.oauth2;
   if (!oauth2) return undefined;
 
-  tokenClient = oauth2.initTokenClient({
+  slot.client = oauth2.initTokenClient({
     client_id: clientId,
     scope: DRIVE_FILE_SCOPE,
     callback: (response) => {
-      const waiting = pending;
-      pending = undefined;
+      const waiting = slot.pending;
+      slot.pending = undefined;
       if (!waiting) return;
       const token = response.access_token;
       if (response.error || !token) {
         waiting.reject(new Error("needs-consent" satisfies AuthFailure));
         return;
       }
-      cached = { token, expiresAt: Date.now() + (response.expires_in ?? 3600) * 1000 };
+      const issuedAt = Date.now();
+      cached = { token, issuedAt, expiresAt: issuedAt + (response.expires_in ?? 3600) * 1000 };
       waiting.resolve(token);
     },
     // Fires when the popup is closed or blocked, which the success callback
     // never reports -- without it an interactive request hangs forever.
     error_callback: (error) => {
-      const waiting = pending;
-      pending = undefined;
+      const waiting = slot.pending;
+      slot.pending = undefined;
       if (!waiting) return;
       // A window the browser refused to open is not a person deciding not to
       // sign in, and the two used to arrive here as the same error. Only one of
@@ -291,37 +352,65 @@ function ensureTokenClient(clientId: string): TokenClient | undefined {
       );
     },
   });
-  return tokenClient;
+  return slot.client;
 }
 
 /**
- * One request at a time.
+ * One request at a time, per slot, and never one that outlives its deadline.
  *
- * The client's callbacks are shared, so two overlapping requests would both be
+ * THE DEADLINE HAS TO LIVE IN HERE. It used to sit outside, as
+ * `withTimeout(requestToken(...))`, which rejected the CALLER and left the
+ * request itself in flight forever: GIS had dropped both callbacks, so the
+ * inner promise never settled, `.finally` never ran, and `inflight` stayed set
+ * for the life of the page. Every later request -- every sync, every tap --
+ * was then handed that dead promise and timed out against it. Reloading was
+ * the only cure, and in an installed PWA, which is never reloaded, that meant
+ * clearing site data. Timing out from inside settles the request, which clears
+ * the slot, which lets the next attempt actually be an attempt.
+ *
+ * The slot's callbacks are shared, so two overlapping requests would both be
  * answered by whichever one the callback happened to find. A second caller gets
  * the first one's promise, which is the answer it was going to get anyway.
  */
-function requestToken(client: TokenClient, interactive: boolean): Promise<string> {
-  if (inflight) return inflight;
+function requestToken(slot: Slot): Promise<string> {
+  if (slot.inflight) return slot.inflight;
+
+  const timeoutMs = slot.interactive ? INTERACTIVE_TOKEN_TIMEOUT_MS : SILENT_TOKEN_TIMEOUT_MS;
 
   const request = new Promise<string>((resolve, reject) => {
-    pending = { resolve, reject };
+    const timer = setTimeout(() => {
+      slot.pending = undefined;
+      reject(new Error("timeout" satisfies AuthFailure));
+    }, timeoutMs);
+
+    slot.pending = {
+      resolve: (token) => {
+        clearTimeout(timer);
+        resolve(token);
+      },
+      reject: (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    };
+
     try {
       // An empty prompt asks Google to renew without showing anything, and
       // fails when consent is actually needed -- which is exactly right for a
       // background sync, since throwing a Google popup at someone mid-workout
       // is not a thing this app does. A deliberate tap passes no override, so
       // the account picker and consent screen appear when they have to.
-      client.requestAccessToken(interactive ? undefined : { prompt: "" });
+      slot.client?.requestAccessToken(slot.interactive ? undefined : { prompt: "" });
     } catch {
-      pending = undefined;
+      clearTimeout(timer);
+      slot.pending = undefined;
       reject(new Error("popup-blocked" satisfies AuthFailure));
     }
   }).finally(() => {
-    inflight = undefined;
-    pending = undefined;
+    slot.inflight = undefined;
+    slot.pending = undefined;
   });
 
-  inflight = request;
+  slot.inflight = request;
   return request;
 }

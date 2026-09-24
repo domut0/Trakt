@@ -12,7 +12,9 @@ function installGis() {
   const state = {
     inits: 0,
     requests: 0,
-    answer: undefined as ((cb: Callbacks) => void) | undefined,
+    /** `prompt: ""` is a silent renewal; undefined is a deliberate tap. */
+    prompts: [] as (string | undefined)[],
+    answer: undefined as ((cb: Callbacks, overrides?: { prompt?: string }) => void) | undefined,
   };
 
   interface Callbacks {
@@ -20,18 +22,19 @@ function installGis() {
     error_callback?: (e: { type?: string }) => void;
   }
 
-  let callbacks: Callbacks | undefined;
-
+  // Each client keeps its own callbacks, as the real one does. A single shared
+  // slot here would hide the very collision these tests are about: the silent
+  // client and the interactive one answering for each other.
   (window as unknown as { google: unknown }).google = {
     accounts: {
       oauth2: {
         initTokenClient: (config: Callbacks) => {
           state.inits += 1;
-          callbacks = config;
           return {
-            requestAccessToken: () => {
+            requestAccessToken: (overrides?: { prompt?: string }) => {
               state.requests += 1;
-              if (callbacks && state.answer) state.answer(callbacks);
+              state.prompts.push(overrides?.prompt);
+              state.answer?.(config, overrides);
             },
           };
         },
@@ -121,5 +124,106 @@ describe("google sign-in", () => {
     await getAccessToken({ interactive: true });
     await getAccessToken({ interactive: false });
     expect(gis.requests).toBe(1);
+  });
+
+  /**
+   * The bug behind "adding a client stops working after a day".
+   *
+   * SyncEngine starts a background sync on every `visibilitychange`, so
+   * foregrounding the app fires a silent renewal -- the one the module header
+   * warns is unreliable in an iOS PWA. With one shared client, the coach's tap
+   * seconds later was handed that silent promise rather than a window of its
+   * own, and inherited its failure. A silent request runs with `prompt: ""`,
+   * which cannot show consent and cannot open anything, so there was never a
+   * window for the coach to have closed.
+   */
+  it("does not let a background renewal answer a deliberate tap", async () => {
+    let settleSilent: (() => void) | undefined;
+    gis.answer = (cb, overrides) => {
+      if (overrides?.prompt === "") {
+        // Still outstanding when the tap arrives, which is the whole setup.
+        settleSilent = () => cb.error_callback?.({ type: "popup_closed" });
+        return;
+      }
+      cb.callback({ access_token: "tok", expires_in: 3600 });
+    };
+
+    const silent = getAccessToken({ interactive: false });
+    await expect(getAccessToken({ interactive: true })).resolves.toBe("tok");
+
+    expect(gis.requests).toBe(2);
+    expect(gis.prompts).toEqual(["", undefined]);
+
+    settleSilent?.();
+    await expect(silent).rejects.toThrow("needs-consent");
+  });
+
+  /**
+   * The other half of the same failure, and the reason it needed site data
+   * cleared rather than a reload: an installed PWA is never reloaded.
+   *
+   * The deadline used to sit outside the request, so a GIS call that dropped
+   * both callbacks rejected the CALLER and left the request itself in flight
+   * forever. Every later request was then handed that dead promise.
+   */
+  it("times out a dropped callback without wedging every request after it", async () => {
+    vi.useFakeTimers();
+    try {
+      gis.answer = () => {
+        // GIS drops both callbacks, as it does when its iframe is blocked.
+      };
+
+      const first = getAccessToken({ interactive: false });
+      const timedOut = expect(first).rejects.toThrow("timeout");
+      await vi.advanceTimersByTimeAsync(30_000);
+      await timedOut;
+
+      gis.answer = (cb) => cb.callback({ access_token: "tok", expires_in: 3600 });
+      await expect(getAccessToken({ interactive: false })).resolves.toBe("tok");
+      expect(gis.requests).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /**
+   * The Picker does not run on the token alone: it draws a docs.google.com
+   * iframe that authenticates with the user's Google cookies, and on WebKit
+   * those are partitioned away from it once the storage-access grant lapses.
+   * Re-minting the token re-opens accounts.google.com first-party, which is
+   * what puts them back -- so a credential too old to vouch for that session
+   * is refused even though it has not expired.
+   */
+  it("mints a new token for the Picker once the session behind it may have lapsed", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      gis.answer = (cb) => cb.callback({ access_token: "first", expires_in: 3600 });
+      await expect(getAccessToken({ interactive: true })).resolves.toBe("first");
+
+      // Four minutes on. The session is plainly still live, and a second
+      // window here would be noise in front of a coach who just signed in.
+      vi.setSystemTime(4 * 60_000);
+      await expect(getAccessToken({ interactive: true, freshSession: true })).resolves.toBe(
+        "first",
+      );
+      expect(gis.requests).toBe(1);
+
+      // Ten minutes on. The token is still valid for another fifty; the
+      // cookies are the part nothing here can see.
+      vi.setSystemTime(10 * 60_000);
+      gis.answer = (cb) => cb.callback({ access_token: "second", expires_in: 3600 });
+      await expect(getAccessToken({ interactive: true, freshSession: true })).resolves.toBe(
+        "second",
+      );
+      expect(gis.requests).toBe(2);
+
+      // Sync is untouched by any of this: it carries the token in a header and
+      // has no iframe to keep alive.
+      await expect(getAccessToken({ interactive: false })).resolves.toBe("second");
+      expect(gis.requests).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

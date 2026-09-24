@@ -7,7 +7,7 @@ import {
   type PickedSheet,
   type PickFailure,
 } from "../lib/google-picker";
-import { googleClientId } from "../lib/google-auth";
+import { googleClientId, warmGoogleAuth } from "../lib/google-auth";
 import { Chevron } from "./icons";
 import { Toggle } from "./Toggle";
 import { freshness } from "./ClientBanner";
@@ -43,6 +43,21 @@ export function CoachSettings() {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  /**
+   * Same reason SyncSettings warms it: `requestAccessToken` opens a window, and
+   * a browser allows that only while the page still holds the activation from
+   * the tap -- a few seconds. Fetching gsi/client first routinely outlasts that
+   * on mobile data, and the blocked window arrives as "the user declined".
+   *
+   * This screen was the one place offering a Google sign-in that never warmed,
+   * so "Choose their sheet" was the tap paying for the script load. Coach mode
+   * being switched on is the signal; the client list is already on screen by
+   * the time anyone reaches for Add a client.
+   */
+  useEffect(() => {
+    if (enabled) warmGoogleAuth();
+  }, [enabled]);
 
   return (
     <>
@@ -205,6 +220,11 @@ const PICK_ERRORS: Record<PickFailure, string> = {
   "script-blocked": "Couldn't load Google. Check your connection or content blocker",
   "no-api-key": "This build has no Google API key",
   "no-client-id": "This build has no Google client id",
+  // Both used to arrive as "sign-in was closed", which named the one thing the
+  // coach had not done: no window was ever put in front of them to close.
+  "popup-blocked":
+    "Your browser blocked the Google window. Allow pop-ups for this site, then try again",
+  timeout: "Google didn't answer. Try again",
   // Two different Cloud Console mistakes produce one indistinguishable
   // rejection, so the message names both rather than guessing at one.
   "bad-api-key":
@@ -286,7 +306,20 @@ function AddByPickerForm({ onDone }: { onDone: () => void }) {
           key behind its own iframe, which surfaces here as a cancel. Never the
           key or the client id themselves -- present/absent and the app id,
           which is the one value that has to match the Cloud project. */}
-      {errorCode !== undefined && <p className="t-caption text-ink-2">{buildDiagnostics()}</p>}
+      {errorCode !== undefined && (
+        <>
+          {/* The Picker rejects a lapsed cookie session with a message about
+              the API key, from inside an iframe we cannot read. On iOS that is
+              the likeliest reading of any failure here, and tapping again now
+              costs nothing: the retry signs in first-party, which is what puts
+              the session back. */}
+          <p className="t-caption text-ink-2">
+            If Google mentioned cookies or an invalid key, tap Choose their sheet again — signing in
+            again is usually what fixes it.
+          </p>
+          <p className="t-caption text-ink-2">{buildDiagnostics()}</p>
+        </>
+      )}
       <div className="flex gap-2">
         <button
           type="button"
