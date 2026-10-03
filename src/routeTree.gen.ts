@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChartsRouteImport } from './routes/charts'
+import { Route as ClientsRouteImport } from './routes/clients'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as PlanRouteImport } from './routes/plan'
@@ -28,6 +29,11 @@ const IndexRoute = IndexRouteImport.update({
 const ChartsRoute = ChartsRouteImport.update({
   id: '/charts',
   path: '/charts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientsRoute = ClientsRouteImport.update({
+  id: '/clients',
+  path: '/clients',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoryRoute = HistoryRouteImport.update({
@@ -74,6 +80,7 @@ const SessionIdRoute = SessionIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/charts': typeof ChartsRoute
+  '/clients': typeof ClientsRoute
   '/history': typeof HistoryRoute
   '/join': typeof JoinRoute
   '/plan': typeof PlanRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/charts': typeof ChartsRoute
+  '/clients': typeof ClientsRoute
   '/history': typeof HistoryRoute
   '/join': typeof JoinRoute
   '/plan': typeof PlanRoute
@@ -99,6 +107,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/charts': typeof ChartsRoute
+  '/clients': typeof ClientsRoute
   '/history': typeof HistoryRoute
   '/join': typeof JoinRoute
   '/plan': typeof PlanRoute
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/charts'
+    | '/clients'
     | '/history'
     | '/join'
     | '/plan'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/charts'
+    | '/clients'
     | '/history'
     | '/join'
     | '/plan'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/charts'
+    | '/clients'
     | '/history'
     | '/join'
     | '/plan'
@@ -150,6 +162,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChartsRoute: typeof ChartsRoute
+  ClientsRoute: typeof ClientsRoute
   HistoryRoute: typeof HistoryRoute
   JoinRoute: typeof JoinRoute
   PlanRoute: typeof PlanRoute
@@ -174,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/charts'
       fullPath: '/charts'
       preLoaderRoute: typeof ChartsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clients': {
+      id: '/clients'
+      path: '/clients'
+      fullPath: '/clients'
+      preLoaderRoute: typeof ClientsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/history': {
@@ -238,6 +258,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChartsRoute: ChartsRoute,
+  ClientsRoute: ClientsRoute,
   HistoryRoute: HistoryRoute,
   JoinRoute: JoinRoute,
   PlanRoute: PlanRoute,

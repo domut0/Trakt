@@ -31,6 +31,15 @@ export interface ProgressDay {
   cardio: ProgressTraining[];
 }
 
+/** A partial duration is not a total: leave it missing if any entry lacks it. */
+export function trainingTotal(
+  entries: ProgressTraining[],
+  field: "sets" | "durationMinutes",
+): number | undefined {
+  if (entries.length === 0 || entries.some((entry) => entry[field] === undefined)) return undefined;
+  return entries.reduce((sum, entry) => sum + entry[field]!, 0);
+}
+
 /** Local calendar arithmetic keeps seven columns even over DST and month edges. */
 export function progressWeeks(anchor: string, period: ProgressPeriod): (string | null)[][] {
   const date = parseDayKey(anchor);

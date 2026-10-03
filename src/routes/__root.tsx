@@ -16,6 +16,7 @@ import { WriteErrorBanner } from "../components/WriteErrorBanner";
 import { SyncEngine } from "../components/SyncEngine";
 import { ToastProvider } from "../components/Toast";
 import { TutorialRail } from "../components/TutorialRail";
+import { useCoachStore } from "../lib/coach-store";
 
 /**
  * Both of the screens below previously styled themselves with `bg-primary`,
@@ -176,9 +177,13 @@ function RootShell({ children }: { children: ReactNode }) {
 // IndexedDB on the server. Renders nothing.
 function StoreHydrator() {
   const hydrate = useStore((s) => s.hydrate);
+  const hydrateCoach = useCoachStore((s) => s.hydrate);
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+  useEffect(() => {
+    void hydrateCoach().catch(() => {});
+  }, [hydrateCoach]);
   return null;
 }
 

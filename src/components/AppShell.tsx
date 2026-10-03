@@ -9,12 +9,13 @@ import { Gear } from "./icons";
 import { CoachPlanPrompt } from "./CoachPlanPrompt";
 import { useSyncStore } from "@/lib/sync-store";
 import { GoogleSyncNotice } from "./GoogleSyncNotice";
+import { Users } from "lucide-react";
 
-type TabPath = "/" | "/plan" | "/history" | "/charts";
+type TabPath = "/" | "/plan" | "/history" | "/charts" | "/clients";
 type TabItem = {
   to: TabPath;
   label: string;
-  icon: "home" | "chart" | "calendar" | "plan";
+  icon: "home" | "chart" | "calendar" | "plan" | "clients";
 };
 
 /**
@@ -43,6 +44,7 @@ const TABS: TabItem[] = [
 ];
 
 function Icon({ name }: { name: TabItem["icon"] }) {
+  if (name === "clients") return <Users size={22} strokeWidth={1.6} aria-hidden="true" />;
   const stroke = "currentColor";
   const common = {
     width: 22,
@@ -133,11 +135,16 @@ export function ActiveSessionBanner() {
 export function BottomNav() {
   const location = useLocation();
   const activeSessionId = useStore((s) => s.activeSessionId);
+  const coachEnabled = useCoachStore((s) => s.enabled);
+  const viewingClient = useCoachStore((s) => s.viewing !== undefined);
   // A plan waiting to be reviewed marks the tab that holds it, so dismissing
   // the card does not hide the fact that something is waiting.
   const planWaiting = useSyncStore((s) => s.pendingCoachPlan !== undefined);
   if (location.pathname === "/workout") return null;
-  const items = TABS;
+  const items: TabItem[] =
+    coachEnabled && !viewingClient
+      ? [...TABS, { to: "/clients", label: "Clients", icon: "clients" }]
+      : TABS;
 
   const renderTab = (it: TabItem) => {
     const active = location.pathname === it.to;
@@ -207,7 +214,9 @@ export function BottomNav() {
           The labels differ in width, so the GAPS between words differ - which
           is why the active tab is marked by colour alone and never by weight,
           since a bolder label is a wider one and would shift. */}
-      <ul className="mx-auto grid max-w-md grid-cols-2 items-stretch px-2 pt-2">
+      <ul
+        className={`mx-auto grid max-w-md ${items.length === 3 ? "grid-cols-3" : "grid-cols-2"} items-stretch px-2 pt-2`}
+      >
         {items.map((it) => renderTab(it))}
       </ul>
       {activeSessionId && (
@@ -287,7 +296,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const showClientBanner = !showTutorialBanner && viewingClient;
   const showBanner =
     !showTutorialBanner && !showClientBanner && activeSessionId && location.pathname !== "/workout";
-  const onTab = TABS.some((t) => t.to === location.pathname);
+  const onTab = TABS.some((t) => t.to === location.pathname) || location.pathname === "/clients";
 
   useRestDaySettles();
 
@@ -312,7 +321,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         // Accept button on a client's new plan off the bottom of the screen.
         className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain anim-route-fade"
       >
-        {onTab && (
+        {onTab && location.pathname !== "/clients" && (
           // The corner where you go elsewhere: History and Charts on Today,
           // and Settings on every tab. One rule for the whole app rather than
           // two toolbars on one screen.

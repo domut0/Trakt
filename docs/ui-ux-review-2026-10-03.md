@@ -108,3 +108,11 @@ Daily logging stays available offline. Because tokens still live only in memory,
 - Required user QA after deployment approval: iPhone Home Screen launch, intentional Google reconnect, coach-managed workout reading, editing and keyboard behavior with a finisher.
 
 Provenance: Gemini 3.6 Flash High wrote the initial bounded workout layout changes. Codex reviewed and revised those changes, added the focus/accessibility adjustments and implemented the Google launch fix and reconnect notice. Two GPT-6.1-sol agents supplied independent read-only reviews. Copilot auto supplied an inventory; an initial empty timeout was reported, and unsupported inventory claims were discarded.
+
+## Coach calendar follow-up after design approval
+
+The user subsequently approved compact Mini Today cards with actual daily values, workout sets and cardio minutes, seven days across and one row per week. This supersedes the earlier logging-presence and Counts proposals and the proposal-only status above.
+
+The `/clients` workspace is now implemented locally on `codex/coach-mini-today`. It provides the coach roster, a focused client calendar and readable day details, with shared periods, read-only bounded snapshot loading, fetched-age labels, retained-data warnings and deliberate Refresh/reconnect actions. Google reads never change the coach's main store. See [coach-progress-brief.md](coach-progress-brief.md) for the accepted scope and verification.
+
+Full verification now passes 80 test files / 1,206 tests, typecheck, scoped ESLint and the production build. Running-app captures at 390px and 320px confirm the seven-column layout; a failed-refresh/recovery fixture verifies stale-day recovery and unchanged own data. Both approved GPT-6.1-sol reviewers scored the required fixes resolved. Codex documented the extension against the unchanged global visual system. Gemini 3.6 Flash High wrote only the bounded presentation components; Codex reviewed/fixed them and owns data, authorization and navigation. This remains local for user QA, with no push or deployment.
