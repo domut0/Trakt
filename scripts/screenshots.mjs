@@ -778,10 +778,84 @@ async function capturePlan(page) {
   await page.getByRole("button", { name: "Rotation", exact: true }).click();
   await settle(page, 400);
 
-  // A split card's actions, which a tap opens. This replaced a long-press.
-  await page.getByText("Heavy Bench", { exact: true }).click();
+  // Row activation reads the workout. Options owns management controls.
+  await page.getByRole("button", { name: "Options for Heavy Bench" }).click();
   await settle(page, 300);
   await shot(page, "62-plan-split-card-actions");
+  await page.getByRole("button", { name: "View Heavy Bench", exact: true }).click();
+  const preview = page.getByRole("dialog", { name: "Heavy Bench", exact: true });
+  await preview.waitFor();
+  const previewBounds = await preview.boundingBox();
+  if (!previewBounds || previewBounds.height < page.viewportSize().height * 0.95) {
+    throw new Error("Planned workout overview must occupy the full phone viewport.");
+  }
+  await preview.getByRole("button", { name: "Edit Heavy Bench" }).click();
+  const editor = page.getByRole("dialog", { name: "Edit card" });
+  await editor.waitFor();
+  await editor.getByLabel("Activity", { exact: true }).selectOption("e_bike");
+  await editor.getByLabel("Minutes", { exact: true }).fill("20");
+  for (const exercise of [
+    "Incline Dumbbell Press",
+    "Romanian Deadlift",
+    "Lat Pulldown",
+    "Face Pull",
+    "Back Squat",
+    "Keenan Flaps",
+  ]) {
+    await editor.getByRole("textbox", { name: "Search exercises" }).fill(exercise);
+    await editor
+      .getByRole("button", { name: new RegExp("^" + exercise) })
+      .first()
+      .click();
+  }
+  await editor.getByLabel("Incline Dumbbell Press sets").fill("3");
+  await editor.getByLabel("Incline Dumbbell Press reps").fill("8-12");
+  await editor
+    .getByLabel("Incline Dumbbell Press load")
+    .fill("RPE 8 with a controlled eccentric and full range of motion");
+  await editor.getByRole("textbox", { name: "Search exercises" }).fill("");
+  await editor.getByRole("heading", { name: "Chosen" }).scrollIntoViewIfNeeded();
+  const editorScroll = editor.locator('[class*="overflow-y-auto"]');
+  const scrollBounds = await editorScroll.boundingBox();
+  if (!scrollBounds || scrollBounds.height < page.viewportSize().height * 0.5) {
+    throw new Error("Finisher controls must not starve the workout editor's scrolling body.");
+  }
+  await settle(page, 300);
+  await shot(page, "66-plan-editor-finisher");
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "View Heavy Bench", exact: true }).click();
+  await preview.waitFor();
+  await settle(page, 300);
+  await shot(page, "65-plan-workout-preview");
+  await preview.getByRole("button", { name: "Close", exact: true }).click();
+
+  // A small phone must retain its close/save controls and a usable body.
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.getByRole("button", { name: "View Heavy Bench", exact: true }).click();
+  await preview.waitFor();
+  const overflow = await preview.evaluate((node) => node.scrollWidth > node.clientWidth);
+  if (overflow) throw new Error("Workout preview overflows horizontally on a small phone.");
+  await settle(page, 300);
+  await shot(page, "68-plan-preview-small-phone");
+  const finisherAmount = preview.getByText("20 min", { exact: true });
+  await finisherAmount.scrollIntoViewIfNeeded();
+  const finisherBounds = await finisherAmount.boundingBox();
+  if (!finisherBounds || finisherBounds.y + finisherBounds.height > page.viewportSize().height) {
+    throw new Error("The full finisher must be reachable on a small phone.");
+  }
+  await settle(page, 300);
+  await shot(page, "67-plan-workout-finisher");
+  await preview.getByRole("button", { name: "Edit Heavy Bench" }).click();
+  await editor.waitFor();
+  await editor.getByRole("heading", { name: "Chosen" }).scrollIntoViewIfNeeded();
+  const saveBounds = await editor.getByRole("button", { name: "Save", exact: true }).boundingBox();
+  if (!saveBounds || saveBounds.y + saveBounds.height > page.viewportSize().height) {
+    throw new Error("Save must stay visible while scrolling the workout editor.");
+  }
+  await settle(page, 300);
+  await shot(page, "69-plan-editor-small-phone");
+  await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
 
   // A day picked out of the target strip, which is what a bar is for.
   await scrollMain(page, 400);

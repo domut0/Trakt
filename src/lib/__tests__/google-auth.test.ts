@@ -97,19 +97,20 @@ describe("google sign-in", () => {
     expect(gis.requests).toBe(2);
   });
 
-  it("never retries a silent renewal, which has no window to open", async () => {
+  it("never requests a fresh token from background sync", async () => {
     gis.answer = (cb) => cb.error_callback?.({ type: "popup_failed_to_open" });
 
-    await expect(getAccessToken({ interactive: false })).rejects.toThrow("popup-blocked");
-    expect(gis.requests).toBe(1);
+    await expect(getAccessToken({ interactive: false })).rejects.toThrow("needs-consent");
+    expect(gis.requests).toBe(0);
+    expect(gis.inits).toBe(0);
   });
 
-  it("gives two overlapping callers the one request", async () => {
+  it("gives two overlapping interactive callers the one request", async () => {
     gis.answer = (cb) => cb.callback({ access_token: "tok", expires_in: 3600 });
 
     const [a, b] = await Promise.all([
       getAccessToken({ interactive: true }),
-      getAccessToken({ interactive: false }),
+      getAccessToken({ interactive: true }),
     ]);
 
     expect([a, b]).toEqual(["tok", "tok"]);

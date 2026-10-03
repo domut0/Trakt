@@ -8,6 +8,7 @@ import { TutorialBanner } from "./TutorialBanner";
 import { Gear } from "./icons";
 import { CoachPlanPrompt } from "./CoachPlanPrompt";
 import { useSyncStore } from "@/lib/sync-store";
+import { GoogleSyncNotice } from "./GoogleSyncNotice";
 
 type TabPath = "/" | "/plan" | "/history" | "/charts";
 type TabItem = {
@@ -358,6 +359,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
         {children}
       </main>
+      {!viewingClient && <GoogleSyncNotice />}
       {/* Mounted once, above everything: a plan can arrive while the person is
           on any tab, and the launch sync opens this itself. */}
       <CoachPlanPrompt />

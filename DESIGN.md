@@ -70,18 +70,18 @@ None of this is about paint, and all of it carries forward unchanged:
 
 Ten values, and only one of them is a hue.
 
-| Token         | Value     | What it is                                    |
-| ------------- | --------- | --------------------------------------------- |
-| `paper`       | `#000000` | The ground.                                   |
-| `surface`     | `#1C1C1E` | A card. The one elevation step.               |
-| `wash`        | `#2C2C2E` | A control sitting on a card.                  |
+| Token         | Value     | What it is                                                                    |
+| ------------- | --------- | ----------------------------------------------------------------------------- |
+| `paper`       | `#000000` | The ground.                                                                   |
+| `surface`     | `#1C1C1E` | A card. The one elevation step.                                               |
+| `wash`        | `#2C2C2E` | A control sitting on a card.                                                  |
 | `field`       | `#48484A` | A field inset against a card; wash is the rule colour and cannot do that job. |
-| `ink`         | `#FFFFFF` | Primary text and figures. 21:1 / 18.4:1       |
-| `ink-2`       | `#AEAEB2` | Secondary text, annotations. 10.6:1 / 9.3:1   |
-| `ink-3`       | `#8E8E93` | Tertiary. 6.9:1 / 6.0:1 — AA on both grounds. |
-| `rule`        | `#2C2C2E` | Hairline. Never carries text.                 |
-| `rule-strong` | `#38383A` | The separator inside a card.                  |
-| `signal`      | `#FF453A` | The exception. Nothing else is coloured.      |
+| `ink`         | `#FFFFFF` | Primary text and figures. 21:1 / 18.4:1                                       |
+| `ink-2`       | `#AEAEB2` | Secondary text, annotations. 10.6:1 / 9.3:1                                   |
+| `ink-3`       | `#8E8E93` | Tertiary. 6.9:1 / 6.0:1 — AA on both grounds.                                 |
+| `rule`        | `#2C2C2E` | Hairline. Never carries text.                                                 |
+| `rule-strong` | `#38383A` | The separator inside a card.                                                  |
+| `signal`      | `#FF453A` | The exception. Nothing else is coloured.                                      |
 
 The names are inherited from the build this replaced, and they still mean what
 they say: **`paper` is the ground, `ink` is what is printed on it.** Inverting
@@ -206,16 +206,23 @@ in this app is almost always a mistake.** Use a card, or use space.
   better-looking thing and the worse one to use — a drag is an imprecise
   gesture for an exact date, it could not draw a gap, and moving one boundary
   silently resized two phases.
+
 - **Last session** (Workout): a `surface` card under the current lift. Set
   number in `ink-3` in a fixed 16px column so the weights line up, figure in
   `ink`, RPE quiet after it; date right-aligned in the header, "Today" and
   "Yesterday" spelled out. Caps at six rows and says how many it kept back.
   Renders **nothing** on a lift you have never done — an empty state here would
   take the same space as the thing it is apologising for.
-- **Card actions** (Plan → Workout split): a tap opens a row of `wash` pills
-  under the card — Edit card / Do this today / Delete — attached to it with no
-  separator, because they belong to it. Never a long press: this list has twice
-  hidden a control behind a gesture and been wrong both times.
+- **Workout overview** (Plan): tapping an existing card opens the full-height
+  prescription, including its cardio finisher. Names and prescriptions wrap in
+  one scroll area, with Close and the optional Edit action in a persistent
+  header. Coach-managed clients can read the same overview.
+- **Card actions** (Plan → Workout split): a separate Options button opens a row
+  of `wash` pills under the card: View workout / Do this today / Delete. Reorder
+  remains available through labeled arrow buttons. Never a long press.
+- **Workout editor** (Plan): all fields share a full-height scrolling body, with
+  Save and Cancel outside it. Sets, reps and load retain visible labels after
+  entry. A finisher never reduces the chosen lifts to a separate tiny pane.
 - **Against target** (Plan): a scrolling chart, one column per day, back to the
   first day ever logged. Calories rise from a centre line in `ink-3`, steps
   fall from it in `ink`, **each on its own absolute axis** — not as a fraction

@@ -85,7 +85,7 @@ describe("the token source seam", () => {
     setGoogleTokenSource(undefined);
     vi.useFakeTimers();
 
-    const pending = getAccessToken({ interactive: false });
+    const pending = getAccessToken({ interactive: true });
     const assertion = expect(pending).rejects.toThrow(/script-blocked/);
     // jsdom appends the script tag and neither event ever fires, which is
     // exactly the real-world case of a blocked or stalled third-party script.

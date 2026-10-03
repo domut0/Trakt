@@ -36,12 +36,25 @@ describe("PlannedCardSheet", () => {
     expect(screen.queryByText("0 × ")).not.toBeInTheDocument();
   });
 
-  it("carries no way to change anything", () => {
+  it("carries no way to change anything when onEdit is omitted", () => {
     render(<PlannedCardSheet slot={upper} open onClose={vi.fn()} />);
 
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(1);
     expect(buttons[0]).toHaveAccessibleName("Close");
+  });
+
+  it("renders Edit action when onEdit is provided, closing preview on click", () => {
+    const onClose = vi.fn();
+    const onEdit = vi.fn();
+    render(<PlannedCardSheet slot={upper} open onClose={onClose} onEdit={onEdit} />);
+
+    const editBtn = screen.getByRole("button", { name: "Edit Upper" });
+    expect(editBtn).toBeInTheDocument();
+
+    fireEvent.click(editBtn);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onEdit).toHaveBeenCalledWith(upper);
   });
 
   it("shows a finisher under the lifts", () => {
@@ -91,5 +104,27 @@ describe("PlannedCardSheet", () => {
     const { container } = render(<PlannedCardSheet slot={upper} open={false} onClose={vi.fn()} />);
     expect(container).toBeEmptyDOMElement();
     expect(screen.queryByText("Bench Press")).not.toBeInTheDocument();
+  });
+  it("contains keyboard focus and returns it to the opener", () => {
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    opener.focus();
+    const { unmount } = render(
+      <PlannedCardSheet slot={upper} open onClose={vi.fn()} onEdit={vi.fn()} />,
+    );
+    const dialog = screen.getByRole("dialog");
+    const edit = screen.getByRole("button", { name: "Edit Upper" });
+    const close = screen.getByRole("button", { name: "Close" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(edit).toHaveFocus();
+    fireEvent.keyDown(edit, { key: "Tab", shiftKey: true });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(close, { key: "Tab" });
+    expect(edit).toHaveFocus();
+    unmount();
+    expect(opener).toHaveFocus();
+    opener.remove();
   });
 });

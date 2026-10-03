@@ -18,9 +18,9 @@
  *
  * ## The regression worth knowing about
  *
- * The browser token model issues no refresh token. Silent renewal works while
- * the user has a live Google session and is unreliable in an iOS PWA, so sync
- * will occasionally need a tap to reconnect. That is survivable only because
+ * The browser token model issues no refresh token. Obtaining a fresh token uses
+ * a Google dialog, even with an empty prompt, so an expired token needs a
+ * deliberate tap to reconnect. That is survivable only because
  * logging never waits on sync: an expired token pauses the mirror, it does not
  * touch the app.
  */
@@ -44,8 +44,7 @@ const RENEW_MARGIN_MS = 60_000;
  */
 const GIS_LOAD_TIMEOUT_MS = 15_000;
 
-/** Silent renewal should be immediate; an interactive one waits on a human. */
-const SILENT_TOKEN_TIMEOUT_MS = 30_000;
+/** An interactive request waits on a human, but must still settle. */
 const INTERACTIVE_TOKEN_TIMEOUT_MS = 120_000;
 
 /** Rejects with `reason` if `promise` has not settled in time. */
@@ -155,8 +154,8 @@ export function googleClientId(): string | undefined {
 /**
  * Loads Google Identity Services, once, and only when it is actually needed.
  *
- * Never at boot. This app is offline-first and nothing on the path to logging a
- * set may wait on a third-party script.
+ * Sign-in surfaces may warm it ahead of a tap. Nothing on the path to logging
+ * a set may wait on this third-party script.
  */
 function loadGis(): Promise<void> {
   if (scriptPromise) return scriptPromise;
@@ -192,10 +191,10 @@ function loadGis(): Promise<void> {
 /**
  * An access token, from cache where possible.
  *
- * `interactive: false` is what every background sync passes: it will renew
- * silently if it can and fail with `needs-consent` if it cannot, rather than
- * throwing a Google popup at someone mid-workout. Only a Settings tap passes
- * true.
+ * `interactive: false` is what every background sync passes: it may
+ * only use an existing token and fail with `needs-consent` otherwise.
+ * Google's token flow opens a dialog even with an empty prompt, so only a
+ * deliberate sign-in tap may obtain a fresh token.
  */
 export async function getAccessToken({ interactive }: { interactive: boolean }): Promise<string> {
   if (tokenSourceImpl) return tokenSourceImpl(interactive);
@@ -205,15 +204,18 @@ export async function getAccessToken({ interactive }: { interactive: boolean }):
   const clientId = googleClientId();
   if (!clientId) throw new Error("no-client-id" satisfies AuthFailure);
 
+  // Cache-only: background sync must never invoke the Google dialog API.
+  if (!interactive) throw new Error("needs-consent" satisfies AuthFailure);
+
   await withTimeout(loadGis(), GIS_LOAD_TIMEOUT_MS, "script-blocked");
 
   const client = ensureTokenClient(clientId);
   if (!client) throw new Error("script-blocked" satisfies AuthFailure);
 
-  const timeout = interactive ? INTERACTIVE_TOKEN_TIMEOUT_MS : SILENT_TOKEN_TIMEOUT_MS;
+  const timeout = INTERACTIVE_TOKEN_TIMEOUT_MS;
 
   try {
-    return await withTimeout(requestToken(client, interactive), timeout, "timeout");
+    return await withTimeout(requestToken(client), timeout, "timeout");
   } catch (err) {
     // One retry, and only for the one failure a retry can actually fix. The
     // first attempt may have spent its user activation loading the script; by
@@ -221,17 +223,16 @@ export async function getAccessToken({ interactive }: { interactive: boolean }):
     // is not retried - asking twice is the app arguing with an answer.
     const blocked = err instanceof Error && err.message === "popup-blocked";
     if (!blocked || !interactive) throw err;
-    return withTimeout(requestToken(client, true), timeout, "timeout");
+    return withTimeout(requestToken(client), timeout, "timeout");
   }
 }
 
 /**
  * Loads the script and builds the token client before anyone taps anything.
  *
- * Call it from wherever a sign-in is about to be offered -- the Settings screen,
- * the tutorial chapter that drives someone there -- not at boot: this app is
- * offline-first and nothing on the path to logging a set may wait on a
- * third-party script.
+ * Call it wherever sign-in is about to be offered, including Settings and the
+ * paused-sync notice. Warming never requests a token or opens a dialog, and
+ * logging never waits for it.
  *
  * Deliberately returns nothing and throws nothing. A failure here costs the
  * warm start and no more; the real attempt reports for itself.
@@ -301,18 +302,15 @@ function ensureTokenClient(clientId: string): TokenClient | undefined {
  * answered by whichever one the callback happened to find. A second caller gets
  * the first one's promise, which is the answer it was going to get anyway.
  */
-function requestToken(client: TokenClient, interactive: boolean): Promise<string> {
+function requestToken(client: TokenClient): Promise<string> {
   if (inflight) return inflight;
 
   const request = new Promise<string>((resolve, reject) => {
     pending = { resolve, reject };
     try {
-      // An empty prompt asks Google to renew without showing anything, and
-      // fails when consent is actually needed -- which is exactly right for a
-      // background sync, since throwing a Google popup at someone mid-workout
-      // is not a thing this app does. A deliberate tap passes no override, so
-      // the account picker and consent screen appear when they have to.
-      client.requestAccessToken(interactive ? undefined : { prompt: "" });
+      // Every fresh token uses Google's dialog flow. Background requests are
+      // rejected before this point; this path follows a deliberate sign-in tap.
+      client.requestAccessToken();
     } catch {
       pending = undefined;
       reject(new Error("popup-blocked" satisfies AuthFailure));

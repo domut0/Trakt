@@ -1,5 +1,7 @@
+import { useRef } from "react";
 import { createPortal } from "react-dom";
 import { useSheetDismiss } from "../hooks/useSheetDismiss";
+import { useDialogFocus } from "../hooks/useDialogFocus";
 import { kindOf } from "../lib/planning";
 import { useStore, type SplitSlot } from "../lib/store";
 import { Close } from "./icons";
@@ -19,24 +21,27 @@ import { Close } from "./icons";
  * Reading is not a write. So a locked card is tappable again, and this is what
  * it opens.
  *
- * ## No actions at all
- *
- * Not the editor with its controls disabled. A sheet full of greyed-out fields
- * is an argument about permissions; this is a page from a programme. The only
- * control on it is the way out.
+ * One scroll area holds the whole prescription, including its finisher. The
+ * header stays reachable. An optional Edit action is supplied by the caller
+ * only when the current plan may be changed.
  */
 export function PlannedCardSheet({
   slot,
   open,
   onClose,
+  onEdit,
 }: {
   slot: SplitSlot | undefined;
   open: boolean;
   onClose: () => void;
+  onEdit?: (slot: SplitSlot) => void;
 }) {
   const exercises = useStore((s) => s.exercises);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useSheetDismiss(open, onClose);
+
+  useDialogFocus(open, containerRef);
 
   if (!open || !slot || typeof document === "undefined") return null;
 
@@ -47,78 +52,119 @@ export function PlannedCardSheet({
     ? (exercises.find((e) => e.id === cardio.exerciseId)?.name ?? "Cardio")
     : undefined;
 
+  const handleEdit = () => {
+    onClose();
+    if (onEdit && slot) {
+      onEdit(slot);
+    }
+  };
+
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end bg-black/25 anim-backdrop" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col bg-paper anim-backdrop"
+      onClick={onClose}
+    >
       <div
-        className="max-h-[85vh] w-full overflow-y-auto bg-paper px-4 pt-4 anim-sheet"
-        onClick={(e) => e.stopPropagation()}
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 32px)" }}
+        ref={containerRef}
+        tabIndex={-1}
         role="dialog"
-        aria-label={slot.name}
+        aria-modal="true"
+        aria-label={kind === "repeat" ? "Back to the top" : slot.name}
+        className="flex h-full w-full flex-col bg-paper outline-none"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 pb-3">
+        <div
+          className="shrink-0 flex items-center justify-between gap-3 border-b border-wash px-4 pb-3"
+          style={{ paddingTop: "max(env(safe-area-inset-top), 16px)" }}
+        >
           <h2 className="min-w-0 text-balance break-words t-heading text-ink">
             {kind === "repeat" ? "Back to the top" : slot.name}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="-mr-2 -mt-2 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center text-ink-2"
-          >
-            <Close size={18} />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={handleEdit}
+                aria-label={`Edit ${slot.name}`}
+                className="flex min-h-[44px] items-center justify-center px-3 t-body font-medium text-ink"
+              >
+                Edit
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center text-ink-2"
+            >
+              <Close size={18} />
+            </button>
+          </div>
         </div>
 
-        {kind === "rest" && <p className="pb-2 t-body text-ink-2">A rest day. Nothing planned.</p>}
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4"
+          style={{ paddingBottom: "max(env(safe-area-inset-bottom), 32px)" }}
+        >
+          {kind === "rest" && (
+            <p className="pb-2 t-body text-ink-2">A rest day. Nothing planned.</p>
+          )}
 
-        {kind === "repeat" && (
-          <p className="pb-2 t-body text-ink-2">
-            Not a day. Reaching this sends the split back to its first card.
-          </p>
-        )}
+          {kind === "repeat" && (
+            <p className="pb-2 t-body text-ink-2">
+              Not a day. Reaching this sends the split back to its first card.
+            </p>
+          )}
 
-        {kind === "workout" &&
-          (lifts.length > 0 ? (
-            <div className="group-list">
-              {lifts.map((lift, i) => {
-                const name = exercises.find((e) => e.id === lift.exerciseId)?.name;
-                return (
-                  <div
-                    key={`${lift.exerciseId}-${i}`}
-                    className={`group-row ${i === 0 ? "" : "group-row-sep"}`}
-                  >
-                    <span className="min-w-0 truncate t-body text-ink">{name ?? "Unknown"}</span>
-                    {/* Whatever the plan actually says, and nothing where it
-                        says nothing: a lift prescribed as a name in an order
-                        is a legal prescription, and inventing "3 × 8" for it
-                        would be the app writing the programme. */}
-                    <span className="shrink-0 tnum t-body text-ink-2">{prescription(lift)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="pb-2 t-body text-ink-2">No lifts chosen.</p>
-          ))}
-
-        {cardioName && (
-          <>
-            <div className="group-header pt-4">
-              <h3 className="t-caption">{kind === "cardio" ? "Cardio" : "Finisher"}</h3>
-            </div>
-            <div className="group-list">
-              <div className="group-row">
-                <span className="min-w-0 truncate t-body text-ink">{cardioName}</span>
-                <span className="shrink-0 tnum t-body text-ink-2">{cardioAmount(cardio)}</span>
+          {kind === "workout" &&
+            (lifts.length > 0 ? (
+              <div className="group-list">
+                {lifts.map((lift, i) => {
+                  const name = exercises.find((e) => e.id === lift.exerciseId)?.name;
+                  const pres = prescription(lift);
+                  return (
+                    <div
+                      key={`${lift.exerciseId}-${i}`}
+                      className={`min-h-[48px] px-4 py-3 ${i === 0 ? "" : "group-row-sep"}`}
+                    >
+                      <span className="block break-words t-body font-medium text-ink">
+                        {name ?? "Unknown"}
+                      </span>
+                      {pres && (
+                        <span className="mt-1 block break-words tnum t-label text-ink-2">
+                          {pres}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-          </>
-        )}
+            ) : (
+              <p className="pb-2 t-body text-ink-2">No lifts chosen.</p>
+            ))}
 
-        {kind === "cardio" && !cardioName && (
-          <p className="pb-2 t-body text-ink-2">Cardio, with the activity left to you.</p>
-        )}
+          {cardioName && (
+            <>
+              <div className="group-header pt-4">
+                <h3 className="t-caption">{kind === "cardio" ? "Cardio" : "Finisher"}</h3>
+              </div>
+              <div className="group-list">
+                <div className="min-h-[48px] px-4 py-3">
+                  <span className="block break-words t-body font-medium text-ink">
+                    {cardioName}
+                  </span>
+                  <span className="mt-1 block break-words tnum t-label text-ink-2">
+                    {cardioAmount(cardio)}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {kind === "cardio" && !cardioName && (
+            <p className="pb-2 t-body text-ink-2">Cardio, with the activity left to you.</p>
+          )}
+        </div>
       </div>
     </div>,
     document.body,

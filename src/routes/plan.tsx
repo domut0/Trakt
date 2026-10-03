@@ -13,7 +13,6 @@ import { CoachPlanCard } from "../components/CoachPlanPrompt";
 import { CoachManagedBanner } from "../components/CoachManagedBanner";
 import { usePlanLocked } from "../lib/plan-lock";
 import { Plus } from "../components/icons";
-import { Chevron } from "../components/icons";
 import { dayKey, parseDayKey } from "../lib/daily-log";
 import { useStore, type SplitSlot } from "../lib/store";
 
@@ -50,7 +49,6 @@ export const Route = createFileRoute("/plan")({
  */
 function PlanPage() {
   const slots = useStore((s) => s.slots);
-  const exercises = useStore((s) => s.exercises);
   const plannedDays = useStore((s) => s.plannedDays);
   const unpinDay = useStore((s) => s.unpinDay);
   const next = useStore((s) => s.nextCard());
@@ -61,22 +59,15 @@ function PlanPage() {
 
   const [editingSlot, setEditingSlot] = useState<SplitSlot | undefined>();
   const [cardOpen, setCardOpen] = useState(false);
-  /** The card being READ, which is what a tap does while a coach owns the plan. */
+  /** The card being READ. Tapping an existing card opens preview for everyone. */
   const [viewingSlot, setViewingSlot] = useState<SplitSlot | undefined>();
 
-  /**
-   * What a tap on a card does, which depends on whose plan it is.
-   *
-   * The whole section used to be `inert` while a coach managed it, which
-   * answers "can I change this" correctly and "what is it" not at all: the one
-   * person the programme was written for could read that Wednesday says Upper
-   * and could not find out what Upper contains without starting it.
-   */
   const openCard = (slot: SplitSlot) => {
-    if (locked) {
-      setViewingSlot(slot);
-      return;
-    }
+    setViewingSlot(slot);
+  };
+
+  const openEditFromPreview = (slot: SplitSlot) => {
+    setViewingSlot(undefined);
     setEditingSlot(slot);
     setCardOpen(true);
   };
@@ -114,10 +105,6 @@ function PlanPage() {
 
       {/* Inert while a coach manages the plan: readable, not editable. The
           store refuses these edits anyway; this is so nothing looks tappable. */}
-      {/* Inert while a coach manages the plan: readable, not editable. The
-          store refuses these edits anyway; this is so nothing looks tappable.
-          The split below is deliberately NOT in here - its cards open to be
-          read, and a tap that opens a card changes nothing. */}
       <div inert={locked}>
         <NutritionPlan />
         <TargetStrip />
@@ -228,6 +215,7 @@ function PlanPage() {
         slot={viewingSlot}
         open={viewingSlot !== undefined}
         onClose={() => setViewingSlot(undefined)}
+        onEdit={!locked ? openEditFromPreview : undefined}
       />
     </AppShell>
   );
