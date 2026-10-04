@@ -6,6 +6,10 @@ import { VitePWA } from "vite-plugin-pwa";
 import tsConfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig(async ({ command }) => {
+  const publicOutput =
+    process.env.VERCEL === "1" || process.env.NITRO_PRESET === "vercel"
+      ? ".vercel/output/static"
+      : ".output/public";
   const plugins: PluginOption[] = [
     tailwindcss(),
     tsConfigPaths({ projects: ["./tsconfig.json"] }),
@@ -42,7 +46,9 @@ export default defineConfig(async ({ command }) => {
       // top-level folder, not the real client output). Point it at nitro's
       // actual public output explicitly so the SW/manifest land where the
       // server serves them from and globPatterns can find the built assets.
-      outDir: ".output/public",
+      // Vercel serves .vercel/output/static; .output/public is only the
+      // default Node preset. A SW in the wrong folder never gets deployed.
+      outDir: publicOutput,
       includeAssets: ["favicon.ico", "icon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "Trakt",

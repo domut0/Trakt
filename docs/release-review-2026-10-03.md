@@ -31,11 +31,15 @@ commit fetched from `origin/main`. A local recovery branch,
    by their times, and handles sets logged after midnight.
 5. A cardio-only client could display the wrong distance unit. The reader now
    recovers the unit from the cardio sheet column.
+6. The service worker was written to the Node build folder during Vercel builds,
+   so the deployed `/sw.js` returned 404. Its output now follows the Vercel
+   static folder when building for Vercel. Update activation still requires the
+   user's Reload tap; the database and its contents are unaffected.
 
 ## Data preservation boundaries
 
 The release does not change the IndexedDB schema, migrations, backup version,
-sheet format, plan format, Settings backup writer, dependency lockfile or PWA
+sheet format, plan format, Settings backup writer or PWA
 update policy. It introduces no database reset or record deletion on upgrade.
 The new session fields are optional and use the existing session write path.
 
@@ -49,10 +53,24 @@ Google reconnection keeps the existing sheet and sharing. While authorization
 is paused, logging still saves to IndexedDB. No existing user's device storage
 or live client sheet was used as a test fixture.
 
+## Deployment security fix
+
+The first push, `79995ce`, was blocked by Vercel before building because the
+existing TanStack Start version was vulnerable to CVE-2026-102989. Production
+continued serving the previous deployment. The security check was not bypassed.
+
+TanStack Start is now 1.168.60, with start-server-core 1.169.39 and compatible
+router/plugin updates. The router error component uses the library's current
+props type. Compatible dependency patches also resolve the remaining npm audit
+findings; `npm audit` reports zero vulnerabilities. These changes update the
+dependency lockfile but do not change application storage formats.
+
+Advisory: https://github.com/TanStack/router/security/advisories/GHSA-qx66-fv34-fjm8
+
 ## Verification
 
 - Full Vitest suite: **80 files and 1,219 tests passed**. TypeScript and the
-  production build passed. Full ESLint passed with zero errors and four
+  production build passed after dependency updates. Full ESLint passed with zero errors and four
   existing warnings. Existing Vite test-route/plugin warnings remain.
 - Regression coverage includes migrations, backup parsing, persistence,
   read-only latches, coach plans, sync merges, auth and the fixes above.
@@ -63,7 +81,13 @@ or live client sheet was used as a test fixture.
   nutrition, zero steps, templates and both clients. All tables were identical
   after calendar reads and full reload. Active workout and backup session
   fields survived. No unsolicited popup or JavaScript error remained after
-  waiting for the streamed UI before fixture setup.
+  interacting with the streamed UI before fixture setup. The harness now
+  asserts zero JavaScript errors both before and after reload.
+- The final Vercel artifact contains the service worker, Workbox runtime and
+  all 53 precache entries. Running its built server function and static assets
+  locally returned 200 for Today, Plan and Clients. In an isolated browser,
+  saved bodyweight, calories and zero steps survived both online and offline
+  reload with an active service worker, no JavaScript errors and no popups.
 - The two previously approved GPT-6.1-sol reviewers checked standards and spec
   independently, then reviewed the release fixes. No blocking findings remain.
 
