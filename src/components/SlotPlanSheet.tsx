@@ -29,7 +29,6 @@ export function SlotPlanSheet({
   const setSlotCardio = useStore((s) => s.setSlotCardio);
   const templates = useStore((s) => s.templates);
   const saveTemplateFrom = useStore((s) => s.saveTemplateFrom);
-  const applyTemplateLifts = useStore((s) => s.applyTemplate);
   const addExercise = useStore((s) => s.addExercise);
   const addSplitCard = useStore((s) => s.addSplitCard);
   const updateSplitCard = useStore((s) => s.updateSplitCard);
@@ -156,11 +155,20 @@ export function SlotPlanSheet({
   };
 
   const applyTemplate = (templateId: string) => {
-    const target = slot ?? addSplitCard({ name, kind });
-    if (!target) return;
-    applyTemplateLifts(templateId, target.id);
-    const applied = useStore.getState().slots.find((sl) => sl.id === target.id);
-    setPicked(applied?.plannedLifts ?? []);
+    const template = templates.find((item) => item.id === templateId);
+    if (!template) return;
+    // Like choosing a lift from the library, resolve names now but keep the
+    // card itself a draft until Save. Cancel must not replace a prescription
+    // or leave behind a new card created only to preview a template.
+    setPicked(
+      template.lifts.map(({ name: liftName, ...prescription }) => {
+        const key = liftName.trim().toLowerCase();
+        const exercise =
+          useStore.getState().exercises.find((item) => item.name.trim().toLowerCase() === key) ??
+          addExercise(liftName.trim(), "accessory");
+        return { exerciseId: exercise.id, ...prescription };
+      }),
+    );
   };
 
   return createPortal(

@@ -339,8 +339,9 @@ Script way. Each owner has to paste the new file and deploy a **new version** of
 the existing deployment — not a new deployment, which would change the `/exec`
 URL. Once every client is on the OAuth path this goes away entirely.
 
-**Testing silent token renewal on a real iPhone.** It cannot be reproduced in a
-desktop browser, and it is the behaviour most likely to disappoint. Install the
-PWA, connect a sheet, leave it overnight, and open it the next morning: either it
-syncs silently or it asks you to reconnect. Either is survivable — logging never
-waits on sync — but you should know which one you shipped.
+**Testing reconnection on a real iPhone.** Background sync only uses an existing
+in-memory token. A cold launch or expired token pauses Google sync and offers
+**Reconnect Google**; opening the app itself never requests a Google window.
+Logging continues to save locally while sync is paused. Reconnect preserves the
+existing sheet and its sharing. The Picker still requests a fresh session when
+needed, and a timed-out sign-in can be retried without clearing site data.

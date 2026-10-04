@@ -1,5 +1,6 @@
 import type { CellValue } from "./csv";
 import { SHEET_TABS } from "./sync";
+import { dayKey } from "./daily-log";
 import { parsePlanTab, resolvePlan, type PlanPayload } from "./plan-tab";
 import type {
   DailyLog,
@@ -175,14 +176,13 @@ export function buildClientSnapshot(
   // --- sessions, first: sets join onto them by slot and day ---------------
   //
   // No column a set can see carries its session's id, so sets are matched to
-  // sessions by day and slot -- which is how a person reading the sheet would
-  // do it, and unambiguous unless the same slot was trained twice in one day.
+  // sessions by day and slot, then by time when that slot was trained twice.
   // Nested rather than a joined string key so that no separator has to be a
   // character neither a date nor a slot name can contain.
-  const sessionByDay = new Map<string, Map<string, WorkoutSession>>();
+  const sessionByDay = new Map<string, Map<string, WorkoutSession[]>>();
   const rememberSession = (date: string, slotId: string, session: WorkoutSession): void => {
-    const forDay = sessionByDay.get(date) ?? new Map<string, WorkoutSession>();
-    forDay.set(slotId, session);
+    const forDay = sessionByDay.get(date) ?? new Map<string, WorkoutSession[]>();
+    forDay.set(slotId, [...(forDay.get(slotId) ?? []), session]);
     sessionByDay.set(date, forDay);
   };
 
@@ -197,7 +197,14 @@ export function buildClientSnapshot(
 
       const slotName = text(sessionRows.get(row, "Split Slot"));
       const slot = slotName === undefined ? undefined : slotFor(slotName);
-      const endedAt = timestamp(date, text(sessionRows.get(row, "Ended")));
+      const ended = text(sessionRows.get(row, "Ended"));
+      // A blank end is an active workout, not one completed at midnight.
+      let endedAt = ended === undefined ? undefined : timestamp(date, ended);
+      if (endedAt !== undefined && endedAt < startedAt) {
+        const nextDay = new Date(endedAt);
+        nextDay.setDate(nextDay.getDate() + 1);
+        endedAt = nextDay.getTime();
+      }
       const note = text(sessionRows.get(row, "Note"));
 
       const session: WorkoutSession = {
@@ -208,7 +215,14 @@ export function buildClientSnapshot(
         ...(note !== undefined ? { note } : {}),
       };
       sessions.push(session);
-      if (slot) rememberSession(date, slot.id, session);
+      rememberSession(date, slot?.id ?? "", session);
+      // A set after midnight is dated when it was logged, while its workout
+      // is dated when it started. Make that completed workout reachable by
+      // either day without duplicating the session in the snapshot.
+      if (endedAt !== undefined) {
+        const endDate = dayKey(new Date(endedAt));
+        if (endDate !== date) rememberSession(endDate, slot?.id ?? "", session);
+      }
     }
   }
 
@@ -240,7 +254,15 @@ export function buildClientSnapshot(
       const slot = slotName === undefined ? undefined : slotFor(slotName);
       // A set whose session is missing from the sheet still renders in History
       // and on charts; it simply belongs to no session.
-      const session = slot ? sessionByDay.get(date)?.get(slot.id) : undefined;
+      const loggedAt = timestamp(date, text(setRows.get(row, "Time"))) ?? 0;
+      const candidates = sessionByDay.get(date)?.get(slot?.id ?? "") ?? [];
+      const timed = candidates.filter(
+        (session) =>
+          loggedAt >= session.startedAt &&
+          (session.endedAt === undefined || loggedAt <= session.endedAt),
+      );
+      const session =
+        candidates.length === 1 ? candidates[0] : timed.length === 1 ? timed[0] : undefined;
 
       const rpe = num(setRows.get(row, "RPE"));
       const setupNote = text(setRows.get(row, "Setup Note"));
@@ -253,7 +275,7 @@ export function buildClientSnapshot(
         reps,
         ...(rpe !== undefined ? { rpe } : {}),
         ...(setupNote !== undefined ? { setupNote } : {}),
-        loggedAt: timestamp(date, text(setRows.get(row, "Time"))) ?? 0,
+        loggedAt,
       });
     }
   }
@@ -272,6 +294,9 @@ export function buildClientSnapshot(
       const exercise = name === undefined ? undefined : exerciseFor(name, "cardio");
       const durationMinutes = num(cardioRows.get(row, "Duration (min)"));
       const distance = num(cardioRows.get(row, "Distance"));
+      const distanceUnit = text(cardioRows.get(row, "Distance Unit"));
+      if (distanceUnit === "km") unit = "kg";
+      else if (distanceUnit === "mi") unit = "lbs";
       const setupNote = text(cardioRows.get(row, "Setup Note"));
       const note = text(cardioRows.get(row, "Note"));
 

@@ -30,8 +30,50 @@ describe("SlotPlanSheet", () => {
       sessions: [],
       sets: [],
       nextSlotId: undefined,
+      coachManaged: false,
+      templates: [],
     });
   });
+
+  it.each([false, true])(
+    "keeps a template preview unsaved until Save (existing card: %s)",
+    (existing) => {
+      const card = {
+        id: "card",
+        name: "Upper",
+        rotationOrder: 0,
+        plannedLifts: [{ exerciseId: SQUAT.id }],
+      };
+      const original = existing ? [card] : [];
+      useStore.setState({
+        slots: original,
+        templates: [
+          {
+            id: "tpl",
+            name: "Bench template",
+            lifts: [{ name: BENCH.name, sets: 3, reps: "8-12" }],
+          },
+        ],
+      });
+      const view = render(
+        <SlotPlanSheet slot={existing ? card : undefined} open onClose={() => {}} />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Bench template" }));
+      expect(screen.getByRole("button", { name: "Remove Bench Press" })).toBeInTheDocument();
+      expect(useStore.getState().slots).toBe(original);
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      view.unmount();
+      expect(useStore.getState().slots).toBe(original);
+
+      render(<SlotPlanSheet slot={existing ? card : undefined} open onClose={() => {}} />);
+      fireEvent.click(screen.getByRole("button", { name: "Bench template" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      expect(useStore.getState().slots).toHaveLength(1);
+      expect(useStore.getState().slots[0].plannedLifts).toEqual([
+        { exerciseId: BENCH.id, sets: 3, reps: "8-12" },
+      ]);
+    },
+  );
 
   describe("the preset library", () => {
     it("offers presets this device has never logged", () => {

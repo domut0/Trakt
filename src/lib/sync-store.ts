@@ -482,7 +482,16 @@ type GetState = () => SyncState;
  * user's edits with the values they had just replaced.
  */
 async function runCycle(config: SyncConfigMeta, set: SetState, get: GetState): Promise<void> {
+  // Opening a client can swap the main store while either read is awaiting.
+  // Recheck after those boundaries before merging or capturing a push payload;
+  // the entry guard alone only protects cycles started inside client view.
+  const pauseForClient = () => {
+    if (dbReadOnlyReason() === undefined) return false;
+    set({ status: "idle", pending: true });
+    return true;
+  };
   let base = await loadSyncBase();
+  if (pauseForClient()) return;
   let collisions: Collision[] = [];
   // Undefined until a pull happens. On the very first sync there is nothing in
   // the sheet to preserve, so publishing the app's own plan is always right.
@@ -491,6 +500,7 @@ async function runCycle(config: SyncConfigMeta, set: SetState, get: GetState): P
 
   if (base) {
     const pulled = await pullFor(config);
+    if (pauseForClient()) return;
     if (!pulled.ok) {
       const { status, message } = describeFailure(pulled.error);
       set({

@@ -109,6 +109,63 @@ describe("rebuilding a client's state from their sheet", () => {
     expect(snap.sets.every((s) => s.sessionId === session.id)).toBe(true);
   });
 
+  it("keeps an unfinished workout unfinished", () => {
+    const snap = roundTrip({
+      ...SOURCE,
+      sessions: [{ ...SOURCE.sessions[0], endedAt: undefined }],
+    });
+    expect(snap.sessions[0].endedAt).toBeUndefined();
+  });
+
+  it("joins sets from a workout that has no split card", () => {
+    const snap = roundTrip({
+      ...SOURCE,
+      sessions: [{ ...SOURCE.sessions[0], splitSlotId: undefined }],
+    });
+    expect(snap.sets.map((set) => set.sessionId)).toEqual(["sess_1", "sess_1"]);
+  });
+
+  it("keeps two workouts on the same card and day separate using their times", () => {
+    const evening = DAY + 8 * 60 * 60_000;
+    const snap = roundTrip({
+      ...SOURCE,
+      sessions: [
+        SOURCE.sessions[0],
+        { ...SOURCE.sessions[0], id: "sess_2", startedAt: evening, endedAt: evening + 60_000 },
+      ],
+      sets: [
+        ...SOURCE.sets,
+        { ...SOURCE.sets[0], id: "set_3", sessionId: "sess_2", loggedAt: evening },
+      ],
+    });
+    expect(snap.sets.map((set) => set.sessionId)).toEqual(["sess_1", "sess_1", "sess_2"]);
+  });
+
+  it("recovers distance units when the client has only logged cardio", () => {
+    const snap = roundTrip({
+      ...SOURCE,
+      unit: "kg",
+      sets: [],
+      dailyLogs: [],
+      sessions: [SOURCE.sessions[1]],
+    });
+    expect(snap.unit).toBe("kg");
+  });
+
+  it("keeps sets logged after midnight attached to the workout that started the previous day", () => {
+    const startedAt = new Date(2026, 8, 12, 23, 30).getTime();
+    const loggedAt = new Date(2026, 8, 13, 0, 15).getTime();
+    const endedAt = new Date(2026, 8, 13, 0, 30).getTime();
+    const snap = roundTrip({
+      ...SOURCE,
+      sessions: [{ ...SOURCE.sessions[0], startedAt, endedAt }],
+      sets: [{ ...SOURCE.sets[0], loggedAt }],
+    });
+    expect(snap.sessions).toHaveLength(1);
+    expect(snap.sessions[0].endedAt).toBe(endedAt);
+    expect(snap.sets[0].sessionId).toBe("sess_1");
+  });
+
   it("attaches the session to a slot named by the sheet", () => {
     const snap = roundTrip();
     const session = snap.sessions.find((s) => s.id === "sess_1")!;

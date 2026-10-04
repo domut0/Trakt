@@ -5,6 +5,7 @@ import {
   loadSyncBase,
   saveSyncBase,
   saveSyncConfig,
+  setDbReadOnly,
   type SyncConfigMeta,
 } from "../db";
 import type { CellValue } from "../csv";
@@ -150,10 +151,42 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  setDbReadOnly(undefined);
   vi.unstubAllEnvs();
 });
 
 describe("syncNow: refusing to run", () => {
+  it.each(["loading the base", "pulling Google"])(
+    "stops an in-flight sync if client view opens while %s",
+    async (moment) => {
+      const ownLogs = [{ date: "2026-10-01", calories: 2200 }];
+      const clientLogs = [{ date: "2026-10-01", calories: 3100 }];
+      useStore.setState({ hydrated: true, dailyLogs: ownLogs });
+      await db.dailyLogs.bulkPut(ownLogs);
+      const originalBase = buildBase(useStore.getState(), 3);
+      await saveSyncBase(originalBase);
+      useSyncStore.setState({ config: CONFIG });
+      const openClient = () => {
+        setDbReadOnly("viewing Client");
+        useStore.setState({ dailyLogs: clientLogs });
+      };
+      const api = fakeSheets({
+        onCall: (kind) => {
+          if (moment === "pulling Google" && kind === "get") openClient();
+        },
+      });
+      const pending = useSyncStore.getState().syncNow();
+      if (moment === "loading the base") openClient();
+      await pending;
+
+      expect(api.calls).toEqual(moment === "pulling Google" ? ["get"] : []);
+      expect(await db.dailyLogs.toArray()).toEqual(ownLogs);
+      expect(await loadSyncBase()).toEqual(originalBase);
+      expect(useStore.getState().dailyLogs).toBe(clientLogs);
+      expect(useSyncStore.getState()).toMatchObject({ pending: true, running: false });
+    },
+  );
+
   it("does nothing before the store has hydrated", async () => {
     // Pushing an empty store would publish an empty sheet, and once a base
     // exists that reads as the user having deleted their entire history.

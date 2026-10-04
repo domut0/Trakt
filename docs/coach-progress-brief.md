@@ -48,4 +48,4 @@ Physical iPhone/VoiceOver and a real Google account remain user QA. The earlier 
 
 ## Status
 
-Implemented locally on `codex/coach-mini-today` in `C:\dev\trakt-workout-preview-ios`. Not pushed or deployed. The branch also contains the previously completed workout overview/editor and background Google sign-in fixes.
+Prepared for the user-authorized direct release to `main` after integrating current production and completing the [release review](release-review-2026-10-03.md). The release also includes the workout overview/editor, workout-deviation persistence and background Google sign-in fixes. The chat records the final pushed commit and deployment result.
