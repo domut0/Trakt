@@ -292,6 +292,44 @@ fatal.
 
 ---
 
+## When the Picker says "The API developer key is invalid"
+
+Nine times out of ten on iOS, it is not the key.
+
+The Picker is the one part of this app that does not run on the OAuth token. It
+draws an iframe from `docs.google.com` that authenticates with the user's Google
+**cookies**. Every browser on iOS is WebKit, so every browser on iOS partitions
+those cookies away from that iframe once its storage-access grant lapses —
+roughly a day. The Picker reports the loss from inside its own iframe, where no
+callback of ours can see it, and the message it picks is the one about the key.
+
+The tell is the sequence: a prompt asking to allow cookies, then "The API
+developer key is invalid", then "Can't access your Google account" on the retry.
+A genuinely wrong key fails the same way on the first attempt, every time, on
+every device, and clearing site data does not help it.
+
+`pickSharedSpreadsheet` handles this by refusing to open the Picker on a token
+more than five minutes old: re-minting one opens `accounts.google.com` as a
+first-party window, which is what puts the cookies back. So the cure is to tap
+**Choose their sheet** again rather than to clear site data or touch the console.
+
+Reach for this page only if the message survives a second tap on a device whose
+site data you have just cleared.
+
+### Why the preflight does not catch it
+
+`preflightPicker` probes the **Drive** API, and step 5 above restricts the key to
+the **Picker** API alone — so on a correctly-restricted production key Google
+answers 403 and the key check never fires. That is deliberate: a 403 from Drive
+is not evidence about the Picker, and blocking on it would lock out coaches whose
+setup is fine. The preflight's 401 check does still fire, and catches a token
+that has been revoked outright.
+
+If you want the key check live in production too, add the Drive API to the key's
+API restrictions. It is not required, and an unrestricted key is worse.
+
+---
+
 ## What is still manual afterwards
 
 Two things, both small:
