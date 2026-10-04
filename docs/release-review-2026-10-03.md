@@ -35,6 +35,11 @@ commit fetched from `origin/main`. A local recovery branch,
    so the deployed `/sw.js` returned 404. Its output now follows the Vercel
    static folder when building for Vercel. Update activation still requires the
    user's Reload tap; the database and its contents are unaffected.
+7. The live production check exposed Today rendering the server's date before
+   the device's date when their time zones crossed midnight. Reproduced with
+   a UTC server and a Pacific browser, it caused React hydration errors. Today
+   now renders a stable loading shell until the client supplies its local date.
+   Logging continues to use the device's calendar date.
 
 ## Data preservation boundaries
 
@@ -88,6 +93,12 @@ Advisory: https://github.com/TanStack/router/security/advisories/GHSA-qx66-fv34-
   locally returned 200 for Today, Plan and Clients. In an isolated browser,
   saved bodyweight, calories and zero steps survived both online and offline
   reload with an active service worker, no JavaScript errors and no popups.
+- `scripts/verify-release.mjs` repeats the production browser check in Honolulu
+  and Kiritimati, whose local dates differ by a full day. Both pass against the
+  built Vercel function with a UTC server, including an assertion that values
+  save to the browser's local date. Set `TRAKT_CHECK_URL` to a built app's origin
+  and run `node scripts/verify-release.mjs`. It creates fresh isolated browser
+  contexts and connects to no Google account or client sheet.
 - The two previously approved GPT-6.1-sol reviewers checked standards and spec
   independently, then reviewed the release fixes. No blocking findings remain.
 

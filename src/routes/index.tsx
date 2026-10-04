@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format, isValid } from "date-fns";
 import { AppShell } from "../components/AppShell";
 import { DayActions } from "../components/DayActions";
@@ -42,8 +42,27 @@ export const Route = createFileRoute("/")({
       },
     ],
   }),
-  component: Home,
+  component: HomePage,
 });
+
+function HomePage() {
+  // Today belongs to the device's time zone, which the server cannot know.
+  // Keep the initial shell stable rather than rendering the server's day and
+  // replacing it during hydration (also important for cached offline HTML).
+  return (
+    <ClientOnly
+      fallback={
+        <AppShell>
+          <p role="status" className="px-4 py-8 t-body text-ink-2">
+            Loading your day…
+          </p>
+        </AppShell>
+      }
+    >
+      <Home />
+    </ClientOnly>
+  );
+}
 
 function Home() {
   const { date } = Route.useSearch();
