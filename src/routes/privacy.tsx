@@ -22,7 +22,7 @@ import { createFileRoute } from "@tanstack/react-router";
  */
 const CONTACT_EMAIL = "ccblue241@gmail.com";
 
-const UPDATED = "19 September 2026";
+const UPDATED = "5 October 2026";
 
 export const Route = createFileRoute("/privacy")({
   head: () => ({
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/privacy")({
       {
         name: "description",
         content:
-          "Trakt keeps your training data on your own device. No accounts, no servers, no analytics.",
+          "Trakt keeps your training data on your own device. No user database, no tracking.",
       },
     ],
   }),
@@ -45,9 +45,10 @@ function PrivacyPage() {
       <p className="pb-6 t-label text-ink-2">Last updated {UPDATED}</p>
 
       <Callout>
-        Trakt has no accounts and no servers. Everything you log stays on your own device. If you
-        turn on the optional Google Sheet, a copy goes to a spreadsheet in your own Google Drive
-        that you own and can delete. Nothing is ever sent to the people who make Trakt.
+        Trakt keeps your workout and fitness data on your own device. If you turn on the optional
+        Google Sheet, a copy goes to a spreadsheet in your own Google Drive that you own and can
+        delete. The backend handles session authentication credentials to keep your sheet connected;
+        it never receives your workout logs, bodyweight, or personal entries.
       </Callout>
 
       <Section title="What Trakt stores, and where">
@@ -56,18 +57,17 @@ function PrivacyPage() {
           log. All of it is written to storage inside your own browser or phone, in the app itself.
         </P>
         <P>
-          There is no Trakt account, no Trakt login, and no Trakt server. Your data is not uploaded
-          to us, because there is no &ldquo;us&rdquo; for it to be uploaded to. Nobody operating
-          Trakt can see what you log.
+          Trakt has no separate account registration, central workout database, or analytics. Your
+          fitness data is not uploaded to Trakt&rsquo;s servers.
         </P>
         <P>
           Because the data lives on your device, clearing your browser&rsquo;s site data or deleting
-          the app deletes it. The JSON export in Settings is the only backup that exists — take one
-          before you change phones.
+          the app deletes it. Export a JSON backup in Settings before you change phones; your Google
+          Sheet, if connected, also retains the data you have synced.
         </P>
       </Section>
 
-      <Section title="The optional Google Sheet">
+      <Section title="Your Google connection">
         <P>
           Trakt can mirror your log into a Google Sheet. It is off until you turn it on, and the app
           works completely without it.
@@ -75,9 +75,9 @@ function PrivacyPage() {
         <P>
           When you connect it, Trakt asks Google for one permission: <Code>drive.file</Code>, which
           Google describes as access to &ldquo;only the specific Google Drive files you use with
-          this app&rdquo;. Trakt creates one spreadsheet and can read and write that spreadsheet. It
-          cannot see anything else in your Drive — not your photos, not your documents, not your
-          other spreadsheets.
+          this app&rdquo;. Trakt can access the spreadsheet it creates and files you explicitly
+          choose through Google Picker, such as a client&rsquo;s shared sheet. It does not request
+          access to the rest of your Drive.
         </P>
         <P>
           The spreadsheet lives in <em>your</em> Google Drive, under your Google account. You own
@@ -85,8 +85,19 @@ function PrivacyPage() {
           covers what they do with files in your Drive.
         </P>
         <P>
-          Your Google sign-in is kept only in memory while the app is open. It is never written to
-          your device&rsquo;s storage and never included in a backup export.
+          To keep you connected between visits, Trakt&rsquo;s server exchanges your Google sign-in
+          code and renews access when it expires. It stores the refresh credential in an encrypted,
+          HttpOnly cookie that browser scripts cannot read. This cookie lasts up to 90 days and
+          renews when your connection is used. Short-lived access tokens stay in browser memory.
+          Neither credential is included in backup exports.
+        </P>
+        <P>
+          Disconnecting in Settings clears this browser&rsquo;s connection without deleting your
+          logs, your spreadsheet, or connections on other devices. If you disconnect offline, a
+          local marker prevents automatic reconnection until you deliberately sign in again. To
+          revoke Trakt&rsquo;s Google access everywhere, remove it from your Google account&rsquo;s
+          third-party connections. Google may also require you to reconnect after revocation or
+          expiry.
         </P>
       </Section>
 
@@ -112,9 +123,9 @@ function PrivacyPage() {
           items={[
             "No analytics, tracking pixels, or usage statistics of any kind.",
             "No advertising, and no sharing or selling of data to anyone.",
-            "No third-party fonts or scripts on ordinary use — the app loads nothing from anyone except Google, and only when you have connected a Google Sheet.",
-            "No crash or error reporting sent anywhere. Errors stay on your device.",
-            "No cookies used to identify or follow you.",
+            "No external fonts. Google scripts load when you use the Google connection or file-selection features.",
+            "No third-party crash reporting. Hosting infrastructure may retain ordinary request and server error logs; authentication credentials are not logged by the session endpoints.",
+            "No advertising or tracking cookies. The Google connection cookie is used only to keep your authorized session working.",
           ]}
         />
       </Section>
@@ -129,8 +140,9 @@ function PrivacyPage() {
         </P>
         <P>
           In practice: data from your Google account is used only to provide the sheet-sync feature
-          you turned on. It is not transferred to anyone else, not used for advertising, and not
-          read by any human — it never leaves your device except to go to your own Drive.
+          you turned on. It is not sold or used for advertising. Your fitness records travel
+          directly between your device and Google; the session server handles only the credentials
+          needed for that connection.
         </P>
       </Section>
 

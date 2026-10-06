@@ -61,9 +61,9 @@ this setup touches is free with no billing attached:
 | Sheets, Drive and Picker APIs              | Free — Workspace APIs, not metered cloud services |
 | Consent screen, OAuth client IDs, API keys | Free                                              |
 
-The quotas are far above what a coaching practice generates. Trakt has no
-backend, which is the point of the whole architecture, so there is no server
-here to be billed for.
+Trakt uses Vercel server functions only to exchange and renew Google credentials.
+Fitness records still travel directly between the browser and Google Sheets.
+No Google Cloud compute service or database is needed for this connection.
 
 If a billing prompt genuinely blocks project creation rather than merely nagging,
 the usual cause is a Google Workspace organization policy requiring billing on
@@ -190,15 +190,18 @@ attached. Go back and remove it.
    - `https://trakt-fit.vercel.app`
    - `http://localhost:8080`
    - `http://localhost:3000`
-4. **Authorized redirect URIs**: leave empty. Google Identity Services uses the
-   token model, which does not redirect.
+4. **Authorized redirect URIs**: leave empty for the GIS popup code flow.
+   Google uses the calling page's authorized origin during code exchange.
 5. Create.
 
 Copy the **Client ID**. It looks like
 `123456789-abc123def456.apps.googleusercontent.com`.
 
-Ignore the client secret. The browser flow does not use one, and it must never
-enter this repo.
+Keep the client secret private. The server now uses it to exchange authorization
+codes and renew access. Add it only as `GOOGLE_CLIENT_SECRET` in Vercel's
+Production environment; never prefix it with `VITE_` or commit it. Google shows
+new secrets only once. If necessary, add a new secret to this same OAuth client,
+copy it directly into Vercel, and leave the existing secret enabled during rollout.
 
 The client ID itself is **not a secret** — it ships in the bundle and is visible
 to anyone who opens devtools. That is normal and expected for this flow.
@@ -242,12 +245,24 @@ Preview, if you want the spike reachable from a preview build).
 Two Vercel gotchas:
 
 - The `VITE_` prefix is not decorative. Vite only exposes variables with that
-  prefix to client code, and everything here runs in the browser.
+  prefix to client code. Only the public client ID and Picker key use that prefix.
 - Environment variables are read at **build** time, so adding them does nothing
   to the deployment already live. Redeploy after adding them.
 
 Neither value is secret, but keeping them out of the repo means rotating one is
 a config change rather than a commit.
+
+Persistent sessions also require these **server-only Production secrets**:
+
+- `GOOGLE_CLIENT_SECRET`: the secret for the same OAuth client as `VITE_GOOGLE_CLIENT_ID`.
+- `GOOGLE_SESSION_PASSWORD`: a cryptographically random value of at least 32 characters.
+  Generate it locally and pipe it directly into Vercel's secret input; never put it
+  in a prompt, terminal output, repository file, or frontend environment variable.
+
+Redeploy after adding the secrets. Keep the encryption password stable across
+deployments: changing it invalidates existing connections (it does not delete
+logs or spreadsheets). See [persistent session operations](persistent-google-session.md)
+for security boundaries, tests, and recovery behavior.
 
 ---
 
@@ -339,9 +354,9 @@ Script way. Each owner has to paste the new file and deploy a **new version** of
 the existing deployment — not a new deployment, which would change the `/exec`
 URL. Once every client is on the OAuth path this goes away entirely.
 
-**Testing reconnection on a real iPhone.** Background sync only uses an existing
-in-memory token. A cold launch or expired token pauses Google sync and offers
-**Reconnect Google**; opening the app itself never requests a Google window.
-Logging continues to save locally while sync is paused. Reconnect preserves the
-existing sheet and its sharing. The Picker still requests a fresh session when
-needed, and a timed-out sign-in can be retried without clearing site data.
+**Testing reconnection on a real iPhone.** Existing installations reconnect once
+to establish the renewable session. Subsequent cold launches and access-token
+expiry recover through the server without opening Google. Missing, expired, or
+revoked grants still offer **Reconnect Google**. Offline logging continues to
+save locally. Reconnect preserves the existing sheet and its sharing. The Picker
+may request a fresh Google browser session when choosing a client's sheet.

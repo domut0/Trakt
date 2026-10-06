@@ -24,7 +24,7 @@ describe("Google sync reconnect notice", () => {
     const reconnect = vi.fn(async () => ({ ok: true as const }));
     useSyncStore.setState({ reauthorize: reconnect });
     render(<GoogleSyncNotice />);
-    expect(screen.getByText("Google sync paused")).toBeInTheDocument();
+    expect(screen.getByText("Reconnect to keep syncing")).toBeInTheDocument();
     expect(reconnect).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Reconnect Google" }));
     await waitFor(() => expect(reconnect).toHaveBeenCalledTimes(1));

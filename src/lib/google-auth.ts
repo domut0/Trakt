@@ -1,71 +1,20 @@
-/**
- * Google sign-in for the Sheets transport.
- *
- * ## One scope, and why it is the whole design
- *
- * `drive.file` means "files this app created". It is a NON-SENSITIVE scope, so
- * it needs no verification review, no privacy policy, and shows no unverified-
- * app warning in production. `spreadsheets` or `drive.readonly` would give
- * broader access and cost weeks of review, so nothing here may ever ask for
- * them. A client's setup being one tap rests entirely on this line.
- *
- * ## The token never touches disk
- *
- * It is a bearer credential with about an hour of life. db.ts already promises
- * that sync credentials stay out of `BackupData` so that sharing a backup does
- * not hand over the sheet; keeping the token in memory only keeps that promise
- * without a second exclusion rule for someone to forget.
- *
- * ## The regression worth knowing about
- *
- * The browser token model issues no refresh token. Obtaining a fresh token uses
- * a Google dialog, even with an empty prompt, so an expired token needs a
- * deliberate tap to reconnect. That is survivable only because
- * logging never waits on sync: an expired token pauses the mirror, it does not
- * touch the app.
- */
-
+/** Google credentials only. Fitness data and sheet configuration never pass through here. */
 export const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
-
 const GIS_SRC = "https://accounts.google.com/gsi/client";
-
-/** Renew this long before expiry, so a sync cannot start on a token that dies mid-flight. */
+const PENDING_LOGOUT_KEY = "trakt_pending_logout";
 const RENEW_MARGIN_MS = 60_000;
-
-/**
- * Nothing here may hang forever.
- *
- * `syncNow` holds a single-flight `running` flag for the length of a cycle, so
- * a promise that never settles does not merely fail -- it wedges sync for the
- * rest of the session, silently, with the UI still reading "syncing". Google
- * Identity Services is a third-party script that can be blocked by an
- * extension, stalled by a captive portal, or loaded into a tab that is then
- * backgrounded, and in none of those cases is either callback guaranteed.
- */
-const GIS_LOAD_TIMEOUT_MS = 15_000;
-
-/** An interactive request waits on a human, but must still settle. */
-const INTERACTIVE_TOKEN_TIMEOUT_MS = 120_000;
-
-/**
- * How recently a token must have been minted to count as "the Google session
- * behind it is live".
- *
- * Only the Picker asks for this (`freshSession`), and only because it is the
- * one flow that does not run on the token alone: it draws a `docs.google.com`
- * iframe that authenticates with the user's Google COOKIES, not with anything
- * we hand it. On WebKit those cookies are partitioned away from the iframe
- * once the storage-access grant lapses -- about a day -- and the Picker then
- * reports the loss as "The API developer key is invalid", which sends whoever
- * reads it to the Cloud Console after a key that was never wrong.
- *
- * Minting a token interactively re-opens accounts.google.com as a first-party
- * window, which is what puts those cookies back. So the Picker refuses to open
- * on a credential old enough that the session behind it may already be gone.
- */
 const FRESH_SESSION_MS = 5 * 60_000;
+const GIS_LOAD_TIMEOUT_MS = 15_000;
+const INTERACTIVE_TIMEOUT_MS = 120_000;
 
-/** Rejects with `reason` if `promise` has not settled in time. */
+export type AuthFailure =
+  | "needs-consent"
+  | "no-client-id"
+  | "script-blocked"
+  | "popup-blocked"
+  | "timeout"
+  | "network"
+  | "missing-refresh-token";
 export function withTimeout<T>(promise: Promise<T>, ms: number, reason: AuthFailure): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(reason)), ms);
@@ -74,313 +23,484 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, reason: AuthFail
         clearTimeout(timer);
         resolve(value);
       },
-      (err: unknown) => {
+      (error) => {
         clearTimeout(timer);
-        reject(err instanceof Error ? err : new Error(String(err)));
+        reject(error);
       },
     );
   });
 }
-
-export type AuthFailure =
-  "needs-consent" | "no-client-id" | "script-blocked" | "popup-blocked" | "timeout";
-
 interface TokenResponse {
   access_token?: string;
   expires_in?: number;
   error?: string;
 }
-
+interface CodeResponse {
+  code?: string;
+  state?: string;
+  error?: string;
+}
 interface TokenClient {
   requestAccessToken: (overrides?: { prompt?: string }) => void;
 }
-
-/** What the caller of an in-flight `requestAccessToken` is waiting on. */
-interface Pending {
-  resolve: (token: string) => void;
-  reject: (err: Error) => void;
+interface CodeClient {
+  requestCode: () => void;
 }
-
 interface GoogleIdentity {
   accounts: {
     oauth2: {
       initTokenClient: (config: {
         client_id: string;
         scope: string;
+        include_granted_scopes?: boolean;
         callback: (response: TokenResponse) => void;
         error_callback?: (error: { type?: string }) => void;
       }) => TokenClient;
+      initCodeClient?: (config: {
+        client_id: string;
+        scope: string;
+        include_granted_scopes: boolean;
+        ux_mode: "popup";
+        state: string;
+        callback: (response: CodeResponse) => void;
+        error_callback: (error: { type?: string }) => void;
+      }) => CodeClient;
     };
   };
 }
-
 declare global {
   interface Window {
     google?: GoogleIdentity;
   }
 }
-
-let cached: { token: string; expiresAt: number; issuedAt: number } | undefined;
-let scriptPromise: Promise<void> | undefined;
-
-/**
- * Only deliberate taps can request a token. Background callers read the cache
- * and never join or start a Google dialog, so they cannot consume a tap's user
- * activation or leave it waiting on a background request.
- * `warmGoogleAuth` prepares this client before the tap.
- */
-interface Slot {
-  client?: TokenClient;
-  /** The request this slot's callbacks belong to, if any. */
-  pending?: Pending;
-  /** The request in flight, so two callers never race the one set of callbacks. */
-  inflight?: Promise<string>;
+interface Credential {
+  token: string;
+  expiresAt: number;
+  browserSessionAt?: number;
 }
-
-const interactiveSlot: Slot = {};
-
-/** A seam, matching `setSyncFetch`. Tests install a fake rather than a global stub. */
+interface SessionResponse {
+  status?: string;
+  accessToken?: string;
+  expiresIn?: number;
+  state?: string;
+  expiresAt?: number;
+  error?: string;
+  ok?: boolean;
+}
+interface Prepared {
+  mode: "persistent" | "legacy";
+  state?: string;
+  expiresAt: number;
+}
+let cached: Credential | undefined;
+let pickerCached: Credential | undefined;
+let scriptPromise: Promise<void> | undefined;
+let preparation: Promise<void> | undefined;
+let prepared: Prepared | undefined;
+let sessionUnavailable = false;
+let generation = 0;
+let pendingLogoutMemory = false;
+let sessionInflight: Promise<SessionResponse> | undefined;
+let logoutInflight: Promise<void> | undefined;
+let interactiveInflight: Promise<string> | undefined;
+let cancelInteractive: (() => void) | undefined;
+let tokenClient: TokenClient | undefined;
+let tokenAnswer: ((response: TokenResponse) => void) | undefined;
+let tokenError: ((error: { type?: string }) => void) | undefined;
+const controllers = new Set<AbortController>();
 type TokenSource = (interactive: boolean) => Promise<string>;
 let tokenSourceImpl: TokenSource | undefined;
 
-function resetSlot(slot: Slot): void {
-  slot.client = undefined;
-  slot.pending = undefined;
-  slot.inflight = undefined;
+export function isPendingLogout(): boolean {
+  try {
+    return pendingLogoutMemory || localStorage.getItem(PENDING_LOGOUT_KEY) === "1";
+  } catch {
+    return pendingLogoutMemory;
+  }
 }
-
-export function setGoogleTokenSource(fn: TokenSource | undefined): void {
-  tokenSourceImpl = fn;
-  cached = undefined;
-  resetSlot(interactiveSlot);
+function markLogout(value: boolean): void {
+  pendingLogoutMemory = value;
+  try {
+    if (value) localStorage.setItem(PENDING_LOGOUT_KEY, "1");
+    else localStorage.removeItem(PENDING_LOGOUT_KEY);
+  } catch {
+    /* Memory still prevents recovery when browser storage is unavailable. */
+  }
 }
-
+/** Forget access in this page. Reauthorization must NOT destroy the durable grant. */
 export function clearGoogleToken(): void {
-  cached = undefined;
+  generation++;
+  cached = pickerCached = undefined;
+  cancelInteractive?.();
+  cancelInteractive = undefined;
+  tokenClient = undefined;
+  tokenAnswer = tokenError = undefined;
+  interactiveInflight = sessionInflight = undefined;
+  preparation = undefined;
+  for (const controller of controllers) controller.abort();
+  controllers.clear();
 }
 
-/** The configured OAuth client id, or undefined when this build has none. */
+/** A Google 401 may arrive before the advertised expiry; retire only that token. */
+export function expireGoogleToken(token: string): void {
+  if (cached?.token === token) cached = undefined;
+}
+export function setGoogleTokenSource(fn: TokenSource | undefined): void {
+  clearGoogleToken();
+  tokenSourceImpl = fn;
+  prepared = preparation = scriptPromise = undefined;
+  logoutInflight = undefined;
+  sessionUnavailable = false;
+  markLogout(false);
+}
+/** The marker remains until deliberate sign-in, including after a successful logout.
+ * A late response in another tab must not silently reconnect this browser. */
+export function disconnectGoogleSession(): Promise<void> {
+  markLogout(true);
+  clearGoogleToken();
+  prepared = undefined;
+  if (tokenSourceImpl) return Promise.resolve();
+  return flushLogout();
+}
+function flushLogout(): Promise<void> {
+  if (logoutInflight) return logoutInflight;
+  const request = sessionPost("/logout").then((data) => {
+    if (!data.ok) throw new Error("network");
+  });
+  logoutInflight = request;
+  void request
+    .finally(() => {
+      if (logoutInflight === request) logoutInflight = undefined;
+    })
+    .catch(() => {});
+  return request;
+}
 export function googleClientId(): string | undefined {
-  const id = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
-  return id && id.length > 0 ? id : undefined;
+  return (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) || undefined;
 }
-
-/**
- * Loads Google Identity Services, once, and only when it is actually needed.
- *
- * Sign-in surfaces may warm it ahead of a tap. Nothing on the path to logging
- * a set may wait on this third-party script.
- */
+async function sessionPost(
+  path = "",
+  body: unknown = {},
+  signal?: AbortSignal,
+): Promise<SessionResponse> {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  controllers.add(controller);
+  try {
+    const response = await withTimeout(
+      (async () => {
+        const result = await fetch(`/api/session${path}`, {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+          redirect: "error",
+          headers: { "Content-Type": "application/json", "X-Trakt-Client": "1" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+        const data = (await result.json()) as SessionResponse;
+        if (!result.ok) {
+          if (data.error === "missing_refresh_token") throw new Error("missing-refresh-token");
+          if (data.error === "needs_consent" || data.error === "invalid_state")
+            throw new Error("needs-consent");
+          throw new Error("network");
+        }
+        return data;
+      })(),
+      15_000,
+      "timeout",
+    );
+    return response;
+  } finally {
+    controller.abort();
+    controllers.delete(controller);
+    signal?.removeEventListener("abort", abort);
+  }
+}
+function checkGeneration(start: number): void {
+  if (start !== generation) throw new Error("needs-consent");
+}
+function credential(data: SessionResponse, browserSession = false): Credential {
+  if (
+    typeof data.accessToken !== "string" ||
+    !data.accessToken ||
+    typeof data.expiresIn !== "number" ||
+    !Number.isFinite(data.expiresIn) ||
+    data.expiresIn <= 60
+  )
+    throw new Error("network");
+  return {
+    token: data.accessToken,
+    expiresAt: Date.now() + data.expiresIn * 1000,
+    browserSessionAt: browserSession ? Date.now() : undefined,
+  };
+}
+async function recoverSession(): Promise<SessionResponse> {
+  if (sessionInflight) return sessionInflight;
+  const start = generation;
+  const request = sessionPost().then((data) => {
+    checkGeneration(start);
+    if (isPendingLogout()) throw new Error("needs-consent");
+    if (data.status === "authenticated") {
+      cached = credential(data);
+      sessionUnavailable = false;
+    } else if (data.status === "unauthenticated" || data.status === "unconfigured")
+      sessionUnavailable = true;
+    else throw new Error("network");
+    return data;
+  });
+  sessionInflight = request;
+  try {
+    return await request;
+  } finally {
+    if (sessionInflight === request) sessionInflight = undefined;
+  }
+}
 function loadGis(): Promise<void> {
+  if (typeof window !== "undefined" && window.google?.accounts?.oauth2) return Promise.resolve();
   if (scriptPromise) return scriptPromise;
   scriptPromise = new Promise<void>((resolve, reject) => {
     if (typeof document === "undefined") return reject(new Error("script-blocked"));
-    if (window.google?.accounts?.oauth2) return resolve();
-    const timer = setTimeout(() => {
-      // Let a later attempt start fresh rather than awaiting a promise that is
-      // never going to settle.
-      scriptPromise = undefined;
-      reject(new Error("script-blocked" satisfies AuthFailure));
-    }, GIS_LOAD_TIMEOUT_MS);
-
     const el = document.createElement("script");
+    const fail = () => {
+      clearTimeout(timer);
+      el.remove();
+      scriptPromise = undefined;
+      reject(new Error("script-blocked"));
+    };
+    const timer = setTimeout(fail, GIS_LOAD_TIMEOUT_MS);
     el.src = GIS_SRC;
     el.async = true;
     el.onload = () => {
       clearTimeout(timer);
-      resolve();
+      if (window.google?.accounts?.oauth2) resolve();
+      else fail();
     };
-    el.onerror = () => {
-      clearTimeout(timer);
-      // Let a later attempt retry: a blocked script is often a network blip or
-      // a content blocker the user can turn off, not a permanent state.
-      scriptPromise = undefined;
-      reject(new Error("script-blocked"));
-    };
+    el.onerror = fail;
     document.head.appendChild(el);
   });
   return scriptPromise;
 }
-
+function ensureTokenClient(): void {
+  if (tokenClient) return;
+  const oauth = window.google?.accounts?.oauth2;
+  if (!oauth) throw new Error("script-blocked");
+  const client = oauth.initTokenClient({
+    client_id: googleClientId()!,
+    scope: DRIVE_FILE_SCOPE,
+    include_granted_scopes: false,
+    callback: (data) => {
+      if (tokenClient === client) tokenAnswer?.(data);
+    },
+    error_callback: (error) => {
+      if (tokenClient === client) tokenError?.(error);
+    },
+  });
+  tokenClient = client;
+}
+async function prepare(): Promise<void> {
+  if (prepared && prepared.expiresAt > Date.now() + INTERACTIVE_TIMEOUT_MS) return;
+  if (preparation) return preparation;
+  const start = generation;
+  const request = (async () => {
+    if (isPendingLogout()) await flushLogout();
+    const [data] = await Promise.all([sessionPost("/state"), loadGis()]);
+    checkGeneration(start);
+    if (data.status === "unconfigured") {
+      prepared = { mode: "legacy", expiresAt: Date.now() + 300_000 };
+      ensureTokenClient();
+    } else if (
+      data.status === "ready" &&
+      typeof data.state === "string" &&
+      typeof data.expiresAt === "number"
+    ) {
+      prepared = { mode: "persistent", state: data.state, expiresAt: data.expiresAt };
+    } else throw new Error("network");
+  })();
+  preparation = request;
+  try {
+    await request;
+  } finally {
+    if (preparation === request) preparation = undefined;
+  }
+}
+/** Prepare the challenge and Google script before a tap; never open a window. */
+export function warmGoogleAuth(): Promise<void> {
+  if (tokenSourceImpl || !googleClientId()) return Promise.resolve();
+  return Promise.all([prepare(), isPendingLogout() ? Promise.resolve() : recoverSession()]).then(
+    () => {},
+    () => {},
+  );
+}
 export interface TokenRequest {
   interactive: boolean;
-  /**
-   * Refuse a cached token old enough that the first-party Google session
-   * behind it may have lapsed, and mint a new one instead. See
-   * `FRESH_SESSION_MS`: only the Picker needs this.
-   */
   freshSession?: boolean;
+  reauthorize?: boolean;
 }
-
-/**
- * An access token, from cache where possible.
- *
- * `interactive: false` is what every background sync passes: it may
- * only use an existing token and fail with `needs-consent` otherwise.
- * Google's token flow opens a dialog even with an empty prompt, so only a
- * deliberate sign-in tap may obtain a fresh token.
- */
-export async function getAccessToken({ interactive, freshSession }: TokenRequest): Promise<string> {
+export async function getAccessToken({
+  interactive,
+  freshSession,
+  reauthorize,
+}: TokenRequest): Promise<string> {
   if (tokenSourceImpl) return tokenSourceImpl(interactive);
-
-  if (cached && cached.expiresAt - RENEW_MARGIN_MS > Date.now()) {
-    if (!freshSession || cached.issuedAt + FRESH_SESSION_MS > Date.now()) return cached.token;
-    // Old enough that the cookies the Picker needs may already be gone. Drop it
-    // so the request below cannot be answered with the same stale credential.
-    cached = undefined;
+  const start = generation;
+  if (!googleClientId()) throw new Error("no-client-id");
+  const usable = freshSession ? (pickerCached ?? cached) : cached;
+  if (
+    !isPendingLogout() &&
+    !reauthorize &&
+    usable &&
+    usable.expiresAt - RENEW_MARGIN_MS > Date.now() &&
+    (!freshSession || (usable.browserSessionAt ?? -Infinity) + FRESH_SESSION_MS > Date.now())
+  )
+    return usable.token;
+  if (!interactive && isPendingLogout()) throw new Error("needs-consent");
+  // A prepared user action must open synchronously, preserving iOS activation.
+  if (
+    interactive &&
+    prepared &&
+    prepared.expiresAt > Date.now() + INTERACTIVE_TIMEOUT_MS &&
+    (reauthorize || freshSession || sessionUnavailable || isPendingLogout())
+  )
+    return requestInteractive(!!freshSession);
+  if (!isPendingLogout() && !reauthorize && !freshSession) {
+    const result = await recoverSession();
+    checkGeneration(start);
+    if (result.status === "authenticated") return cached!.token;
   }
-
-  const clientId = googleClientId();
-  if (!clientId) throw new Error("no-client-id" satisfies AuthFailure);
-
-  // Cache-only: background sync must never invoke the Google dialog API.
-  if (!interactive) throw new Error("needs-consent" satisfies AuthFailure);
-
-  await withTimeout(loadGis(), GIS_LOAD_TIMEOUT_MS, "script-blocked");
-
-  const slot = interactiveSlot;
-  if (!ensureTokenClient(clientId, slot)) throw new Error("script-blocked" satisfies AuthFailure);
-
-  try {
-    return await requestToken(slot);
-  } catch (err) {
-    // One retry, and only for the one failure a retry can actually fix. The
-    // first attempt may have spent its user activation loading the script; by
-    // now everything is in memory and the window opens on the spot. A decline
-    // is not retried - asking twice is the app arguing with an answer.
-    const blocked = err instanceof Error && err.message === "popup-blocked";
-    if (!blocked || !interactive) throw err;
-    return requestToken(slot);
+  if (!interactive) throw new Error("needs-consent");
+  await prepare();
+  checkGeneration(start);
+  return requestInteractive(!!freshSession);
+}
+function requestInteractive(freshSession: boolean): Promise<string> {
+  if (interactiveInflight) return interactiveInflight;
+  const setup = prepared!;
+  // Picker also needs first-party Google cookies. A token minted solely for its
+  // iframe is never combined with the server's existing account credential.
+  const pickerOnly = freshSession && setup.mode === "persistent" && !isPendingLogout();
+  const legacy = setup.mode === "legacy" || pickerOnly;
+  if (!legacy) {
+    // Retire any old-account refresh before the user chooses an account. Keep
+    // background callers (including other tabs) paused until exchange finishes.
+    // Otherwise a slow refresh could overwrite the newly chosen account.
+    markLogout(true);
+    clearGoogleToken();
   }
-}
-
-/**
- * Loads the script and builds the token client before anyone taps anything.
- *
- * Call it wherever sign-in is about to be offered, including Settings and the
- * paused-sync notice. Warming never requests a token or opens a dialog, and
- * logging never waits for it.
- *
- * Deliberately returns nothing and throws nothing. A failure here costs the
- * warm start and no more; the real attempt reports for itself.
- */
-export function warmGoogleAuth(): void {
-  if (tokenSourceImpl) return;
-  const clientId = googleClientId();
-  if (!clientId) return;
-  if (interactiveSlot.client) return;
-  void loadGis()
-    .then(() => {
-      ensureTokenClient(clientId, interactiveSlot);
-    })
-    .catch(() => {
-      // See above: warming is best-effort by design.
-    });
-}
-
-/**
- * A slot's token client, built on first use and kept for the page's life.
- *
- * Its two callbacks are fixed at construction, so they answer whichever request
- * the slot has in flight rather than closing over one -- which is what
- * `slot.pending` is.
- */
-function ensureTokenClient(clientId: string, slot: Slot): TokenClient | undefined {
-  if (slot.client) return slot.client;
-  const oauth2 = window.google?.accounts?.oauth2;
-  if (!oauth2) return undefined;
-
-  const client = oauth2.initTokenClient({
-    client_id: clientId,
-    scope: DRIVE_FILE_SCOPE,
-    callback: (response) => {
-      // A timed-out dialog can answer after another tap. Its callbacks must
-      // never settle the newer request or replace its cached credential.
-      if (slot.client !== client) return;
-      const waiting = slot.pending;
-      slot.pending = undefined;
-      if (!waiting) return;
-      const token = response.access_token;
-      if (response.error || !token) {
-        waiting.reject(new Error("needs-consent" satisfies AuthFailure));
-        return;
-      }
-      const issuedAt = Date.now();
-      cached = { token, issuedAt, expiresAt: issuedAt + (response.expires_in ?? 3600) * 1000 };
-      waiting.resolve(token);
-    },
-    // Fires when the popup is closed or blocked, which the success callback
-    // never reports -- without it an interactive request hangs forever.
-    error_callback: (error) => {
-      if (slot.client !== client) return;
-      const waiting = slot.pending;
-      slot.pending = undefined;
-      if (!waiting) return;
-      // A window the browser refused to open is not a person deciding not to
-      // sign in, and the two used to arrive here as the same error. Only one of
-      // them is worth retrying, and only one of them is the user's fault.
-      const blocked = error?.type === "popup_failed_to_open";
-      waiting.reject(
-        new Error((blocked ? "popup-blocked" : "needs-consent") satisfies AuthFailure),
-      );
-    },
-  });
-  slot.client = client;
-  return slot.client;
-}
-
-/**
- * One request at a time, per slot, and never one that outlives its deadline.
- *
- * THE DEADLINE HAS TO LIVE IN HERE. It used to sit outside, as
- * `withTimeout(requestToken(...))`, which rejected the CALLER and left the
- * request itself in flight forever: GIS had dropped both callbacks, so the
- * inner promise never settled, `.finally` never ran, and `inflight` stayed set
- * for the life of the page. Every later request -- every sync, every tap --
- * was then handed that dead promise and timed out against it. Reloading was
- * the only cure, and in an installed PWA, which is never reloaded, that meant
- * clearing site data. Timing out from inside settles the request, which clears
- * the slot, which lets the next attempt actually be an attempt.
- *
- * The slot's callbacks are shared, so two overlapping requests would both be
- * answered by whichever one the callback happened to find. A second caller gets
- * the first one's promise, which is the answer it was going to get anyway.
- */
-function requestToken(slot: Slot): Promise<string> {
-  if (slot.inflight) return slot.inflight;
-
-  const request = new Promise<string>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      slot.client = undefined;
-      slot.pending = undefined;
-      reject(new Error("timeout" satisfies AuthFailure));
-    }, INTERACTIVE_TOKEN_TIMEOUT_MS);
-
-    slot.pending = {
-      resolve: (token) => {
-        clearTimeout(timer);
-        resolve(token);
-      },
-      reject: (err) => {
-        clearTimeout(timer);
-        reject(err);
-      },
-    };
-
-    try {
-      // Every fresh token uses Google's dialog flow. Background requests are
-      // rejected before this point; this path follows a deliberate sign-in tap.
-      slot.client!.requestAccessToken();
-    } catch {
+  const start = generation;
+  const exchangeController = new AbortController();
+  let finished = false;
+  const promise = new Promise<string>((resolve, reject) => {
+    const finish = (error?: Error, value?: string) => {
+      if (finished) return;
+      finished = true;
+      exchangeController.abort();
       clearTimeout(timer);
-      slot.pending = undefined;
-      reject(new Error("popup-blocked" satisfies AuthFailure));
+      tokenAnswer = tokenError = undefined;
+      if (error) reject(error);
+      else resolve(value!);
+    };
+    const timer = setTimeout(() => {
+      tokenClient = undefined;
+      prepared = undefined;
+      finish(new Error("timeout"));
+    }, INTERACTIVE_TIMEOUT_MS);
+    cancelInteractive = () => finish(new Error("needs-consent"));
+    const fail = (error: { type?: string }) =>
+      finish(new Error(error.type === "popup_failed_to_open" ? "popup-blocked" : "needs-consent"));
+    if (legacy) {
+      try {
+        ensureTokenClient();
+        tokenAnswer = (data) => {
+          if (finished || start !== generation) return;
+          if (data.error || !data.access_token) return finish(new Error("needs-consent"));
+          const value = credential(
+            { accessToken: data.access_token, expiresIn: data.expires_in ?? 3600 },
+            true,
+          );
+          if (pickerOnly) pickerCached = value;
+          else {
+            cached = value;
+            markLogout(false);
+            sessionUnavailable = false;
+          }
+          finish(undefined, value.token);
+        };
+        // Keep the legacy one-retry behavior, without introducing automatic dialogs.
+        let retried = false;
+        tokenError = (error) => {
+          if (error.type === "popup_failed_to_open" && !retried) {
+            retried = true;
+            try {
+              tokenClient!.requestAccessToken();
+            } catch {
+              fail(error);
+            }
+          } else fail(error);
+        };
+        tokenClient!.requestAccessToken();
+      } catch {
+        finish(new Error("popup-blocked"));
+      }
+      return;
     }
-  }).finally(() => {
-    slot.inflight = undefined;
-    slot.pending = undefined;
+    try {
+      const oauth = window.google?.accounts?.oauth2;
+      if (!oauth?.initCodeClient || !setup.state) return finish(new Error("script-blocked"));
+      const client = oauth.initCodeClient({
+        client_id: googleClientId()!,
+        scope: DRIVE_FILE_SCOPE,
+        include_granted_scopes: false,
+        ux_mode: "popup",
+        state: setup.state,
+        callback: (response) => {
+          if (finished || start !== generation) return;
+          if (response.error || !response.code || response.state !== setup.state)
+            return finish(new Error("needs-consent"));
+          prepared = undefined;
+          void sessionPost(
+            "/exchange",
+            { code: response.code, state: response.state },
+            exchangeController.signal,
+          )
+            .then((data) => {
+              if (finished || start !== generation) return;
+              if (data.status !== "authenticated") return finish(new Error("needs-consent"));
+              cached = credential(data, true);
+              markLogout(false);
+              sessionUnavailable = false;
+              finish(undefined, cached.token);
+            })
+            .catch((error) => finish(error instanceof Error ? error : new Error("network")));
+        },
+        error_callback: fail,
+      });
+      client.requestCode();
+    } catch {
+      finish(new Error("popup-blocked"));
+    }
   });
+  interactiveInflight = promise;
+  void promise
+    .finally(() => {
+      if (interactiveInflight === promise) {
+        interactiveInflight = undefined;
+        cancelInteractive = undefined;
+      }
+    })
+    .catch(() => {});
+  return promise;
+}
 
-  slot.inflight = request;
-  return request;
+// Keep already-open tabs from retaining the old account after a disconnect or
+// deliberate reconnect in another tab. The marker contains no credentials.
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key === PENDING_LOGOUT_KEY) {
+      pendingLogoutMemory = event.newValue === "1";
+      clearGoogleToken();
+      prepared = undefined;
+    }
+  });
 }

@@ -11,6 +11,10 @@ describe("background Google sync never launches sign-in", () => {
     vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "test-client-id");
     setGoogleTokenSource(undefined);
     expiresIn = 3600;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ status: "unconfigured" }))),
+    );
     (window as unknown as { google: unknown }).google = {
       accounts: {
         oauth2: {
@@ -31,6 +35,7 @@ describe("background Google sync never launches sign-in", () => {
     setGoogleTokenSource(undefined);
     delete (window as unknown as { google?: unknown }).google;
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 

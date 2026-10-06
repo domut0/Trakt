@@ -94,7 +94,8 @@ export default defineConfig(async ({ command }) => {
         navigateFallback: undefined,
         runtimeCaching: [
           {
-            urlPattern: ({ request }) => request.mode === "navigate",
+            urlPattern: ({ request, url }) =>
+              request.mode === "navigate" && !url.pathname.startsWith("/api/"),
             handler: "NetworkFirst",
             options: {
               cacheName: "pages",

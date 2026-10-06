@@ -1,5 +1,5 @@
 import type { CellValue } from "./csv";
-import { getAccessToken } from "./google-auth";
+import { expireGoogleToken, getAccessToken } from "./google-auth";
 import { SHEET_TABS } from "./sync";
 import type { SyncErrorCode, SyncResponse } from "./sync-protocol";
 
@@ -58,6 +58,7 @@ export function errorForStatus(status: number): SyncErrorCode {
 async function call(
   url: string,
   init: RequestInit & { interactive?: boolean } = {},
+  retried = false,
 ): Promise<{ ok: true; body: unknown } | { ok: false; error: SyncErrorCode }> {
   let token: string;
   try {
@@ -80,6 +81,12 @@ async function call(
         ...(init.headers ?? {}),
       },
     });
+    if (response.status === 401 && !retried) {
+      // Google rejected authorization before performing this operation. Renew
+      // once, silently; never reopen consent or retry a possibly completed write.
+      expireGoogleToken(token);
+      return call(url, { ...init, interactive: false }, true);
+    }
     if (!response.ok) return { ok: false, error: errorForStatus(response.status) };
     return { ok: true, body: (await response.json()) as unknown };
   } catch {

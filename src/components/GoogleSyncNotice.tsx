@@ -21,7 +21,7 @@ export function GoogleSyncNotice() {
     <div className="shrink-0 border-t border-rule bg-surface px-4 py-1">
       <div className="flex items-center justify-between gap-3">
         <span className="t-label text-ink-2" role="status">
-          Google sync paused
+          {busy ? "Connecting to Google…" : "Reconnect to keep syncing"}
         </span>
         <button
           type="button"

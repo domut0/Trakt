@@ -53,17 +53,21 @@ describe("google sign-in", () => {
     // Also clears the cached token, the token client and any in-flight request.
     setGoogleTokenSource(undefined);
     gis = installGis();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ status: "unconfigured" }))),
+    );
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     setGoogleTokenSource(undefined);
     delete (window as unknown as { google?: unknown }).google;
   });
 
   it("builds the token client before the tap, and reuses it on the tap", async () => {
-    warmGoogleAuth();
-    await Promise.resolve();
+    await warmGoogleAuth();
     expect(gis.inits).toBe(1);
 
     gis.answer = (cb) => cb.callback({ access_token: "tok", expires_in: 3600 });
@@ -242,5 +246,24 @@ describe("google sign-in", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("recovers access silently from server session without GIS popup on cold start", async () => {
+    const fetchSpy = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          status: "authenticated",
+          accessToken: "server-recovered-token",
+          expiresIn: 3600,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const token = await getAccessToken({ interactive: false });
+    expect(token).toBe("server-recovered-token");
+    expect(gis.requests).toBe(0); // No GIS popup!
+    expect(fetchSpy).toHaveBeenCalledWith("/api/session", expect.any(Object));
   });
 });

@@ -32,7 +32,12 @@ import { loadDisplayName } from "./tutorial-state";
 import { loadPendingCoach } from "./pending-coach";
 import type { SyncErrorCode, SyncResponse } from "./sync-protocol";
 import { createSpreadsheet, pullTabs, pushTabs } from "./sync-client-google";
-import { clearGoogleToken, getAccessToken, googleClientId } from "./google-auth";
+import {
+  clearGoogleToken,
+  disconnectGoogleSession,
+  getAccessToken,
+  googleClientId,
+} from "./google-auth";
 
 /**
  * Sheet sync state, deliberately in its own store.
@@ -118,8 +123,8 @@ export interface SyncState {
    * an expired-token banner to it would quietly mint a second sheet, strand the
    * one that has the history in it, and break the share the coach is reading.
    *
-   * The browser token model has no refresh token, so a lapsed grant genuinely
-   * needs a tap. This is that tap, and nothing else about the connection moves.
+   * Ordinary expiry renews silently. A missing or revoked persistent grant
+   * needs this deliberate tap; nothing about the sheet connection moves.
    */
   reauthorize: () => Promise<{ ok: boolean; error?: string }>;
   /** True when this build carries an OAuth client id, so the button can exist. */
@@ -355,7 +360,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     // credential and report success.
     clearGoogleToken();
     try {
-      await getAccessToken({ interactive: true });
+      await getAccessToken({ interactive: true, reauthorize: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       // A dismissed Google dialog lands here too, which is not an error worth
@@ -366,12 +371,18 @@ export const useSyncStore = create<SyncState>((set, get) => ({
         error:
           message === "needs-consent"
             ? "Google sign-in was not completed."
-            : "Couldn't reach Google. Check your connection.",
+            : message === "popup-blocked"
+              ? "Sign-in is ready. Tap Reconnect Google again to open it."
+              : message === "missing-refresh-token"
+                ? "Google did not grant a lasting connection. Try reconnecting and approve access. Your existing sheet is unchanged."
+                : "Couldn't reach Google. Your logs are saved on this device. Check your connection and retry.",
       };
     }
 
     // `config` is deliberately untouched. The sheet id, the coach's share and
     // every row in it are all still exactly what they were.
+    if (get().config !== config)
+      return { ok: false, error: "The sheet connection changed. Try again." };
     set({
       status: config.enabled ? "idle" : "off",
       lastError: undefined,
@@ -384,7 +395,9 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   disconnect: async () => {
     // Drop the token as well: leaving it cached would let the next connection
     // reuse a grant the user believes they just ended.
-    clearGoogleToken();
+    // Clear the durable session too. Offline disconnects retain a non-secret
+    // marker that prevents silent recovery when the device reconnects.
+    void disconnectGoogleSession().catch(() => {});
     try {
       await deleteSyncConfig();
       await clearSyncBase();

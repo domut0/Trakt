@@ -83,6 +83,7 @@ describe("the token source seam", () => {
     // the UI still reading "syncing".
     vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "test.apps.googleusercontent.com");
     setGoogleTokenSource(undefined);
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ status: "unconfigured" })));
     vi.useFakeTimers();
 
     const pending = getAccessToken({ interactive: true });

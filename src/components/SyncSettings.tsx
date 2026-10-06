@@ -170,18 +170,13 @@ export function SyncSettings() {
         />
       </div>
 
-      {/* The status line above says "Reconnect to keep syncing", and until now
-          there was nothing on the screen to tap. The instruction was real - a
-          browser Google token has no refresh token, so a lapsed grant genuinely
-          needs one - but the only Reconnect button in this component was on the
-          legacy Apps Script branch, which a normal connection never reaches.
-
-          It calls `reauthorize`, NOT `connectGoogle`. The latter creates a
-          spreadsheet, so the obvious wiring would have made a second sheet and
-          left the one with the history in it behind, along with the coach's
-          share of it. */}
-      {blockedReason === "needs-consent" && (
+      {/* Reconnect an absent/revoked grant while preserving the existing sheet. */}
+      {(blockedReason === "needs-consent" || blockedReason === "popup-blocked") && (
         <div className="group-row-sep space-y-3 px-4 py-4">
+          <p className="t-label text-ink-2">
+            Reconnect once to stay connected between visits. Your existing sheet and logs stay in
+            place.
+          </p>
           {reconnectError && <p className="t-label text-signal">{reconnectError}</p>}
           <button
             type="button"
